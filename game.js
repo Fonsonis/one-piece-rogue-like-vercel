@@ -877,18 +877,25 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
 }
 
 let storyMode = 'classic';
+let sagaViewMode = '3d';
+let currentGlobeFocusIdx = null;
+
 function screenSagas() {
   playMusic('menu');
+  destroyGlobe();
+
   render(`
     ${topbar(false)}
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
     <div class="panel">
-      <h2>Historia</h2>
-      <p>El modo historia es la gran aventura: recorre las islas de cada saga,
-      derrota a los capitanes enemigos y consigue sus emblemas hasta conquistar la saga.
-      Elige Clásico o Nuzlocke, la dificultad y una saga para empezar.</p>
-      <div style="text-align:center;margin-top:8px;">
-        <button class="btn small blue" id="btn-saga-probs-all" style="font-size:8px;">📊 TABLA DE PROBABILIDADES POR SAGA</button>
+      <h2>Historia — El Mundo de One Piece</h2>
+      <p>Elige tu modo, la dificultad y selecciona una saga en el mapa 3D para zarpar.</p>
+      <div class="globe-controls-bar" style="margin-top:10px;">
+        <div style="display:flex;gap:6px;">
+          <button class="btn small ${sagaViewMode === '3d' ? 'gold' : 'gray'}" id="btn-view-3d">🌐 GLOBO 3D</button>
+          <button class="btn small ${sagaViewMode === 'list' ? 'gold' : 'gray'}" id="btn-view-list">📋 VISTA EN LISTA</button>
+        </div>
+        <button class="btn small blue" id="btn-saga-probs-all" style="font-size:8px;">📊 PROBABILIDADES DE SAGAS</button>
       </div>
     </div>
     <div class="tabs">
@@ -908,50 +915,67 @@ function screenSagas() {
         ${DIFFICULTIES.find(d => d.id === selectedDiff)?.desc}
       </div>
     </div>
-    ${SAGAS.map((s, idx) => {
-      const diffWinsMap = (meta.sagaDiffWins && meta.sagaDiffWins[s.id]) || {};
-      const diffWins = Object.keys(diffWinsMap).length;
-      const isSelectedCleared = !!diffWinsMap[selectedDiff];
-      const curDiffName = (DIFFICULTIES.find(d => d.id === selectedDiff) || {}).name;
-      return `
-      <div class="saga-row ${sagaUnlocked(idx) ? '' : 'locked'} ${isSelectedCleared ? 'diff-cleared' : ''}" data-saga="${idx}">
-        <div class="saga-art" style="background:${s.color || '#777'}">
-          <div>${sagaUnlocked(idx) ? '' : '🔒 '}${s.name}</div><small>${s.sub}</small>
-        </div>
-        <div class="saga-stats">
-          ${isSelectedCleared
-            ? `<span class="diff-cleared-tag">⭐ ${curDiffName} SUPERADA</span>`
-            : `<span class="diff-pending-tag">🔒 ${curDiffName} PENDIENTE</span>`}
-          Victorias Clásico <b>${meta.wins[s.id] || 0}</b><br>
-          Victorias Nuzlocke <b>${meta.nuzWins[s.id] || 0}</b><br>
-          Dificultades Superadas <b>${diffWins}/5 ⭐</b>
-          <div class="saga-diff-badges">
-            ${DIFFICULTIES.map(d => {
-              const beaten = !!diffWinsMap[d.id];
-              return `<span class="saga-diff-badge ${beaten ? 'beaten' : ''}" title="${d.name}: ${beaten ? 'Superada ✓' : 'Pendiente'}">
-                ${d.emoji}${beaten ? '✓' : ''}
-              </span>`;
-            }).join('')}
-          </div>
-          <div class="saga-stats-btn-wrap">
-            <button class="btn small gray btn-saga-probs" data-saga="${idx}" style="font-size:7px;padding:3px 6px;">📊 PROBABILIDADES</button>
-          </div>
-        </div>
+
+    ${sagaViewMode === '3d' ? `
+      <div id="globe-canvas-container"></div>
+      <div style="text-align:center;font-size:8px;color:#fff;text-shadow:1px 1px 0 #000;margin-bottom:12px;">
+        🌐 Arrastra vertical u horizontalmente para girar el planeta · Toca un nodo de saga para seleccionar
       </div>
-    `}).join('')}
+    ` : ''}
+
+    <div class="saga-list-container" style="display:${sagaViewMode === 'list' ? 'block' : 'none'};">
+      ${SAGAS.map((s, idx) => {
+        const diffWinsMap = (meta.sagaDiffWins && meta.sagaDiffWins[s.id]) || {};
+        const diffWins = Object.keys(diffWinsMap).length;
+        const isSelectedCleared = !!diffWinsMap[selectedDiff];
+        const curDiffName = (DIFFICULTIES.find(d => d.id === selectedDiff) || {}).name;
+        return `
+        <div class="saga-row ${sagaUnlocked(idx) ? '' : 'locked'} ${isSelectedCleared ? 'diff-cleared' : ''}" data-saga="${idx}">
+          <div class="saga-art" style="background:${s.color || '#777'}">
+            <div>${sagaUnlocked(idx) ? '' : '🔒 '}${s.name}</div><small>${s.sub}</small>
+          </div>
+          <div class="saga-stats">
+            ${isSelectedCleared
+              ? `<span class="diff-cleared-tag">⭐ ${curDiffName} SUPERADA</span>`
+              : `<span class="diff-pending-tag">🔒 ${curDiffName} PENDIENTE</span>`}
+            Victorias Clásico <b>${meta.wins[s.id] || 0}</b><br>
+            Victorias Nuzlocke <b>${meta.nuzWins[s.id] || 0}</b><br>
+            Dificultades Superadas <b>${diffWins}/5 ⭐</b>
+            <div class="saga-diff-badges">
+              ${DIFFICULTIES.map(d => {
+                const beaten = !!diffWinsMap[d.id];
+                return `<span class="saga-diff-badge ${beaten ? 'beaten' : ''}" title="${d.name}: ${beaten ? 'Superada ✓' : 'Pendiente'}">
+                  ${d.emoji}${beaten ? '✓' : ''}
+                </span>`;
+              }).join('')}
+            </div>
+            <div class="saga-stats-btn-wrap">
+              <button class="btn small gray btn-saga-probs" data-saga="${idx}" style="font-size:7px;padding:3px 6px;">📊 PROBABILIDADES</button>
+            </div>
+          </div>
+        </div>
+      `}).join('')}
+    </div>
     <div class="footer-note">Más sagas en camino. ¡Mientras tanto, prueba la Torre Marine!</div>
   `);
-  $('#btn-back').onclick = screenHome;
+
+  $('#btn-back').onclick = () => { destroyGlobe(); screenHome(); };
   $('#tab-classic').onclick = () => { storyMode = 'classic'; screenSagas(); };
   $('#tab-nuz').onclick = () => { storyMode = 'nuzlocke'; screenSagas(); };
+  $('#btn-view-3d').onclick = () => { sagaViewMode = '3d'; screenSagas(); };
+  $('#btn-view-list').onclick = () => { sagaViewMode = 'list'; screenSagas(); };
+
   const allProbsBtn = $('#btn-saga-probs-all');
   if (allProbsBtn) allProbsBtn.onclick = () => showSagaProbabilitiesModal(0);
   document.querySelectorAll('[data-diff]').forEach(btn => {
-    btn.onclick = () => { selectedDiff = +btn.dataset.diff; screenSagas(); };
+    btn.onclick = () => {
+      selectedDiff = +btn.dataset.diff;
+      screenSagas();
+    };
   });
   document.querySelectorAll('.saga-row').forEach(el => {
     const idx = +el.dataset.saga;
-    if (sagaUnlocked(idx)) el.onclick = () => screenStarter(idx);
+    if (sagaUnlocked(idx)) el.onclick = () => { destroyGlobe(); screenStarter(idx); };
   });
   document.querySelectorAll('.btn-saga-probs').forEach(btn => {
     btn.onclick = e => {
@@ -959,6 +983,22 @@ function screenSagas() {
       showSagaProbabilitiesModal(+btn.dataset.saga);
     };
   });
+
+  if (sagaViewMode === '3d') {
+    const globeContainer = $('#globe-canvas-container');
+    if (globeContainer && isThreeAvailable()) {
+      window.onGlobeFocusChange = idx => {
+        currentGlobeFocusIdx = idx;
+      };
+      initOnePieceGlobe(globeContainer, idx => {
+        destroyGlobe();
+        screenStarter(idx);
+      }, currentGlobeFocusIdx);
+    } else if (globeContainer && !isThreeAvailable()) {
+      sagaViewMode = 'list';
+      screenSagas();
+    }
+  }
 }
 
 // ============ LISTAS DE PERSONAJES: FILTRO, ORDEN Y CUADRÍCULA 3x3 ============
