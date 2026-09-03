@@ -59,6 +59,13 @@ function loadMeta() {
     const m = localStorage.getItem(storeKey('oplike_meta'));
     if (m) meta = Object.assign(meta, JSON.parse(m));
   } catch (e) {}
+  if (!meta.totalIslands) {
+    const totalWins = Object.values(meta.wins || {}).reduce((a, b) => a + b, 0) +
+      Object.values(meta.nuzWins || {}).reduce((a, b) => a + b, 0);
+    const rosterCount = (meta.roster || []).length;
+    const dexCount = (meta.dex || []).length;
+    meta.totalIslands = totalWins * 4 + Math.floor(dexCount / 2) + rosterCount;
+  }
 }
 loadMeta();
 
@@ -448,8 +455,8 @@ const ACHIEVEMENTS = [
   { id: 'saga_1', title: 'Conquistador I', emoji: '⚔️', desc: 'Supera 1 saga en cualquier modo.', goal: 1, check: () => totalWinsCount(), fame: 100 },
   { id: 'saga_5', title: 'Conquistador V', emoji: '👑', desc: 'Supera 5 sagas en cualquier modo.', goal: 5, check: () => totalWinsCount(), fame: 300 },
   { id: 'saga_10', title: 'Gran Pirata de Grand Line', emoji: '⚓', desc: 'Supera las 10 sagas principales.', goal: 10, check: () => Object.keys(meta.wins || {}).filter(k => (meta.wins[k] || 0) + (meta.nuzWins[k] || 0) > 0).length, fame: 600 },
-  { id: 'straw_hats', title: 'Los 10 Sombrero de Paja', emoji: '🏴‍☠️', desc: 'Desbloquea a los 10 nakamas principales.', goal: 10, check: () => NAKAMA_STARTERS.filter(id => meta.roster && meta.roster.includes(id)).length, fame: 250 },
-  { id: 'saga_full', title: 'Compendio de Saga', emoji: '📜', desc: 'Consigue a todos los personajes de 1 saga en la Dex.', goal: 1, check: () => hasCompletedAnySagaDex(), fame: 200 },
+  { id: 'straw_hats', title: 'Los 10 Sombrero de Paja', emoji: '🏴‍☠️', desc: 'Desbloquea o recluta a los 10 nakamas principales.', goal: 10, check: () => NAKAMA_STARTERS.filter(id => isNakamaUnlocked(id)).length, fame: 250 },
+  { id: 'saga_full', title: 'Compendio de Saga', emoji: '📜', desc: 'Completa al 100% los personajes de 1 saga en la Dex.', goal: 100, check: () => bestSagaDexProgress(), fame: 200 },
   { id: 'dex_full', title: 'Leyenda Viviente', emoji: '📖', desc: 'Consigue a todos los personajes del juego en la Dex.', goal: Object.keys(CHARS).length, check: () => (meta.dex ? meta.dex.length : 0), fame: 1000 },
   { id: 'tri_naruto', title: 'Trío Shinobi', emoji: '🍥', desc: 'Registra a Naruto, Sasuke y Kakashi en la Dex.', goal: 3, check: () => countInDex(['naruto', 'sasuke', 'kakashi']), fame: 150 },
   { id: 'tri_jjk', title: 'Trío Hechicero', emoji: '👹', desc: 'Registra a Itadori, Yuta y Gojo en la Dex.', goal: 3, check: () => countInDex(['itadori', 'yuta', 'gojo']), fame: 150 },
@@ -464,20 +471,39 @@ function totalWinsCount() {
 }
 
 function countInDex(ids) {
-  return ids.filter(id => meta.dex && meta.dex.includes(id)).length;
+  return ids.filter(id =>
+    (meta.dex && meta.dex.includes(id)) ||
+    (meta.recruited && meta.recruited.includes(id)) ||
+    (meta.roster && meta.roster.includes(id))
+  ).length;
 }
 
-function hasCompletedAnySagaDex() {
+function isNakamaUnlocked(id) {
+  const defaultStarters = ['luffy', 'zoro', 'nami', 'usopp', 'sanji'];
+  if (defaultStarters.includes(id)) return true;
+  if (meta.roster && meta.roster.includes(id)) return true;
+  if (meta.recruited && meta.recruited.includes(id)) return true;
+  if (meta.dex && meta.dex.includes(id)) return true;
+  return false;
+}
+
+function bestSagaDexProgress() {
+  let maxPct = 0;
   for (const s of SAGAS) {
-    const sagaChars = Object.keys(CHARS).filter(id => CHARS[id].saga === s.id);
-    if (sagaChars.length && sagaChars.every(id => meta.dex && meta.dex.includes(id))) {
-      return 1;
-    }
+    const sagaChars = Object.keys(CHARS).filter(id => CHARS[id].saga === s.id && !CHARS[id].boss);
+    if (!sagaChars.length) continue;
+    const inDex = sagaChars.filter(id =>
+      (meta.dex && meta.dex.includes(id)) ||
+      (meta.recruited && meta.recruited.includes(id)) ||
+      (meta.roster && meta.roster.includes(id))
+    ).length;
+    const pct = Math.floor((inDex / sagaChars.length) * 100);
+    if (pct > maxPct) maxPct = pct;
   }
-  return 0;
+  return maxPct;
 }
 
-function showAchievementsModal() {
+function showAchievementsModal(savedScrollTop = 0) {
   meta.claimedAch = meta.claimedAch || {};
   const completedCount = ACHIEVEMENTS.filter(a => a.check() >= a.goal).length;
 
@@ -488,7 +514,7 @@ function showAchievementsModal() {
     <p style="font-size:8px;text-align:center;margin-bottom:12px;color:#666;">
       Completa desafíos en tus aventuras para ganar ⭐ Fama adicional.
     </p>
-    <div style="max-height:360px;overflow-y:auto;">
+    <div class="achieve-list-container" style="max-height:360px;overflow-y:auto;">
       ${ACHIEVEMENTS.map(a => {
         const val = a.check();
         const done = val >= a.goal;
@@ -512,21 +538,43 @@ function showAchievementsModal() {
   </div>`;
   document.body.appendChild(ov);
 
-  ov.querySelector('#ach-close').onclick = () => ov.remove();
+  const container = ov.querySelector('.achieve-list-container');
+  if (container && savedScrollTop) {
+    container.scrollTop = savedScrollTop;
+  }
+
+  const syncFameUI = () => {
+    const shipBtn = $('#btn-ship');
+    if (shipBtn) shipBtn.innerHTML = `🏪 Tienda — ⭐${meta.fame}`;
+    const topAchBtn = $('#btn-top-ach');
+    if (topAchBtn) {
+      const unclaimed = ACHIEVEMENTS.some(ach => ach.check() >= ach.goal && !(meta.claimedAch && meta.claimedAch[ach.id]));
+      topAchBtn.innerHTML = `🏆${unclaimed ? '🔴' : ''}`;
+    }
+  };
+
+  const closeFn = () => {
+    ov.remove();
+    syncFameUI();
+  };
+
+  ov.querySelector('#ach-close').onclick = closeFn;
   ov.querySelectorAll('[data-claim]').forEach(btn => {
     btn.onclick = () => {
+      const st = container ? container.scrollTop : 0;
       const id = btn.dataset.claim;
       const a = ACHIEVEMENTS.find(x => x.id === id);
       if (!a || meta.claimedAch[id] || a.check() < a.goal) return;
       meta.claimedAch[id] = true;
       gainFame(a.fame);
       saveMeta();
+      syncFameUI();
       toast(`🏆 Logro completado: ¡+${a.fame} Fama!`);
       ov.remove();
-      showAchievementsModal();
+      showAchievementsModal(st);
     };
   });
-  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.onclick = e => { if (e.target === ov) closeFn(); };
 }
 
 // ============ LOGIN / REGISTRO ============
@@ -3259,9 +3307,6 @@ const GLOBAL_ITEMS = {
   cartelesplus2: { name: 'Imprenta de carteles II', emoji: '📜', desc: '+4 Carteles de Recluta al zarpar.', cost: 700, lvl: 7, req: 'cartelesplus' },
   carnerealplus:  { name: 'Banquete de Carne Real', emoji: '🍗', desc: 'Comienza la aventura con 2 Carnes Reales 🍗.', cost: 500, lvl: 4 },
   carnerealplus2: { name: 'Banquete del Capitán',   emoji: '🍶', desc: 'Comienza con 2 Carnes Reales 🍗 y 1 Sake 🍶.', cost: 1000, lvl: 8, req: 'carnerealplus' },
-  shipcap1:      { name: 'Capitanía Nivel II',      emoji: '⚓', desc: 'Aumenta el límite de mejora de veteranos a Nv.15.', cost: 800, lvl: 6 },
-  shipcap2:      { name: 'Capitanía Nivel III',     emoji: '⚓', desc: 'Aumenta el límite de mejora de veteranos a Nv.20.', cost: 1500, lvl: 10, req: 'shipcap1' },
-  shipcap3:      { name: 'Capitanía Leyenda',       emoji: '⚓', desc: 'Aumenta el límite de mejora de veteranos a Nv.25.', cost: 3000, lvl: 14, req: 'shipcap2' },
 };
 
 function nextStarterSlotItem() {
@@ -3282,10 +3327,31 @@ function nextStarterSlotItem() {
 }
 
 function maxUpgLvl() {
-  if (meta.global.shipcap3) return 25;
-  if (meta.global.shipcap2) return 20;
-  if (meta.global.shipcap1) return 15;
-  return 10;
+  let tier = meta.global.veteranLimitTier || 0;
+  if (!meta.global.veteranLimitTier) {
+    if (meta.global.shipcap3) tier = 3;
+    else if (meta.global.shipcap2) tier = 2;
+    else if (meta.global.shipcap1) tier = 1;
+  }
+  return 10 + tier * 5;
+}
+
+function nextCapitaniaItem() {
+  const curMax = maxUpgLvl();
+  const nextMax = curMax + 5;
+  const tier = (curMax - 10) / 5;
+  const cost = Math.floor(600 * Math.pow(1.7, tier));
+  const lvlReq = 4 + tier * 2;
+  return {
+    id: `stat_limit_${nextMax}`,
+    curMax,
+    nextMax,
+    name: `Límite de Stats de Veteranos (+5 Nv)`,
+    emoji: '⚓',
+    desc: `Aumenta el límite máximo de entrenamiento de stats en el barco de Nv.${curMax} a Nv.${nextMax}.`,
+    cost,
+    lvl: lvlReq,
+  };
 }
 
 const UPG_STATS = [
@@ -3308,6 +3374,7 @@ function screenShip() {
   const accLvl = accountLevel();
   const maxLvl = maxUpgLvl();
   const nextSlot = nextStarterSlotItem();
+  const nextCap = nextCapitaniaItem();
 
   const availableGlobals = Object.entries(GLOBAL_ITEMS).filter(([id, it]) => {
     if (it.req && !meta.global[it.req]) return false;
@@ -3343,6 +3410,19 @@ function screenShip() {
           : meta.fame >= nextSlot.cost
           ? `<button class="btn small green" id="btn-buy-starter-slot">COMPRAR</button>`
           : `<button class="btn small gray" disabled>COMPRAR</button>`}
+      </div>
+
+      <h2 style="font-size:11px;margin-top:16px;">⚓ Límite de Entrenamiento de Veteranos</h2>
+      <div class="shop-item">
+        <span class="emoji">${nextCap.emoji}</span>
+        <div class="info">
+          <b>${nextCap.name}</b> — <span class="price">⭐${nextCap.cost}</span><br>
+          <small>${nextCap.desc} (Límite actual: Nv.${nextCap.curMax})</small>
+        </div>
+        ${accLvl < nextCap.lvl ? `<span style="font-size:8px;color:#888;">🔒 Cuenta Nv${nextCap.lvl}</span>`
+          : meta.fame >= nextCap.cost
+          ? `<button class="btn small green" id="btn-buy-capitania">COMPRAR (+5 NV)</button>`
+          : `<button class="btn small gray" disabled>COMPRAR (+5 NV)</button>`}
       </div>
 
       <h2 style="font-size:11px;margin-top:16px;">🌍 Añadidos globales</h2>
@@ -3414,6 +3494,20 @@ function screenShip() {
       meta.global.doblestarter = true;
       saveMeta();
       toast(`👥 ¡${nextSlot.name} desbloqueado!`);
+      screenShip();
+    };
+  }
+
+  const buyCapBtn = $('#btn-buy-capitania');
+  if (buyCapBtn) {
+    buyCapBtn.onclick = () => {
+      if (Date.now() - shipBuyLock < 300) return;
+      shipBuyLock = Date.now();
+      if (accLvl < nextCap.lvl || meta.fame < nextCap.cost) return;
+      meta.fame -= nextCap.cost;
+      meta.global.veteranLimitTier = ((maxUpgLvl() - 10) / 5) + 1;
+      saveMeta();
+      toast(`⚓ ¡Límite de entrenamiento ampliado a Nv.${maxUpgLvl()}!`);
       screenShip();
     };
   }

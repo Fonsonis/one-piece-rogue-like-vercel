@@ -3,7 +3,7 @@
   "created": "2026-09-02T15:03:14.874Z",
   "meta": {
     "wins": {
-      "eastblue": 7,
+      "eastblue": 8,
       "alabasta": 2,
       "skypiea": 1,
       "water7": 1,
@@ -514,7 +514,7 @@
       "fujitora"
     ],
     "towerRecord": 32,
-    "fame": 5,
+    "fame": 345,
     "upgrades": {
       "luffy": {
         "atk": 5,
@@ -538,7 +538,7 @@
         "spatk": 4
       }
     },
-    "accXp": 5655,
+    "accXp": 5995,
     "global": {
       "doblestarter": true,
       "berriesplus": true,
@@ -767,11 +767,11 @@
       "wanda"
     ],
     "sagaClears": {
-      "benn": 3,
+      "benn": 4,
       "luffy": 2,
       "zoro": 1,
       "nami": 1,
-      "gojo": 13,
+      "gojo": 14,
       "gin": 1,
       "koushirou": 1,
       "chuu": 1,
@@ -819,7 +819,8 @@
       "suleiman": 1,
       "viola": 1,
       "law": 1,
-      "kyros": 1
+      "kyros": 1,
+      "coby": 1
     },
     "sagaDiffWins": {
       "eastblue": {
@@ -854,9 +855,12 @@
     "claimedAch": {
       "saga_1": true,
       "saga_5": true,
-      "saga_full": true
-    }
+      "saga_full": true,
+      "isl_10": true,
+      "isl_50": true
+    },
+    "totalIslands": 298
   },
-  "saved": "2026-09-03T17:42:56.328Z",
+  "saved": "2026-09-03T18:00:00.985Z",
   "run": null
 }
