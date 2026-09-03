@@ -429,13 +429,104 @@ function typeBadges(types) {
 function berriesHTML(v) { return `฿${v.toLocaleString('es')}`; }
 
 function topbar(showBerries) {
+  const unclaimed = typeof ACHIEVEMENTS !== 'undefined' && ACHIEVEMENTS.some(a => a.check() >= a.goal && !(meta.claimedAch && meta.claimedAch[a.id]));
   return `<div class="topbar">
     <div class="logo">GRAND<span>LINE</span>LIKE</div>
-    <div style="display:flex;align-items:center;gap:10px;">
+    <div style="display:flex;align-items:center;gap:6px;">
       ${showBerries && run ? `<div class="berries">${berriesHTML(run.berries)}</div>` : ''}
+      <button class="btn small gold" id="btn-top-ach" style="padding:6px 8px;font-size:11px;" title="Ver Logros">🏆${unclaimed ? '🔴' : ''}</button>
       <button class="btn small gray" id="btn-mute" style="padding:6px 8px;font-size:12px;" title="Activar/Silenciar música">${isMuted ? '🔇' : '🎵'}</button>
     </div>
   </div>`;
+}
+
+// ============ LOGROS / ACHIEVEMENTS ============
+const ACHIEVEMENTS = [
+  { id: 'isl_10', title: 'Primer Navegante', emoji: '🏝️', desc: 'Recorre al menos 10 islas.', goal: 10, check: () => (meta.totalIslands || 0), fame: 50 },
+  { id: 'isl_50', title: 'Lobo de Mar', emoji: '🗺️', desc: 'Recorre al menos 50 islas.', goal: 50, check: () => (meta.totalIslands || 0), fame: 150 },
+  { id: 'isl_100', title: 'Rey de los Mares', emoji: '🌊', desc: 'Recorre al menos 100 islas.', goal: 100, check: () => (meta.totalIslands || 0), fame: 300 },
+  { id: 'saga_1', title: 'Conquistador I', emoji: '⚔️', desc: 'Supera 1 saga en cualquier modo.', goal: 1, check: () => totalWinsCount(), fame: 100 },
+  { id: 'saga_5', title: 'Conquistador V', emoji: '👑', desc: 'Supera 5 sagas en cualquier modo.', goal: 5, check: () => totalWinsCount(), fame: 300 },
+  { id: 'saga_10', title: 'Gran Pirata de Grand Line', emoji: '⚓', desc: 'Supera las 10 sagas principales.', goal: 10, check: () => Object.keys(meta.wins || {}).filter(k => (meta.wins[k] || 0) + (meta.nuzWins[k] || 0) > 0).length, fame: 600 },
+  { id: 'straw_hats', title: 'Los 10 Sombrero de Paja', emoji: '🏴‍☠️', desc: 'Desbloquea a los 10 nakamas principales.', goal: 10, check: () => NAKAMA_STARTERS.filter(id => meta.roster && meta.roster.includes(id)).length, fame: 250 },
+  { id: 'saga_full', title: 'Compendio de Saga', emoji: '📜', desc: 'Consigue a todos los personajes de 1 saga en la Dex.', goal: 1, check: () => hasCompletedAnySagaDex(), fame: 200 },
+  { id: 'dex_full', title: 'Leyenda Viviente', emoji: '📖', desc: 'Consigue a todos los personajes del juego en la Dex.', goal: Object.keys(CHARS).length, check: () => (meta.dex ? meta.dex.length : 0), fame: 1000 },
+  { id: 'tri_naruto', title: 'Trío Shinobi', emoji: '🍥', desc: 'Registra a Naruto, Sasuke y Kakashi en la Dex.', goal: 3, check: () => countInDex(['naruto', 'sasuke', 'kakashi']), fame: 150 },
+  { id: 'tri_jjk', title: 'Trío Hechicero', emoji: '👹', desc: 'Registra a Itadori, Yuta y Gojo en la Dex.', goal: 3, check: () => countInDex(['itadori', 'yuta', 'gojo']), fame: 150 },
+  { id: 'tri_kimetsu', title: 'Trío Cazador', emoji: '🩸', desc: 'Registra a Tanjiro, Zenitsu e Inosuke en la Dex.', goal: 3, check: () => countInDex(['tanjiro', 'zenitsu', 'inosuke']), fame: 150 },
+  { id: 'tri_db', title: 'Trío Saiyan', emoji: '🐉', desc: 'Registra a Goku, Vegeta y Gohan en la Dex.', goal: 3, check: () => countInDex(['goku', 'vegeta', 'gohan']), fame: 150 },
+  { id: 'tri_opm', title: 'Trío Héroes OPM', emoji: '👊', desc: 'Registra a Genos, Garou y Tatsumaki en la Dex.', goal: 3, check: () => countInDex(['genos', 'garou', 'tatsumaki']), fame: 150 },
+];
+
+function totalWinsCount() {
+  return Object.values(meta.wins || {}).reduce((a, b) => a + b, 0) +
+    Object.values(meta.nuzWins || {}).reduce((a, b) => a + b, 0);
+}
+
+function countInDex(ids) {
+  return ids.filter(id => meta.dex && meta.dex.includes(id)).length;
+}
+
+function hasCompletedAnySagaDex() {
+  for (const s of SAGAS) {
+    const sagaChars = Object.keys(CHARS).filter(id => CHARS[id].saga === s.id);
+    if (sagaChars.length && sagaChars.every(id => meta.dex && meta.dex.includes(id))) {
+      return 1;
+    }
+  }
+  return 0;
+}
+
+function showAchievementsModal() {
+  meta.claimedAch = meta.claimedAch || {};
+  const completedCount = ACHIEVEMENTS.filter(a => a.check() >= a.goal).length;
+
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal" style="max-width:580px;">
+    <h2>🏆 Logros de Pirata (${completedCount}/${ACHIEVEMENTS.length})</h2>
+    <p style="font-size:8px;text-align:center;margin-bottom:12px;color:#666;">
+      Completa desafíos en tus aventuras para ganar ⭐ Fama adicional.
+    </p>
+    <div style="max-height:360px;overflow-y:auto;">
+      ${ACHIEVEMENTS.map(a => {
+        const val = a.check();
+        const done = val >= a.goal;
+        const claimed = !!meta.claimedAch[a.id];
+        const pct = Math.min(100, Math.floor((val / a.goal) * 100));
+        return `<div class="achieve-row ${claimed ? 'done' : ''}">
+          <span class="emoji">${a.emoji}</span>
+          <div class="info">
+            <b>${a.title}</b> — <span style="color:var(--accent);">⭐+${a.fame} Fama</span><br>
+            <small style="color:#555;">${a.desc}</small>
+            <div class="achieve-bar"><i style="width:${pct}%"></i></div>
+            <div style="font-size:7px;color:#666;margin-top:2px;">Progreso: ${val}/${a.goal} (${pct}%)</div>
+          </div>
+          ${claimed ? '<span style="font-size:8px;color:var(--green);font-weight:bold;">✓ RECLAMADO</span>'
+            : done ? `<button class="btn small green" data-claim="${a.id}">RECLAMAR ⭐${a.fame}</button>`
+            : '<span style="font-size:8px;color:#888;">🔒 EN PROGRESO</span>'}
+        </div>`;
+      }).join('')}
+    </div>
+    <div class="actions" style="margin-top:12px;"><button class="btn gray" id="ach-close">CERRAR</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+
+  ov.querySelector('#ach-close').onclick = () => ov.remove();
+  ov.querySelectorAll('[data-claim]').forEach(btn => {
+    btn.onclick = () => {
+      const id = btn.dataset.claim;
+      const a = ACHIEVEMENTS.find(x => x.id === id);
+      if (!a || meta.claimedAch[id] || a.check() < a.goal) return;
+      meta.claimedAch[id] = true;
+      gainFame(a.fame);
+      saveMeta();
+      toast(`🏆 Logro completado: ¡+${a.fame} Fama!`);
+      ov.remove();
+      showAchievementsModal();
+    };
+  });
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
 }
 
 // ============ LOGIN / REGISTRO ============
@@ -499,8 +590,8 @@ function showLoginModal() {
 // ============ PANTALLA: HOME ============
 function screenHome() {
   playMusic('menu');
-  const totalWins = Object.values(meta.wins).reduce((a, b) => a + b, 0) +
-    Object.values(meta.nuzWins).reduce((a, b) => a + b, 0);
+  const totalWins = totalWinsCount();
+  const completedAch = ACHIEVEMENTS.filter(a => a.check() >= a.goal).length;
   render(`
     ${topbar(false)}
     <div class="subtitle">ONE PIECE ROGUELIKE | v1.1</div>
@@ -524,6 +615,7 @@ function screenHome() {
     <div style="text-align:center;margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center;">
       <button class="btn blue" id="btn-dex">📖 Dex Pirata (${meta.dex.length}/${Object.keys(CHARS).length})</button>
       <button class="btn gold" id="btn-ship">🏪 Tienda — ⭐${meta.fame}</button>
+      <button class="btn gold" id="btn-achievements">🏆 Logros (${completedAch}/${ACHIEVEMENTS.length})</button>
       <button class="btn gray" id="btn-guide">📊 Tipos y Sinergias</button>
       ${meta.towerRecord ? `<span style="color:#fff;text-shadow:1px 1px 0 #000;font-size:9px;">Récord Torre: ${meta.towerRecord}</span>` : ''}
     </div>
@@ -549,6 +641,7 @@ function screenHome() {
   if (totalWins) $('#mode-tower').onclick = () => screenTowerIntro();
   $('#btn-dex').onclick = screenDex;
   $('#btn-ship').onclick = screenShip;
+  $('#btn-achievements').onclick = showAchievementsModal;
   $('#btn-guide').onclick = () => showTypeChartModal(run ? run.team : null);
   const loginBtn = $('#btn-login');
   if (loginBtn) loginBtn.onclick = showLoginModal;
@@ -768,17 +861,31 @@ function screenSagas() {
       </div>
     </div>
     ${SAGAS.map((s, idx) => {
-      const diffWins = meta.sagaDiffWins && meta.sagaDiffWins[s.id] ? Object.keys(meta.sagaDiffWins[s.id]).length : 0;
+      const diffWinsMap = (meta.sagaDiffWins && meta.sagaDiffWins[s.id]) || {};
+      const diffWins = Object.keys(diffWinsMap).length;
+      const isSelectedCleared = !!diffWinsMap[selectedDiff];
+      const curDiffName = (DIFFICULTIES.find(d => d.id === selectedDiff) || {}).name;
       return `
-      <div class="saga-row ${sagaUnlocked(idx) ? '' : 'locked'}" data-saga="${idx}">
+      <div class="saga-row ${sagaUnlocked(idx) ? '' : 'locked'} ${isSelectedCleared ? 'diff-cleared' : ''}" data-saga="${idx}">
         <div class="saga-art" style="background:${s.color || '#777'}">
           <div>${sagaUnlocked(idx) ? '' : '🔒 '}${s.name}</div><small>${s.sub}</small>
         </div>
         <div class="saga-stats">
+          ${isSelectedCleared
+            ? `<span class="diff-cleared-tag">⭐ ${curDiffName} SUPERADA</span>`
+            : `<span class="diff-pending-tag">🔒 ${curDiffName} PENDIENTE</span>`}
           Victorias Clásico <b>${meta.wins[s.id] || 0}</b><br>
           Victorias Nuzlocke <b>${meta.nuzWins[s.id] || 0}</b><br>
           Dificultades Superadas <b>${diffWins}/5 ⭐</b>
-          <div style="margin-top:6px;text-align:right;">
+          <div class="saga-diff-badges">
+            ${DIFFICULTIES.map(d => {
+              const beaten = !!diffWinsMap[d.id];
+              return `<span class="saga-diff-badge ${beaten ? 'beaten' : ''}" title="${d.name}: ${beaten ? 'Superada ✓' : 'Pendiente'}">
+                ${d.emoji}${beaten ? '✓' : ''}
+              </span>`;
+            }).join('')}
+          </div>
+          <div class="saga-stats-btn-wrap">
             <button class="btn small gray btn-saga-probs" data-saga="${idx}" style="font-size:7px;padding:3px 6px;">📊 PROBABILIDADES</button>
           </div>
         </div>
@@ -928,31 +1035,57 @@ function selCardHTML(id, veteran, picked, unlocked) {
   </div>`;
 }
 
+function starterSlotsCount() {
+  return Math.max(1, meta.global.starterSlots || (meta.global.doblestarter ? 2 : 1));
+}
+
 function screenStarter(sagaIdx) {
   playMusic('menu');
   const saga = SAGAS[sagaIdx];
   const veterans = meta.roster.filter(id => CHARS[id] && !saga.starters.includes(id));
   const allIds = [...saga.starters, ...veterans];
   starterView.page = 0;
-  // Con "Dúo inicial" comprado se eligen 2 nakamas; si no, 1.
-  let picked = null;
+  const maxSlots = starterSlotsCount();
+  let picked = [];
+
+  const updateSubTitle = () => {
+    const sub = $('#starter-subtitle');
+    if (sub) {
+      sub.textContent = maxSlots === 1
+        ? '¡Elige tu primer nakama!'
+        : `¡Elige a tus ${maxSlots} nakamas iniciales! (${picked.length}/${maxSlots})`;
+    }
+  };
+
   render(`
     ${topbar(false)}
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
-    <div class="subtitle" style="font-size:14px;">¡Elige ${meta.global.doblestarter ? 'a tus 2 primeros nakamas' : 'tu primer nakama'}!</div>
+    <div class="subtitle" id="starter-subtitle" style="font-size:14px;"></div>
     <div class="panel">
       ${charControlsHTML(starterView)}
       <div id="char-grid"></div>
-      <div style="font-size:8px;color:#888;margin-top:8px;text-align:center;">Toca una carta para elegir a tu nakama · ℹ️ para ver su ficha completa.</div>
+      <div style="text-align:center;margin-top:10px;">
+        <button class="btn green" id="btn-zarpar" style="display:${maxSlots > 1 ? 'inline-block' : 'none'};" ${picked.length === maxSlots ? '' : 'disabled'}>
+          🏴‍☠️ ZARPAR CON TU BANDA (${picked.length}/${maxSlots})
+        </button>
+      </div>
+      <div style="font-size:8px;color:#888;margin-top:8px;text-align:center;">Toca las cartas para elegir a tus nakamas · ℹ️ para ver su ficha.</div>
     </div>
   `);
+
+  updateSubTitle();
   $('#btn-back').onclick = screenSagas;
+  const zarparBtn = $('#btn-zarpar');
+  if (zarparBtn) zarparBtn.onclick = () => {
+    if (picked.length === maxSlots) startRun(sagaIdx, picked);
+  };
+
   const update = () => {
     const ids = filterSortChars(allIds, starterView);
     renderCharGrid($('#char-grid'), ids, starterView,
       id => {
         const isUnlocked = id === 'luffy' || (meta.roster && meta.roster.includes(id));
-        return selCardHTML(id, veterans.includes(id), picked === id, isUnlocked);
+        return selCardHTML(id, veterans.includes(id), picked.includes(id), isUnlocked);
       },
       el => {
         el.querySelectorAll('.sel-card').forEach(card => {
@@ -963,17 +1096,28 @@ function screenStarter(sagaIdx) {
               toast('🔒 Personaje bloqueado. ¡Conquista islas/sagas para desbloquearlo!');
               return;
             }
-            if (!meta.global.doblestarter) return startRun(sagaIdx, [id]);
-            if (!picked) {
-              picked = id;
-              card.classList.add('picked');
-              toast('👥 Dúo inicial: elige a tu segundo nakama');
-            } else if (picked === id) {
-              picked = null;
-              card.classList.remove('picked');
+            const idx = picked.indexOf(id);
+            if (idx >= 0) {
+              picked.splice(idx, 1);
             } else {
-              startRun(sagaIdx, [picked, id]);
+              if (picked.length < maxSlots) {
+                picked.push(id);
+              } else if (maxSlots === 1) {
+                picked = [id];
+              } else {
+                toast(`Ya has seleccionado ${maxSlots} nakamas.`);
+                return;
+              }
             }
+            if (maxSlots === 1 && picked.length === 1) {
+              return startRun(sagaIdx, picked);
+            }
+            updateSubTitle();
+            if (zarparBtn) {
+              zarparBtn.disabled = picked.length !== maxSlots;
+              zarparBtn.textContent = `🏴‍☠️ ZARPAR CON TU BANDA (${picked.length}/${maxSlots})`;
+            }
+            update();
           };
         });
         el.querySelectorAll('.info-btn').forEach(btn => {
@@ -993,12 +1137,24 @@ function startLvlOf(id) {
 
 function startRun(sagaIdx, starterIds) {
   const saga = SAGAS[sagaIdx];
+  const items = {
+    cartel: 3 + (meta.global.cartelesplus2 ? 4 : meta.global.cartelesplus ? 2 : 0),
+    carne: 2,
+  };
+  if (meta.global.carnerealplus2) {
+    items.carnereal = 2;
+    items.sake = 1;
+  } else if (meta.global.carnerealplus) {
+    items.carnereal = 2;
+  }
+  const berries = 300 + (meta.global.berriesplus3 ? 700 : meta.global.berriesplus2 ? 400 : meta.global.berriesplus ? 200 : 0);
+
   run = {
     saga: sagaIdx, mode: storyMode, diff: selectedDiff || 1,
     islandIdx: 0,
     team: starterIds.map(id => applyUpgrades(makeChar(id, startLvlOf(id)))),
-    items: { cartel: 3 + (meta.global.cartelesplus ? 2 : 0), carne: 2 },
-    berries: 300 + (meta.global.berriesplus ? 200 : 0),
+    items,
+    berries,
     badges: [],
     map: genMap(saga.islands[0]),
     pos: null,
@@ -3096,10 +3252,41 @@ function towerGameOver() {
 // ============ TIENDA GLOBAL (mejoras + añadidos macro) ============
 // Añadidos macro: se compran con Fama y se desbloquean por nivel de cuenta.
 const GLOBAL_ITEMS = {
-  berriesplus:  { name: 'Fondo de expedición',   emoji: '💰', desc: '+200 Berries al zarpar en cada aventura.', cost: 250, lvl: 2 },
-  cartelesplus: { name: 'Imprenta de carteles',  emoji: '📜', desc: '+2 Carteles de Recluta al zarpar.', cost: 300, lvl: 3 },
-  doblestarter: { name: 'Dúo inicial',           emoji: '👥', desc: 'Zarpa con 2 nakamas iniciales en vez de 1.', cost: 600, lvl: 5 },
+  berriesplus:   { name: 'Fondo de expedición I',   emoji: '💰', desc: '+200 Berries al zarpar en cada aventura.', cost: 250, lvl: 2 },
+  berriesplus2:  { name: 'Fondo de expedición II',  emoji: '💰', desc: '+400 Berries al zarpar.', cost: 600, lvl: 6, req: 'berriesplus' },
+  berriesplus3:  { name: 'Fondo de expedición III', emoji: '💰', desc: '+700 Berries al zarpar.', cost: 1200, lvl: 10, req: 'berriesplus2' },
+  cartelesplus:  { name: 'Imprenta de carteles I',  emoji: '📜', desc: '+2 Carteles de Recluta al zarpar.', cost: 300, lvl: 3 },
+  cartelesplus2: { name: 'Imprenta de carteles II', emoji: '📜', desc: '+4 Carteles de Recluta al zarpar.', cost: 700, lvl: 7, req: 'cartelesplus' },
+  carnerealplus:  { name: 'Banquete de Carne Real', emoji: '🍗', desc: 'Comienza la aventura con 2 Carnes Reales 🍗.', cost: 500, lvl: 4 },
+  carnerealplus2: { name: 'Banquete del Capitán',   emoji: '🍶', desc: 'Comienza con 2 Carnes Reales 🍗 y 1 Sake 🍶.', cost: 1000, lvl: 8, req: 'carnerealplus' },
+  shipcap1:      { name: 'Capitanía Nivel II',      emoji: '⚓', desc: 'Aumenta el límite de mejora de veteranos a Nv.15.', cost: 800, lvl: 6 },
+  shipcap2:      { name: 'Capitanía Nivel III',     emoji: '⚓', desc: 'Aumenta el límite de mejora de veteranos a Nv.20.', cost: 1500, lvl: 10, req: 'shipcap1' },
+  shipcap3:      { name: 'Capitanía Leyenda',       emoji: '⚓', desc: 'Aumenta el límite de mejora de veteranos a Nv.25.', cost: 3000, lvl: 14, req: 'shipcap2' },
 };
+
+function nextStarterSlotItem() {
+  const current = starterSlotsCount();
+  const nextN = current + 1;
+  const cost = 600 * Math.pow(2, nextN - 2);
+  const lvlReq = 5 + (nextN - 2) * 3;
+  const names = ['', '', 'Dúo inicial (2 casillas)', 'Trío inicial (3 casillas)', 'Cuarteto inicial (4 casillas)', 'Quinteto inicial (5 casillas)', 'Sexteto inicial (6 casillas)'];
+  return {
+    id: `starter_slot_${nextN}`,
+    nextN,
+    name: names[nextN] || `Casilla inicial ${nextN}`,
+    emoji: '👥',
+    desc: `Zarpa con ${nextN} nakamas iniciales a la vez en el modo historia.`,
+    cost,
+    lvl: lvlReq,
+  };
+}
+
+function maxUpgLvl() {
+  if (meta.global.shipcap3) return 25;
+  if (meta.global.shipcap2) return 20;
+  if (meta.global.shipcap1) return 15;
+  return 10;
+}
 
 const UPG_STATS = [
   ['hp', 'PS', '+3 PS máx.'],
@@ -3109,15 +3296,30 @@ const UPG_STATS = [
   ['spdef', 'E.DEF', '+1 E.DEF'],
   ['spd', 'VEL', '+1 VEL'],
 ];
-const UPG_MAX = 10;
 let shipBuyLock = 0;
-// Costes por tramos: las 2 primeras compras cuestan ⭐30, las 2 siguientes ⭐60, luego ⭐90...
+let shipSearchQ = '';
+let shipExpanded = {};
+
 function upgCost(lvl) { return (Math.floor(lvl / 2) + 1) * 30; }
 
 function screenShip() {
   playMusic('menu');
   const roster = meta.roster.filter(id => CHARS[id]);
   const accLvl = accountLevel();
+  const maxLvl = maxUpgLvl();
+  const nextSlot = nextStarterSlotItem();
+
+  const availableGlobals = Object.entries(GLOBAL_ITEMS).filter(([id, it]) => {
+    if (it.req && !meta.global[it.req]) return false;
+    return true;
+  });
+
+  const q = (shipSearchQ || '').trim().toLowerCase();
+  const filteredRoster = roster.filter(id => {
+    if (!q) return true;
+    return CHARS[id].name.toLowerCase().includes(q);
+  });
+
   render(`
     ${topbar(false)}
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
@@ -3129,8 +3331,22 @@ function screenShip() {
       <div style="text-align:center;font-size:12px;margin:12px 0;color:var(--accent);">
         ⭐ ${meta.fame} Fama · 👤 Cuenta Nv${accLvl} (${meta.accXp || 0}/${accountNextAt()} PX)
       </div>
-      <h2 style="font-size:11px;">🌍 Añadidos globales</h2>
-      ${Object.entries(GLOBAL_ITEMS).map(([id, it]) => {
+
+      <h2 style="font-size:11px;">👥 Casillas de Nakamas Iniciales</h2>
+      <div class="shop-item">
+        <span class="emoji">${nextSlot.emoji}</span>
+        <div class="info">
+          <b>${nextSlot.name}</b> — <span class="price">⭐${nextSlot.cost}</span><br>
+          <small>${nextSlot.desc} (Actualmente: ${starterSlotsCount()} casillas)</small>
+        </div>
+        ${accLvl < nextSlot.lvl ? `<span style="font-size:8px;color:#888;">🔒 Cuenta Nv${nextSlot.lvl}</span>`
+          : meta.fame >= nextSlot.cost
+          ? `<button class="btn small green" id="btn-buy-starter-slot">COMPRAR</button>`
+          : `<button class="btn small gray" disabled>COMPRAR</button>`}
+      </div>
+
+      <h2 style="font-size:11px;margin-top:16px;">🌍 Añadidos globales</h2>
+      ${availableGlobals.map(([id, it]) => {
         const owned = !!meta.global[id];
         const locked = accLvl < it.lvl;
         const can = !owned && !locked && meta.fame >= it.cost;
@@ -3142,31 +3358,66 @@ function screenShip() {
             : `<button class="btn small ${can ? 'green' : 'gray'}" data-global="${id}" ${can ? '' : 'disabled'}>COMPRAR</button>`}
         </div>`;
       }).join('')}
+
       <h2 style="font-size:11px;margin-top:16px;">⚓ Mi Barco — Entrenamiento de veteranos</h2>
-      ${roster.length ? roster.map(id => {
+      <div style="margin:8px 0;">
+        <input id="ship-search-q" placeholder="🔎 Buscar veterano por nombre..." value="${(shipSearchQ || '').replace(/"/g, '&quot;')}" style="width:100%;padding:8px;border:2px solid var(--ink);font-family:inherit;font-size:9px;background:#fff;">
+      </div>
+      ${filteredRoster.length ? filteredRoster.map(id => {
         const c = CHARS[id];
         const u = meta.upgrades[id] || {};
-        return `<div class="ship-row">
-          <span class="emoji">${charIcon(id, 28)}</span>
-          <div class="ship-name"><b>${c.name}</b>${typeBadges(c.types)}</div>
-          <div class="ship-upgs">
-            ${UPG_STATS.map(([stat, label, desc]) => {
-              const lvl = u[stat] || 0;
-              const cost = upgCost(lvl);
-              const maxed = lvl >= UPG_MAX;
-              const can = !maxed && meta.fame >= cost;
-              return `<div class="upg">
-                <span class="upg-label">${label} ${lvl}/${UPG_MAX}</span>
-                <button class="btn small ${can ? 'green' : 'gray'}" data-up="${id}" data-stat="${stat}"
-                  title="${desc}" ${can ? '' : 'disabled'}>${maxed ? 'MÁX' : `⭐${cost}`}</button>
-              </div>`;
-            }).join('')}
+        const isExpanded = !!shipExpanded[id];
+        const totalStats = UPG_STATS.reduce((acc, [st]) => acc + (u[st] || 0), 0);
+        return `<div class="ship-card-acc">
+          <div class="ship-card-header" data-toggle-ship="${id}">
+            <span class="emoji">${charIcon(id, 28)}</span>
+            <div style="flex:1;">
+              <b>${c.name}</b> ${typeBadges(c.types)}<br>
+              <small style="color:#666;font-size:7px;">Stats mejorados: <b>${totalStats}</b> (Límite: Nv${maxLvl})</small>
+            </div>
+            <button class="btn small gray">${isExpanded ? '▲ CERRAR' : '▼ MEJORAR'}</button>
           </div>
+          ${isExpanded ? `
+            <div class="ship-card-body">
+              <div class="ship-upgs" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:8px;">
+                ${UPG_STATS.map(([stat, label, desc]) => {
+                  const lvl = u[stat] || 0;
+                  const cost = upgCost(lvl);
+                  const maxed = lvl >= maxLvl;
+                  const can = !maxed && meta.fame >= cost;
+                  return `<div class="upg">
+                    <span class="upg-label">${label} ${lvl}/${maxLvl}</span>
+                    <button class="btn small ${can ? 'green' : 'gray'}" data-up="${id}" data-stat="${stat}"
+                      title="${desc}" ${can ? '' : 'disabled'}>${maxed ? 'MÁX' : `⭐${cost}`}</button>
+                  </div>`;
+                }).join('')}
+              </div>
+            </div>
+          ` : ''}
         </div>`;
-      }).join('') : '<p style="text-align:center;font-size:9px;color:#888;">Aún no tienes veteranos.<br>Supera islas con nakamas en tu banda para desbloquearlos.</p>'}
+      }).join('') : '<p style="text-align:center;font-size:9px;color:#888;padding:12px;">No se han encontrado veteranos con ese nombre.</p>'}
     </div>
   `);
+
   $('#btn-back').onclick = screenHome;
+  const searchInput = $('#ship-search-q');
+  if (searchInput) searchInput.oninput = e => { shipSearchQ = e.target.value; screenShip(); };
+
+  const buySlotBtn = $('#btn-buy-starter-slot');
+  if (buySlotBtn) {
+    buySlotBtn.onclick = () => {
+      if (Date.now() - shipBuyLock < 300) return;
+      shipBuyLock = Date.now();
+      if (accLvl < nextSlot.lvl || meta.fame < nextSlot.cost) return;
+      meta.fame -= nextSlot.cost;
+      meta.global.starterSlots = starterSlotsCount() + 1;
+      meta.global.doblestarter = true;
+      saveMeta();
+      toast(`👥 ¡${nextSlot.name} desbloqueado!`);
+      screenShip();
+    };
+  }
+
   document.querySelectorAll('[data-global]').forEach(btn => {
     btn.onclick = () => {
       if (Date.now() - shipBuyLock < 300) return;
@@ -3181,15 +3432,24 @@ function screenShip() {
       screenShip();
     };
   });
+
+  document.querySelectorAll('[data-toggle-ship]').forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.toggleShip;
+      shipExpanded[id] = !shipExpanded[id];
+      screenShip();
+    };
+  });
+
   document.querySelectorAll('[data-up]').forEach(btn => {
     btn.onclick = () => {
-      if (Date.now() - shipBuyLock < 300) return; // evita compras dobles accidentales
+      if (Date.now() - shipBuyLock < 300) return;
       shipBuyLock = Date.now();
       const id = btn.dataset.up, stat = btn.dataset.stat;
       const u = meta.upgrades[id] = meta.upgrades[id] || {};
       const lvl = u[stat] || 0;
       const cost = upgCost(lvl);
-      if (lvl >= UPG_MAX || meta.fame < cost) return;
+      if (lvl >= maxLvl || meta.fame < cost) return;
       meta.fame -= cost;
       u[stat] = lvl + 1;
       saveMeta();
