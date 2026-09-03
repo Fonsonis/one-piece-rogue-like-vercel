@@ -131,6 +131,21 @@ button { font-family: inherit; cursor: pointer; }
 .saga-art small { font-size: 8px; }
 .saga-stats { flex: 1; padding: 10px 14px; font-size: 9px; line-height: 2.1; }
 .saga-stats b { float: right; }
+.saga-stats-btn-wrap { margin-top: 6px; text-align: center; clear: both; }
+
+.saga-row.diff-cleared {
+  border-color: var(--green);
+  box-shadow: 0 0 10px rgba(63, 158, 77, .45);
+}
+.saga-diff-badges {
+  display: flex; gap: 4px; margin-top: 4px; align-items: center; flex-wrap: wrap; clear: both;
+}
+.saga-diff-badge {
+  font-size: 7px; padding: 2px 4px; border: 1px solid var(--ink); background: #eee; color: #888;
+}
+.saga-diff-badge.beaten { background: #dff2df; color: #2e6e3a; border-color: var(--green); }
+.diff-cleared-tag { font-size: 7px; color: var(--green); font-weight: bold; float: right; }
+.diff-pending-tag { font-size: 7px; color: #888; float: right; }
 
 .tabs { display: flex; gap: 8px; margin-bottom: 12px; }
 .tab {
@@ -637,3 +652,27 @@ button, .mode-card, .saga-row, .map-node, .team-slot, .dex-card, .poster, .item-
 }
 .chart-table tr:nth-child(even) td { background: #faf6ec; }
 .chart-table .type-badge { white-space: nowrap; }
+
+/* --- Tienda: acordeón desplegable --- */
+.ship-card-acc {
+  border: 2px solid var(--ink); background: #fff; margin-bottom: 8px; overflow: hidden;
+}
+.ship-card-header {
+  display: flex; align-items: center; gap: 10px; padding: 8px 10px; cursor: pointer; background: var(--paper-dark);
+}
+.ship-card-header:hover { background: #e8ded0; }
+.ship-card-body {
+  padding: 10px; border-top: 2px dashed #999; background: #fff;
+}
+
+/* --- Logros --- */
+.achieve-row {
+  display: flex; align-items: center; gap: 10px; padding: 10px;
+  border: 2px solid var(--ink); background: #fff; margin-bottom: 8px; font-size: 9px;
+}
+.achieve-row.done { background: #eaf7ea; border-color: var(--green); }
+.achieve-row .emoji { font-size: 26px; }
+.achieve-row .info { flex: 1; line-height: 1.6; }
+.achieve-bar { height: 6px; background: #ccc; border: 1px solid var(--ink); margin-top: 4px; }
+.achieve-bar i { display: block; height: 100%; background: var(--green); }
+
