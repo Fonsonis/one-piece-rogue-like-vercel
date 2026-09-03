@@ -1,0 +1,4 @@
+# No publicar el servidor local ni los datos de jugadores (contienen hashes de contraseña)
+server.js
+players/
+.claude/

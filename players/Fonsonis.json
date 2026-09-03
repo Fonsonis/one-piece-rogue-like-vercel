@@ -1,0 +1,491 @@
+{
+  "pass": "e9bcee29fef2656f6f8fb71513ffa9a243afdf83738abc6ad6e92afa9d45cc66",
+  "created": "2026-09-02T15:03:14.874Z",
+  "meta": {
+    "wins": {
+      "eastblue": 1
+    },
+    "nuzWins": {},
+    "dex": [
+      "luffy",
+      "kuina",
+      "piratanovato",
+      "tamanegi",
+      "arlong",
+      "helmeppo",
+      "morgan",
+      "makino",
+      "carnecook",
+      "patty",
+      "mohji",
+      "cabaji",
+      "buggy",
+      "bellemere",
+      "bandido",
+      "piiman",
+      "nami",
+      "coby2",
+      "luffy2",
+      "sham",
+      "kuro",
+      "piratagato",
+      "gin",
+      "pearl",
+      "krieg",
+      "ipponmatsu",
+      "gyojin",
+      "nami2",
+      "genzo",
+      "johnny",
+      "usopp2",
+      "chuu",
+      "kuroobi",
+      "hachi",
+      "zeff",
+      "tashigi",
+      "piratapayaso",
+      "woopslap",
+      "bogard",
+      "marineraso",
+      "smoker",
+      "dorry",
+      "vivi",
+      "kureha",
+      "zoro2",
+      "ninjin",
+      "zoro",
+      "kaya",
+      "viola",
+      "king",
+      "chaka",
+      "teach",
+      "merry",
+      "coby",
+      "usopp",
+      "brogy",
+      "gaimon",
+      "boodle",
+      "cobra",
+      "toto",
+      "yasopp",
+      "sanji",
+      "shyarly",
+      "pell",
+      "kohza",
+      "mikita",
+      "gem"
+    ],
+    "recruited": [
+      "luffy",
+      "kuina",
+      "tamanegi",
+      "arlong",
+      "nami",
+      "johnny",
+      "tashigi",
+      "zoro2",
+      "coby2",
+      "boodle",
+      "cobra",
+      "yasopp",
+      "kohza",
+      "toto"
+    ],
+    "roster": [
+      "kuina",
+      "luffy",
+      "tamanegi",
+      "nami",
+      "johnny",
+      "zoro",
+      "coby"
+    ],
+    "towerRecord": 4,
+    "fame": 55,
+    "upgrades": {
+      "luffy": {
+        "atk": 3,
+        "hp": 1,
+        "def": 1,
+        "spd": 1
+      }
+    },
+    "accXp": 325,
+    "global": {},
+    "defeated": [
+      "piratanovato",
+      "helmeppo",
+      "morgan",
+      "luffy",
+      "makino",
+      "carnecook",
+      "patty",
+      "mohji",
+      "cabaji",
+      "buggy",
+      "bellemere",
+      "bandido",
+      "piiman",
+      "nami",
+      "sham",
+      "kuro",
+      "piratagato",
+      "gin",
+      "pearl",
+      "krieg",
+      "ipponmatsu",
+      "gyojin",
+      "kuina",
+      "genzo",
+      "chuu",
+      "kuroobi",
+      "hachi",
+      "arlong",
+      "zeff",
+      "piratapayaso",
+      "woopslap",
+      "bogard",
+      "marineraso",
+      "tashigi",
+      "smoker",
+      "ninjin",
+      "johnny",
+      "zoro",
+      "kaya",
+      "merry",
+      "coby",
+      "gaimon",
+      "usopp",
+      "toto",
+      "cobra"
+    ],
+    "sagaClears": {},
+    "sagaDiffWins": {}
+  },
+  "saved": "2026-09-03T14:01:25.569Z",
+  "run": {
+    "saga": 0,
+    "mode": "classic",
+    "diff": 1,
+    "islandIdx": 0,
+    "team": [
+      {
+        "id": "luffy",
+        "lvl": 5,
+        "hp": 42,
+        "maxhp": 42,
+        "atk": 19,
+        "def": 11,
+        "spatk": 13,
+        "spdef": 9,
+        "spd": 14,
+        "atkBonus": 3,
+        "defBonus": 1,
+        "spatkBonus": 0,
+        "spdefBonus": 0,
+        "xp": 0,
+        "moves": [
+          "pistolagoma"
+        ],
+        "hpBonus": 3,
+        "spdBonus": 1
+      }
+    ],
+    "items": {
+      "cartel": 3,
+      "carne": 2
+    },
+    "berries": 300,
+    "badges": [],
+    "map": {
+      "rows": [
+        [
+          {
+            "r": 0,
+            "i": 0,
+            "type": "wild",
+            "done": false
+          },
+          {
+            "r": 0,
+            "i": 1,
+            "type": "marine",
+            "done": false
+          },
+          {
+            "r": 0,
+            "i": 2,
+            "type": "wild",
+            "done": false
+          },
+          {
+            "r": 0,
+            "i": 3,
+            "type": "wild",
+            "done": false
+          }
+        ],
+        [
+          {
+            "r": 1,
+            "i": 0,
+            "type": "wild",
+            "done": false
+          },
+          {
+            "r": 1,
+            "i": 1,
+            "type": "wild",
+            "done": false
+          },
+          {
+            "r": 1,
+            "i": 2,
+            "type": "rest",
+            "done": false
+          }
+        ],
+        [
+          {
+            "r": 2,
+            "i": 0,
+            "type": "mystery",
+            "done": false
+          },
+          {
+            "r": 2,
+            "i": 1,
+            "type": "marine",
+            "done": false
+          },
+          {
+            "r": 2,
+            "i": 2,
+            "type": "marine",
+            "done": false
+          },
+          {
+            "r": 2,
+            "i": 3,
+            "type": "shop",
+            "done": false
+          }
+        ],
+        [
+          {
+            "r": 3,
+            "i": 0,
+            "type": "shop",
+            "done": false
+          },
+          {
+            "r": 3,
+            "i": 1,
+            "type": "rest",
+            "done": false
+          },
+          {
+            "r": 3,
+            "i": 2,
+            "type": "wild",
+            "done": false
+          },
+          {
+            "r": 3,
+            "i": 3,
+            "type": "item",
+            "done": false
+          }
+        ],
+        [
+          {
+            "r": 4,
+            "i": 0,
+            "type": "wild",
+            "done": false
+          },
+          {
+            "r": 4,
+            "i": 1,
+            "type": "item",
+            "done": false
+          },
+          {
+            "r": 4,
+            "i": 2,
+            "type": "wild",
+            "done": false
+          },
+          {
+            "r": 4,
+            "i": 3,
+            "type": "rest",
+            "done": false
+          }
+        ],
+        [
+          {
+            "r": 5,
+            "i": 0,
+            "type": "boss",
+            "done": false
+          }
+        ]
+      ],
+      "edges": [
+        [
+          0,
+          0,
+          1,
+          0
+        ],
+        [
+          0,
+          1,
+          1,
+          0
+        ],
+        [
+          0,
+          2,
+          1,
+          1
+        ],
+        [
+          0,
+          3,
+          1,
+          2
+        ],
+        [
+          1,
+          0,
+          2,
+          0
+        ],
+        [
+          1,
+          0,
+          2,
+          1
+        ],
+        [
+          1,
+          1,
+          2,
+          1
+        ],
+        [
+          1,
+          1,
+          2,
+          2
+        ],
+        [
+          1,
+          2,
+          2,
+          2
+        ],
+        [
+          1,
+          1,
+          2,
+          3
+        ],
+        [
+          2,
+          0,
+          3,
+          0
+        ],
+        [
+          2,
+          0,
+          3,
+          1
+        ],
+        [
+          2,
+          1,
+          3,
+          1
+        ],
+        [
+          2,
+          1,
+          3,
+          2
+        ],
+        [
+          2,
+          2,
+          3,
+          2
+        ],
+        [
+          2,
+          2,
+          3,
+          3
+        ],
+        [
+          2,
+          3,
+          3,
+          3
+        ],
+        [
+          3,
+          0,
+          4,
+          0
+        ],
+        [
+          3,
+          1,
+          4,
+          1
+        ],
+        [
+          3,
+          2,
+          4,
+          2
+        ],
+        [
+          3,
+          3,
+          4,
+          3
+        ],
+        [
+          4,
+          0,
+          5,
+          0
+        ],
+        [
+          4,
+          1,
+          5,
+          0
+        ],
+        [
+          4,
+          2,
+          5,
+          0
+        ],
+        [
+          4,
+          3,
+          5,
+          0
+        ]
+      ]
+    },
+    "pos": null,
+    "nuzCaught": {}
+  }
+}
