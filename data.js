@@ -1224,7 +1224,7 @@ const SAGA_DEFS = [
     ['Villa Syrup', ['sham', 'kuro']], ['Baratie', ['gin', 'pearl', 'krieg']],
     ['Arlong Park', ['chuu', 'kuroobi', 'hachi', 'arlong']], ['Loguetown', ['tashigi', 'smoker']],
   ]},
-  { id: 'alabasta', name: 'ALABASTA', color: '#d9a441', islands: [
+  { id: 'alabasta', name: 'ALABASTA', img: 'Images/portada-saga-alabasta.jpg', color: '#d9a441', islands: [
     ['Whiskey Peak', ['mikita', 'gem']], ['Little Garden', ['marianne', 'galdino']],
     ['Isla Drum', ['chess', 'kuromarimo', 'wapol']], ['Rainbase', ['mr4', 'merrychristmas', 'bentham']],
     ['Alubarna', ['paula', 'dazbones', 'crocodile']],
@@ -1333,7 +1333,7 @@ const NAKAMA_STARTERS = ['luffy', 'zoro', 'nami', 'usopp', 'sanji',
   'chopper', 'robin', 'franky', 'brook', 'jinbe'].filter(id => CHARS[id]);
 
 const SAGAS = SAGA_DEFS.map((d, i) => {
-  const startLvl = 4 + i * 5;
+  const startLvl = 5 + i * 6;
   const totalIslands = d.islands.length;
   const mobs = Object.keys(CHARS).filter(id =>
     CHARS[id].saga === d.id && !CHARS[id].boss && !CHARS[id].nakama && !EVOLVED_FORMS.has(id));
@@ -1341,16 +1341,16 @@ const SAGAS = SAGA_DEFS.map((d, i) => {
     CHARS[id].saga === d.id && CHARS[id].nakama && !EVOLVED_FORMS.has(id));
   const pool = [...mobs, ...nakamas]; // los nakamas también aparecen en salvaje
   return {
-    id: d.id, name: d.name, sub: `Saga ${i + 1}`, color: d.color,
+    id: d.id, name: d.name, sub: `Saga ${i + 1}`, img: d.img, color: d.color,
     starters: NAKAMA_STARTERS,
     islands: d.islands.map(([name, bossesRaw], k) => {
       const bosses = bossesRaw.map(b => BOSS_ALIASES[b] || b).filter(b => CHARS[b]);
-      const lvl0 = startLvl + k * 3;
+      const lvl0 = startLvl + k * 4;
       const rowsCount = totalIslands === 1 ? 14 : (6 + Math.min(3, Math.floor(k / 2)));
       return {
         name, boss: bosses,
-        bossLvl: bosses.map((b, j) => lvl0 + 3 + j + CHARS[b].rareza),
-        pool, lvl: [lvl0, lvl0 + 3],
+        bossLvl: bosses.map((b, j) => lvl0 + 4 + j + CHARS[b].rareza),
+        pool, lvl: [lvl0, lvl0 + 4],
         rows: rowsCount,
         singleIslandSaga: totalIslands === 1,
         final: k === d.islands.length - 1,
