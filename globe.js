@@ -22,8 +22,18 @@ function initOnePieceGlobe(containerEl, onSelectSaga, initialFocusIdx = null) {
   const scene = new THREE.Scene();
   scene.fog = new THREE.FogExp2(0x050c1a, 0.01);
 
-  const camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-  camera.position.set(0, 0, 15.5); // Esfera grande y detallada
+  const aspect = width / height;
+  let zoomLevel = 1.0;
+  const baseCamZ = 24.5;
+
+  const updateCameraDistance = () => {
+    const naspect = camera.aspect;
+    const baseZ = naspect < 1 ? baseCamZ / Math.pow(naspect, 0.75) : baseCamZ;
+    camera.position.z = baseZ * zoomLevel;
+  };
+
+  const camera = new THREE.PerspectiveCamera(45, aspect, 0.1, 1000);
+  updateCameraDistance();
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance' });
   renderer.setSize(width, height);
@@ -59,7 +69,7 @@ function initOnePieceGlobe(containerEl, onSelectSaga, initialFocusIdx = null) {
   scene.add(starField);
 
   // ---------- Esfera del Planeta Azul (Textura Fiel al Mapa Oficial OP-MAPS) ----------
-  const radius = 8.8;
+  const radius = 14.5;
   const globeGroup = new THREE.Group();
   scene.add(globeGroup);
 
@@ -253,8 +263,8 @@ function initOnePieceGlobe(containerEl, onSelectSaga, initialFocusIdx = null) {
   globeGroup.add(nodeGroup);
 
   // Longitudes calculadas para coincidir exactamente con el Grand Line oficial
-  // Paraíso (0° a 170°), Cruce Red Line / Gyojin (180°), Nuevo Mundo (190° a 310°)
-  const sagaLongitudes = [0, 36, 72, 108, 144, 168, 185, 220, 260, 300];
+  // Paraíso (0° a 170°), Cruce Red Line / Gyojin (180°), Nuevo Mundo (190° a 325°)
+  const sagaLongitudes = [0, 38, 76, 114, 152, 180, 205, 245, 285, 325];
 
   SAGAS.forEach((s, idx) => {
     const isUnlocked = sagaUnlocked(idx);
@@ -264,16 +274,16 @@ function initOnePieceGlobe(containerEl, onSelectSaga, initialFocusIdx = null) {
 
     const lonDeg = sagaLongitudes[idx] || (idx * 36);
     const lon = (lonDeg * Math.PI) / 180;
-    const lat = Math.sin(idx * 0.8) * 0.15;
+    const lat = Math.sin(idx * 0.9) * 0.22;
 
-    const rPos = radius + 0.35;
+    const rPos = radius + 0.42;
     const x = rPos * Math.cos(lat) * Math.cos(lon);
     const y = rPos * Math.sin(lat);
     const z = rPos * Math.cos(lat) * Math.sin(lon);
 
     const baseColor = isBeaten ? 0x2ec4b6 : isCurrentActive ? 0xff0055 : isUnlocked ? 0xffb703 : 0x555555;
 
-    const nGeo = new THREE.SphereGeometry(0.35, 20, 20);
+    const nGeo = new THREE.SphereGeometry(0.52, 24, 24);
     const nMat = new THREE.MeshStandardMaterial({
       color: baseColor,
       roughness: 0.15,
@@ -287,7 +297,7 @@ function initOnePieceGlobe(containerEl, onSelectSaga, initialFocusIdx = null) {
     nodeGroup.add(nodeMesh);
 
     // Anillo exterior de resplandor
-    const ringGeo = new THREE.RingGeometry(0.42, 0.62, 24);
+    const ringGeo = new THREE.RingGeometry(0.64, 0.94, 24);
     const ringMat = new THREE.MeshBasicMaterial({
       color: baseColor,
       side: THREE.DoubleSide,
@@ -318,7 +328,7 @@ function initOnePieceGlobe(containerEl, onSelectSaga, initialFocusIdx = null) {
   globeGroup.rotation.x = targetRotX;
 
   // ---------- UI Overlays en el Contenedor ----------
-  // 1. Barra de Navegación por Flechas ◀ RETROCEDER / AVANZAR ▶
+  // 1. Barra de Navegación por Flechas ◀ RETROCEDER / AVANZAR ▶ + Control de Zoom
   let navOverlay = containerEl.querySelector('#globe-nav-overlay');
   if (!navOverlay) {
     navOverlay = document.createElement('div');
@@ -351,29 +361,35 @@ function initOnePieceGlobe(containerEl, onSelectSaga, initialFocusIdx = null) {
     const grandLineZone = focusedSagaIdx < 6 ? 'Paraíso 🌊' : focusedSagaIdx === 6 ? 'Cruce Red Line ⚓' : 'Nuevo Mundo ⚡';
 
     navOverlay.innerHTML = `
-      <div style="display:flex;gap:8px;align-items:center;">
-        <button class="btn small gray globe-arrow-btn" id="gnav-prev" ${focusedSagaIdx === 0 ? 'disabled' : ''}>◀ RETROCEDER</button>
-        <button class="btn small gold" id="gnav-active" title="Ir a tu saga activa actual">🎯 MI SAGA (${SAGAS[activeSagaIdx].name})</button>
-        <button class="btn small gray globe-arrow-btn" id="gnav-next" ${focusedSagaIdx === SAGAS.length - 1 ? 'disabled' : ''}>AVANZAR ▶</button>
+      <div class="globe-nav-btns">
+        <button class="btn small gray globe-arrow-btn" id="gnav-prev" ${focusedSagaIdx === 0 ? 'disabled' : ''}>◀ <span class="nav-text">RETROCEDER</span></button>
+        <button class="btn small gold" id="gnav-active" title="Ir a tu saga activa: ${SAGAS[activeSagaIdx].name}">🎯 <span class="nav-text">MI SAGA</span></button>
+        <button class="btn small gray globe-arrow-btn" id="gnav-next" ${focusedSagaIdx === SAGAS.length - 1 ? 'disabled' : ''}><span class="nav-text">AVANZAR </span>▶</button>
       </div>
-      <button class="btn small ${autoReturnEnabled ? 'blue' : 'gray'}" id="gnav-lock" style="font-size:7px;padding:4px 6px;">
-        ${autoReturnEnabled ? '⏱️ RETORNO 3s: SÍ' : '🔒 GIRO LIBRE FIJO'}
-      </button>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <div class="globe-zoom-container">
+          <span style="font-size:9px;color:var(--gold);" title="Zoom del Planeta">🔍</span>
+          <input type="range" id="gnav-zoom-slider" min="0.5" max="1.6" step="0.02" value="${zoomLevel}" class="globe-zoom-slider" title="Desliza para zoom">
+        </div>
+        <button class="btn small ${autoReturnEnabled ? 'blue' : 'gray'}" id="gnav-lock" style="font-size:7px;padding:4px 6px;">
+          ${autoReturnEnabled ? '⏱️ 3s' : '🔒 FIJO'}
+        </button>
+      </div>
     `;
 
     bottomCard.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+      <div class="globe-bottom-card-inner">
         <div style="text-align:left;">
-          <div style="font-size:12px;font-weight:bold;color:${s.color || '#fff'};">
+          <div style="font-size:12px;font-weight:bold;color:${s.color || '#fff'};" class="globe-bottom-title">
             ${unlocked ? '' : '🔒 '}${s.name} <small style="color:#aaa;font-size:8px;">(${grandLineZone} · ${idxToRoman(focusedSagaIdx + 1)} de ${SAGAS.length})</small>
           </div>
           <small style="color:#ccc;font-size:8px;">${s.sub}</small>
-          <div style="font-size:8px;margin-top:4px;">
+          <div style="font-size:8px;margin-top:4px;" class="globe-bottom-meta">
             ${isSelectedCleared
               ? `<span class="diff-cleared-tag" style="display:inline-block;margin-right:6px;">⭐ ${curDiffName} SUPERADA</span>`
               : `<span class="diff-pending-tag" style="display:inline-block;margin-right:6px;">🔒 ${curDiffName} PENDIENTE</span>`}
             ${isCurrentActive ? '<span style="color:var(--accent);font-weight:bold;">📍 TU RUTA ACTUAL</span> · ' : ''}
-            Dificultades Superadas: <b>${Object.keys(diffWinsMap).length}/5 ⭐</b>
+            Dificultades: <b>${Object.keys(diffWinsMap).length}/5 ⭐</b>
           </div>
         </div>
         <div>
@@ -392,6 +408,14 @@ function initOnePieceGlobe(containerEl, onSelectSaga, initialFocusIdx = null) {
       updateUIOverlays();
       toast(autoReturnEnabled ? '⏱️ Retorno automático tras 3s activado' : '🔒 Giro libre fijo');
     };
+
+    const zoomSlider = navOverlay.querySelector('#gnav-zoom-slider');
+    if (zoomSlider) {
+      zoomSlider.oninput = e => {
+        zoomLevel = parseFloat(e.target.value);
+        updateCameraDistance();
+      };
+    }
 
     const enterBtn = bottomCard.querySelector('#gnav-enter');
     if (enterBtn) {
@@ -425,52 +449,83 @@ function initOnePieceGlobe(containerEl, onSelectSaga, initialFocusIdx = null) {
   const mouse = new THREE.Vector2();
 
   let isDragging = false;
+  let dragDistance = 0;
   let prevMousePos = { x: 0, y: 0 };
   let hoveredNode = null;
+  let initialTouchDist = 0;
+  let initialZoomLevel = 1.0;
+
+  const getPos = e => {
+    if (e.touches && e.touches.length > 0) {
+      return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+    return { x: e.clientX || 0, y: e.clientY || 0 };
+  };
 
   const onPointerDown = e => {
+    if (e.touches && e.touches.length === 2) {
+      initialTouchDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      initialZoomLevel = zoomLevel;
+      isDragging = false;
+      return;
+    }
     isDragging = true;
+    dragDistance = 0;
+    const pos = getPos(e);
     lastInteractionTime = Date.now();
-    prevMousePos = { x: e.clientX || e.touches[0].clientX, y: e.clientY || e.touches[0].clientY };
+    prevMousePos = pos;
   };
 
   const onPointerMove = e => {
-    const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
-    const clientY = e.clientY || (e.touches && e.touches[0] ? e.touches[0].clientY : 0);
+    if (e.touches && e.touches.length === 2 && initialTouchDist > 0) {
+      const dist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY);
+      const factor = initialTouchDist / dist;
+      zoomLevel = Math.max(0.5, Math.min(1.6, initialZoomLevel * factor));
+      updateCameraDistance();
+      const slider = containerEl.querySelector('#gnav-zoom-slider');
+      if (slider) slider.value = zoomLevel;
+      return;
+    }
+
+    const pos = getPos(e);
 
     if (isDragging) {
       lastInteractionTime = Date.now();
-      const deltaX = clientX - prevMousePos.x;
-      const deltaY = clientY - prevMousePos.y;
+      const deltaX = pos.x - prevMousePos.x;
+      const deltaY = pos.y - prevMousePos.y;
+      dragDistance += Math.hypot(deltaX, deltaY);
       targetRotY += deltaX * 0.005;
       targetRotX += deltaY * 0.005;
       targetRotX = Math.max(-Math.PI / 2.6, Math.min(Math.PI / 2.6, targetRotX));
-      prevMousePos = { x: clientX, y: clientY };
+      prevMousePos = pos;
     }
 
-    const rect = renderer.domElement.getBoundingClientRect();
-    mouse.x = ((clientX - rect.left) / rect.width) * 2 - 1;
-    mouse.y = -((clientY - rect.top) / rect.height) * 2 + 1;
+    if (!isDragging || dragDistance < 8) {
+      const rect = renderer.domElement.getBoundingClientRect();
+      mouse.x = ((pos.x - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((pos.y - rect.top) / rect.height) * 2 + 1;
 
-    raycaster.setFromCamera(mouse, camera);
-    const hits = raycaster.intersectObjects([...sagaNodes.map(n => n.mesh), planetMesh]);
+      raycaster.setFromCamera(mouse, camera);
+      const hits = raycaster.intersectObjects([...sagaNodes.map(n => n.mesh), planetMesh]);
 
-    if (hits.length > 0 && hits[0].object !== planetMesh) {
-      const hitNode = hits[0].object;
-      if (hoveredNode !== hitNode) {
-        if (hoveredNode) hoveredNode.scale.set(1, 1, 1);
-        hoveredNode = hitNode;
-        hoveredNode.scale.set(1.4, 1.4, 1.4);
-        containerEl.style.cursor = 'pointer';
+      if (hits.length > 0 && hits[0].object !== planetMesh) {
+        const hitNode = hits[0].object;
+        if (hoveredNode !== hitNode) {
+          if (hoveredNode) hoveredNode.scale.set(1, 1, 1);
+          hoveredNode = hitNode;
+          hoveredNode.scale.set(1.4, 1.4, 1.4);
+          containerEl.style.cursor = 'pointer';
+        }
+      } else if (hoveredNode) {
+        hoveredNode.scale.set(1, 1, 1);
+        hoveredNode = null;
+        containerEl.style.cursor = 'grab';
       }
-    } else if (hoveredNode) {
-      hoveredNode.scale.set(1, 1, 1);
-      hoveredNode = null;
-      containerEl.style.cursor = 'grab';
     }
   };
 
   const onPointerUp = () => {
+    initialTouchDist = 0;
     if (isDragging) {
       isDragging = false;
       lastInteractionTime = Date.now();
@@ -478,9 +533,18 @@ function initOnePieceGlobe(containerEl, onSelectSaga, initialFocusIdx = null) {
   };
 
   const onClick = e => {
+    if (dragDistance > 8) return;
     if (!hoveredNode) return;
     const idx = hoveredNode.userData.sagaIdx;
     focusSaga(idx);
+  };
+
+  const onWheel = e => {
+    e.preventDefault();
+    zoomLevel = Math.max(0.5, Math.min(1.6, zoomLevel + e.deltaY * 0.0012));
+    updateCameraDistance();
+    const slider = containerEl.querySelector('#gnav-zoom-slider');
+    if (slider) slider.value = zoomLevel;
   };
 
   const domEl = renderer.domElement;
@@ -491,6 +555,7 @@ function initOnePieceGlobe(containerEl, onSelectSaga, initialFocusIdx = null) {
   domEl.addEventListener('touchstart', onPointerDown, { passive: true });
   domEl.addEventListener('touchmove', onPointerMove, { passive: true });
   window.addEventListener('touchend', onPointerUp);
+  domEl.addEventListener('wheel', onWheel, { passive: false });
 
   domEl.addEventListener('click', onClick);
 
@@ -500,6 +565,7 @@ function initOnePieceGlobe(containerEl, onSelectSaga, initialFocusIdx = null) {
     const nw = containerEl.clientWidth || 600;
     const nh = containerEl.clientHeight || 480;
     camera.aspect = nw / nh;
+    updateCameraDistance();
     camera.updateProjectionMatrix();
     renderer.setSize(nw, nh);
   };
