@@ -579,6 +579,162 @@ function screenHome() {
 const sagaUnlocked = i => i === 0 ||
   ((meta.wins[SAGAS[i - 1].id] || 0) + (meta.nuzWins[SAGAS[i - 1].id] || 0)) > 0;
 
+// ============ MODAL: TABLA DE PROBABILIDADES POR SAGA ============
+let currentProbSagaIdx = 0;
+let currentProbTab = 'wild';
+
+function showSagaProbabilitiesModal(initialSagaIdx = 0) {
+  currentProbSagaIdx = initialSagaIdx;
+  currentProbTab = 'wild';
+
+  const renderModalContent = () => {
+    const s = SAGAS[currentProbSagaIdx];
+    if (!s) return '';
+
+    // 1. Wild Pool
+    const wildPool = (s.islands && s.islands[0] && s.islands[0].pool) || [];
+    const wildPct = wildPool.length ? (100 / wildPool.length) : 0;
+
+    // 2. Bosses (por isla)
+    const islandBosses = s.islands.map(isl => ({
+      name: isl.name,
+      bosses: (isl.boss || []).filter(b => CHARS[b])
+    }));
+
+    // 3. Mercado Clandestino (Carteles SE BUSCA)
+    const weights = [5, 4, 3, 2, 1];
+    const totalWeight = 15;
+    const gachaTiers = [1, 2, 3, 4, 5].map(r => {
+      const pool = sagaPoolByRareza(s.id, r);
+      const pct = (weights[r - 1] / totalWeight) * 100;
+      const each = pool.length ? (pct / pool.length) : 0;
+      return { rareza: r, pct, pool, each };
+    });
+
+    let tabHTML = '';
+    if (currentProbTab === 'wild') {
+      const rows = wildPool.map(id => {
+        const c = CHARS[id];
+        return `<tr>
+          <td style="white-space:nowrap;">${charIcon(id, 20)} <b>${c.name}</b></td>
+          <td>${'⭐'.repeat(c.rareza)}</td>
+          <td>${typeBadges(c.types)}</td>
+          <td><b>${wildPct.toFixed(2)}%</b></td>
+        </tr>`;
+      }).join('');
+      tabHTML = `
+        <div style="font-size:8px;line-height:1.7;margin-bottom:8px;color:#555;">
+          Aparición en nodos de piratas salvajes 🏴‍☠️ y marines ⚓ durante el viaje.<br>
+          <b>${wildPool.length}</b> personajes en el pool salvaje (${wildPct.toFixed(2)}% por slot de enemigo).
+        </div>
+        <div style="max-height:280px;overflow-y:auto;border:1px solid var(--ink);">
+          <table class="chart-table">
+            <thead><tr><th>Personaje</th><th>Rareza</th><th>Tipos</th><th>Prob. Slot</th></tr></thead>
+            <tbody>${rows || '<tr><td colspan="4" style="text-align:center;">Sin datos</td></tr>'}</tbody>
+          </table>
+        </div>`;
+    } else if (currentProbTab === 'boss') {
+      const rows = islandBosses.map(ib => {
+        const bossesHTML = ib.bosses.map(id => {
+          const c = CHARS[id];
+          return `${charIcon(id, 20)} <b>${c.name}</b> ${'⭐'.repeat(c.rareza)}`;
+        }).join('<br>');
+        return `<tr>
+          <td><b>${ib.name}</b></td>
+          <td>${bossesHTML || 'Sin jefe'}</td>
+          <td><b>100%</b> <small style="color:#666;">(Nodo 💀)</small></td>
+        </tr>`;
+      }).join('');
+      tabHTML = `
+        <div style="font-size:8px;line-height:1.7;margin-bottom:8px;color:#555;">
+          Capitanes y villanos que aparecen de forma garantizada al final de cada isla.
+        </div>
+        <div style="max-height:280px;overflow-y:auto;border:1px solid var(--ink);">
+          <table class="chart-table">
+            <thead><tr><th>Isla</th><th>Jefe(s)</th><th>Probabilidad</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    } else if (currentProbTab === 'gacha') {
+      const rows = gachaTiers.map(t => {
+        const poolHTML = t.pool.map(id => `${CHARS[id].name} <span style="color:#888;">(${t.each.toFixed(2)}%)</span>`).join(' · ');
+        return `<tr>
+          <td style="white-space:nowrap;">${'⭐'.repeat(t.rareza)}</td>
+          <td><b>${t.pct.toFixed(1)}%</b></td>
+          <td style="font-size:7px;line-height:1.9;">${poolHTML}</td>
+        </tr>`;
+      }).join('');
+      tabHTML = `
+        <div style="font-size:8px;line-height:1.7;margin-bottom:8px;color:#555;">
+          Probabilidades de los 5 Carteles SE BUSCA en el Mercado Clandestino 🌟.
+        </div>
+        <div style="max-height:280px;overflow-y:auto;border:1px solid var(--ink);">
+          <table class="chart-table">
+            <thead><tr><th>Cartel / Rareza</th><th>Prob. Cartel</th><th>Personajes posibles (prob. ind.)</th></tr></thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    }
+
+    return `
+      <h2>📊 Probabilidades: ${s.name}</h2>
+      <div style="display:flex;justify-content:center;margin-bottom:10px;">
+        <select id="spm-saga-sel" style="font-family:inherit;font-size:9px;padding:6px 10px;border:2px solid var(--ink);background:#fff;">
+          ${SAGAS.map((sg, i) => `<option value="${i}" ${i === currentProbSagaIdx ? 'selected' : ''}>${sg.sub}: ${sg.name}</option>`).join('')}
+        </select>
+      </div>
+      <div class="tabs" style="margin-bottom:10px;">
+        <div class="tab ${currentProbTab === 'wild' ? 'active' : ''}" id="spm-tab-wild">🏴‍☠️ SALVAJES (${wildPool.length})</div>
+        <div class="tab ${currentProbTab === 'boss' ? 'active' : ''}" id="spm-tab-boss">💀 JEFES</div>
+        <div class="tab ${currentProbTab === 'gacha' ? 'active' : ''}" id="spm-tab-gacha">🎰 MERCADO</div>
+      </div>
+      ${tabHTML}
+      <div class="actions" style="margin-top:12px;"><button class="btn gray" id="spm-close">CERRAR</button></div>
+    `;
+  };
+
+  const existingOverlay = document.querySelector('#saga-prob-overlay');
+  if (existingOverlay) existingOverlay.remove();
+
+  const ov = document.createElement('div');
+  ov.id = 'saga-prob-overlay';
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal" style="max-width:580px;">${renderModalContent()}</div>`;
+  document.body.appendChild(ov);
+
+  const bindEvents = () => {
+    const sel = ov.querySelector('#spm-saga-sel');
+    if (sel) sel.onchange = e => {
+      currentProbSagaIdx = +e.target.value;
+      ov.querySelector('.modal').innerHTML = renderModalContent();
+      bindEvents();
+    };
+    const twild = ov.querySelector('#spm-tab-wild');
+    if (twild) twild.onclick = () => {
+      currentProbTab = 'wild';
+      ov.querySelector('.modal').innerHTML = renderModalContent();
+      bindEvents();
+    };
+    const tboss = ov.querySelector('#spm-tab-boss');
+    if (tboss) tboss.onclick = () => {
+      currentProbTab = 'boss';
+      ov.querySelector('.modal').innerHTML = renderModalContent();
+      bindEvents();
+    };
+    const tgacha = ov.querySelector('#spm-tab-gacha');
+    if (tgacha) tgacha.onclick = () => {
+      currentProbTab = 'gacha';
+      ov.querySelector('.modal').innerHTML = renderModalContent();
+      bindEvents();
+    };
+    const cbtn = ov.querySelector('#spm-close');
+    if (cbtn) cbtn.onclick = () => ov.remove();
+  };
+
+  bindEvents();
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+}
+
 let storyMode = 'classic';
 function screenSagas() {
   playMusic('menu');
@@ -590,6 +746,9 @@ function screenSagas() {
       <p>El modo historia es la gran aventura: recorre las islas de cada saga,
       derrota a los capitanes enemigos y consigue sus emblemas hasta conquistar la saga.
       Elige Clásico o Nuzlocke, la dificultad y una saga para empezar.</p>
+      <div style="text-align:center;margin-top:8px;">
+        <button class="btn small blue" id="btn-saga-probs-all" style="font-size:8px;">📊 TABLA DE PROBABILIDADES POR SAGA</button>
+      </div>
     </div>
     <div class="tabs">
       <div class="tab ${storyMode === 'classic' ? 'active' : ''}" id="tab-classic">CLÁSICO</div>
@@ -619,6 +778,9 @@ function screenSagas() {
           Victorias Clásico <b>${meta.wins[s.id] || 0}</b><br>
           Victorias Nuzlocke <b>${meta.nuzWins[s.id] || 0}</b><br>
           Dificultades Superadas <b>${diffWins}/5 ⭐</b>
+          <div style="margin-top:6px;text-align:right;">
+            <button class="btn small gray btn-saga-probs" data-saga="${idx}" style="font-size:7px;padding:3px 6px;">📊 PROBABILIDADES</button>
+          </div>
         </div>
       </div>
     `}).join('')}
@@ -627,12 +789,20 @@ function screenSagas() {
   $('#btn-back').onclick = screenHome;
   $('#tab-classic').onclick = () => { storyMode = 'classic'; screenSagas(); };
   $('#tab-nuz').onclick = () => { storyMode = 'nuzlocke'; screenSagas(); };
+  const allProbsBtn = $('#btn-saga-probs-all');
+  if (allProbsBtn) allProbsBtn.onclick = () => showSagaProbabilitiesModal(0);
   document.querySelectorAll('[data-diff]').forEach(btn => {
     btn.onclick = () => { selectedDiff = +btn.dataset.diff; screenSagas(); };
   });
   document.querySelectorAll('.saga-row').forEach(el => {
     const idx = +el.dataset.saga;
     if (sagaUnlocked(idx)) el.onclick = () => screenStarter(idx);
+  });
+  document.querySelectorAll('.btn-saga-probs').forEach(btn => {
+    btn.onclick = e => {
+      e.stopPropagation();
+      showSagaProbabilitiesModal(+btn.dataset.saga);
+    };
   });
 }
 
@@ -1401,14 +1571,12 @@ function showCharModal(fOrId) {
 // o jugar a los 5 carteles de SE BUSCA: se destapan en orden y el número
 // de cartel donde aparece el pirata marca su rareza (1º = 1⭐ ... 5º = 5⭐).
 // El primer cartel es el más probable; cada uno siguiente lo es menos.
-// Solo formas base de la saga actual (evita conseguir personajes rotos de otras sagas)
-const basePirateIds = () => {
-  const sagaId = SAGAS[run.saga].id;
-  return Object.keys(CHARS).filter(id => !BASE_OF[id] && CHARS[id].saga === sagaId);
-};
-// Cartel de rareza r: personajes de esa rareza en la saga; si no hay, la más cercana
-const poolByRareza = r => {
-  const ids = basePirateIds();
+// Formas base por id de saga
+const sagaBasePirateIds = sagaId => Object.keys(CHARS).filter(id => !BASE_OF[id] && CHARS[id].saga === sagaId);
+
+// Cartel de rareza r en una saga determinada; si no hay, la más cercana
+const sagaPoolByRareza = (sagaId, r) => {
+  const ids = sagaBasePirateIds(sagaId);
   for (let d = 0; d <= 4; d++) {
     for (const rr of [r - d, r + d]) {
       const pool = ids.filter(id => CHARS[id].rareza === rr);
@@ -1417,6 +1585,11 @@ const poolByRareza = r => {
   }
   return ids;
 };
+
+// Solo formas base de la saga actual en partida (evita conseguir personajes rotos de otras sagas)
+const basePirateIds = () => sagaBasePirateIds(SAGAS[run.saga].id);
+// Cartel de rareza r en la saga actual
+const poolByRareza = r => sagaPoolByRareza(SAGAS[run.saga].id, r);
 const hirePrice = c => c.rareza * c.rareza * 250; // precio elevado por elegir a dedo
 
 function specialBlockedReason() {
