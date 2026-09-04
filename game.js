@@ -1543,7 +1543,7 @@ function screenSagas() {
               <div class="saga-lock-banner">
                 🔒 SAGA BLOQUEADA<br>
                 <span style="font-weight:normal;font-size:8.5px;color:#ffeaad;">
-                  Requisito: Supera <b>${SAGAS[idx - 1].name}</b> en Dificultad <b>⚔️ Capitán (3/5)</b> o superior.
+                  Debes completar la Dificultad <b>⚔️ Capitán</b> de la saga anterior (<b>${SAGAS[idx - 1].name}</b>).
                 </span>
               </div>` : `
               <div>
@@ -1617,7 +1617,7 @@ function screenSagas() {
     const s = SAGAS[idx];
     el.onclick = () => {
       if (!sagaUnlocked(idx)) {
-        toast(`🔒 Supera ${SAGAS[idx - 1].name} en Dificultad Capitán (3/5) primero.`);
+        toast(`🔒 Saga bloqueada. Debes completar la Dificultad Capitán de ${SAGAS[idx - 1].name}.`);
         return;
       }
       if (!sagaDiffUnlocked(s.id, selectedDiff)) {
@@ -1797,8 +1797,8 @@ function showInventoryModal(opts = {}) {
     return `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
         <h2 style="margin:0;font-size:12px;color:var(--sea);">${title}</h2>
-        <div style="font-size:9.5px;font-weight:bold;color:var(--gold);background:var(--ink);padding:3px 8px;border-radius:4px;border:1px solid var(--gold);">
-          🧭 Log Poses: ${meta.logPoses || 0}
+        <div id="inv-logpose-info" style="font-size:9.5px;font-weight:bold;color:var(--gold);background:var(--ink);padding:3px 8px;border-radius:4px;border:1px solid var(--gold);cursor:pointer;" title="Toca para saber más sobre los Log Poses">
+          🧭 Log Poses: ${meta.logPoses || 0} ℹ️
         </div>
         <button class="btn gray small" id="inv-close-x" style="padding:2px 6px;font-size:9px;">✕</button>
       </div>
@@ -1850,6 +1850,21 @@ function showInventoryModal(opts = {}) {
   };
 
   const bindEvents = () => {
+    const logPoseBtn = ov.querySelector('#inv-logpose-info');
+    if (logPoseBtn) {
+      logPoseBtn.onclick = () => {
+        modalInfo(
+          '🧭 Log Poses de Navegación',
+          `<div style="font-size:8.5px;line-height:1.5;color:#333;text-align:left;padding:4px;">
+            Los <b>Log Poses 🧭</b> son brujulas de navegación de Grand Line que obtienes al derrotar enemigos durante tu travesía en el modo Historia.<br><br>
+            • <b>¿Para qué sirven?</b> Se consumen para entrenar y <b>subir de nivel base permanente</b> a tus nakamas desde este inventario.<br>
+            • <b>Recompensas en combate:</b> Obtienes de 1 a 3 Log Poses por enemigo vencido (y más en combates de jefes).<br>
+            • <b>Coste incremental:</b> Cuanto mayor sea el nivel de un nakama, más Log Poses necesitarás para subirlo al siguiente nivel (hasta el límite de tu saga actual).
+          </div>`
+        );
+      };
+    }
+
     const qInput = ov.querySelector('#inv-q');
     if (qInput) qInput.oninput = e => {
       invViewState.q = e.target.value;
@@ -2257,7 +2272,7 @@ function screenMap() {
         <div class="map-title">📍 SAGA: <b>${saga.name}</b> · Isla ${run.islandIdx + 1}/${saga.islands.length}: <b>${island.name}</b> (${run.mode === 'nuzlocke' ? 'NUZLOCKE' : 'CLÁSICO'})</div>
         <svg class="map-svg">${edgesHTML}</svg>
         ${nodesHTML}
-        <div style="position:absolute;top:42px;right:10px;z-index:20;">
+        <div style="position:absolute;top:42px;left:10px;z-index:20;">
           <button class="btn gold small" id="btn-map-reroll" ${rerollUsed ? 'disabled' : ''} style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
             Reroll x${rerollUsed ? 0 : 1}
           </button>
