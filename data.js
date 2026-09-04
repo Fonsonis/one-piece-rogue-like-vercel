@@ -1338,10 +1338,10 @@ const SAGAS = SAGA_DEFS.map((d, i) => {
   const startLvl = Math.round(8 + 7 * i + (i >= 3 ? Math.pow(i - 2, 2.2) * 2.2 : 0));
   const totalIslands = d.islands.length;
   const mobs = Object.keys(CHARS).filter(id =>
-    CHARS[id].saga === d.id && !CHARS[id].boss && !CHARS[id].nakama && !EVOLVED_FORMS.has(id));
+    CHARS[id].saga === d.id && (!CHARS[id].boss || CHARS[id].rareza === 5) && !CHARS[id].nakama && !EVOLVED_FORMS.has(id));
   const nakamas = Object.keys(CHARS).filter(id =>
     CHARS[id].saga === d.id && CHARS[id].nakama && !EVOLVED_FORMS.has(id));
-  const pool = [...mobs, ...nakamas]; // los nakamas también aparecen en salvaje
+  const pool = [...new Set([...mobs, ...nakamas])]; // los nakamas y legendarios 5⭐ también aparecen en salvaje
   return {
     id: d.id, name: d.name, sub: `Saga ${i + 1}`, img: d.img, color: d.color,
     starters: NAKAMA_STARTERS,
