@@ -223,7 +223,7 @@ button { font-family: inherit; cursor: pointer; }
 .starter-desc { font-size: 8px; color: #555; line-height: 1.6; min-height: 40px; }
 
 /* --- Mapa --- */
-.map-wrap { display: flex; flex-direction: column; gap: 12px; align-items: stretch; }
+.map-wrap { display: flex; flex-direction: column; gap: 12px; align-items: stretch; margin-top: 14px; }
 .side-panel { width: 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 10px; }
 .side-panel .panel { padding: 10px; }
 .side-panel h3 { font-size: 10px; color: var(--red); margin-bottom: 8px; }
@@ -251,7 +251,7 @@ button { font-family: inherit; cursor: pointer; }
 .map-board {
   flex: 1; position: relative; border: 3px solid var(--ink); box-shadow: var(--shadow);
   background: url('Images/fondo-mapa.jpg') center center / cover no-repeat;
-  min-height: 520px; overflow: hidden;
+  min-height: 650px; overflow: hidden;
 }
 .map-title {
   position: absolute; top: 0; left: 0; right: 0; text-align: center;
@@ -628,7 +628,13 @@ button { font-family: inherit; cursor: pointer; }
 .pick-row .emoji { font-size: 20px; }
 .pick-row .info { flex: 1; line-height: 1.6; }
 
-.back-btn { margin-bottom: 12px; }
+.back-btn {
+  position: sticky;
+  top: 10px;
+  z-index: 100;
+  margin-bottom: 12px;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+}
 
 .toast {
   position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -673,6 +679,7 @@ button { font-family: inherit; cursor: pointer; }
   #app { padding: 10px; }
   .logo { font-size: 18px; }
   .topbar { margin-bottom: 10px; }
+  .back-btn { top: 8px; }
   .floating-controls { top: 8px; right: 8px; gap: 4px; }
   .floating-controls .btn { padding: 4px 6px; font-size: 7.5px; }
   .floating-berries { top: 38px; left: 8px; }
@@ -703,7 +710,7 @@ button { font-family: inherit; cursor: pointer; }
   .dex-saga-head { font-size: 9px; }
   .battle-log { height: 96px; font-size: 9px; }
   .modal { padding: 12px; max-height: 92vh; }
-  .map-board { min-height: 420px !important; }
+  .map-board { min-height: 520px !important; }
   /* Botones y filas más cómodos para el dedo */
   .btn { padding: 12px 14px; }
   .btn.small { padding: 8px 10px; }
