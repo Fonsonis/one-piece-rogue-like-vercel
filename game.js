@@ -272,11 +272,11 @@ function showAutoSettingsModal() {
 
 // ---------- Dificultades de la aventura ----------
 const DIFFICULTIES = [
-  { id: 1, name: 'Grumete', emoji: '⚓', mult: 1.10, desc: 'Normal (rivales +10% atributos)' },
-  { id: 2, name: 'Pirata', emoji: '🏴‍☠️', mult: 1.35, desc: 'Desafiante (rivales +35% atributos)' },
-  { id: 3, name: 'Capitán', emoji: '⚔️', mult: 1.60, desc: 'Difícil (rivales +60% atributos)' },
-  { id: 4, name: 'Supernova', emoji: '⚡', mult: 1.95, desc: 'Muy Difícil (rivales +95% atributos)' },
-  { id: 5, name: 'Rey Pirata', emoji: '👑', mult: 2.40, desc: 'Extremo (rivales +140% atributos)' },
+  { id: 1, name: 'Grumete', emoji: '⚓', mult: 1.00, desc: 'Normal (Atributos base de la saga)' },
+  { id: 2, name: 'Pirata', emoji: '🏴‍☠️', mult: 1.30, desc: 'Desafiante (rivales +30% atributos)' },
+  { id: 3, name: 'Capitán', emoji: '⚔️', mult: 1.65, desc: 'Difícil (rivales +65% atributos — algo menor que la saga posterior)' },
+  { id: 4, name: 'Supernova', emoji: '⚡', mult: 2.15, desc: 'Muy Difícil (rivales +115% atributos — muy superior al jefe de la saga posterior)' },
+  { id: 5, name: 'Rey Pirata', emoji: '👑', mult: 2.75, desc: 'Extremo (rivales +175% atributos — equivalente al jefe de la 2ª saga posterior)' },
 ];
 let selectedDiff = 1;
 
@@ -385,9 +385,24 @@ function importSaveFile(file) {
   reader.readAsText(file);
 }
 
-// Nivel de cuenta: sube con los PX de cuenta (se ganan a la par que la Fama)
-function accountLevel() { return 1 + Math.floor((meta.accXp || 0) / 150); }
-function accountNextAt() { return accountLevel() * 150; }
+// Nivel de cuenta: sube de forma exponencial con los PX de cuenta (se ganan a la par que la Fama)
+function xpForAccLevel(lvl) {
+  if (lvl <= 1) return 0;
+  return Math.floor(100 * (Math.pow(1.115, lvl - 1) - 1) / 0.115);
+}
+function accountLevel() {
+  const xp = meta.accXp || 0;
+  let lvl = 1;
+  while (xpForAccLevel(lvl + 1) <= xp) {
+    lvl++;
+    if (lvl >= 100) break;
+  }
+  return lvl;
+}
+function accountNextAt() {
+  const lvl = accountLevel();
+  return xpForAccLevel(lvl + 1);
+}
 function gainFame(n) {
   meta.fame += n;
   meta.accXp = (meta.accXp || 0) + n;
@@ -1035,6 +1050,14 @@ const sagaUnlocked = i => {
   return sagaMaxDiffCleared(prevSaga.id) >= 3;
 };
 
+// Desbloqueo secuencial de dificultades por saga:
+// Dificultad 1 (Grumete) siempre disponible. Para Dificultad N (N > 1), se requiere haber superado la N-1 en esa misma saga.
+const sagaDiffUnlocked = (sagaId, diffId) => {
+  if (diffId <= 1) return true;
+  const wins = (meta.sagaDiffWins && meta.sagaDiffWins[sagaId]) || {};
+  return !!wins[diffId - 1];
+};
+
 // ============ MODAL: TABLA DE PROBABILIDADES POR SAGA ============
 let currentProbSagaIdx = 0;
 let currentProbTab = 'wild';
@@ -1196,31 +1219,40 @@ let storyMode = 'classic';
 function screenSagas() {
   playMusic('menu');
 
+  const curDiffObj = DIFFICULTIES.find(d => d.id === selectedDiff) || DIFFICULTIES[0];
+
   render(`
     ${topbar(false)}
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
-    <div class="panel">
+    <div class="panel" style="margin-bottom:10px;">
       <h2>Historia — El Mundo de One Piece</h2>
       <p>Elige tu modo, la dificultad y selecciona una saga para zarpar.</p>
-      <div style="margin-top:10px;text-align:right;">
+      <div style="margin-top:8px;text-align:right;">
         <button class="btn small blue" id="btn-saga-probs-all" style="font-size:8px;">📊 PROBABILIDADES DE SAGAS</button>
       </div>
     </div>
-    <div class="tabs">
-      <div class="tab ${storyMode === 'classic' ? 'active' : ''}" id="tab-classic">CLÁSICO</div>
-      <div class="tab ${storyMode === 'nuzlocke' ? 'active' : ''}" id="tab-nuz">NUZLOCKE</div>
-    </div>
-    <div class="panel" style="margin-bottom:12px;padding:10px;">
-      <h3 style="font-size:10px;color:var(--red);margin-bottom:8px;text-align:center;">🎯 DIFICULTAD DE LA AVENTURA</h3>
-      <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
-        ${DIFFICULTIES.map(d => `
-          <button class="btn small ${selectedDiff === d.id ? 'gold' : 'gray'}" data-diff="${d.id}" title="${d.desc}">
-            ${d.emoji} ${d.name}
-          </button>
-        `).join('')}
+
+    <div class="diff-picker-bar">
+      <div class="tabs" style="margin-bottom:0;flex:1;max-width:320px;">
+        <div class="tab ${storyMode === 'classic' ? 'active' : ''}" id="tab-classic">CLÁSICO</div>
+        <div class="tab ${storyMode === 'nuzlocke' ? 'active' : ''}" id="tab-nuz">NUZLOCKE</div>
       </div>
-      <div style="font-size:8px;color:#666;text-align:center;margin-top:6px;">
-        ${DIFFICULTIES.find(d => d.id === selectedDiff)?.desc}
+      <div class="diff-dropdown-container" id="diff-dropdown-container">
+        <button class="btn gold small diff-dropdown-trigger" id="btn-diff-trigger">
+          🎯 DIFICULTAD: ${curDiffObj.emoji} ${curDiffObj.name.toUpperCase()} ▾
+        </button>
+        <div class="diff-dropdown-menu hidden" id="diff-dropdown-menu">
+          <div class="diff-dropdown-header">🎯 SELECCIONA DIFICULTAD DE LA AVENTURA</div>
+          ${DIFFICULTIES.map(d => `
+            <div class="diff-dropdown-item ${selectedDiff === d.id ? 'active' : ''}" data-diff="${d.id}">
+              <div class="diff-item-head">
+                <span>${d.emoji} <b>${d.name}</b></span>
+                <span style="font-size:8px;color:var(--gold);">x${d.mult.toFixed(2)}</span>
+              </div>
+              <div class="diff-item-desc">${d.desc}</div>
+            </div>
+          `).join('')}
+        </div>
       </div>
     </div>
 
@@ -1229,12 +1261,15 @@ function screenSagas() {
     const diffWinsMap = (meta.sagaDiffWins && meta.sagaDiffWins[s.id]) || {};
     const diffWins = Object.keys(diffWinsMap).length;
     const isSelectedCleared = !!diffWinsMap[selectedDiff];
-    const curDiffName = (DIFFICULTIES.find(d => d.id === selectedDiff) || {}).name;
-    const isUnlocked = sagaUnlocked(idx);
+    const isSagaUnlocked = sagaUnlocked(idx);
+    const isDiffUnlocked = sagaDiffUnlocked(s.id, selectedDiff);
+    const curDiffName = curDiffObj.name;
+    const prevDiffObj = DIFFICULTIES.find(d => d.id === selectedDiff - 1);
+
     return `
-        <div class="saga-row ${isUnlocked ? '' : 'locked'} ${isSelectedCleared ? 'diff-cleared' : ''}" data-saga="${idx}">
+        <div class="saga-row ${isSagaUnlocked && isDiffUnlocked ? '' : 'locked'} ${isSelectedCleared ? 'diff-cleared' : ''}" data-saga="${idx}">
           <div class="saga-art" style="background:${s.img ? `url('${s.img}') center/cover no-repeat` : s.color || '#777'};">
-            ${isUnlocked ? '' : `
+            ${isSagaUnlocked ? '' : `
               <div class="saga-art-overlay">
                 <div class="saga-art-title">🔒 ${s.name}</div>
                 <div class="saga-art-sub">${s.sub}</div>
@@ -1242,7 +1277,7 @@ function screenSagas() {
             `}
           </div>
           <div class="saga-stats">
-            ${!isUnlocked ? `
+            ${!isSagaUnlocked ? `
               <div class="saga-lock-banner">
                 🔒 SAGA BLOQUEADA<br>
                 <span style="font-weight:normal;font-size:8.5px;color:#ffeaad;">
@@ -1252,17 +1287,25 @@ function screenSagas() {
               <div>
                 ${isSelectedCleared
         ? `<span class="diff-cleared-tag">⭐ ${curDiffName} SUPERADA</span>`
-        : `<span class="diff-pending-tag">🔒 ${curDiffName} PENDIENTE</span>`}
+        : isDiffUnlocked
+          ? `<span class="diff-pending-tag">🎯 ${curDiffName} PENDIENTE</span>`
+          : `<span class="diff-locked-tag">🔒 ${curDiffName} BLOQUEADA</span>`}
                 Victorias Clásico <b>${meta.wins[s.id] || 0}</b><br>
                 Victorias Nuzlocke <b>${meta.nuzWins[s.id] || 0}</b><br>
                 Dificultades Superadas <b>${diffWins}/5 ⭐</b>
+                ${!isDiffUnlocked && prevDiffObj ? `
+                  <div style="color:#e65c5c;font-size:8px;margin-top:6px;background:rgba(0,0,0,0.3);padding:4px 6px;border-radius:4px;line-height:1.4;">
+                    ⚠️ Requisito: Supera esta saga en Dificultad <b>${prevDiffObj.emoji} ${prevDiffObj.name}</b> primero.
+                  </div>
+                ` : ''}
               </div>
               <div>
                 <div class="saga-diff-badges">
                   ${DIFFICULTIES.map(d => {
           const beaten = !!diffWinsMap[d.id];
-          return `<span class="saga-diff-badge ${beaten ? 'beaten' : ''}" title="${d.name}: ${beaten ? 'Superada ✓' : 'Pendiente'}">
-                      ${d.emoji}${beaten ? '✓' : ''}
+          const unlocked = sagaDiffUnlocked(s.id, d.id);
+          return `<span class="saga-diff-badge ${beaten ? 'beaten' : ''} ${!unlocked ? 'locked-badge' : ''}" title="${d.name}: ${beaten ? 'Superada ✓' : unlocked ? 'Disponible' : 'Bloqueada'}">
+                      ${d.emoji}${beaten ? '✓' : !unlocked ? '🔒' : ''}
                     </span>`;
         }).join('')}
                 </div>
@@ -1282,18 +1325,49 @@ function screenSagas() {
   $('#tab-classic').onclick = () => { storyMode = 'classic'; screenSagas(); };
   $('#tab-nuz').onclick = () => { storyMode = 'nuzlocke'; screenSagas(); };
 
+  const diffTrigger = $('#btn-diff-trigger');
+  const diffMenu = $('#diff-dropdown-menu');
+  if (diffTrigger && diffMenu) {
+    diffTrigger.onclick = e => {
+      e.stopPropagation();
+      diffMenu.classList.toggle('hidden');
+    };
+    document.onclick = e => {
+      if (!diffMenu.classList.contains('hidden') && !e.target.closest('#diff-dropdown-container')) {
+        diffMenu.classList.add('hidden');
+      }
+    };
+  }
+
   const allProbsBtn = $('#btn-saga-probs-all');
   if (allProbsBtn) allProbsBtn.onclick = () => showSagaProbabilitiesModal(0);
-  document.querySelectorAll('[data-diff]').forEach(btn => {
-    btn.onclick = () => {
-      selectedDiff = +btn.dataset.diff;
+
+  document.querySelectorAll('.diff-dropdown-item').forEach(item => {
+    item.onclick = e => {
+      e.stopPropagation();
+      selectedDiff = +item.dataset.diff;
       screenSagas();
     };
   });
+
   document.querySelectorAll('.saga-row').forEach(el => {
     const idx = +el.dataset.saga;
-    if (sagaUnlocked(idx)) el.onclick = () => { screenStarter(idx); };
+    const s = SAGAS[idx];
+    el.onclick = () => {
+      if (!sagaUnlocked(idx)) {
+        toast(`🔒 Supera ${SAGAS[idx - 1].name} en Dificultad Capitán (3/5) primero.`);
+        return;
+      }
+      if (!sagaDiffUnlocked(s.id, selectedDiff)) {
+        const prevD = DIFFICULTIES.find(d => d.id === selectedDiff - 1);
+        const curD = DIFFICULTIES.find(d => d.id === selectedDiff);
+        toast(`🔒 Debes superar ${s.name} en Dificultad ${prevD ? prevD.name : ''} primero.`);
+        return;
+      }
+      screenStarter(idx);
+    };
   });
+
   document.querySelectorAll('.btn-saga-probs').forEach(btn => {
     btn.onclick = e => {
       e.stopPropagation();
@@ -1629,9 +1703,7 @@ function maxStartLvlCap() {
   for (let i = 0; i < SAGAS.length; i++) {
     if (sagaUnlocked(i)) highestSaga = i;
   }
-  if (highestSaga === 0) return 5;
-  if (highestSaga === 1) return 8;
-  return 14 + (highestSaga - 2) * 3;
+  return SAGAS[highestSaga] ? SAGAS[highestSaga].islands[0].lvl[0] : 5;
 }
 
 function startLvlOf(id) {

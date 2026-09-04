@@ -861,6 +861,95 @@ button, .mode-card, .saga-row, .map-node, .team-slot, .dex-card, .poster, .item-
   }
 }
 
+/* --- Selección de Dificultad Desplegable Superpuesta --- */
+.diff-picker-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  position: relative;
+}
+.diff-dropdown-container {
+  position: relative;
+  z-index: 120;
+}
+.diff-dropdown-trigger {
+  font-size: 9.5px;
+  padding: 8px 12px;
+  white-space: nowrap;
+}
+.diff-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  width: 310px;
+  background: rgba(22, 26, 38, 0.96);
+  border: 3px solid var(--gold);
+  border-radius: 6px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8), var(--shadow);
+  padding: 8px;
+  z-index: 250;
+  backdrop-filter: blur(8px);
+}
+.diff-dropdown-header {
+  font-size: 8px;
+  color: var(--gold);
+  text-align: center;
+  padding-bottom: 6px;
+  margin-bottom: 6px;
+  border-bottom: 1px dashed rgba(255, 255, 255, 0.2);
+}
+.diff-dropdown-item {
+  padding: 8px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+.diff-dropdown-item:hover {
+  background: rgba(232, 200, 50, 0.2);
+  border-color: var(--gold);
+}
+.diff-dropdown-item.active {
+  background: rgba(232, 200, 50, 0.35);
+  border-color: var(--gold);
+  box-shadow: inset 0 0 6px rgba(232, 200, 50, 0.5);
+}
+.diff-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9.5px;
+}
+.diff-item-desc {
+  font-size: 7.5px;
+  color: #bbb;
+  margin-top: 3px;
+  line-height: 1.4;
+}
+.diff-locked-tag {
+  font-size: 7px;
+  color: #ff6b6b;
+  font-weight: bold;
+  float: right;
+}
+.saga-diff-badge.locked-badge {
+  opacity: 0.4;
+  background: #ccc;
+  border-color: #999;
+}
+@media (max-width: 700px) {
+  .diff-picker-bar { flex-direction: column; align-items: stretch; gap: 8px; }
+  .diff-dropdown-container { width: 100%; }
+  .diff-dropdown-trigger { width: 100%; text-align: center; }
+  .diff-dropdown-menu { width: 100%; right: 0; left: 0; }
+}
+
 
 
 

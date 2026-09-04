@@ -3,7 +3,7 @@
   "created": "2026-09-02T15:03:14.874Z",
   "meta": {
     "wins": {
-      "eastblue": 7,
+      "eastblue": 8,
       "alabasta": 2,
       "skypiea": 1,
       "water7": 1,
@@ -335,30 +335,8 @@
       "zunesha",
       "lilith",
       "pizarro",
-      "morley",
-      "streusen",
-      "kingbaum",
-      "cracker",
-      "betty",
-      "prometheus",
-      "baohuang",
-      "leo",
-      "carrot",
-      "shyarly",
-      "morgans",
-      "montdor",
-      "reiju",
-      "zeus2",
-      "hack",
-      "sflamingo",
-      "crocus",
-      "alvida",
-      "amande",
-      "toko",
-      "sai",
-      "sora",
-      "shaka",
-      "pekoms"
+      "cricket",
+      "wyper"
     ],
     "recruited": [
       "luffy",
@@ -459,13 +437,7 @@
       "napoleon",
       "pedro",
       "lindbergh",
-      "koala",
-      "morley",
-      "shishilian",
-      "mjosgard",
-      "morgans",
-      "zunesha",
-      "sora"
+      "koala"
     ],
     "roster": [
       "kuina",
@@ -541,16 +513,10 @@
       "viola",
       "kyros",
       "pica",
-      "fujitora",
-      "shishilian",
-      "morley",
-      "mjosgard",
-      "lindbergh",
-      "zunesha",
-      "sora"
+      "fujitora"
     ],
     "towerRecord": 32,
-    "fame": 255322100,
+    "fame": 385,
     "upgrades": {
       "luffy": {
         "atk": 5,
@@ -559,9 +525,9 @@
         "spd": 2
       },
       "gojo": {
-        "spatk": 9,
+        "spatk": 7,
         "spd": 8,
-        "hp": 6,
+        "hp": 5,
         "def": 5,
         "spdef": 5
       },
@@ -572,25 +538,14 @@
       },
       "shanks": {
         "spatk": 4
-      },
-      "kuina": {
-        "def": 34
       }
     },
-    "accXp": 674000,
+    "accXp": 6035,
     "global": {
       "doblestarter": true,
       "berriesplus": true,
       "cartelesplus": true,
-      "starterSlots": 20,
-      "cartelesplus2": true,
-      "veteranLimitTier": 28,
-      "tower_start50": true,
-      "berriesplus2": true,
-      "berriesplus3": true,
-      "carneplus": true,
-      "carnerealplus": true,
-      "platosanjiplus": true
+      "starterSlots": 3
     },
     "defeated": [
       "piratanovato",
@@ -812,26 +767,15 @@
       "fujitora",
       "brulee",
       "wanda",
-      "napoleon",
-      "lindbergh",
-      "streusen",
-      "cosette",
-      "kingbaum",
-      "bobbin",
-      "cracker",
-      "betty",
-      "reiju",
-      "zeus2",
-      "mjosgard",
-      "pekoms",
-      "hack"
+      "robin",
+      "cricket"
     ],
     "sagaClears": {
-      "benn": 3,
+      "benn": 4,
       "luffy": 2,
       "zoro": 1,
       "nami": 1,
-      "gojo": 13,
+      "gojo": 14,
       "gin": 1,
       "koushirou": 1,
       "chuu": 1,
@@ -879,7 +823,8 @@
       "suleiman": 1,
       "viola": 1,
       "law": 1,
-      "kyros": 1
+      "kyros": 1,
+      "coby": 1
     },
     "sagaDiffWins": {
       "eastblue": {
@@ -917,7 +862,7 @@
       "3": []
     },
     "stats": {
-      "kills": 0,
+      "kills": 20,
       "items": 0
     },
     "relics": [],
@@ -927,12 +872,10 @@
       "saga_5": true,
       "saga_full": true,
       "isl_10": true,
-      "isl_50": true,
-      "isl_100": true,
-      "straw_hats": true
+      "isl_50": true
     },
-    "totalIslands": 300
+    "totalIslands": 298
   },
-  "saved": "2026-09-03T22:09:14.391Z",
+  "saved": "2026-09-04T16:13:30.255Z",
   "run": null
 }
