@@ -47,6 +47,15 @@ button { font-family: inherit; cursor: pointer; }
   display: flex; justify-content: space-between; align-items: center;
   margin-bottom: 14px; gap: 10px; flex-wrap: wrap;
 }
+.topbar-left {
+  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+}
+.topbar-right {
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px; margin-left: auto;
+}
+.topbar-right .btn {
+  padding: 4px 6px; font-size: 8px; white-space: nowrap;
+}
 .logo {
   font-size: 26px; letter-spacing: 2px; color: #fff;
   text-shadow: 3px 3px 0 var(--red), -1px -1px 0 var(--ink),
@@ -653,7 +662,10 @@ button { font-family: inherit; cursor: pointer; }
   }
   #app { padding: 10px; }
   .logo { font-size: 18px; }
-  .topbar { margin-bottom: 10px; }
+  .topbar { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 6px; }
+  .topbar-left { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+  .topbar-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; margin-left: auto; flex-shrink: 0; }
+  .berries { padding: 4px 8px; font-size: 9.5px; }
   .panel { padding: 10px; }
   .modes { gap: 10px; }
   .mode-card { width: 100%; max-width: 300px; }
@@ -688,6 +700,20 @@ button { font-family: inherit; cursor: pointer; }
   .ship-row { flex-direction: column; align-items: stretch; gap: 8px; }
   .ship-name { width: 100%; text-align: center; }
   .ship-upgs { width: 100%; }
+
+  /* Tienda y Mejoras en móvil: botones e insignias debajo de los textos */
+  .shop-item { flex-wrap: wrap; gap: 6px 8px; padding: 10px 6px; }
+  .shop-item .emoji { font-size: 22px; flex-shrink: 0; }
+  .shop-item .info { flex: 1 1 calc(100% - 38px); min-width: 0; }
+  .shop-item .btn, .shop-item button { width: 100%; margin-top: 4px; text-align: center; display: block; }
+
+  .global-upg-grid { grid-template-columns: 1fr; }
+  .global-upg-row { flex-wrap: wrap; gap: 6px 8px; padding: 10px 8px; }
+  .global-upg-row .upg-details { flex: 1 1 calc(100% - 38px); min-width: 0; }
+  .global-upg-row .upg-action { width: 100%; margin-left: 0; margin-top: 4px; display: flex; justify-content: center; }
+  .global-upg-row .upg-action .btn,
+  .global-upg-row .upg-action button,
+  .global-upg-row .upg-action .upg-badge { width: 100%; display: block; text-align: center; box-sizing: border-box; }
 }
 
 .sel-card.locked { filter: grayscale(.85); opacity: .65; cursor: not-allowed; }
