@@ -1219,7 +1219,7 @@ for (const [id, c] of Object.entries(CHARS)) {
 
 // ============ CONSTRUCCIÓN DE SAGAS E ISLAS ============
 const SAGA_DEFS = [
-  { id: 'eastblue', name: 'EAST BLUE', color: '#3f8fd6', islands: [
+  { id: 'eastblue', name: 'EAST BLUE', img: 'Images/east-blue-portada.jpg', color: '#3f8fd6', islands: [
     ['Shells Town', ['helmeppo', 'morgan']], ['Orange Town', ['mohji', 'cabaji', 'buggy']],
     ['Villa Syrup', ['sham', 'kuro']], ['Baratie', ['gin', 'pearl', 'krieg']],
     ['Arlong Park', ['chuu', 'kuroobi', 'hachi', 'arlong']], ['Loguetown', ['tashigi', 'smoker']],
@@ -1229,28 +1229,28 @@ const SAGA_DEFS = [
     ['Isla Drum', ['chess', 'kuromarimo', 'wapol']], ['Rainbase', ['mr4', 'merrychristmas', 'bentham']],
     ['Alubarna', ['paula', 'dazbones', 'crocodile']],
   ]},
-  { id: 'skypiea', name: 'SKYPIEA', color: '#9fd6e8', islands: [
+  { id: 'skypiea', name: 'SKYPIEA', img: 'Images/portada-saga-skypiea.jpg', color: '#9fd6e8', islands: [
     ['Jaya', ['sarquiss', 'bellamy']], ['Playa Angel', ['satori', 'shura']],
     ['Upper Yard', ['gedatsu', 'ohm', 'yama']], ['Santuario de Dios', ['enel']],
   ]},
-  { id: 'water7', name: 'WATER 7', color: '#5aa8c4', islands: [
+  { id: 'water7', name: 'WATER 7', img: 'Images/portada-saga-water-seven.jpg', color: '#5aa8c4', islands: [
     ['Water 7', ['wanze', 'nero']], ['Tren Marino', ['tbone', 'blueno']],
     ['Enies Lobby', ['kumadori', 'fukuro', 'jabra']], ['Torre de la Justicia', ['kaku', 'kalifa', 'lucci']],
   ]},
-  { id: 'thriller', name: 'THRILLER BARK', color: '#6e5a8a', islands: [
+  { id: 'thriller', name: 'THRILLER BARK', img: 'Images/portada-saga-thriller-bark.jpg', color: '#6e5a8a', islands: [
     ['Niebla Fantasma', ['hildon', 'tararan']], ['Mansión Hogback', ['hogback', 'absalom']],
     ['Jardín Helado', ['ryuma', 'perona']], ['Mástil Mayor', ['oars', 'moria']],
   ]},
-  { id: 'marineford', name: 'MARINEFORD', color: '#c45a5a', islands: [
+  { id: 'marineford', name: 'MARINEFORD', img: 'Images/portada-saga-marine-fort.jpg', color: '#c45a5a', islands: [
     ['Amazon Lily', ['sadie', 'domino']], ['Impel Down Nv1-3', ['saldeath', 'minotauros', 'hannyabal']],
     ['Impel Down Nv4-6', ['magellan']], ['Bahía de Marineford', ['momonga', 'onigumo', 'johngiant']],
     ['Plaza Ejecución', ['strawberry', 'doberman', 'sengoku']],
   ]},
-  { id: 'gyojin', name: 'ISLA GYOJIN', color: '#3fbfae', islands: [
+  { id: 'gyojin', name: 'ISLA GYOJIN', img: 'Images/portada-saga-gyogin.jpg', color: '#3fbfae', islands: [
     ['Bosque Marino', ['hammond', 'hyouzou']], ['Distrito Gyojin', ['dosun', 'zeo', 'daruma']],
     ['Palacio Ryugu', ['ikaros', 'decken']], ['Plaza Gyoncorde', ['wadatsumi', 'hody']],
   ]},
-  { id: 'dressrosa', name: 'DRESSROSA', color: '#d96a8a', islands: [
+  { id: 'dressrosa', name: 'DRESSROSA', img: 'Images/portada-saga-dressrossa.jpg', color: '#d96a8a', islands: [
     ['Punk Hazard', ['monet', 'vergo', 'caesar']], ['Puerto de Acacia', ['sugar', 'jora', 'buffalo']],
     ['Coliseo Corrida', ['dellinger', 'laog', 'machvise']], ['Palacio Real', ['gladius', 'senorpink', 'diamante']],
     ['Campo de Flores', ['pica', 'trebol', 'doflamingo']], ['Puerto Final', ['fujitora']],
@@ -1260,13 +1260,13 @@ const SAGA_DEFS = [
     ['Castillo Whole Cake', ['opera', 'tamago', 'perospero']], ['La Boda', ['daifuku', 'oven', 'smoothie']],
     ['Isla Cacao', ['katakuri']], ['Huida Final', ['bigmom']],
   ]},
-  { id: 'wano', name: 'PAÍS DE WANO', color: '#b03a3a', islands: [
+  { id: 'wano', name: 'PAÍS DE WANO', img: 'Images/portada-saga-wano.jpg', color: '#b03a3a', islands: [
     ['Kuri', ['holdem', 'speed2']], ['Udon', ['dobon', 'daifugo', 'babanuki']],
     ['La Capital', ['batman', 'gazelleman', 'fukurokuju']], ['Onigashima Exterior', ['ulti', 'pageone', 'jack']],
     ['Castillo del Cráneo', ['sasaki', 'blackmaria', 'whoswho']], ['Cúpula', ['king', 'queen']],
     ['Techo del Mundo', ['orochi', 'kaido']],
   ]},
-  { id: 'egghead', name: 'EGGHEAD', color: '#7a5ad9', islands: [
+  { id: 'egghead', name: 'EGGHEAD', img: 'Images/portada-saga-egghead.jpg', color: '#7a5ad9', islands: [
     ['Laboratorio', ['ssnake', 'shawk', 'sshark']], ['Fábrica', ['sbear', 'sflamingo', 'sgecko']],
     ['Ciudad Futura', ['scroc', 'york']], ['Asalto Marine', ['ryokugyu', 'kizaru']],
     ['Los Cinco Ancianos', ['saturn', 'mars', 'warcury']], ['Trono Vacío', ['nusjuro', 'jupeter', 'im']],
