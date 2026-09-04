@@ -947,7 +947,82 @@ button, .mode-card, .saga-row, .map-node, .team-slot, .dex-card, .poster, .item-
   .diff-picker-bar { flex-direction: column; align-items: stretch; gap: 8px; }
   .diff-dropdown-container { width: 100%; }
   .diff-dropdown-trigger { width: 100%; text-align: center; }
-  .diff-dropdown-menu { width: 100%; right: 0; left: 0; }
+}
+.btn.purple { background: #7c3aed; color: #fff; }
+
+/* --- Cuadrícula de Huecos de Equipo (Screen Starter) --- */
+.starter-team-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+  margin: 12px 0;
+}
+.starter-slot-card {
+  background: var(--paper);
+  border: 3px solid var(--ink);
+  box-shadow: var(--shadow);
+  padding: 10px 8px;
+  text-align: center;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 175px;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+  cursor: pointer;
+}
+.starter-slot-card:hover {
+  transform: translateY(-3px);
+  border-color: var(--sea);
+}
+.starter-slot-card.empty-slot {
+  border-style: dashed;
+  border-color: #888;
+  background: rgba(255, 255, 255, 0.4);
+  justify-content: center;
+}
+.starter-slot-card.empty-slot:hover {
+  border-color: var(--green);
+  background: rgba(255, 255, 255, 0.85);
+}
+.starter-slot-badge {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  font-size: 7px;
+  background: var(--ink);
+  color: var(--gold);
+  padding: 2px 5px;
+  border-radius: 3px;
+  font-weight: bold;
+}
+
+/* --- Botones Principales del Menú Home (4 Bloques Iguales) --- */
+.home-main-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-top: 18px;
+  width: 100%;
+  max-width: 760px;
+  margin-left: auto;
+  margin-right: auto;
+}
+.home-main-buttons .btn {
+  width: 100%;
+  padding: 8px 4px;
+  font-size: 8.5px;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-sizing: border-box;
+}
+@media (max-width: 640px) {
+  .home-main-buttons {
+    grid-template-columns: repeat(2, 1fr);
+  }
 }
 
 

@@ -290,6 +290,8 @@ const META_DEFAULTS = () => ({
   stats: { kills: 0, items: 0 },
   relics: [],
   soloWins: 0,
+  logPoses: 0,
+  charUpgrades: {},
 });
 let meta = META_DEFAULTS();
 function loadMeta() {
@@ -298,6 +300,8 @@ function loadMeta() {
     const m = localStorage.getItem(storeKey('oplike_meta'));
     if (m) meta = Object.assign(meta, JSON.parse(m));
   } catch (e) { }
+  meta.logPoses = meta.logPoses || 0;
+  meta.charUpgrades = meta.charUpgrades || {};
   if (!meta.totalIslands) {
     const totalWins = Object.values(meta.wins || {}).reduce((a, b) => a + b, 0) +
       Object.values(meta.nuzWins || {}).reduce((a, b) => a + b, 0);
@@ -978,11 +982,14 @@ function screenHome() {
         <div class="mode-btn">${challengeUnlocked ? 'ENTRAR' : '🔒 NV. CUENTA 50'}</div>
       </div>
     </div>
-    <div style="text-align:center;margin-top:18px;display:flex;gap:10px;justify-content:center;flex-wrap:wrap;align-items:center;">
-      <button class="btn blue" id="btn-dex">📖 Dex Pirata (${meta.dex.length}/${Object.keys(CHARS).length})</button>
-      <button class="btn gold" id="btn-ship">🏪 Tienda — ⭐${meta.fame}</button>
-      <button class="btn gold" id="btn-achievements">🏆 Logros (${completedAch}/${ACHIEVEMENTS.length})</button>
-      <button class="btn gray" id="btn-guide">📊 Tipos y Sinergias</button>
+    <div class="home-main-buttons">
+      <button class="btn blue small" id="btn-dex">📖 Dex (${meta.dex.length}/${Object.keys(CHARS).length})</button>
+      <button class="btn purple small" id="btn-inventory">🎒 Inventario (${(meta.roster || []).length})</button>
+      <button class="btn gold small" id="btn-ship">🏪 Tienda (⭐${meta.fame})</button>
+      <button class="btn gold small" id="btn-achievements">🏆 Logros (${completedAch}/${ACHIEVEMENTS.length})</button>
+    </div>
+    <div style="text-align:center;margin-top:8px;">
+      <button class="btn gray small" id="btn-guide" style="padding:6px 14px;font-size:9px;">📊 Tipos y Sinergias</button>
     </div>
     <div style="text-align:center;margin-top:14px;display:flex;flex-direction:column;gap:6px;align-items:center;">
       <div style="color:#fff;text-shadow:1px 1px 0 #000;font-size:9.5px;">
@@ -1009,6 +1016,8 @@ function screenHome() {
   if (towerUnlocked) $('#mode-tower').onclick = () => screenTowerIntro();
   if (challengeUnlocked) $('#mode-challenge').onclick = () => screenChallenges();
   $('#btn-dex').onclick = screenDex;
+  const invBtn = $('#btn-inventory');
+  if (invBtn) invBtn.onclick = () => showInventoryModal();
   $('#btn-ship').onclick = screenShip;
   $('#btn-achievements').onclick = showAchievementsModal;
   $('#btn-guide').onclick = () => showTypeChartModal(run ? run.team : null);
@@ -1484,6 +1493,160 @@ function renderCharGrid(el, ids, st, cardFn, bindFn) {
   bindFn && bindFn(el);
 }
 
+// ============ MODAL: INVENTARIO DE NAKAMAS ============
+let invViewState = { q: '', type: '', rarity: 0 };
+
+function showInventoryModal(opts = {}) {
+  const onSelect = opts.onSelect || null;
+  const currentTeam = opts.currentTeam || [];
+  const title = opts.title || '🎒 INVENTARIO DE NAKAMAS';
+
+  const rosterChars = (meta.roster || []).filter(id => CHARS[id]);
+  const allUnlocked = [...new Set(['luffy', ...STRAW_HAT_MEMBERS, ...rosterChars])].filter(id => CHARS[id] && isNakamaUnlocked(id));
+
+  invViewState = { q: '', type: '', rarity: 0 };
+
+  const renderModalContent = () => {
+    let ids = filterSortChars(allUnlocked, invViewState);
+    const cap = maxStartLvlCap();
+
+    const cardsHTML = ids.map(id => {
+      const c = CHARS[id];
+      const inTeam = currentTeam.includes(id);
+      const startLvl = startLvlOf(id);
+      const cost = logPoseUpgradeCost(startLvl);
+      const isMax = startLvl >= cap;
+      const canAfford = (meta.logPoses || 0) >= cost;
+
+      return `
+        <div class="dex-card sel-card ${inTeam ? 'picked' : ''}" data-id="${id}" style="position:relative;background:var(--paper);border:2px solid var(--ink);padding:8px 6px;text-align:center;cursor:pointer;">
+          ${inTeam ? '<div class="veteran-tag" style="background:var(--green);font-size:7px;">EN EQUIPO</div>' : ''}
+          <div class="emoji">${charIcon(id, 34)}</div>
+          <div style="font-size:8.5px;margin:3px 0;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</div>
+          <div class="char-lvl" style="font-size:7.5px;">Nv. ${startLvl} · ${'⭐'.repeat(c.rareza)}</div>
+          <div class="type-badges" style="margin:3px 0;justify-content:center;">${typeBadges(c.types)}</div>
+          <div style="display:flex;flex-direction:column;gap:3px;margin-top:4px;">
+            ${isMax ? `
+              <span style="font-size:7px;color:var(--green);font-weight:bold;background:rgba(0,0,0,0.06);padding:2px;border-radius:3px;">🔒 Nv. Máx (${cap})</span>
+            ` : `
+              <button class="btn small gold btn-upg-inv" data-id="${id}" ${canAfford ? '' : 'disabled'} style="font-size:7px;padding:3px 4px;" title="Cuesta ${cost} Log Poses">
+                ⬆️ Nv ${startLvl + 1} (${cost} 🧭)
+              </button>
+            `}
+            <div style="display:flex;gap:3px;justify-content:center;">
+              ${onSelect ? `<button class="btn small green btn-pick-inv" data-id="${id}" style="font-size:7px;padding:3px 6px;flex:1;">${inTeam ? 'SELECCIONADO' : 'ELEGIR'}</button>` : ''}
+              <button class="btn small gray btn-info-inv" data-id="${id}" style="font-size:7px;padding:3px 6px;">ℹ️ FICHA</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+        <h2 style="margin:0;font-size:12px;color:var(--sea);">${title}</h2>
+        <div style="font-size:9.5px;font-weight:bold;color:var(--gold);background:var(--ink);padding:3px 8px;border-radius:4px;border:1px solid var(--gold);">
+          🧭 Log Poses: ${meta.logPoses || 0}
+        </div>
+        <button class="btn gray small" id="inv-close-x" style="padding:2px 6px;font-size:9px;">✕</button>
+      </div>
+      <div style="font-size:8px;color:#555;margin-bottom:8px;">
+        Nakamas disponibles: <b>${allUnlocked.length}</b> ${onSelect ? '· Toca un personaje para elegirlo para tu equipo' : ''}
+      </div>
+      <div class="char-controls" style="margin-bottom:10px;gap:4px;">
+        <input id="inv-q" placeholder="🔎 Buscar por nombre..." value="${(invViewState.q || '').replace(/"/g, '&quot;')}" style="font-size:8px;padding:5px;">
+        <select id="inv-type" style="font-size:8px;padding:5px;">
+          <option value="">Todos los tipos</option>
+          ${Object.keys(TYPES).map(t => `<option value="${t}" ${invViewState.type === t ? 'selected' : ''}>${TYPES[t].emoji} ${t}</option>`).join('')}
+        </select>
+        <select id="inv-rarity" style="font-size:8px;padding:5px;">
+          <option value="0">Toda rareza</option>
+          ${[1, 2, 3, 4, 5].map(r => `<option value="${r}" ${+invViewState.rarity === r ? 'selected' : ''}>${'⭐'.repeat(r)}</option>`).join('')}
+        </select>
+      </div>
+      <div id="inv-cards-grid" style="max-height:360px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:8px;padding:4px;border:1px solid #ccc;background:rgba(0,0,0,0.05);">
+        ${cardsHTML || '<div style="grid-column:1/-1;text-align:center;font-size:9px;color:#888;padding:20px;">Sin nakamas que coincidan.</div>'}
+      </div>
+      <div class="actions" style="margin-top:10px;text-align:right;">
+        <button class="btn gray small" id="inv-close-btn">CERRAR</button>
+      </div>
+    `;
+  };
+
+  const existing = document.querySelector('#inventory-modal-overlay');
+  if (existing) existing.remove();
+
+  const ov = document.createElement('div');
+  ov.id = 'inventory-modal-overlay';
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal" style="max-width:640px;width:95%;">${renderModalContent()}</div>`;
+  document.body.appendChild(ov);
+
+  const bindEvents = () => {
+    const qInput = ov.querySelector('#inv-q');
+    if (qInput) qInput.oninput = e => {
+      invViewState.q = e.target.value;
+      ov.querySelector('.modal').innerHTML = renderModalContent();
+      bindEvents();
+      const newQ = ov.querySelector('#inv-q');
+      if (newQ) { newQ.focus(); newQ.selectionStart = newQ.selectionEnd = newQ.value.length; }
+    };
+
+    const typeSel = ov.querySelector('#inv-type');
+    if (typeSel) typeSel.onchange = e => {
+      invViewState.type = e.target.value;
+      ov.querySelector('.modal').innerHTML = renderModalContent();
+      bindEvents();
+    };
+
+    const raritySel = ov.querySelector('#inv-rarity');
+    if (raritySel) raritySel.onchange = e => {
+      invViewState.rarity = +e.target.value;
+      ov.querySelector('.modal').innerHTML = renderModalContent();
+      bindEvents();
+    };
+
+    ov.querySelectorAll('.btn-upg-inv').forEach(btn => {
+      btn.onclick = e => {
+        e.stopPropagation();
+        if (upgradeCharLvl(btn.dataset.id)) {
+          ov.querySelector('.modal').innerHTML = renderModalContent();
+          bindEvents();
+        }
+      };
+    });
+
+    ov.querySelectorAll('.dex-card').forEach(card => {
+      card.onclick = (e) => {
+        if (e.target.closest('.btn-upg-inv') || e.target.closest('.btn-info-inv')) return;
+        const id = card.dataset.id;
+        if (onSelect) {
+          ov.remove();
+          onSelect(id);
+        } else {
+          showCharModal(id);
+        }
+      };
+    });
+
+    ov.querySelectorAll('.btn-info-inv').forEach(btn => {
+      btn.onclick = e => {
+        e.stopPropagation();
+        showCharModal(btn.dataset.id);
+      };
+    });
+
+    const closeBtn = ov.querySelector('#inv-close-btn');
+    if (closeBtn) closeBtn.onclick = () => ov.remove();
+
+    const closeX = ov.querySelector('#inv-close-x');
+    if (closeX) closeX.onclick = () => ov.remove();
+  };
+
+  bindEvents();
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+}
+
 // ============ PANTALLA: INICIAL ============
 const starterView = { q: '', saga: '', type: '', rarity: 0, sort: 'default', page: 0 };
 
@@ -1507,55 +1670,54 @@ function starterSlotsCount() {
 function screenStarter(sagaIdx) {
   playMusic('menu');
   const saga = SAGAS[sagaIdx];
-  const rosterChars = (meta.roster || []).filter(id => CHARS[id]);
-  const allIds = [...new Set(['luffy', ...STRAW_HAT_MEMBERS, ...rosterChars])];
-  const veterans = rosterChars.filter(id => id !== 'luffy');
-  starterView.page = 0;
   const maxSlots = starterSlotsCount();
   let picked = [];
 
   meta.teamPresets = meta.teamPresets || { 1: [], 2: [], 3: [] };
 
-  const updateSubTitle = () => {
-    const sub = $('#starter-subtitle');
-    if (sub) {
-      sub.textContent = maxSlots === 1
-        ? '¡Elige tu nakama inicial!'
-        : `¡Elige entre 1 y ${maxSlots} nakamas iniciales! (${picked.length}/${maxSlots})`;
-    }
-  };
-
-  const renderActiveTeamTop = () => {
-    return `
-      <div class="active-team-bar" style="background:rgba(0,0,0,0.35);padding:10px 14px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);margin-bottom:10px;text-align:center;">
-        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
-          <span style="font-size:11px;font-weight:bold;color:var(--gold);">
-            🏴‍☠️ BANDA SELECCIONADA (${picked.length}/${maxSlots})
-          </span>
-          <button class="btn green small btn-zarpar-top" ${picked.length >= 1 ? '' : 'disabled'} style="font-size:10px;padding:6px 14px;font-weight:bold;">
-            ⚔️ INICIAR COMBATE (${picked.length}/${maxSlots})
-          </button>
-        </div>
-        <div class="selected-team-chips" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;min-height:36px;align-items:center;">
-          ${picked.length ? picked.map(id => `
-            <div class="sel-chip" data-remove="${id}" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.1);border:1px solid var(--gold);padding:4px 8px;border-radius:20px;cursor:pointer;" title="Toca para quitar a ${CHARS[id].name}">
-              <span>${charIcon(id, 22)}</span>
-              <span style="font-size:9.5px;font-weight:bold;">${CHARS[id].name}</span>
-              <span style="font-size:9px;color:var(--red);margin-left:2px;font-weight:bold;">✕</span>
+  const renderSlotsGrid = () => {
+    let slotsHTML = '';
+    for (let i = 0; i < maxSlots; i++) {
+      const id = picked[i];
+      if (id && CHARS[id]) {
+        const c = CHARS[id];
+        const startLvl = startLvlOf(id);
+        slotsHTML += `
+          <div class="starter-slot-card occupied" data-slot="${i}">
+            <div class="starter-slot-badge">HUECO ${i + 1}</div>
+            <div style="margin-top:14px;" class="emoji">${charIcon(id, 40)}</div>
+            <div style="font-size:10px;font-weight:bold;margin:4px 0;">${c.name}</div>
+            <div class="char-lvl" style="font-size:8px;">Nv. ${startLvl} · ${'⭐'.repeat(c.rareza)}</div>
+            <div class="type-badges" style="margin:4px 0;justify-content:center;">${typeBadges(c.types)}</div>
+            <div style="display:flex;gap:4px;margin-top:6px;width:100%;justify-content:center;">
+              <button class="btn small blue btn-swap-slot" data-slot="${i}" style="font-size:7.5px;padding:3px 6px;">🔄 Cambiar</button>
+              <button class="btn small gray btn-info-slot" data-id="${id}" style="font-size:7.5px;padding:3px 6px;">ℹ️</button>
+              <button class="btn small red btn-remove-slot" data-slot="${i}" style="font-size:7.5px;padding:3px 6px;">✕</button>
             </div>
-          `).join('') : '<div style="font-size:9px;color:#aaa;font-style:italic;">No has seleccionado a ningún nakama aún. Toca en los personajes de abajo para añadirlos a tu banda.</div>'}
-        </div>
-      </div>`;
+          </div>
+        `;
+      } else {
+        slotsHTML += `
+          <div class="starter-slot-card empty-slot" data-slot="${i}">
+            <div class="starter-slot-badge">HUECO ${i + 1}</div>
+            <div style="font-size:28px;margin-bottom:4px;">➕</div>
+            <div style="font-size:9.5px;font-weight:bold;color:var(--sea);">Añadir Nakama</div>
+            <div style="font-size:7.5px;color:#666;margin-top:2px;">Toca para elegir</div>
+          </div>
+        `;
+      }
+    }
+    return `<div class="starter-team-grid">${slotsHTML}</div>`;
   };
 
   const renderPresetsBar = () => {
     return `
-      <div class="preset-bar" style="display:flex;flex-direction:column;gap:6px;align-items:center;margin:8px 0;background:rgba(0,0,0,0.25);padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);">
+      <div class="preset-bar" style="display:flex;flex-direction:column;gap:6px;align-items:center;margin:12px 0;background:rgba(0,0,0,0.25);padding:10px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);">
         <span style="font-size:9px;font-weight:bold;color:var(--gold);">💾 EQUIPOS PREDEFINIDOS</span>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;width:100%;">
           ${[1, 2, 3].map(slot => {
-      const p = meta.teamPresets[slot] || [];
-      return `
+            const p = meta.teamPresets[slot] || [];
+            return `
               <div class="preset-slot-box" style="display:flex;align-items:center;gap:4px;background:rgba(0,0,0,0.4);padding:4px 8px;border-radius:4px;border:1px solid #555;">
                 <span style="font-size:8.5px;color:var(--gold);font-weight:bold;">P${slot}:</span>
                 <button class="btn small gray btn-load-preset" data-slot="${slot}" style="font-size:7.5px;padding:3px 6px;">
@@ -1565,7 +1727,7 @@ function screenStarter(sagaIdx) {
                   💾 Guardar
                 </button>
               </div>`;
-    }).join('')}
+          }).join('')}
         </div>
       </div>`;
   };
@@ -1573,127 +1735,126 @@ function screenStarter(sagaIdx) {
   render(`
     ${topbar(false)}
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
-    <div class="subtitle" id="starter-subtitle" style="font-size:14px;"></div>
+    <div class="subtitle" style="font-size:14px;">Aventura en ${saga.name}</div>
     <div class="panel">
-      <div id="active-team-container"></div>
+      <h2 style="margin-bottom:4px;">🏴‍☠️ Configuración de la Banda (${picked.length}/${maxSlots})</h2>
+      <p style="font-size:8.5px;color:#555;margin-bottom:12px;">Toca un personaje para cambiarlo o pulsa un hueco vacío para abrir el inventario y elegir a tu nakama.</p>
+      
+      <div id="starter-slots-container"></div>
       ${renderPresetsBar()}
-      ${charControlsHTML(starterView)}
-      <div id="char-grid"></div>
-      <div style="text-align:center;margin-top:10px;">
-        <button class="btn green" id="btn-zarpar" ${picked.length >= 1 ? '' : 'disabled'}>
-          🏴‍☠️ ZARPAR CON TU BANDA (${picked.length}/${maxSlots})
+
+      <div style="text-align:center;margin-top:16px;">
+        <button class="btn green" id="btn-zarpar" style="font-size:11px;padding:10px 20px;">
+          ⚔️ ZARPAR CON TU BANDA (${picked.length}/${maxSlots})
         </button>
       </div>
-      <div style="font-size:8px;color:#888;margin-top:8px;text-align:center;">Toca las cartas para elegir a tus nakamas · ℹ️ para ver su ficha. Puedes zarpar con 1 solo personaje para conseguir un logro.</div>
     </div>
   `);
 
-  updateSubTitle();
   $('#btn-back').onclick = screenSagas;
 
-  const bindPresetEvents = () => {
-    document.querySelectorAll('.btn-load-preset').forEach(btn => {
-      btn.onclick = () => {
-        const slot = +btn.dataset.slot;
-        const p = meta.teamPresets[slot] || [];
-        const valid = p.filter(id => allIds.includes(id));
-        if (valid.length) {
-          picked = valid.slice(0, maxSlots);
-          toast(`📂 Equipo Preset ${slot} cargado (${picked.length} miembro/s)`);
-          updateSubTitle();
-          update();
+  const openInventoryPicker = (slotIdx) => {
+    showInventoryModal({
+      title: `Añadir / Sustituir Nakama (Hueco ${slotIdx + 1})`,
+      currentTeam: picked,
+      onSelect: (newId) => {
+        const existingIdx = picked.indexOf(newId);
+        if (existingIdx >= 0 && existingIdx !== slotIdx) {
+          const temp = picked[slotIdx];
+          picked[slotIdx] = newId;
+          if (temp) picked[existingIdx] = temp;
+          else picked.splice(existingIdx, 1);
         } else {
-          toast(`⚠️ Preset ${slot} está vacío o no contiene personajes disponibles en esta saga.`);
+          picked[slotIdx] = newId;
         }
-      };
-    });
-    document.querySelectorAll('.btn-save-preset').forEach(btn => {
-      btn.onclick = () => {
-        const slot = +btn.dataset.slot;
-        if (!picked.length) {
-          toast('⚠️ Selecciona al menos 1 personaje antes de guardar.');
-          return;
-        }
-        meta.teamPresets[slot] = [...picked];
-        saveMeta();
-        toast(`💾 Equipo guardado en Preset ${slot}`);
         update();
-      };
+      }
     });
   };
 
-  const zarparBtn = $('#btn-zarpar');
-  if (zarparBtn) zarparBtn.onclick = () => {
-    if (picked.length >= 1) startRun(sagaIdx, picked);
-  };
-
-  const update = () => {
-    const activeCont = $('#active-team-container');
-    if (activeCont) {
-      activeCont.innerHTML = renderActiveTeamTop();
-      const topBtn = $('.btn-zarpar-top');
-      if (topBtn) topBtn.onclick = () => {
-        if (picked.length >= 1) startRun(sagaIdx, picked);
-      };
-      activeCont.querySelectorAll('.sel-chip').forEach(chip => {
-        chip.onclick = () => {
-          const id = chip.dataset.remove;
-          const idx = picked.indexOf(id);
-          if (idx >= 0) picked.splice(idx, 1);
-          updateSubTitle();
-          if (zarparBtn) {
-            zarparBtn.disabled = picked.length < 1;
-            zarparBtn.textContent = `🏴‍☠️ ZARPAR CON TU BANDA (${picked.length}/${maxSlots})`;
-          }
+  const bindEvents = () => {
+    const slotsContainer = $('#starter-slots-container');
+    if (slotsContainer) {
+      slotsContainer.querySelectorAll('.starter-slot-card.empty-slot').forEach(card => {
+        card.onclick = () => openInventoryPicker(+card.dataset.slot);
+      });
+      slotsContainer.querySelectorAll('.btn-swap-slot').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          openInventoryPicker(+btn.dataset.slot);
+        };
+      });
+      slotsContainer.querySelectorAll('.starter-slot-card.occupied').forEach(card => {
+        card.onclick = (e) => {
+          if (e.target.closest('button')) return;
+          openInventoryPicker(+card.dataset.slot);
+        };
+      });
+      slotsContainer.querySelectorAll('.btn-info-slot').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          showCharModal(btn.dataset.id);
+        };
+      });
+      slotsContainer.querySelectorAll('.btn-remove-slot').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          const slotIdx = +btn.dataset.slot;
+          picked.splice(slotIdx, 1);
           update();
         };
       });
     }
 
-    if (zarparBtn) {
-      zarparBtn.disabled = picked.length < 1;
-      zarparBtn.textContent = `🏴‍☠️ ZARPAR CON TU BANDA (${picked.length}/${maxSlots})`;
-    }
+    document.querySelectorAll('.btn-load-preset').forEach(btn => {
+      btn.onclick = () => {
+        const slot = +btn.dataset.slot;
+        const p = meta.teamPresets[slot] || [];
+        const valid = p.filter(id => CHARS[id] && isNakamaUnlocked(id));
+        if (valid.length) {
+          picked = valid.slice(0, maxSlots);
+          toast(`📂 Equipo Preset ${slot} cargado (${picked.length} miembro/s)`);
+          update();
+        } else {
+          toast(`⚠️ Preset ${slot} está vacío o no contiene nakamas disponibles.`);
+        }
+      };
+    });
 
-    const ids = filterSortChars(allIds, starterView);
-    renderCharGrid($('#char-grid'), ids, starterView,
-      id => {
-        const unlocked = isNakamaUnlocked(id);
-        return selCardHTML(id, veterans.includes(id), picked.includes(id), unlocked);
-      },
-      el => {
-        el.querySelectorAll('.sel-card').forEach(card => {
-          card.onclick = () => {
-            const id = card.dataset.id;
-            const unlocked = isNakamaUnlocked(id);
-            if (!unlocked) {
-              toast('🔒 Personaje bloqueado. ¡Encuéntralo o reclútalo en tus aventuras para desbloquearlo!');
-              return;
-            }
-            const idx = picked.indexOf(id);
-            if (idx >= 0) {
-              picked.splice(idx, 1);
-            } else {
-              if (picked.length < maxSlots) {
-                picked.push(id);
-              } else if (maxSlots === 1) {
-                picked = [id];
-              } else {
-                toast(`Ya has seleccionado los ${maxSlots} nakamas permitidos.`);
-                return;
-              }
-            }
-            updateSubTitle();
-            update();
-          };
-        });
-        el.querySelectorAll('.info-btn').forEach(btn => {
-          btn.onclick = e => { e.stopPropagation(); showCharModal(btn.dataset.info); };
-        });
-      });
-    bindPresetEvents();
+    document.querySelectorAll('.btn-save-preset').forEach(btn => {
+      btn.onclick = () => {
+        const slot = +btn.dataset.slot;
+        const cleanPicked = picked.filter(Boolean);
+        if (!cleanPicked.length) {
+          toast('⚠️ Selecciona al menos 1 personaje antes de guardar.');
+          return;
+        }
+        meta.teamPresets[slot] = [...cleanPicked];
+        saveMeta();
+        toast(`💾 Equipo guardado en Preset ${slot}`);
+        update();
+      };
+    });
+
+    const zarparBtn = $('#btn-zarpar');
+    if (zarparBtn) {
+      const cleanPicked = picked.filter(Boolean);
+      zarparBtn.disabled = cleanPicked.length < 1;
+      zarparBtn.textContent = `⚔️ ZARPAR CON TU BANDA (${cleanPicked.length}/${maxSlots})`;
+      zarparBtn.onclick = () => {
+        if (cleanPicked.length >= 1) startRun(sagaIdx, cleanPicked);
+      };
+    }
   };
-  bindCharControls(starterView, update);
+
+  const update = () => {
+    const slotsContainer = $('#starter-slots-container');
+    if (slotsContainer) slotsContainer.innerHTML = renderSlotsGrid();
+    const presetBarCont = document.querySelector('.preset-bar');
+    if (presetBarCont) presetBarCont.outerHTML = renderPresetsBar();
+    bindEvents();
+  };
+
   update();
 }
 
@@ -1707,11 +1868,39 @@ function maxStartLvlCap() {
   return SAGAS[highestSaga] ? SAGAS[highestSaga].islands[0].lvl[0] : 5;
 }
 
+function logPoseUpgradeCost(currentLvl) {
+  const diff = Math.max(0, currentLvl - 5);
+  return Math.floor(3 * Math.pow(1.5, diff) + diff * 2 + 3);
+}
+
 function startLvlOf(id) {
-  const clears = (meta.sagaClears || {})[baseFormOf(id)] || 0;
-  const rawLvl = 5 + clears * 3;
+  const base = baseFormOf(id);
+  const purchased = (meta.charUpgrades || {})[base] || 0;
+  const rawLvl = 5 + purchased;
   const cap = maxStartLvlCap();
   return Math.min(rawLvl, cap);
+}
+
+function upgradeCharLvl(id) {
+  const base = baseFormOf(id);
+  meta.charUpgrades = meta.charUpgrades || {};
+  meta.logPoses = meta.logPoses || 0;
+  const curLvl = startLvlOf(id);
+  const cap = maxStartLvlCap();
+  if (curLvl >= cap) {
+    toast(`🔒 ${CHARS[id].name} ya alcanza el nivel máximo permitido para tus sagas (${cap}).`);
+    return false;
+  }
+  const cost = logPoseUpgradeCost(curLvl);
+  if (meta.logPoses < cost) {
+    toast(`⚠️ Te faltan Log Poses. Requiere ${cost} 🧭 (tienes ${meta.logPoses} 🧭).`);
+    return false;
+  }
+  meta.logPoses -= cost;
+  meta.charUpgrades[base] = (meta.charUpgrades[base] || 0) + 1;
+  saveMeta();
+  toast(`✨ ¡${CHARS[id].name} sube al Nivel ${startLvlOf(id)}! (${cost} 🧭 consumidos)`);
+  return true;
 }
 
 function startRun(sagaIdx, starterIds) {
@@ -2053,7 +2242,8 @@ function doMystery(island) {
         modalInfo('❓ Misterio', `<div class="reward-list">Un pirata quería unirse, pero la regla Nuzlocke lo impide.<br>Te deja 200 Berries de regalo.</div>`, screenMap);
       } else {
         const id = pick(island.pool);
-        const f = applyUpgrades(makeChar(id, island.lvl[0]));
+        const recLvl = Math.max(1, Math.floor(island.lvl[0] * 0.85));
+        const f = applyUpgrades(makeChar(id, recLvl));
         addToTeam(f, ok => {
           if (ok) {
             if (run.mode === 'nuzlocke') run.nuzCaught[run.islandIdx] = true;
@@ -2114,14 +2304,14 @@ function wildEncounter(wild) {
   }
   const recruit = () => {
     if (isLegendary) return;
-    const f = { ...wild };
-    applyUpgrades(f);
+    const recLvl = Math.max(1, Math.floor(wild.lvl * 0.85));
+    const f = applyUpgrades(makeChar(wild.id, recLvl));
     addToTeam(f, ok => {
       if (ok) {
         if (run.mode === 'nuzlocke') run.nuzCaught[run.islandIdx] = true;
         registerRecruit(f.id);
         saveRun();
-        modalInfo('🎉 ¡Nuevo nakama!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(f.id, 44)}</span><br><b>${c.name}</b> Nv${wild.lvl} se une a tu banda.</div>`, screenMap);
+        modalInfo('🎉 ¡Nuevo nakama!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(f.id, 44)}</span><br><b>${c.name}</b> Nv${f.lvl} se une a tu banda.</div>`, screenMap);
       } else {
         modalInfo('🌊 Se marcha', '<div class="reward-list">Dejas marchar al pirata con un saludo.</div>', screenMap);
       }
@@ -2439,13 +2629,14 @@ function specialBlockedReason() {
 }
 
 function specialJoin(id, lvl) {
-  const f = applyUpgrades(makeChar(id, lvl));
+  const recLvl = Math.max(1, Math.floor(lvl * 0.85));
+  const f = applyUpgrades(makeChar(id, recLvl));
   addToTeam(f, ok => {
     if (ok) {
       if (run.mode === 'nuzlocke') run.nuzCaught[run.islandIdx] = true;
       registerRecruit(id);
       saveRun();
-      modalInfo('🎉 ¡Nuevo nakama!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(id, 44)}</span><br><b>${CHARS[id].name}</b> Nv${lvl} se une a tu banda.</div>`, screenMap);
+      modalInfo('🎉 ¡Nuevo nakama!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(id, 44)}</span><br><b>${CHARS[id].name}</b> Nv${recLvl} se une a tu banda.</div>`, screenMap);
     } else {
       modalInfo('🌊 Trato deshecho', '<div class="reward-list">Dejas marchar al recluta. Lo pagado no se devuelve: negocios son negocios.</div>', screenMap);
     }
@@ -3725,6 +3916,15 @@ function afterRound() {
       meta.defeated.push(b.curE.id);
       saveMeta();
     }
+    // Recompensa de Log Poses al derrotar enemigos en historia
+    if (run && !b.tower) {
+      const sagaIdx = run.saga || 0;
+      const isBossEnemy = !!charData(b.curE).boss || b.opts.boss;
+      const logPosesWon = isBossEnemy ? (sagaIdx + 3) : (sagaIdx + 1);
+      meta.logPoses = (meta.logPoses || 0) + logPosesWon;
+      saveMeta();
+      log(`🧭 ¡Consigues ${logPosesWon} Log Pose! (Total: ${meta.logPoses})`);
+    }
     const xp = Math.floor(b.curE.lvl * 14 * (charData(b.curE).boss ? 1.6 : 1) * (b.opts.xpMult || 1));
     log(`¡Toda la banda gana ${xp} EXP!`);
     b.pTeam.forEach(f => { if (f.hp > 0) gainXP(f, xp, log); });
@@ -4113,11 +4313,12 @@ function crossoverReward(key) {
       if (!meta.recruited.includes(id)) meta.recruited.push(id);
       if (!meta.dex.includes(id)) meta.dex.push(id);
       saveMeta();
-      const f = applyUpgrades(makeChar(id, lvl));
+      const recLvl = Math.max(1, Math.floor(lvl * 0.85));
+      const f = applyUpgrades(makeChar(id, recLvl));
       addToTeam(f, ok => {
         if (ok) {
           modalInfo('🎉 ¡Nuevo nakama legendario!',
-            `<div class="reward-list"><span style="font-size:34px;">${CHARS[id].emoji}</span><br><b>${CHARS[id].name}</b> (${CHARS[id].rareza}⭐) Nv${lvl} se une a tu banda<br>y queda desbloqueado como veterano.</div>`,
+            `<div class="reward-list"><span style="font-size:34px;">${CHARS[id].emoji}</span><br><b>${CHARS[id].name}</b> (${CHARS[id].rareza}⭐) Nv${recLvl} se une a tu banda<br>y queda desbloqueado como veterano.</div>`,
             sagaComplete);
         } else {
           modalInfo('🌊 Se desvanece',
@@ -4166,13 +4367,6 @@ function sagaComplete() {
 
   // Guarda la banda completa (incluyendo legendarios/jefes) en meta.roster
   const addedLegendaries = unlockRoster(true);
-
-  // Cada nakama de la banda gana experiencia de saga: +3 Nv inicial en futuros viajes
-  meta.sagaClears = meta.sagaClears || {};
-  run.team.forEach(f => {
-    const b = baseFormOf(f.id);
-    meta.sagaClears[b] = (meta.sagaClears[b] || 0) + 1;
-  });
   saveMeta();
 
   const team = run.team;
@@ -4186,8 +4380,7 @@ function sagaComplete() {
       <span style="font-size:30px;">${team.map(f => charIcon(f.id, 38)).join(' ')}</span><br><br>
       ${team.map(f => `${charName(f)}${f.stars ? ` ⭐${f.stars}` : ''} Nv${f.lvl}`).join(' · ')}<br><br>
       ${rewardMessage}</p>
-      <p style="font-size:9px;color:#666;margin-bottom:14px;">Tus nakamas ${addedLegendaries.length ? '(¡incluyendo legendarios!) ' : ''}quedan disponibles como veteranos para próximas aventuras<br>
-      y empezarán los próximos viajes con +3 niveles por esta conquista.<br></p>
+      <p style="font-size:9px;color:#666;margin-bottom:14px;">Tus nakamas ${addedLegendaries.length ? '(¡incluyendo legendarios!) ' : ''}quedan disponibles como veteranos para próximas aventuras.<br></p>
       <button class="btn green" id="btn-fin">VOLVER AL PUERTO</button>
     </div>
   `);

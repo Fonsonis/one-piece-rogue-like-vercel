@@ -437,7 +437,8 @@
       "napoleon",
       "pedro",
       "lindbergh",
-      "koala"
+      "koala",
+      "usopp"
     ],
     "roster": [
       "kuina",
@@ -513,10 +514,11 @@
       "viola",
       "kyros",
       "pica",
-      "fujitora"
+      "fujitora",
+      "usopp"
     ],
     "towerRecord": 32,
-    "fame": 385,
+    "fame": 415,
     "upgrades": {
       "luffy": {
         "atk": 5,
@@ -540,7 +542,7 @@
         "spatk": 4
       }
     },
-    "accXp": 6035,
+    "accXp": 6065,
     "global": {
       "doblestarter": true,
       "berriesplus": true,
@@ -857,16 +859,24 @@
       }
     },
     "teamPresets": {
-      "1": [],
+      "1": [
+        "luffy",
+        "zoro",
+        "usopp"
+      ],
       "2": [],
       "3": []
     },
     "stats": {
-      "kills": 20,
+      "kills": 30,
       "items": 0
     },
     "relics": [],
     "soloWins": 0,
+    "logPoses": 8,
+    "charUpgrades": {
+      "usopp": 1
+    },
     "claimedAch": {
       "saga_1": true,
       "saga_5": true,
@@ -876,6 +886,6 @@
     },
     "totalIslands": 298
   },
-  "saved": "2026-09-04T16:13:30.255Z",
+  "saved": "2026-09-04T17:15:59.453Z",
   "run": null
 }
