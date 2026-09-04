@@ -483,16 +483,20 @@ function makeChar(id, lvl, isEnemy = false) {
 function applyUpgrades(f) {
   const u = meta.upgrades[baseFormOf(f.id)];
   if (!u) return f;
-  f.hpBonus = (u.hp || 0) * 3;
-  f.spdBonus = (u.spd || 0);
+  f.hpBonus = (u.hp || 0) * 6;
+  f.spdBonus = (u.spd || 0) * 2;
   f.maxhp += f.hpBonus;
   if (f.hp > 0) {
     f.hp = Math.min(f.maxhp, f.hp + f.hpBonus);
   }
-  f.atkBonus += u.atk || 0; f.atk += u.atk || 0;
-  f.defBonus += u.def || 0; f.def += u.def || 0;
-  f.spatkBonus = (f.spatkBonus || 0) + (u.spatk || 0); f.spatk += u.spatk || 0;
-  f.spdefBonus = (f.spdefBonus || 0) + (u.spdef || 0); f.spdef += u.spdef || 0;
+  const atkAdd = (u.atk || 0) * 2;
+  const defAdd = (u.def || 0) * 2;
+  const spatkAdd = (u.spatk || 0) * 2;
+  const spdefAdd = (u.spdef || 0) * 2;
+  f.atkBonus += atkAdd; f.atk += atkAdd;
+  f.defBonus += defAdd; f.def += defAdd;
+  f.spatkBonus = (f.spatkBonus || 0) + spatkAdd; f.spatk += spatkAdd;
+  f.spdefBonus = (f.spdefBonus || 0) + spdefAdd; f.spdef += spdefAdd;
   f.spd += f.spdBonus;
   return f;
 }
@@ -820,7 +824,7 @@ function showNodeConfirmModal(r, i) {
   let detailsText = '';
   switch (node.type) {
     case 'wild':
-      detailsText = 'Te enfrentarás a un pirata salvaje de esta zona. Tienes la oportunidad de combatirlo y reclutarlo para tu banda.';
+      detailsText = `Te enfrentarás a un pirata salvaje de esta zona. Tienes la oportunidad de combatirlo y reclutarlo para tu banda.<br>${cartelesBadgeHTML()}`;
       break;
     case 'marine':
       detailsText = 'Una patrulla de la Marina te ha cortado el paso. Enfréntate a ellos en combate táctico para obtener Berries y Log Poses.';
@@ -1542,8 +1546,8 @@ function screenSagas() {
             ${!isSagaUnlocked ? `
               <div class="saga-lock-banner">
                 🔒 SAGA BLOQUEADA<br>
-                <span style="font-weight:normal;font-size:8.5px;color:#ffeaad;">
-                  Debes completar la Dificultad <b>⚔️ Capitán</b> de la saga anterior (<b>${SAGAS[idx - 1].name}</b>).
+                <span style="font-weight:normal;font-size:9px;color:#ffeaad;">
+                  Debes completar Dificultad <b>⚔️ Capitán</b> en <b>${SAGAS[idx - 1] ? SAGAS[idx - 1].name : ''}</b>
                 </span>
               </div>` : `
               <div>
@@ -1617,7 +1621,7 @@ function screenSagas() {
     const s = SAGAS[idx];
     el.onclick = () => {
       if (!sagaUnlocked(idx)) {
-        toast(`🔒 Saga bloqueada. Debes completar la Dificultad Capitán de ${SAGAS[idx - 1].name}.`);
+        toast(`🔒 Debes completar Dificultad Capitán en ${SAGAS[idx - 1].name}.`);
         return;
       }
       if (!sagaDiffUnlocked(s.id, selectedDiff)) {
@@ -2591,6 +2595,14 @@ function doMystery(island) {
 // ============ ENCUENTRO SALVAJE ============
 function wildRecruitPrice(c) { return c.rareza * 150 * (run.islandIdx + 1); }
 
+function cartelesBadgeHTML() {
+  if (!run || !run.items) return '';
+  const c1 = run.items.cartel || 0;
+  const c2 = run.items.carteldorado || 0;
+  const c3 = run.items.cartelbuster || 0;
+  return `<div style="font-size:10.5px;background:rgba(255,215,0,0.16);padding:6px 10px;border-radius:6px;border:1px solid var(--gold);margin:8px 0;color:#222;text-align:center;"><b>📜 Carteles en tu bolsa:</b> 📜 ×${c1} Recluta ${c2 ? `· 🏅 ×${c2} Dorado` : ''} ${c3 ? `· 📯 ×${c3} Buster` : ''}</div>`;
+}
+
 function wildEncounter(wild) {
   const c = charData(wild);
   const isLegendary = c.rareza === 5;
@@ -2606,6 +2618,7 @@ function wildEncounter(wild) {
       <div class="special-stars">${'⭐'.repeat(c.rareza)}</div>
       ${typeBadges(c.types)}
     </div>
+    ${cartelesBadgeHTML()}
     ${isLegendary ? '<div class="special-fail" style="color:var(--gold);border-color:var(--gold);background:#fffbe8;">👑 ¡PIRATA LEGENDARIO (5⭐)!<br>Inmune al reclutamiento salvaje. ¡Únicamente puedes combatirlo!</div>' : nuzBlock ? '<div class="special-fail">Regla Nuzlocke: ya reclutaste en esta isla (solo puedes combatir).</div>' : ''}
     <div class="actions" style="flex-direction:column;align-items:stretch;">
       <button class="btn red" id="we-fight">⚔️ COMBATIR — gana XP para la banda</button>
@@ -2864,7 +2877,7 @@ function addToTeam(f, done) {
 // Muestra las características reales del personaje en la saga (nivel, fusiones y barco).
 function showCharModal(fOrId) {
   const isLive = typeof fOrId === 'object';
-  const f = isLive ? migrateFighter(fOrId) : makeChar(fOrId, 5);
+  const f = isLive ? migrateFighter(fOrId) : applyUpgrades(makeChar(fOrId, startLvlOf(fOrId)));
   const c = CHARS[f.id];
   const lore = (typeof LORE !== 'undefined' && LORE) ? (LORE[f.id] || LORE[baseFormOf(f.id)] || {}) : {};
   const spVal = lore.sp ? statAt(lore.sp, f.lvl) : null;
@@ -2872,21 +2885,26 @@ function showCharModal(fOrId) {
   const ultMv = getUltimateMove(f);
 
   const stats = [
-    ['PS', f.maxhp, 45], ['ATQ', f.atk, 20], ['DEF', f.def, 20],
-    ['E.ATQ', f.spatk, 20], ['E.DEF', f.spdef, 20],
-    ...(spVal !== null ? [['SP', spVal, 20]] : []), ['VEL', f.spd, 20],
+    ['PS', f.maxhp, 45, f.hpBonus || 0],
+    ['ATQ', f.atk, 20, f.atkBonus || 0],
+    ['DEF', f.def, 20, f.defBonus || 0],
+    ['E.ATQ', f.spatk, 20, f.spatkBonus || 0],
+    ['E.DEF', f.spdef, 20, f.spdefBonus || 0],
+    ...(spVal !== null ? [['SP', spVal, 20, 0]] : []),
+    ['VEL', f.spd, 20, f.spdBonus || 0],
   ];
   const isFru = c.types.includes('Fruta'), isHak = c.types.includes('Haki');
   const known = f.moves;
   const future = c.learnset.filter(([l, m]) => l > f.lvl && !known.includes(m));
   const starsTag = f.stars ? `<span style="color:var(--gold);font-size:16px;margin-left:6px;">⭐${f.stars}</span>` : '';
+  const hasUpgrades = (f.hpBonus || 0) + (f.atkBonus || 0) + (f.defBonus || 0) + (f.spatkBonus || 0) + (f.spdefBonus || 0) + (f.spdBonus || 0) > 0;
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal char-sheet">
-    <h2><span style="font-size:26px;">${charIcon(f.id, 34)}</span> ${c.name}${starsTag} ${isLive ? `<small>Nv${f.lvl}</small>` : '<small>Nv5 (base)</small>'}</h2>
+    <h2><span style="font-size:26px;">${charIcon(f.id, 34)}</span> ${c.name}${starsTag} <small>Nv.${f.lvl}</small></h2>
     ${typeBadges(c.types)}
     ${f.stars ? `<div class="sheet-line" style="color:var(--gold);background:rgba(255,215,0,0.1);padding:4px 8px;border-radius:4px;"><b>⭐ Fusión ${f.stars} Estrellas</b> — +${f.stars * 5}% a todas las características en esta partida</div>` : ''}
-    ${isLive ? `<div class="sheet-line" style="color:var(--gold);font-weight:bold;">📍 Características reales en esta Saga (nivel, fusiones y barco)</div>` : ''}
+    ${isLive ? `<div class="sheet-line" style="color:var(--gold);font-weight:bold;">📍 Características reales en combate (Nivel, Fusiones y Barco)</div>` : `<div class="sheet-line" style="color:var(--gold);font-weight:bold;">📍 Nivel base e incentivos del barco actuales${hasUpgrades ? ' (incluye mejoras del barco)' : ''}</div>`}
     ${isFru || isHak ? `<div class="sheet-line">
       ${isFru ? '<b>🍈 Tag FRUTA</b> — recibe la mitad de daño de atacantes sin HAKI. ' : ''}
       ${isHak ? '<b>👁️ Tag HAKI</b> — sus ataques anulan la defensa pasiva de los usuarios FRUTA.' : ''}
@@ -2895,10 +2913,10 @@ function showCharModal(fOrId) {
     ${lore.clase ? `<div class="sheet-line"><b>Clase:</b> ${lore.clase}</div>` : ''}
     ${lore.faccion ? `<div class="sheet-line"><b>Facción:</b> ${lore.faccion}</div>` : ''}
     <div class="sheet-stats">
-      ${stats.map(([label, val, max]) => `
+      ${stats.map(([label, val, max, bonus]) => `
         <div class="sheet-stat"><label>${label}</label>
           <div class="stat-bar"><i style="width:${clamp(val / (max * (1 + 0.085 * (f.lvl - 1)) * (1 + (f.stars || 0) * 0.05)) * 100, 4, 100)}%"></i></div>
-          <span><b>${val}</b></span>
+          <span><b>${val}</b>${bonus ? `<small style="color:var(--gold);font-size:7.5px;margin-left:2px;">(+${bonus})</small>` : ''}</span>
         </div>`).join('')}
     </div>
     <div class="sheet-line" style="text-align:center;color:#777;">
@@ -2983,6 +3001,7 @@ function doSpecialPirate(island) {
     <b>🎯 Elegir:</b> cualquier pirata del catálogo, pagando su caché completo.<br>
     <b>🎰 Carteles:</b> 5 carteles de SE BUSCA boca abajo. Destápalos en orden:
     el 1º es el más probable (recluta de 1⭐)... y el 5º, el premio gordo (5⭐).</p>
+    ${cartelesBadgeHTML()}
     ${blocked ? `<div class="special-fail">${blocked}</div>` : ''}
     <div class="actions" style="flex-direction:column;align-items:stretch;">
       <button class="btn blue" id="sp-choose" ${blocked ? 'disabled' : ''}>🎯 ELEGIR PIRATA — catálogo</button>
@@ -4918,12 +4937,12 @@ function nextCapitaniaItem() {
 }
 
 const UPG_STATS = [
-  ['hp', 'PS', '+3 PS máx.'],
-  ['atk', 'ATQ', '+1 ATQ'],
-  ['def', 'DEF', '+1 DEF'],
-  ['spatk', 'E.ATQ', '+1 E.ATQ'],
-  ['spdef', 'E.DEF', '+1 E.DEF'],
-  ['spd', 'VEL', '+1 VEL'],
+  ['hp', 'PS', '+6 PS máx.'],
+  ['atk', 'ATQ', '+2 ATQ'],
+  ['def', 'DEF', '+2 DEF'],
+  ['spatk', 'E.ATQ', '+2 E.ATQ'],
+  ['spdef', 'E.DEF', '+2 E.DEF'],
+  ['spd', 'VEL', '+2 VEL'],
 ];
 let shipBuyLock = 0;
 let shipSearchQ = '';

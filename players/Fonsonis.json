@@ -519,10 +519,10 @@
       "usopp"
     ],
     "towerRecord": 32,
-    "fame": 415,
+    "fame": 325,
     "upgrades": {
       "luffy": {
-        "atk": 5,
+        "atk": 6,
         "hp": 3,
         "def": 1,
         "spd": 2
@@ -874,9 +874,10 @@
     },
     "relics": [],
     "soloWins": 0,
-    "logPoses": 8,
+    "logPoses": 2,
     "charUpgrades": {
-      "usopp": 1
+      "usopp": 1,
+      "luffy": 1
     },
     "settings": {
       "showEventConfirm": true,
@@ -891,6 +892,6 @@
     },
     "totalIslands": 298
   },
-  "saved": "2026-09-04T19:57:04.723Z",
+  "saved": "2026-09-04T20:16:28.077Z",
   "run": null
 }
