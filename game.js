@@ -38,6 +38,7 @@ const storeKey = base => session ? `${base}_${session.user}` : base;
 let autoMode = false;
 let autoTimer = null;
 let autoSettings = {
+  speed: 'x2', // 'x1' (normal, mitad) o 'x2' (rápida, actual)
   healThreshold: 50, // 0 = desactivo, 25, 50, 75, 99
   nodePriority: 'random', // 'random', 'item', 'battle', 'rest'
   wildAction: 'fight', // 'fight', 'recruit', 'chains'
@@ -61,45 +62,59 @@ function stopAutoMode() {
 function scheduleAutoStep(fn, ms = 700) {
   if (!autoMode) return;
   if (autoTimer) clearTimeout(autoTimer);
+  const mult = (autoSettings.speed === 'x1') ? 2 : 1;
   autoTimer = setTimeout(() => {
     autoTimer = null;
     if (autoMode) fn();
-  }, ms);
+  }, ms * mult);
 }
 
 function runAutoItems() {
-  if (!autoMode || !autoSettings.healThreshold || !run || !run.items || !run.team) return;
-  const isNuz = run.mode === 'nuzlocke';
+  if (!autoMode || !autoSettings.healThreshold) return;
+  const isCombat = typeof battle !== 'undefined' && battle && !battle.over;
+  const targetRun = isCombat ? { items: battle.items, team: battle.pTeam } : run;
+  if (!targetRun || !targetRun.items || !targetRun.team) return;
+  const isNuz = typeof run !== 'undefined' && run && run.mode === 'nuzlocke';
   const thresh = autoSettings.healThreshold;
-  if (!isNuz && (run.items.sake || 0) > 0) {
-    const dead = run.team.find(f => f.hp <= 0);
+
+  if (!isNuz && (targetRun.items.sake || 0) > 0) {
+    const dead = targetRun.team.find(f => f.hp <= 0);
     if (dead) {
-      run.items.sake--;
+      targetRun.items.sake--;
       dead.hp = Math.floor(dead.maxhp * 0.5);
-      toast(`🤖 Auto: ${charName(dead)} revivido con Sake 🍶`);
+      const msg = `🤖 Auto: ${charName(dead)} revivido con Sake 🍶`;
+      if (isCombat) log(msg); else toast(msg);
     }
   }
-  for (const f of run.team) {
+  for (const f of targetRun.team) {
     if (f.hp > 0) {
       const pct = (f.hp / f.maxhp) * 100;
       if (pct <= thresh) {
-        if ((run.items.carnereal || 0) > 0 && f.hp < f.maxhp * 0.5) {
-          run.items.carnereal--;
+        if ((targetRun.items.carnereal || 0) > 0 && f.hp < f.maxhp * 0.5) {
+          targetRun.items.carnereal--;
           f.hp = f.maxhp;
-          toast(`🤖 Auto: Carne Real usada en ${charName(f)} 🥩`);
-        } else if ((run.items.carne || 0) > 0) {
-          run.items.carne--;
+          const msg = `🤖 Auto: Carne Real usada en ${charName(f)} 🥩`;
+          if (isCombat) log(msg); else toast(msg);
+        } else if ((targetRun.items.carne || 0) > 0) {
+          targetRun.items.carne--;
           f.hp = Math.min(f.maxhp, f.hp + 40);
-          toast(`🤖 Auto: Carne usada en ${charName(f)} 🍖`);
-        } else if ((run.items.bocadillo || 0) > 0) {
-          run.items.bocadillo--;
+          const msg = `🤖 Auto: Carne usada en ${charName(f)} 🍖`;
+          if (isCombat) log(msg); else toast(msg);
+        } else if ((targetRun.items.bocadillo || 0) > 0) {
+          targetRun.items.bocadillo--;
           f.hp = Math.min(f.maxhp, f.hp + 25);
-          toast(`🤖 Auto: Bocadillo usado en ${charName(f)} 🥪`);
+          const msg = `🤖 Auto: Bocadillo usado en ${charName(f)} 🥪`;
+          if (isCombat) log(msg); else toast(msg);
         }
       }
     }
   }
-  saveRun();
+  if (isCombat) {
+    refreshHPCards();
+    refreshControls();
+  } else if (typeof saveRun === 'function') {
+    saveRun();
+  }
 }
 
 function pickAutoNode(reach) {
@@ -129,6 +144,17 @@ function showAutoSettingsModal() {
     
     <div style="display:flex;flex-direction:column;gap:12px;margin:14px 0;text-align:left;">
       
+      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
+        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
+          ⚡ Velocidad del Modo Automático
+        </label>
+        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Elige el ritmo de avance en mapa y combate:</div>
+        <select id="auto-speed-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
+          <option value="x2" ${autoSettings.speed === 'x2' || !autoSettings.speed ? 'selected' : ''}>⚡ Modo x2 (Rápido - Velocidad actual)</option>
+          <option value="x1" ${autoSettings.speed === 'x1' ? 'selected' : ''}>🚶 Modo x1 (Normal - Mitad de velocidad)</option>
+        </select>
+      </div>
+
       <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
         <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
           🍖 Consumo Automático de Objetos
@@ -213,6 +239,7 @@ function showAutoSettingsModal() {
   document.body.appendChild(ov);
 
   const saveFormSettings = () => {
+    autoSettings.speed = ov.querySelector('#auto-speed-sel').value;
     autoSettings.healThreshold = +ov.querySelector('#auto-heal-sel').value;
     autoSettings.nodePriority = ov.querySelector('#auto-node-sel').value;
     autoSettings.wildAction = ov.querySelector('#auto-wild-sel').value;
@@ -392,8 +419,9 @@ function migrateFighter(f) {
     f.spatk = statAt(CHARS[f.id].base[3], f.lvl) + (f.atkBonus || 0);
     f.spdef = statAt(CHARS[f.id].base[4], f.lvl) + (f.defBonus || 0);
   }
-  // partidas anteriores a las mejoras E.ATQ/E.DEF: el ATQ/DEF del Barco potenciaba ambas vertientes
   if (f.spatkBonus == null) { f.spatkBonus = f.atkBonus || 0; f.spdefBonus = f.defBonus || 0; }
+  if (f.ultCharge == null) f.ultCharge = 0;
+  if (f.moves && f.moves.length > 2) f.moves = f.moves.slice(-2);
   return f;
 }
 loadRun();
@@ -405,7 +433,7 @@ function xpForLevel(lvl) { return Math.floor(lvl * lvl * 6); }
 
 function makeChar(id, lvl, isEnemy = false) {
   const c = CHARS[id];
-  const moves = c.learnset.filter(([l]) => l <= lvl).map(([, m]) => m).slice(-4);
+  const moves = c.learnset.filter(([l]) => l <= lvl).map(([, m]) => m).slice(-2);
   if (!moves.length) moves.push(c.learnset[0][1]); // nunca sin movimientos
   let diffMult = 1.0;
   if (isEnemy && typeof run !== 'undefined' && run && run.diff > 1) {
@@ -422,7 +450,7 @@ function makeChar(id, lvl, isEnemy = false) {
     spdef: Math.floor(statAt(c.base[4], lvl) * diffMult),
     spd: Math.floor(statAt(c.base[5], lvl) * diffMult),
     atkBonus: 0, defBonus: 0, spatkBonus: 0, spdefBonus: 0,
-    xp: 0, moves,
+    xp: 0, moves, ultCharge: 0,
   };
 }
 // Aplica las mejoras permanentes del Barco (solo a personajes del jugador)
@@ -460,11 +488,11 @@ function gainXP(f, amount, log) {
     f.spdef = statAt(c.base[4], f.lvl) + (f.spdefBonus || 0);
     f.spd = statAt(c.base[5], f.lvl) + (f.spdBonus || 0);
     msgs.push(`¡${c.name} sube al nivel ${f.lvl}!`);
-    // nuevos movimientos
+    // nuevos movimientos (máximo 2 ataques regulares)
     for (const [l, m] of c.learnset) {
       if (l === f.lvl && !f.moves.includes(m)) {
         f.moves.push(m);
-        if (f.moves.length > 4) f.moves.shift();
+        if (f.moves.length > 2) f.moves.shift();
         msgs.push(`¡${c.name} aprende ${MOVES[m].name}!`);
       }
     }
@@ -624,7 +652,34 @@ function toggleMute() {
   try { localStorage.setItem('oplike_muted', String(isMuted)); } catch (e) { }
   if (bgmAudio) bgmAudio.muted = isMuted;
   const btn = $('#btn-mute');
-  if (btn) btn.textContent = isMuted ? '🔇' : '🎵';
+  if (btn) btn.textContent = isMuted ? '🔇 MÚSICA' : '🎵 MÚSICA';
+}
+
+function cycleTopbarAuto() {
+  if (!autoMode) {
+    autoMode = true;
+    autoSettings.speed = 'x1';
+    toast('🤖 Modo Auto: ACTIVADO (x1)');
+  } else if (autoSettings.speed === 'x1') {
+    autoSettings.speed = 'x2';
+    toast('⚡ Modo Auto: Velocidad x2');
+  } else {
+    autoMode = false;
+    if (autoTimer) {
+      clearTimeout(autoTimer);
+      autoTimer = null;
+    }
+    toast('⏹️ Modo Auto: PAUSADO');
+  }
+  if (typeof battle !== 'undefined' && battle && !battle.over) {
+    if (autoMode) battle.speed = (autoSettings.speed === 'x1') ? 1 : 2;
+    refreshControls();
+    renderBattlePreserveLog();
+  } else if (typeof run !== 'undefined' && run) {
+    screenMap();
+  } else {
+    screenHome();
+  }
 }
 
 // ---------- Render raíz ----------
@@ -632,6 +687,8 @@ function render(html) {
   app.innerHTML = html;
   const btn = $('#btn-mute');
   if (btn) btn.onclick = toggleMute;
+  const autoBtn = $('#btn-topbar-auto');
+  if (autoBtn) autoBtn.onclick = cycleTopbarAuto;
 }
 function toast(msg) {
   const t = document.createElement('div');
@@ -648,11 +705,16 @@ function typeBadges(types) {
 function berriesHTML(v) { return `฿${v.toLocaleString('es')}`; }
 
 function topbar(showBerries) {
+  const autoLabel = !autoMode ? '🤖 PAUSADO' : (autoSettings.speed === 'x1' ? '🤖 AUTO x1' : '🤖 AUTO x2');
+  const autoBtnClass = !autoMode ? 'gray' : 'green';
   return `<div class="topbar">
     <div class="logo">GRAND<span>LINE</span>LIKE</div>
     <div style="display:flex;align-items:center;gap:6px;">
       ${showBerries && run ? `<div class="berries">${berriesHTML(run.berries)}</div>` : ''}
-      <button class="btn small gray" id="btn-mute" style="padding:6px 8px;font-size:12px;" title="Activar/Silenciar música">${isMuted ? '🔇' : '🎵'}</button>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+        <button class="btn small gray" id="btn-mute" style="padding:4px 6px;font-size:10px;" title="Activar/Silenciar música">${isMuted ? '🔇 MÚSICA' : '🎵 MÚSICA'}</button>
+        <button class="btn small ${autoBtnClass}" id="btn-topbar-auto" style="padding:3px 6px;font-size:7.5px;white-space:nowrap;" title="Cambiar velocidad o activar/pausar modo auto">${autoLabel}</button>
+      </div>
     </div>
   </div>`;
 }
@@ -1165,10 +1227,12 @@ function screenSagas() {
     return `
         <div class="saga-row ${isUnlocked ? '' : 'locked'} ${isSelectedCleared ? 'diff-cleared' : ''}" data-saga="${idx}">
           <div class="saga-art" style="background:${s.img ? `url('${s.img}') center/cover no-repeat` : s.color || '#777'};">
-            <div class="saga-art-overlay">
-              <div class="saga-art-title">${isUnlocked ? '' : '🔒 '}${s.name}</div>
-              <div class="saga-art-sub">${s.sub}</div>
-            </div>
+            ${isUnlocked ? '' : `
+              <div class="saga-art-overlay">
+                <div class="saga-art-title">🔒 ${s.name}</div>
+                <div class="saga-art-sub">${s.sub}</div>
+              </div>
+            `}
           </div>
           <div class="saga-stats">
             ${!isUnlocked ? `
@@ -2116,6 +2180,27 @@ function addToTeam(f, done) {
   const existing = run.team.find(m => baseFormOf(m.id) === baseFormOf(f.id));
   if (existing) {
     existing.stars = (existing.stars || 0) + 1;
+    const oldLvl = existing.lvl;
+    const newLvl = Math.max(existing.lvl, f.lvl);
+    if (newLvl > oldLvl) {
+      existing.lvl = newLvl;
+      existing.xp = f.xp || 0;
+      const c = CHARS[existing.id];
+      if (c) {
+        existing.maxhp = hpAt(c.base[0], existing.lvl);
+        existing.atk = statAt(c.base[1], existing.lvl);
+        existing.def = statAt(c.base[2], existing.lvl);
+        existing.spatk = statAt(c.base[3], existing.lvl);
+        existing.spdef = statAt(c.base[4], existing.lvl);
+        existing.spd = statAt(c.base[5], existing.lvl);
+        const updatedMoves = c.learnset.filter(([l]) => l <= existing.lvl).map(([, m]) => m).slice(-2);
+        if (updatedMoves.length) existing.moves = updatedMoves;
+        if (c.evo && existing.lvl >= c.evo.lvl) {
+          existing.id = c.evo.to;
+        }
+        applyUpgrades(existing);
+      }
+    }
     const boostHP = Math.max(1, Math.floor(existing.maxhp * 0.05));
     existing.maxhp += boostHP;
     existing.hp = Math.min(existing.maxhp, existing.hp + boostHP);
@@ -2126,7 +2211,7 @@ function addToTeam(f, done) {
     existing.spd = Math.floor(existing.spd * 1.05);
 
     saveRun();
-    toast(`⭐ ¡FUSIÓN! ${charData(existing).emoji} ${charName(existing)} alcanza ⭐${existing.stars} estrella(s) (+5% a todas las stats).`);
+    toast(`⭐ ¡FUSIÓN! ${charData(existing).emoji} ${charName(existing)} alcanza ⭐${existing.stars} estrella(s) (Nv${existing.lvl}).`);
     done && done(true);
     return;
   }
@@ -2172,8 +2257,11 @@ function showCharModal(fOrId) {
   const isLive = typeof fOrId === 'object';
   const f = isLive ? migrateFighter(fOrId) : makeChar(fOrId, 5);
   const c = CHARS[f.id];
-  const lore = LORE[f.id] || LORE[baseFormOf(f.id)] || {};
+  const lore = (typeof LORE !== 'undefined' && LORE) ? (LORE[f.id] || LORE[baseFormOf(f.id)] || {}) : {};
   const spVal = lore.sp ? statAt(lore.sp, f.lvl) : null;
+  const pInfo = passiveInfo(f);
+  const ultMv = getUltimateMove(f);
+
   const stats = [
     ['PS', f.maxhp, 45], ['ATQ', f.atk, 20], ['DEF', f.def, 20],
     ['E.ATQ', f.spatk, 20], ['E.DEF', f.spdef, 20],
@@ -2207,18 +2295,19 @@ function showCharModal(fOrId) {
     <div class="sheet-line" style="text-align:center;color:#777;">
       EVA ${Math.round(BASE_EVA * 100)}% · CRIT ${Math.round(BASE_CRIT * 100)}% (x${BASE_CRIT_DMG}) — mejorables con sinergias
     </div>
-    <div class="sheet-section"><b>⚔️ Movimientos</b>
+    <div class="sheet-section"><b>⚔️ Movimientos Ataque</b>
       ${known.map(m => {
-    const mv = MOVES[m];
-    const cat = mv.power === 0 ? '' : isPhysType(mv.type) ? ' · FÍS' : ' · ESP';
-    return `<div class="sheet-move"><span class="type-badge" style="background:${TYPES[mv.type].color}">${mv.type.toUpperCase()}</span>
-          ${mv.name} <small>${mv.power ? mv.power + ' PWR · ' + Math.round(mv.acc * 100) + '%' + cat : 'APOYO'}</small></div>`;
-  }).join('')}
-      ${future.map(([l, m]) => `<div class="sheet-move future">🔒 Nv${l} — ${MOVES[m].name}</div>`).join('')}
+        const mv = MOVES[m];
+        if (!mv) return '';
+        const cat = mv.power === 0 ? '' : isPhysType(mv.type) ? ' · FÍS' : ' · ESP';
+        return `<div class="sheet-move"><span class="type-badge" style="background:${TYPES[mv.type]?.color || '#888'}">${mv.type.toUpperCase()}</span>
+              ${mv.name} <small>${mv.power ? mv.power + ' PWR · ' + Math.round((mv.acc || 0.9) * 100) + '%' + cat : 'APOYO'}</small></div>`;
+      }).join('')}
+      ${future.map(([l, m]) => `<div class="sheet-move future">🔒 Nv${l} — ${MOVES[m] ? MOVES[m].name : m}</div>`).join('')}
     </div>
-    ${lore.pasiva ? `<div class="sheet-section"><b>✨ Pasiva — ${lore.pasiva.name}</b><p>${lore.pasiva.desc}</p></div>` : ''}
-    ${lore.ulti ? `<div class="sheet-section"><b>💥 Definitiva — ${lore.ulti.name}</b><p>${lore.ulti.desc}</p></div>` : ''}
-    ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>Al nivel ${c.evo.lvl} se convierte en ${CHARS[c.evo.to].name}.</p></div>` : ''}
+    ${pInfo ? `<div class="sheet-section"><b>✨ Pasiva — ${pInfo.label}</b><p>${pInfo.desc}</p></div>` : ''}
+    ${ultMv ? `<div class="sheet-section"><b>💥 Habilidad Definitiva — ${ultMv.name}</b><p>${ultMv.type ? `<span class="type-badge" style="background:${TYPES[ultMv.type]?.color || '#888'}">${ultMv.type.toUpperCase()}</span> ` : ''}${ultMv.power ? ultMv.power + ' PWR · ' + Math.round((ultMv.acc || 0.9) * 100) + '% precisión' : 'MOVIMIENTO DEFINITIVO'}</p></div>` : ''}
+    ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>Al nivel ${c.evo.lvl} se convierte en ${CHARS[c.evo.to] ? CHARS[c.evo.to].name : c.evo.to}.</p></div>` : ''}
     <p class="sheet-desc">${c.desc}</p>
     <div class="actions"><button class="btn gray" id="sheet-close">CERRAR</button></div>
   </div>`;
@@ -2563,19 +2652,90 @@ const activeE = () => battle.eTeam.find(f => f.hp > 0);
 const isP = (f, id) => baseFormOf(f.id) === id;
 const teamOf = f => (battle && battle.pTeam.includes(f)) ? battle.pTeam : (battle ? battle.eTeam : []);
 
+// Compendio de pasivas para personajes de 4 y 5 estrellas (One Piece y Crossover)
+const STAR_45_PASSIVES = {
+  luffy2: { name: 'Gear Second', desc: 'Aumenta el ataque y la velocidad en combate por el bombeo de sangre.' },
+  zoro2: { name: 'Estilo de 3 Espadas', desc: 'Aumenta la probabilidad de golpe crítico conforme disminuyen sus PS.' },
+  nami2: { name: 'Clima-Tact Avanzado', desc: 'Aumenta la evasión de todo el equipo un 10%.' },
+  arlong: { name: 'Orgullo Gyojin', desc: 'Aumenta el daño de los ataques Físicos y de Agua.' },
+  crocodile: { name: 'Cuerpo de Arena', desc: 'Reduce el daño recibido de ataques que no sean de Agua.' },
+  enel: { name: 'Mantra Divino', desc: 'Aumenta el daño de Rayo y esquiva el primer impacto recibido.' },
+  lucci: { name: 'Garra de Depredador', desc: 'Aumenta el daño de ataques Físicos un 15%.' },
+  moria: { name: 'Robo de Sombras', desc: 'Drena un 3% de los PS del rival cada ronda.' },
+  jinbe: { name: 'Karate Gyojin', desc: 'Aumenta la defensa y el daño de Agua un 15%.' },
+  hancock: { name: 'Mero Mero Mellow', desc: 'Los ataques pueden petrificar y ralentizar al rival.' },
+  magellan: { name: 'Veneno Corrosivo', desc: 'Aumenta el daño de movimientos de Veneno un 25%.' },
+  sengoku: { name: 'Gran Buda', desc: 'Aumenta la DEF y la ESP_DEF un 20%.' },
+  newgate: { name: 'Terremoto de Barbablanca', desc: '+25% de ATQ al estar por debajo del 50% de PS.' },
+  roger: { name: 'Voluntad del Rey Pirata', desc: 'Aumenta el daño de todo el equipo un 20%.' },
+  shanks: { name: 'Haki del Conquistador', desc: 'Debilita el ATQ del enemigo un 15%.' },
+  teach: { name: 'Vórtice Oscuro', desc: '+25% de daño contra usuarios de Fruta del Diablo.' },
+  garp: { name: 'Puño de Hierro', desc: 'Ignora un 30% de la defensa enemiga.' },
+  akainu: { name: 'Magma Hirviente', desc: 'Aumenta el daño de ataques de Fuego un 20%.' },
+  kizaru: { name: 'Velocidad Destello', desc: 'Aumenta la velocidad un 30%.' },
+  aokiji: { name: 'Era de Hielo', desc: 'Ralentiza al enemigo al asestar un golpe.' },
+  dragon: { name: 'Viento del Destino', desc: 'Aumenta la evasión de la banda un 15%.' },
+  mihawk: { name: 'Ojo de Halcón', desc: '+15% de probabilidad de golpe crítico.' },
+  oden: { name: 'Espadachín de Wano', desc: '+10% de crítico y +20% de daño crítico.' },
+  doflamingo: { name: 'Titiritero', desc: 'Aumenta el daño de ataques especiales un 15%.' },
+  katakuri: { name: 'Futuro Inalterable', desc: 'Esquiva los 2 primeros ataques del combate.' },
+  bigmom: { name: 'Soul Pocus', desc: 'Drena un 4% de los PS máximos del rival cada ronda.' },
+  kaido: { name: 'Piel de Dragón', desc: 'Reduce el daño recibido un 15% y aumenta la defensa.' },
+  yamato: { name: 'Espejo Divino', desc: 'Aumenta la defensa y el ataque un 15%.' },
+  king: { name: 'Llama Lunaria', desc: 'Aumenta la resistencia a los ataques recibidos.' },
+  queen: { name: 'Virus de Plaga', desc: 'Aumenta el daño de veneno un 20%.' },
+  kid: { name: 'Magnetismo', desc: 'Aumenta el daño de ataques Físicos un 15%.' },
+  law: { name: 'Room Cirujano', desc: 'Aumenta el daño especial un 15%.' },
+  sabo: { name: 'Garra del Dragón', desc: 'Aumenta el daño de ataques de Fuego un 15%.' },
+  cavendish: { name: 'Hakuba', desc: '+25% de velocidad al bajar del 50% de PS.' },
+  kyros: { name: 'Gladiador Invicto', desc: 'Aumenta el ATQ físico un 15%.' },
+  fujitora: { name: 'Gravedad Pesada', desc: 'Reduce la velocidad del enemigo un 20%.' },
+  ryokugyu: { name: 'Regeneración Forestal', desc: 'Recupera un 5% de PS al final de cada ronda.' },
+  garling: { name: 'Juicio Celestial', desc: 'Aumenta el daño físico un 20%.' },
+  saturn: { name: 'Regeneración Abisal', desc: 'Recupera un 5% de PS al final de cada ronda.' },
+  mars: { name: 'Vuelo Bestial', desc: 'Aumenta la velocidad un 20%.' },
+  warcury: { name: 'Piel de Incondicional', desc: 'Aumenta la defensa un 25%.' },
+  nusjuro: { name: 'Corte Gélido', desc: 'Aumenta el daño de Corte e Hielo un 20%.' },
+  jupeter: { name: 'Devorador Terrestre', desc: 'Aumenta los PS máximos y la defensa.' },
+  im: { name: 'Sombra del Trono', desc: 'Aumenta el daño de Oscuridad y Haki un 25%.' },
+  xebec: { name: 'Furia Salvaje', desc: 'Aumenta el ataque un 25%.' },
+  
+  // Crossover 4⭐ / 5⭐
+  naruto: { name: 'Modo Senjutsu', desc: 'Aumenta el daño de Viento y la velocidad un 15%.' },
+  sasuke: { name: 'Sharingan', desc: '+15% de crítico y aumenta el daño de Rayo.' },
+  kakashi: { name: 'Ninja Copia', desc: 'Aumenta la evasión y la velocidad un 15%.' },
+  itadori: { name: 'Puño Divergente', desc: 'Aumenta el daño de ataques físicos un 15%.' },
+  yuta: { name: 'Energía Maldita (Rika)', desc: 'Aumenta el ataque especial un 15%.' },
+  gojo: { name: 'Infinito', desc: 'Esquiva el primer ataque recibido en combate.' },
+  tanjiro: { name: 'Danza del Dios del Fuego', desc: 'Aumenta el daño de Fuego y Agua un 15%.' },
+  zenitsu: { name: 'Respiración del Rayo', desc: '+30% de velocidad y +15% de crítico.' },
+  inosuke: { name: 'Asalto de la Bestia', desc: 'Aumenta el ataque físico un 15%.' },
+  nezuko: { name: 'Sangre Ardiente', desc: 'Aumenta el daño de Fuego y la resistencia.' },
+  goku: { name: 'Super Saiyan', desc: '+20% de ATQ al bajar del 70% de PS.' },
+  vegeta: { name: 'Orgullo Saiyan', desc: '+15% de ATQ y +10% de probabilidad de crítico.' },
+  gohan: { name: 'Ira Desatada', desc: '+20% de ATQ al recibir daño en combate.' },
+  genos: { name: 'Incineración', desc: 'Aumenta el daño de Fuego y Rayo un 20%.' },
+  garou: { name: 'Cazador de Héroes', desc: '+15% de ATQ y +10% de evasión.' },
+  tatsumaki: { name: 'Telequinesis', desc: 'Aumenta el daño de ataques especiales un 20%.' },
+  orochimaru: { name: 'Sustitución de Serpiente', desc: 'Recupera un 5% de PS al final de cada ronda.' },
+  madara: { name: 'Susanoo Definitivo', desc: 'Aumenta la defensa y la defensa especial un 25%.' },
+  sukuna: { name: 'Corte Desmantelar', desc: 'Aumenta el daño de movimientos de Corte un 20%.' },
+  kibutsuji: { name: 'Biokinesis Demoniaca', desc: 'Recupera un 5% de PS al final de cada ronda.' },
+  gokuui: { name: 'Doctrina del Egoísta', desc: '+25% de evasión y +20% de velocidad.' },
+  jiren: { name: 'Fuerza Absoluta', desc: '+25% de ataque y defensa.' },
+  cell: { name: 'Células Perfectas', desc: 'Recupera un 5% de PS al final de cada ronda.' },
+  frieza: { name: 'Emperador del Universo', desc: '+20% de daño contra objetivos con poca salud.' },
+  zenosama: { name: 'Borrado Divino', desc: 'Aumenta el daño general un 25%.' },
+  saitama: { name: 'Entrenamiento Serio', desc: '+35% al daño de ataques Físicos.' },
+};
+
 // Estado en tiempo real de cada pasiva implementada
 const PASSIVE_IMPL = {
-  luffy: f => ({ active: f.hp > 0 && f.hp < f.maxhp * 0.5 }),
-  zoro: f => ({ active: f.hp > 0 && f.hp < f.maxhp, extra: `+${Math.round(25 * (1 - f.hp / Math.max(1, f.maxhp)))}% crít` }),
-  nami: f => ({ active: f.hp > 0 }),
-  usopp: f => ({ active: f.hp > 0 }),
-  sanji: f => ({ active: f.hp > 0 }),
-  franky: f => ({ active: f.hp > 0 }),
-  brook: f => ({ active: !f.reviveUsed }),
+  luffy2: f => ({ active: f.hp > 0 }),
+  zoro2: f => ({ active: f.hp > 0 && f.hp < f.maxhp, extra: `+${Math.round(25 * (1 - f.hp / Math.max(1, f.maxhp)))}% crít` }),
+  nami2: f => ({ active: f.hp > 0 }),
   marco: f => ({ active: f.hp > 0 }),
   katakuri: f => ({ active: (f.dodgeLeft || 0) > 0, extra: `${f.dodgeLeft || 0} esquivas` }),
-  buggy: f => ({ active: f.hp > 0 }),
-  // 5 estrellas One Piece
   roger: f => ({ active: f.hp > 0 }),
   newgate: f => ({ active: f.hp > 0 && f.hp < f.maxhp * 0.5 }),
   kaido: f => ({ active: f.hp > 0 }),
@@ -2601,29 +2761,70 @@ const PASSIVE_IMPL = {
   jupeter: f => ({ active: f.hp > 0 }),
   im: f => ({ active: f.hp > 0 }),
   xebec: f => ({ active: f.hp > 0 }),
-  // Crossover 5 estrellas
+  naruto: f => ({ active: f.hp > 0 }),
+  sasuke: f => ({ active: f.hp > 0 }),
+  kakashi: f => ({ active: f.hp > 0 }),
+  itadori: f => ({ active: f.hp > 0 }),
+  yuta: f => ({ active: f.hp > 0 }),
+  gojo: f => ({ active: (f.dodgeLeft || 0) > 0, extra: `${f.dodgeLeft || 0} esquiva` }),
+  tanjiro: f => ({ active: f.hp > 0 }),
+  zenitsu: f => ({ active: f.hp > 0 }),
+  inosuke: f => ({ active: f.hp > 0 }),
+  nezuko: f => ({ active: f.hp > 0 }),
   goku: f => ({ active: f.hp > 0 && f.hp < f.maxhp * 0.7 }),
-  gokuui: f => ({ active: f.hp > 0 && f.hp < f.maxhp * 0.7 }),
+  gokuui: f => ({ active: f.hp > 0 }),
   vegeta: f => ({ active: f.hp > 0 }),
-  jiren: f => ({ active: f.hp > 0 }),
-  saitama: f => ({ active: f.hp > 0 }),
+  gohan: f => ({ active: f.hp > 0 }),
+  genos: f => ({ active: f.hp > 0 }),
+  garou: f => ({ active: f.hp > 0 }),
+  tatsumaki: f => ({ active: f.hp > 0 }),
+  orochimaru: f => ({ active: f.hp > 0 }),
   madara: f => ({ active: f.hp > 0 }),
   sukuna: f => ({ active: f.hp > 0 }),
-  gojo: f => ({ active: (f.dodgeLeft || 0) > 0, extra: `${f.dodgeLeft || 0} esquiva` }),
   kibutsuji: f => ({ active: f.hp > 0 }),
   cell: f => ({ active: f.hp > 0 }),
   frieza: f => ({ active: f.hp > 0 }),
   zenosama: f => ({ active: f.hp > 0 }),
+  saitama: f => ({ active: f.hp > 0 }),
+  jiren: f => ({ active: f.hp > 0 }),
+  arlong: f => ({ active: f.hp > 0 }),
+  crocodile: f => ({ active: f.hp > 0 }),
+  enel: f => ({ active: f.hp > 0 }),
+  lucci: f => ({ active: f.hp > 0 }),
+  moria: f => ({ active: f.hp > 0 }),
+  jinbe: f => ({ active: f.hp > 0 }),
+  hancock: f => ({ active: f.hp > 0 }),
+  magellan: f => ({ active: f.hp > 0 }),
+  doflamingo: f => ({ active: f.hp > 0 }),
+  yamato: f => ({ active: f.hp > 0 }),
+  king: f => ({ active: f.hp > 0 }),
+  queen: f => ({ active: f.hp > 0 }),
+  kid: f => ({ active: f.hp > 0 }),
+  law: f => ({ active: f.hp > 0 }),
+  sabo: f => ({ active: f.hp > 0 }),
+  cavendish: f => ({ active: f.hp > 0 && f.hp < f.maxhp * 0.5 }),
+  kyros: f => ({ active: f.hp > 0 }),
 };
 
 function passiveInfo(f) {
+  const c = charData(f);
+  if (!c || c.rareza < 4) return null; // Únicamente los personajes de 4 y 5 estrellas tienen pasiva
+
   const base = baseFormOf(f.id);
-  const lore = LORE[f.id] || LORE[base];
-  if (!lore || !lore.pasiva) return null;
-  const impl = PASSIVE_IMPL[base];
-  let active = false, extra = '';
-  if (impl) { const st = impl(f); active = st.active; extra = st.extra ? ` (${st.extra})` : ''; }
-  return { label: lore.pasiva.name + extra, active, desc: lore.pasiva.desc, implemented: !!impl };
+  const lore = (typeof LORE !== 'undefined' && LORE) ? (LORE[f.id] || LORE[base]) : null;
+  let pData = (lore && lore.pasiva) ? lore.pasiva : (STAR_45_PASSIVES[f.id] || STAR_45_PASSIVES[base]);
+  if (!pData) {
+    pData = { name: 'Voluntad Indomable', desc: 'Aumenta las capacidades de combate de este personaje destacado.' };
+  }
+
+  const impl = PASSIVE_IMPL[f.id] || PASSIVE_IMPL[base];
+  let active = f.hp > 0, extra = '';
+  if (impl) {
+    const st = impl(f);
+    active = st.active;
+    extra = st.extra ? ` (${st.extra})` : '';
+  }
+  return { label: pData.name + extra, active, desc: pData.desc, implemented: true };
 }
 
 // ---------- Sinergias de equipo (rediseño) ----------
@@ -2817,10 +3018,89 @@ function showTypeChartModal(team) {
   ov.onclick = e => { if (e.target === ov) ov.remove(); };
 }
 
+const CROSSOVER_ULTIMATES = {
+  naruto: { name: 'Rasengan Shuriken', type: 'Viento', power: 140, acc: 0.9 },
+  sasuke: { name: 'Kirin', type: 'Rayo', power: 140, acc: 0.9 },
+  kakashi: { name: 'Raikiri', type: 'Rayo', power: 135, acc: 0.95 },
+  itadori: { name: 'Kokusen (Destello Negro)', type: 'Golpe', power: 145, acc: 0.85 },
+  yuta: { name: 'Amor Puro (Rika)', type: 'Corte', power: 140, acc: 0.9 },
+  gojo: { name: 'Vacío Inconmensurable', type: 'Oscuridad', power: 150, acc: 0.85 },
+  tanjiro: { name: 'Danza del Dios del Fuego', type: 'Fuego', power: 140, acc: 0.9 },
+  zenitsu: { name: 'Respiración del Rayo: 7ª Postura', type: 'Rayo', power: 145, acc: 0.9 },
+  inosuke: { name: 'Colmillo Desgarrador', type: 'Corte', power: 135, acc: 0.9 },
+  nezuko: { name: 'Explosión de Sangre', type: 'Fuego', power: 135, acc: 0.9 },
+  goku: { name: 'Kamehameha x10', type: 'Golpe', power: 145, acc: 0.85 },
+  vegeta: { name: 'Final Flash', type: 'Rayo', power: 145, acc: 0.85 },
+  gohan: { name: 'Kamehameha Padre e Hijo', type: 'Golpe', power: 150, acc: 0.85 },
+  gokuui: { name: 'Doctrina Suprema', type: 'Haki', power: 160, acc: 0.9 },
+  jiren: { name: 'Impacto de Poder', type: 'Golpe', power: 155, acc: 0.85 },
+  cell: { name: 'Kamehameha Solar', type: 'Rayo', power: 150, acc: 0.85 },
+  frieza: { name: 'Supernova', type: 'Oscuridad', power: 150, acc: 0.85 },
+  zenosama: { name: 'Borrado Divino', type: 'Oscuridad', power: 180, acc: 0.95 },
+  saitama: { name: 'Puñetazo Serio', type: 'Golpe', power: 200, acc: 0.95 },
+  genos: { name: 'Cañón de Incineración', type: 'Fuego', power: 140, acc: 0.85 },
+  garou: { name: 'Puño de Liberación del Agua', type: 'Golpe', power: 145, acc: 0.85 },
+  tatsumaki: { name: 'Meteoro Psíquico', type: 'Viento', power: 145, acc: 0.85 },
+  madara: { name: 'Tengai Shinsei', type: 'Tierra', power: 155, acc: 0.85 },
+  orochimaru: { name: 'Técnica de la Serpiente de 8 Cabezas', type: 'Veneno', power: 140, acc: 0.9 },
+  sukuna: { name: 'Expansión de Dominio: Santuario Malévolo', type: 'Corte', power: 160, acc: 0.9 },
+  kibutsuji: { name: 'Látigos de Sangre Demoniaca', type: 'Veneno', power: 155, acc: 0.9 },
+};
+
+function getUltimateMove(f) {
+  if (!f) return MOVES.punetazo;
+  const base = baseFormOf(f.id);
+
+  if (CROSSOVER_ULTIMATES[f.id]) return CROSSOVER_ULTIMATES[f.id];
+  if (CROSSOVER_ULTIMATES[base]) return CROSSOVER_ULTIMATES[base];
+
+  const c = CHARS[f.id] || CHARS[base];
+  if (!c) return MOVES.punetazo;
+
+  if (c.learnset && c.learnset.length >= 3) {
+    const highMove = c.learnset[c.learnset.length - 1][1];
+    if (MOVES[highMove]) return MOVES[highMove];
+  }
+
+  const lore = (typeof LORE !== 'undefined' && LORE) ? (LORE[f.id] || LORE[base]) : null;
+  if (lore && lore.ulti && lore.ulti.name) {
+    for (const [k, m] of Object.entries(MOVES)) {
+      if (m.name.toLowerCase() === lore.ulti.name.toLowerCase()) return m;
+    }
+  }
+
+  const t1 = c.types[0];
+  const typeUltis = {
+    Golpe: 'kingkonggun', Corte: 'santoryuogi', Disparo: 'kabuto', Fuego: 'daienkai',
+    Agua: 'karatepez', Rayo: 'yasakani', Hielo: 'iceage', Tierra: 'terremoto',
+    Viento: 'vientolibre', Veneno: 'virusmomia', Oscuridad: 'blackhole', Haki: 'galaxyimpact', Fruta: 'gammaknife'
+  };
+  const ultKey = typeUltis[t1] || 'kingkonggun';
+  return MOVES[ultKey] || MOVES.punetazo;
+}
+
+function useUltimate(f) {
+  const b = battle;
+  if (!b || b.over || !f || f.hp <= 0) return;
+  const enemy = b.curE;
+  if (!enemy || enemy.hp <= 0) return;
+  if (f.lvl < 20) return toast(`🔒 Ultimate de ${charName(f)} desbloqueable a Nv20.`);
+  if ((f.ultCharge || 0) < 100) return toast(`⚡ Ultimate de ${charName(f)} al ${Math.floor(f.ultCharge || 0)}% (golpea para cargar).`);
+
+  f.ultCharge = 0;
+  const ultMv = getUltimateMove(f);
+  log(`💥 <b>¡DEFINITIVA DE ${charName(f).toUpperCase()}!</b> Desata <b>${ultMv.name}</b> 💥`);
+  attackWith(f, enemy, ultMv, 'enemy');
+  refreshHPCards();
+}
+
 function startBattle(enemies, opts) {
   playMusic('combat');
   const team = opts.tower ? tower.team : run.team;
   if (!team.some(f => f.hp > 0)) return opts.tower ? towerGameOver() : gameOver();
+  if (autoMode) {
+    autoSpeed = (autoSettings.speed === 'x1') ? 1 : 2;
+  }
   battle = {
     pTeam: team, eTeam: enemies,
     items: opts.tower ? tower.items : run.items,
@@ -2869,12 +3149,22 @@ function fighterCardHTML(f, side, idx, active) {
   const c = charData(f);
   const ps = passiveInfo(f);
   const starTag = f.stars ? `<span style="color:var(--gold);font-size:9px;">⭐${f.stars}</span>` : '';
-  return `<div class="fcard ${f.hp <= 0 ? 'ko' : ''} ${f === active ? 'active' : ''}" id="fc-${side}-${idx}">
+  const isUltUnlocked = f.lvl >= 20;
+  const isUltReady = isUltUnlocked && (f.ultCharge || 0) >= 100;
+  const ultPct = isUltUnlocked ? clamp(f.ultCharge || 0, 0, 100) : 0;
+
+  const ultBarHTML = side === 'p' ? `
+    <div class="ult-bar-wrap ${isUltUnlocked ? '' : 'locked'}" title="${isUltUnlocked ? 'Ultimate (' + Math.floor(ultPct) + '%)' : 'Desbloquea Ultimate a Nv20'}">
+      ${isUltUnlocked ? `<div class="ult-bar" style="width:${ultPct}%"></div>` : '<div class="ult-bar-text">🔒 ULTI A NV20</div>'}
+    </div>` : '';
+
+  return `<div class="fcard ${f.hp <= 0 ? 'ko' : ''} ${f === active ? 'active' : ''} ${isUltReady ? 'ult-ready' : ''}" id="fc-${side}-${idx}">
     <div class="fcard-title">${c.name} ${starTag} Nv${f.lvl} <span class="fcard-tags">${tagIcons(f)}</span><span class="fcard-st">${stIcons(f)}</span></div>
     <div class="fcard-hp">
       <div class="hp-bar"><i class="${hpBarClass(f)}" style="width:${clamp(f.hp / f.maxhp * 100, 0, 100)}%"></i></div>
       <div class="hp-nums">${f.hp}/${f.maxhp}</div>
     </div>
+    ${ultBarHTML}
     <div class="fcard-stats-mini" style="font-size:7.5px;color:#eee;text-align:center;margin:2px 0;background:rgba(0,0,0,0.3);padding:2px 4px;border-radius:3px;">
       ⚔️ ATQ ${f.atk} · 🛡️ DEF ${f.def} · ⚡ VEL ${f.spd}
     </div>
@@ -2926,11 +3216,29 @@ function renderBattle(logLines) {
     </div>
   `);
   bindControls();
-  // toca una carta para consultar su ficha sin pausar el combate
+  // En combate: las cartas enemigas muestran su ficha; las cartas aliadas activan la Ultimate si está lista
   [['p', b.pTeam], ['e', b.eTeam]].forEach(([side, team]) => {
     team.forEach((f, i) => {
       const card = $(`#fc-${side}-${i}`);
-      if (card) card.onclick = () => showCharModal(f);
+      if (card) {
+        card.onclick = () => {
+          if (side === 'e') {
+            showCharModal(f);
+          } else {
+            if (f === b.curP) {
+              if (f.lvl >= 20 && (f.ultCharge || 0) >= 100) {
+                useUltimate(f);
+              } else if (f.lvl < 20) {
+                toast(`🔒 Ultimate de ${charName(f)} desbloqueable a Nv20.`);
+              } else {
+                toast(`⚡ Ultimate de ${charName(f)} al ${Math.floor(f.ultCharge || 0)}% (golpea para cargar).`);
+              }
+            } else {
+              toast(`⚡ Solo el nakama activo (${charName(b.curP)}) puede lanzar su Ultimate.`);
+            }
+          }
+        };
+      }
     });
   });
 }
@@ -2967,6 +3275,11 @@ function refreshHPCards() {
       card.querySelector('.hp-nums').textContent = `${f.hp}/${f.maxhp}`;
       card.classList.toggle('ko', f.hp <= 0);
       card.classList.toggle('active', f === active);
+      const isUltUnlocked = f.lvl >= 20;
+      const isUltReady = isUltUnlocked && (f.ultCharge || 0) >= 100;
+      card.classList.toggle('ult-ready', isUltReady);
+      const ultBar = card.querySelector('.ult-bar');
+      if (ultBar) ultBar.style.width = clamp(f.ultCharge || 0, 0, 100) + '%';
       const stEl = card.querySelector('.fcard-st');
       if (stEl) stEl.textContent = stIcons(f);
       const pEl = card.querySelector('.fcard-passive');
@@ -3178,6 +3491,10 @@ function attackWith(att, dfd, mv, targetSide) {
     return;
   }
   dfd.hp = Math.max(0, dfd.hp - dmg);
+  // Recarga de Ultimate al golpear al enemigo (para personajes de nivel base >= 20)
+  if (att && att.lvl >= 20 && b.pTeam.includes(att)) {
+    att.ultCharge = Math.min(100, (att.ultCharge || 0) + 34);
+  }
   if (dfd.hp === 0 && battle && battle.eTeam && battle.eTeam.includes(dfd)) {
     meta.stats = meta.stats || { kills: 0, items: 0 };
     meta.stats.kills = (meta.stats.kills || 0) + 1;
@@ -3225,8 +3542,15 @@ function scheduleRound(delay) {
 function runRound() {
   const b = battle;
   if (!b || b.over || b.waiting) return;
+  if (autoMode) runAutoItems();
   const p = b.curP, e = b.curE;
   if (!p || !e || p.hp <= 0 || e.hp <= 0) return afterRound();
+
+  // Modo auto: tira la Ultimate automáticamente si está cargada
+  if (autoMode && p.lvl >= 20 && (p.ultCharge || 0) >= 100) {
+    useUltimate(p);
+  }
+
   // Velocidad efectiva: Rayo (+20/+40%), Nakama Ⅰ, ralentización de Hielo,
   // racha de Viento Ⅱ y pasiva Usopp (siempre ataca primero)
   const spdOf = f => {

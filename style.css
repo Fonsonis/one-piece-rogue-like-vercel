@@ -119,8 +119,8 @@ button { font-family: inherit; cursor: pointer; }
 /* --- Selección de saga --- */
 .saga-row {
   display: flex; align-items: stretch; border: 3px solid var(--ink);
-  box-shadow: var(--shadow); margin-bottom: 12px; background: var(--paper);
-  cursor: pointer; overflow: hidden; min-height: 135px; height: 135px;
+  box-shadow: var(--shadow); margin-bottom: 14px; background: var(--paper);
+  cursor: pointer; overflow: hidden; min-height: 175px; height: 175px;
 }
 .saga-row.locked { cursor: not-allowed; opacity: 1; }
 .saga-row.locked .saga-art { filter: grayscale(.85); opacity: .5; }
@@ -143,7 +143,7 @@ button { font-family: inherit; cursor: pointer; }
   box-sizing: border-box;
 }
 .saga-art {
-  width: 145px; height: 100%; flex-shrink: 0; position: relative;
+  width: 220px; height: 100%; flex-shrink: 0; position: relative;
   border-right: 3px solid var(--ink); overflow: hidden; box-sizing: border-box;
 }
 .saga-art-overlay {
@@ -161,7 +161,7 @@ button { font-family: inherit; cursor: pointer; }
   text-shadow: 1px 1px 2px #000; margin-top: 3px;
 }
 .saga-stats {
-  flex: 1; padding: 10px 14px; font-size: 9px; line-height: 1.9;
+  flex: 1; padding: 12px 16px; font-size: 9.5px; line-height: 2.0;
   display: flex; flex-direction: column; justify-content: space-between; height: 100%; box-sizing: border-box;
 }
 .saga-stats b { float: right; }
@@ -598,8 +598,9 @@ button { font-family: inherit; cursor: pointer; }
   .fcard-passive { font-size: 6px; padding: 3px 4px; }
   .syn-chips { gap: 3px; }
   .syn-chip { font-size: 6px; padding: 2px 4px; }
-  .saga-art { width: 110px; font-size: 11px; }
-  .saga-stats { font-size: 8px; padding: 8px 10px; }
+  .saga-row { min-height: 150px; height: 150px; }
+  .saga-art { width: 160px; font-size: 11px; }
+  .saga-stats { font-size: 8.5px; padding: 8px 10px; }
   .dex-grid { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 6px; }
   .dex-saga-head { font-size: 9px; }
   .battle-log { height: 96px; font-size: 9px; }
@@ -708,7 +709,51 @@ button, .mode-card, .saga-row, .map-node, .team-slot, .dex-card, .poster, .item-
 .achieve-row .emoji { font-size: 26px; }
 .achieve-row .info { flex: 1; line-height: 1.6; }
 .achieve-bar { height: 6px; background: #ccc; border: 1px solid var(--ink); margin-top: 4px; }
-.achieve-bar i { display: block; height: 100%; background: var(--green); }
+/* --- Estilos de Ultimate y Recarga --- */
+.ult-bar-wrap {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.6);
+  border: 1px solid var(--ink);
+  border-radius: 3px;
+  margin-top: 3px;
+  overflow: hidden;
+  position: relative;
+}
+.ult-bar-wrap.locked {
+  background: rgba(40, 40, 40, 0.8);
+  border-color: #555;
+}
+.ult-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #e8c832 0%, #ff8c00 100%);
+  transition: width 0.3s ease;
+  box-shadow: 0 0 6px var(--gold);
+}
+.ult-bar-text {
+  font-size: 6.5px;
+  color: #aaa;
+  text-align: center;
+  line-height: 8px;
+  font-weight: bold;
+}
+.fcard.ult-ready {
+  border: 2px solid var(--gold) !important;
+  box-shadow: 0 0 12px var(--gold), 0 0 20px #ff4500, inset 0 0 10px rgba(255, 215, 0, 0.5) !important;
+  animation: ultGlow 0.8s infinite alternate !important;
+  cursor: pointer !important;
+}
+@keyframes ultGlow {
+  from {
+    box-shadow: 0 0 8px var(--gold), 0 0 14px #ff4500, inset 0 0 6px rgba(255, 215, 0, 0.4);
+    transform: scale(1);
+  }
+  to {
+    box-shadow: 0 0 18px var(--gold), 0 0 26px #ff8c00, inset 0 0 14px rgba(255, 215, 0, 0.8);
+    transform: scale(1.02);
+  }
+}
+
 
 
 
