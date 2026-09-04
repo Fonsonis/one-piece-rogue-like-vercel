@@ -303,6 +303,10 @@ function loadMeta() {
   } catch (e) { }
   meta.logPoses = meta.logPoses || 0;
   meta.charUpgrades = meta.charUpgrades || {};
+  meta.roster = meta.roster || [];
+  if (!meta.roster.includes('luffy')) {
+    meta.roster.push('luffy');
+  }
   meta.settings = Object.assign({ showEventConfirm: true, customSounds: false }, meta.settings || {});
   if (!meta.totalIslands) {
     const totalWins = Object.values(meta.wins || {}).reduce((a, b) => a + b, 0) +
@@ -559,12 +563,12 @@ function registerRecruit(id) {
   registerDex(id);
   if (!meta.recruited.includes(id)) { meta.recruited.push(id); saveMeta(); }
 }
-// Desbloquea para futuras aventuras a todos los nakamas de la banda actual
-function unlockRoster(allowBosses = false) {
+// Desbloquea para futuras aventuras a todos los nakamas de la banda actual al superar un jefe
+function unlockRoster(allowBosses = true) {
   const added = [];
   for (const f of run.team) {
     const b = baseFormOf(f.id);
-    if ((allowBosses || !CHARS[b].boss) && !meta.roster.includes(b)) {
+    if (!meta.roster.includes(b)) {
       meta.roster.push(b);
       added.push(b);
     }
@@ -1042,11 +1046,9 @@ function countInDex(ids) {
 }
 
 function isNakamaUnlocked(id) {
-  if (id === 'luffy') return true;
-  if (meta.roster && meta.roster.includes(id)) return true;
-  if (meta.recruited && meta.recruited.includes(id)) return true;
-  if (meta.dex && meta.dex.includes(id)) return true;
-  return false;
+  const base = baseFormOf(id);
+  if (base === 'luffy') return true;
+  return meta.roster && meta.roster.includes(base);
 }
 
 function bestSagaDexProgress() {
@@ -1758,7 +1760,7 @@ function showInventoryModal(opts = {}) {
   const title = opts.title || '🎒 INVENTARIO DE NAKAMAS';
 
   const rosterChars = (meta.roster || []).filter(id => CHARS[id]);
-  const allUnlocked = [...new Set(['luffy', ...STRAW_HAT_MEMBERS, ...rosterChars])].filter(id => CHARS[id] && isNakamaUnlocked(id));
+  const allUnlocked = [...new Set(['luffy', ...rosterChars])].filter(id => CHARS[id] && isNakamaUnlocked(id));
 
   invViewState = { q: '', type: '', rarity: 0 };
 
@@ -2227,6 +2229,7 @@ function startRun(sagaIdx, starterIds) {
     badges: [],
     map: genMap(saga.islands[0]),
     pos: null,
+    sagaRerollUsed: false,
     nuzCaught: {}, // isla -> ya reclutado
   };
   starterIds.forEach(registerRecruit);
@@ -2266,8 +2269,7 @@ function screenMap() {
       style="left:${x}%;top:${y}%" data-r="${r}" data-i="${i}" title="${NODE_TYPES[n.type].label}">${NODE_TYPES[n.type].emoji}</div>`;
   }));
 
-  run.rerollsUsed = run.rerollsUsed || {};
-  const rerollUsed = !!run.rerollsUsed[run.islandIdx];
+  const canReroll = run.islandIdx === 0 && run.pos === null && !run.sagaRerollUsed;
 
   render(`
     ${topbar(true)}
@@ -2277,8 +2279,8 @@ function screenMap() {
         <svg class="map-svg">${edgesHTML}</svg>
         ${nodesHTML}
         <div style="position:absolute;top:42px;left:10px;z-index:20;">
-          <button class="btn gold small" id="btn-map-reroll" ${rerollUsed ? 'disabled' : ''} style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
-            Reroll x${rerollUsed ? 0 : 1}
+          <button class="btn gold small" id="btn-map-reroll" ${canReroll ? '' : 'disabled'} style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
+            Reroll x${canReroll ? 1 : 0}
           </button>
         </div>
       </div>
@@ -2334,14 +2336,13 @@ function screenMap() {
   `);
 
   const mapRerollBtn = $('#btn-map-reroll');
-  if (mapRerollBtn && !rerollUsed) {
+  if (mapRerollBtn && canReroll) {
     mapRerollBtn.onclick = () => {
-      run.rerollsUsed = run.rerollsUsed || {};
-      run.rerollsUsed[run.islandIdx] = true;
+      run.sagaRerollUsed = true;
       run.map = genMap(island);
       run.pos = null;
       saveRun();
-      toast('🎲 ¡Mapa de la isla regenerado!');
+      toast('🎲 ¡Mapa de la saga regenerado!');
       screenMap();
     };
   }
@@ -4465,7 +4466,10 @@ function endBattle(victory, fled, recruited) {
   }
   if (victory && opts.boss) {
     run.badges.push(run.islandIdx);
-    const newVets = unlockRoster();
+    const newVets = unlockRoster(true);
+    if (newVets.length > 0) {
+      toast(`🎉 ¡${newVets.map(id => CHARS[id] ? CHARS[id].name : id).join(', ')} desbloqueado/s para tu plantilla permanente!`);
+    }
     gainFame(20);
     const saga = SAGAS[run.saga];
     // Al vencer al jefe de la isla (en modo Clásico), toda la banda (incluyendo caídos) se recupera al 100% de PS
