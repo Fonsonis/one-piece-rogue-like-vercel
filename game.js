@@ -292,6 +292,7 @@ const META_DEFAULTS = () => ({
   soloWins: 0,
   logPoses: 0,
   charUpgrades: {},
+  settings: { showEventConfirm: true, customSounds: false },
 });
 let meta = META_DEFAULTS();
 function loadMeta() {
@@ -302,6 +303,7 @@ function loadMeta() {
   } catch (e) { }
   meta.logPoses = meta.logPoses || 0;
   meta.charUpgrades = meta.charUpgrades || {};
+  meta.settings = Object.assign({ showEventConfirm: true, customSounds: false }, meta.settings || {});
   if (!meta.totalIslands) {
     const totalWins = Object.values(meta.wins || {}).reduce((a, b) => a + b, 0) +
       Object.values(meta.nuzWins || {}).reduce((a, b) => a + b, 0);
@@ -716,6 +718,8 @@ function render(html) {
   app.innerHTML = html;
   const btn = $('#btn-mute');
   if (btn) btn.onclick = toggleMute;
+  const setBtn = $('#btn-settings');
+  if (setBtn) setBtn.onclick = showSettingsModal;
   const autoBtn = $('#btn-topbar-auto');
   if (autoBtn) autoBtn.onclick = cycleTopbarAuto;
 }
@@ -741,9 +745,243 @@ function topbar(showBerries = false, showAuto = showBerries) {
     ${showBerries && run ? `<div class="floating-berries"><div class="berries">${berriesHTML(run.berries)}</div></div>` : ''}
     <div class="floating-controls">
       <button class="btn small gray" id="btn-mute" title="Activar/Silenciar música">${isMuted ? '🔇 MÚSICA' : '🎵 MÚSICA'}</button>
+      <button class="btn small gray" id="btn-settings" title="Ajustes de juego">⚙️ AJUSTES</button>
       ${showAuto ? `<button class="btn small ${autoBtnClass}" id="btn-topbar-auto" title="Cambiar velocidad o activar/pausar modo auto">${autoLabel}</button>` : ''}
     </div>
   </div>`;
+}
+
+function showSettingsModal() {
+  meta.settings = meta.settings || { showEventConfirm: true, customSounds: false };
+
+  const existing = document.querySelector('#settings-modal-overlay');
+  if (existing) existing.remove();
+
+  const ov = document.createElement('div');
+  ov.id = 'settings-modal-overlay';
+  ov.className = 'overlay';
+
+  const showConfirm = meta.settings.showEventConfirm !== false;
+  const customSounds = !!meta.settings.customSounds;
+
+  ov.innerHTML = `
+    <div class="modal" style="max-width:440px;width:90%;">
+      <h2 style="margin-top:0;color:var(--sea);font-size:14px;border-bottom:2px solid var(--gold);padding-bottom:6px;">⚙️ AJUSTES DE JUEGO</h2>
+      <div style="display:flex;flex-direction:column;gap:12px;margin:16px 0;">
+        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.05);padding:10px;border-radius:6px;border:1px solid #ccc;">
+          <div style="flex:1;padding-right:10px;">
+            <div style="font-size:9.5px;font-weight:bold;color:var(--ink);">📜 Confirmación de Eventos en Mapa</div>
+            <div style="font-size:7.5px;color:#555;margin-top:2px;">Muestra una pantalla informativa antes de entrar a cada nodo con la opción de entrar o volver.</div>
+          </div>
+          <label style="cursor:pointer;">
+            <input type="checkbox" id="chk-event-confirm" ${showConfirm ? 'checked' : ''} style="transform:scale(1.3);cursor:pointer;">
+          </label>
+        </div>
+
+        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.05);padding:10px;border-radius:6px;border:1px solid #ccc;">
+          <div style="flex:1;padding-right:10px;">
+            <div style="font-size:9.5px;font-weight:bold;color:var(--ink);">🔊 Sonidos Caseros <span style="font-size:7.5px;color:var(--red);font-weight:bold;">(No implementado)</span></div>
+            <div style="font-size:7.5px;color:#555;margin-top:2px;">Efectos de sonido grabados para habilidades, ataques y eventos del juego.</div>
+          </div>
+          <label style="cursor:pointer;">
+            <input type="checkbox" id="chk-custom-sounds" ${customSounds ? 'checked' : ''} style="transform:scale(1.3);cursor:pointer;">
+          </label>
+        </div>
+      </div>
+      <div style="text-align:right;margin-top:16px;">
+        <button class="btn gold small" id="btn-save-settings">GUARDAR Y CERRAR</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(ov);
+
+  ov.querySelector('#chk-event-confirm').onchange = e => {
+    meta.settings.showEventConfirm = e.target.checked;
+    saveMeta();
+  };
+
+  ov.querySelector('#chk-custom-sounds').onchange = e => {
+    meta.settings.customSounds = e.target.checked;
+    saveMeta();
+    if (e.target.checked) {
+      toast('🔊 Sonidos caseros activados (No implementado aún).');
+    }
+  };
+
+  ov.querySelector('#btn-save-settings').onclick = () => ov.remove();
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+}
+
+function showNodeConfirmModal(r, i) {
+  const node = run.map.rows[r][i];
+  const typeInfo = NODE_TYPES[node.type] || { emoji: '❓', label: 'Evento' };
+  const island = SAGAS[run.saga].islands[run.islandIdx];
+
+  let detailsText = '';
+  switch (node.type) {
+    case 'wild':
+      detailsText = 'Te enfrentarás a un pirata salvaje de esta zona. Tienes la oportunidad de combatirlo y reclutarlo para tu banda.';
+      break;
+    case 'marine':
+      detailsText = 'Una patrulla de la Marina te ha cortado el paso. Enfréntate a ellos en combate táctico para obtener Berries y Log Poses.';
+      break;
+    case 'boss':
+      const bossNames = island.boss.map(id => CHARS[id] ? CHARS[id].name : id).join(' y ');
+      detailsText = `¡Combate contra el jefe definitivo de la isla: <b>${bossNames}</b>! Véncelo para conseguir el Emblema de la isla.`;
+      break;
+    case 'item':
+      detailsText = 'Encontrarás un cofre de tesoro con un objeto útil para tu viaje (Carne, Carteles de Reclutamiento, Sake, etc.).';
+      break;
+    case 'mystery':
+      detailsText = 'Un evento misterioso e impredecible. Puede resultar en una gran oportunidad, un tesoro o un desafío inesperado.';
+      break;
+    case 'shop':
+      detailsText = 'Visita el Mercado Clandestino de la isla para comprar consumibles, reclutar nakamas o mejorar tu banda con Berries.';
+      break;
+    case 'rest':
+      detailsText = 'Tu banda descansará en el campamento. Todos los nakamas conscientes recuperarán un 50% de sus PS máximos.';
+      break;
+    case 'special':
+      detailsText = 'Combate especial contra un pirata de gran poder. Una batalla muy exigente pero con grandes recompensas.';
+      break;
+    case 'crossover':
+      detailsText = 'Un portal dimensional te traslada a un evento alternativo fuera de la historia principal.';
+      break;
+    default:
+      detailsText = 'Avanza hacia este nodo para descubrir qué aventuras te esperan.';
+      break;
+  }
+
+  const existing = document.querySelector('#node-confirm-overlay');
+  if (existing) existing.remove();
+
+  const ov = document.createElement('div');
+  ov.id = 'node-confirm-overlay';
+  ov.className = 'overlay';
+
+  ov.innerHTML = `
+    <div class="modal" style="max-width:400px;width:90%;text-align:center;">
+      <div style="font-size:36px;margin-bottom:6px;">${typeInfo.emoji}</div>
+      <h2 style="margin:0 0 8px 0;color:var(--sea);font-size:14px;">${typeInfo.label.toUpperCase()}</h2>
+      <div style="font-size:8.5px;color:#444;line-height:1.4;background:rgba(0,0,0,0.04);padding:10px;border-radius:6px;border:1px solid #ccc;margin-bottom:14px;">
+        ${detailsText}
+      </div>
+      <div style="display:flex;gap:10px;justify-content:center;">
+        <button class="btn gray small" id="btn-node-back" style="flex:1;">🔴 VOLVER</button>
+        <button class="btn green small" id="btn-node-enter" style="flex:1;font-weight:bold;">🟢 ENTRAR</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(ov);
+
+  ov.querySelector('#btn-node-enter').onclick = () => {
+    ov.remove();
+    enterNode(r, i);
+  };
+  ov.querySelector('#btn-node-back').onclick = () => ov.remove();
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+}
+
+function makeListReorderable(container, itemSelector, onReorder) {
+  const cont = typeof container === 'string' ? document.querySelector(container) : container;
+  if (!cont) return;
+  const items = Array.from(cont.querySelectorAll(itemSelector));
+  if (!items.length) return;
+
+  let draggedIdx = null;
+  let touchStartElement = null;
+  let touchStartY = 0;
+  let touchStartX = 0;
+  let isTouchDragging = false;
+
+  items.forEach((item) => {
+    const idx = parseInt(item.dataset.idx !== undefined ? item.dataset.idx : item.dataset.slot);
+    item.setAttribute('draggable', 'true');
+
+    item.ondragstart = e => {
+      draggedIdx = idx;
+      item.classList.add('dragging');
+      e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/plain', idx);
+    };
+
+    item.ondragend = () => {
+      item.classList.remove('dragging');
+      items.forEach(el => el.classList.remove('dragover'));
+      draggedIdx = null;
+    };
+
+    item.ondragover = e => {
+      e.preventDefault();
+      item.classList.add('dragover');
+    };
+
+    item.ondragleave = () => {
+      item.classList.remove('dragover');
+    };
+
+    item.ondrop = e => {
+      e.preventDefault();
+      item.classList.remove('dragover');
+      const fromIdx = draggedIdx !== null ? draggedIdx : parseInt(e.dataTransfer.getData('text/plain'));
+      if (!isNaN(fromIdx) && fromIdx !== idx) {
+        onReorder(fromIdx, idx);
+      }
+    };
+
+    item.ontouchstart = e => {
+      const touch = e.touches[0];
+      touchStartY = touch.clientY;
+      touchStartX = touch.clientX;
+      touchStartElement = item;
+      draggedIdx = idx;
+      isTouchDragging = false;
+    };
+
+    item.ontouchmove = e => {
+      if (draggedIdx === null || !touchStartElement) return;
+      const touch = e.touches[0];
+      const dy = touch.clientY - touchStartY;
+      const dx = touch.clientX - touchStartX;
+
+      if (!isTouchDragging && (Math.abs(dy) > 6 || Math.abs(dx) > 6)) {
+        isTouchDragging = true;
+        touchStartElement.classList.add('dragging');
+      }
+
+      if (isTouchDragging) {
+        if (e.cancelable) e.preventDefault();
+        const elUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+        const hoverItem = elUnder ? elUnder.closest(itemSelector) : null;
+        items.forEach(el => {
+          if (el === hoverItem && el !== touchStartElement) {
+            el.classList.add('dragover');
+          } else {
+            el.classList.remove('dragover');
+          }
+        });
+      }
+    };
+
+    item.ontouchend = e => {
+      if (draggedIdx !== null && isTouchDragging) {
+        const touch = e.changedTouches[0];
+        const elUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+        const dropItem = elUnder ? elUnder.closest(itemSelector) : null;
+        if (dropItem) {
+          const targetIdx = parseInt(dropItem.dataset.idx !== undefined ? dropItem.dataset.idx : dropItem.dataset.slot);
+          if (!isNaN(targetIdx) && targetIdx !== draggedIdx) {
+            onReorder(draggedIdx, targetIdx);
+          }
+        }
+      }
+      if (touchStartElement) touchStartElement.classList.remove('dragging');
+      items.forEach(el => el.classList.remove('dragover'));
+      touchStartElement = null;
+      draggedIdx = null;
+      isTouchDragging = false;
+    };
+  });
 }
 
 // ============ LOGROS / ACHIEVEMENTS ============
@@ -865,10 +1103,15 @@ function showAchievementsModal(savedScrollTop = 0) {
 
   const syncFameUI = () => {
     const shipBtn = $('#btn-ship');
-    if (shipBtn) shipBtn.innerHTML = `🏪 Tienda — ⭐${meta.fame}`;
+    if (shipBtn) shipBtn.innerHTML = `🏪 Tienda (⭐${meta.fame})`;
+    const achBtn = $('#btn-achievements');
+    const unclaimed = ACHIEVEMENTS.some(ach => ach.check() >= ach.goal && !(meta.claimedAch && meta.claimedAch[ach.id]));
+    if (achBtn) {
+      const completedAch = ACHIEVEMENTS.filter(a => a.check() >= a.goal).length;
+      achBtn.innerHTML = `🏆 Logros (${completedAch}/${ACHIEVEMENTS.length})${unclaimed ? ' <span class="ach-badge-dot" style="background:#e74c3c;color:#fff;font-size:7px;border-radius:50%;padding:1px 4px;margin-left:4px;font-weight:bold;animation:pulse 1s infinite alternate;border:1px solid #fff;">!</span>' : ''}`;
+    }
     const topAchBtn = $('#btn-top-ach');
     if (topAchBtn) {
-      const unclaimed = ACHIEVEMENTS.some(ach => ach.check() >= ach.goal && !(meta.claimedAch && meta.claimedAch[ach.id]));
       topAchBtn.innerHTML = `🏆${unclaimed ? '🔴' : ''}`;
     }
   };
@@ -962,6 +1205,7 @@ function screenHome() {
   const towerUnlocked = accLvl >= 20;
   const challengeUnlocked = accLvl >= 50;
   const completedAch = ACHIEVEMENTS.filter(a => a.check() >= a.goal).length;
+  const hasUnclaimedAch = ACHIEVEMENTS.some(ach => ach.check() >= ach.goal && !(meta.claimedAch && meta.claimedAch[ach.id]));
   render(`
     ${topbar(false)}
     <div class="subtitle">ONE PIECE ROGUELIKE | v1.1</div>
@@ -986,7 +1230,7 @@ function screenHome() {
       <button class="btn blue small" id="btn-dex">📖 Dex (${meta.dex.length}/${Object.keys(CHARS).length})</button>
       <button class="btn purple small" id="btn-inventory">🎒 Inventario (${(meta.roster || []).length})</button>
       <button class="btn gold small" id="btn-ship">🏪 Tienda (⭐${meta.fame})</button>
-      <button class="btn gold small" id="btn-achievements">🏆 Logros (${completedAch}/${ACHIEVEMENTS.length})</button>
+      <button class="btn gold small" id="btn-achievements">🏆 Logros (${completedAch}/${ACHIEVEMENTS.length})${hasUnclaimedAch ? ' <span class="ach-badge-dot" style="background:#e74c3c;color:#fff;font-size:7px;border-radius:50%;padding:1px 4px;margin-left:4px;font-weight:bold;animation:pulse 1s infinite alternate;border:1px solid #fff;">!</span>' : ''}</button>
     </div>
     <div style="text-align:center;margin-top:8px;">
       <button class="btn gray small" id="btn-guide" style="padding:6px 14px;font-size:9px;">📊 Tipos y Sinergias</button>
@@ -1590,12 +1834,26 @@ function showInventoryModal(opts = {}) {
   ov.innerHTML = `<div class="modal" style="max-width:640px;width:95%;">${renderModalContent()}</div>`;
   document.body.appendChild(ov);
 
+  const refreshModalContent = () => {
+    const grid = ov.querySelector('#inv-cards-grid');
+    const gridScrollTop = grid ? grid.scrollTop : 0;
+    const modal = ov.querySelector('.modal');
+    const modalScrollTop = modal ? modal.scrollTop : 0;
+
+    modal.innerHTML = renderModalContent();
+    bindEvents();
+
+    const newGrid = ov.querySelector('#inv-cards-grid');
+    if (newGrid) newGrid.scrollTop = gridScrollTop;
+    const newModal = ov.querySelector('.modal');
+    if (newModal) newModal.scrollTop = modalScrollTop;
+  };
+
   const bindEvents = () => {
     const qInput = ov.querySelector('#inv-q');
     if (qInput) qInput.oninput = e => {
       invViewState.q = e.target.value;
-      ov.querySelector('.modal').innerHTML = renderModalContent();
-      bindEvents();
+      refreshModalContent();
       const newQ = ov.querySelector('#inv-q');
       if (newQ) { newQ.focus(); newQ.selectionStart = newQ.selectionEnd = newQ.value.length; }
     };
@@ -1603,23 +1861,20 @@ function showInventoryModal(opts = {}) {
     const typeSel = ov.querySelector('#inv-type');
     if (typeSel) typeSel.onchange = e => {
       invViewState.type = e.target.value;
-      ov.querySelector('.modal').innerHTML = renderModalContent();
-      bindEvents();
+      refreshModalContent();
     };
 
     const raritySel = ov.querySelector('#inv-rarity');
     if (raritySel) raritySel.onchange = e => {
       invViewState.rarity = +e.target.value;
-      ov.querySelector('.modal').innerHTML = renderModalContent();
-      bindEvents();
+      refreshModalContent();
     };
 
     ov.querySelectorAll('.btn-upg-inv').forEach(btn => {
       btn.onclick = e => {
         e.stopPropagation();
         if (upgradeCharLvl(btn.dataset.id)) {
-          ov.querySelector('.modal').innerHTML = renderModalContent();
-          bindEvents();
+          refreshModalContent();
         }
       };
     });
@@ -1783,6 +2038,13 @@ function screenStarter(sagaIdx) {
   const bindEvents = () => {
     const slotsContainer = $('#starter-slots-container');
     if (slotsContainer) {
+      makeListReorderable(slotsContainer, '.starter-slot-card.occupied', (from, to) => {
+        const temp = picked[from];
+        picked[from] = picked[to];
+        picked[to] = temp;
+        update();
+      });
+
       slotsContainer.querySelectorAll('.starter-slot-card.empty-slot').forEach(card => {
         card.onclick = () => openInventoryPicker(+card.dataset.slot);
       });
@@ -1916,11 +2178,23 @@ function startRun(sagaIdx, starterIds) {
   const items = {
     cartel: 3 + (meta.global.cartelesplus2 ? 4 : meta.global.cartelesplus ? 2 : 0),
   };
-  if (meta.global.carneplus3 || meta.global.platosanjiplus) {
+  if (meta.global.food_sake3) {
+    items.sake = 3;
+  } else if (meta.global.food_sake2) {
+    items.sake = 2;
+  } else if (meta.global.food_sake1) {
+    items.sake = 1;
+  } else if (meta.global.food_carnereal3) {
+    items.carnereal = 3;
+  } else if (meta.global.food_carnereal2) {
+    items.carnereal = 2;
+  } else if (meta.global.food_carnereal1 || meta.global.carnerealplus || meta.global.platosanjiplus) {
+    items.carnereal = 1;
+  } else if (meta.global.carneplus2 || meta.global.carneplus3) {
     items.carne = 3;
-  } else if (meta.global.carneplus2 || meta.global.carnerealplus) {
-    items.carne = 2;
   } else if (meta.global.carneplus) {
+    items.carne = 2;
+  } else {
     items.carne = 1;
   }
   const berries = 300 + (meta.global.berriesplus3 ? 700 : meta.global.berriesplus2 ? 400 : meta.global.berriesplus ? 200 : 0);
@@ -2054,36 +2328,32 @@ function screenMap() {
   }
 
   document.querySelectorAll('.map-node.reachable').forEach(el => {
-    el.onclick = () => enterNode(+el.dataset.r, +el.dataset.i);
+    el.onclick = () => {
+      const r = +el.dataset.r;
+      const i = +el.dataset.i;
+      const showConfirm = meta.settings ? meta.settings.showEventConfirm !== false : true;
+      if (showConfirm) {
+        showNodeConfirmModal(r, i);
+      } else {
+        enterNode(r, i);
+      }
+    };
   });
-  let dragIdx = null, dragged = false, pickedIdx = null;
+  let pickedIdx = null;
   const moveSlot = (from, to) => {
     const [f] = run.team.splice(from, 1);
     run.team.splice(to, 0, f);
     saveRun(); screenMap();
   };
+
+  makeListReorderable('.side-panel', '.team-slot', (from, to) => {
+    moveSlot(from, to);
+  });
+
   document.querySelectorAll('.team-slot').forEach(el => {
     const idx = +el.dataset.idx;
-    el.ondragstart = e => {
-      dragIdx = idx; dragged = true;
-      e.dataTransfer.effectAllowed = 'move';
-      el.classList.add('dragging');
-    };
-    el.ondragend = () => {
-      el.classList.remove('dragging');
-      setTimeout(() => { dragged = false; }, 100);
-    };
-    el.ondragover = e => { e.preventDefault(); el.classList.add('dragover'); };
-    el.ondragleave = () => el.classList.remove('dragover');
-    el.ondrop = e => {
-      e.preventDefault();
-      el.classList.remove('dragover');
-      if (dragIdx === null || dragIdx === idx) return;
-      moveSlot(dragIdx, idx);
-      dragIdx = null;
-    };
-    // En táctil no hay drag & drop: toca ≡ para "coger" y luego toca el destino
-    el.querySelector('.drag-handle').onclick = e => {
+    const handle = el.querySelector('.drag-handle');
+    if (handle) handle.onclick = e => {
       e.stopPropagation();
       if (pickedIdx === null) {
         pickedIdx = idx;
@@ -2095,7 +2365,8 @@ function screenMap() {
         moveSlot(pickedIdx, idx);
       }
     };
-    el.onclick = () => {
+    el.onclick = (e) => {
+      if (e.target.closest('.drag-handle')) return;
       if (pickedIdx !== null) {
         if (pickedIdx !== idx) moveSlot(pickedIdx, idx);
         else {
@@ -2104,7 +2375,7 @@ function screenMap() {
         }
         return;
       }
-      if (!dragged) showCharModal(run.team[idx]);
+      showCharModal(run.team[idx]);
     };
   });
   document.querySelectorAll('.item-row').forEach(el => {
@@ -4564,9 +4835,14 @@ const GLOBAL_ITEMS = {
   berriesplus3: { name: 'Fondo de expedición III', emoji: '💰', desc: '+700 Berries al zarpar.', cost: 1200, lvl: 10, req: 'berriesplus2', chain: 'berries', tier: 3 },
   cartelesplus: { name: 'Imprenta de carteles I', emoji: '📜', desc: '+2 Carteles de Recluta al zarpar.', cost: 300, lvl: 3, chain: 'carteles', tier: 1 },
   cartelesplus2: { name: 'Imprenta de carteles II', emoji: '📜', desc: '+4 Carteles de Recluta al zarpar.', cost: 700, lvl: 7, req: 'cartelesplus', chain: 'carteles', tier: 2 },
-  carneplus: { name: 'Banquete de Carne', emoji: '🥩', desc: 'Comienza la aventura con 2 Carnes 🥩 al zarpar.', cost: 250, lvl: 2, chain: 'food', tier: 1 },
-  carnerealplus: { name: 'Banquete de Carne Real', emoji: '🍗', desc: 'Comienza la aventura con 2 Carnes Reales 🍗 (sustituye la carne normal).', cost: 500, lvl: 4, req: 'carneplus', chain: 'food', tier: 2 },
-  platosanjiplus: { name: 'Banquete del Cocinero', emoji: '🍱', desc: 'Comienza con 2 Carnes Reales 🍗 y 2 Platos de Sanji 🍱.', cost: 1000, lvl: 8, req: 'carnerealplus', chain: 'food', tier: 3 },
+  carneplus: { name: 'Suministro de Carne (2 Carnes)', emoji: '🍖', desc: 'Comienza la aventura con 2 Carnes 🍖 al zarpar.', cost: 200, lvl: 2, chain: 'food', tier: 1 },
+  carneplus2: { name: 'Suministro de Carne (3 Carnes)', emoji: '🍖', desc: 'Comienza la aventura con 3 Carnes 🍖 al zarpar.', cost: 400, lvl: 4, req: 'carneplus', chain: 'food', tier: 2 },
+  food_carnereal1: { name: 'Banquete de Carne Real I (1 Carne Real)', emoji: '🍗', desc: 'Comienza la aventura con 1 Carne Real 🍗 al zarpar.', cost: 650, lvl: 6, req: 'carneplus2', chain: 'food', tier: 3 },
+  food_carnereal2: { name: 'Banquete de Carne Real II (2 Carnes Reales)', emoji: '🍗', desc: 'Comienza la aventura con 2 Carnes Reales 🍗 al zarpar.', cost: 950, lvl: 8, req: 'food_carnereal1', chain: 'food', tier: 4 },
+  food_carnereal3: { name: 'Banquete de Carne Real III (3 Carnes Reales)', emoji: '🍗', desc: 'Comienza la aventura con 3 Carnes Reales 🍗 al zarpar.', cost: 1300, lvl: 10, req: 'food_carnereal2', chain: 'food', tier: 5 },
+  food_sake1: { name: 'Sake de Binks I (1 Sake)', emoji: '🍶', desc: 'Comienza la aventura con 1 Sake de Binks 🍶 al zarpar.', cost: 1800, lvl: 12, req: 'food_carnereal3', chain: 'food', tier: 6 },
+  food_sake2: { name: 'Sake de Binks II (2 Sakes)', emoji: '🍶', desc: 'Comienza la aventura con 2 Sakes de Binks 🍶 al zarpar.', cost: 2400, lvl: 14, req: 'food_sake1', chain: 'food', tier: 7 },
+  food_sake3: { name: 'Sake de Binks III (3 Sakes)', emoji: '🍶', desc: 'Comienza la aventura con 3 Sakes de Binks 🍶 al zarpar.', cost: 3200, lvl: 16, req: 'food_sake2', chain: 'food', tier: 8 },
   tower_start50: { name: 'Comienzo Épico en Torre Marine', emoji: '🗼', desc: 'Comienza tus ascensos en la Torre Marine directamente en el Piso 50 (luchadores a Nv.65).', cost: 2000, lvl: 80 },
 };
 
