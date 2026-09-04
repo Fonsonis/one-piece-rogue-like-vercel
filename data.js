@@ -645,6 +645,7 @@ const ITEMS = {
   cartelbuster: { name: 'Buster Call',        emoji: '📯', desc: 'Rompe las 3 cadenas: reclutamiento garantizado.', price: 800, kind: 'ball', val: 3.5 },
   proteina:     { name: 'Proteína de Franky', emoji: '🥤', desc: '+2 ATQ permanente al nakama activo.', price: 600, kind: 'boost', stat: 1 },
   hierro:       { name: 'Placa de Hierro',    emoji: '🛡️', desc: '+2 DEF permanente al nakama activo.', price: 600, kind: 'boost', stat: 2 },
+  fruta_diablo: { name: 'Fruta del Diablo',   emoji: '🍈', desc: 'Concede un nuevo Tag/Sinergia elemental a 2 nakamas activos.', price: 1000, kind: 'fruta' },
 };
 
 // ============ SAGAS / ISLAS ============
@@ -660,6 +661,7 @@ const MYSTERY_EVENTS = [
   { id: 'entrenamiento', text: 'Un viejo maestro entrena a tu nakama activo. ¡+2 ATQ!', kind: 'boost' },
   { id: 'trampa', text: '¡Pisas una trampa de red! Tu nakama activo pierde 10 PS.', kind: 'damage', val: 10 },
   { id: 'recluta', text: '¡Un pirata errante se une a tu banda!', kind: 'recruit' },
+  { id: 'fruta', text: '¡Encuentras una misteriosa Fruta del Diablo entre la maleza! 🍈', kind: 'fruta' },
 ];
 
 // ============ LORE: fichas del compendio (SP, pasivas, definitivas) ============

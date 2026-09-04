@@ -692,6 +692,11 @@ function toggleMute() {
   if (bgmAudio) bgmAudio.muted = isMuted;
   const btn = $('#btn-mute');
   if (btn) btn.textContent = isMuted ? '🔇 MÚSICA' : '🎵 MÚSICA';
+  const chkBtn = $('#chk-music-toggle');
+  if (chkBtn) {
+    chkBtn.className = `btn small ${isMuted ? 'gray' : 'blue'}`;
+    chkBtn.textContent = isMuted ? '🔇 MÚSICA: OFF' : '🎵 MÚSICA: ON';
+  }
 }
 
 function cycleTopbarAuto() {
@@ -738,9 +743,30 @@ function toast(msg) {
   setTimeout(() => t.remove(), 2600);
 }
 
+function fighterTypes(f) {
+  if (!f) return [];
+  const base = (CHARS[f.id] && CHARS[f.id].types) ? CHARS[f.id].types : [];
+  const extra = f.extraTypes || [];
+  return [...new Set([...base, ...extra])];
+}
+
 function typeBadges(types) {
+  if (!types || !Array.isArray(types)) return '';
   return `<div class="type-badges">${types.map(t =>
-    `<span class="type-badge" style="background:${TYPES[t].color}">${t.toUpperCase()}</span>`).join('')}</div>`;
+    TYPES[t] ? `<span class="type-badge" style="background:${TYPES[t].color}">${t.toUpperCase()}</span>` : ''
+  ).join('')}</div>`;
+}
+
+function trackItemCollected(qty = 1) {
+  meta.stats = meta.stats || { kills: 0, items: 0 };
+  meta.stats.items = (meta.stats.items || 0) + qty;
+  saveMeta();
+}
+
+function trackKills(qty = 1) {
+  meta.stats = meta.stats || { kills: 0, items: 0 };
+  meta.stats.kills = (meta.stats.kills || 0) + qty;
+  saveMeta();
 }
 
 function berriesHTML(v) { return `฿${v.toLocaleString('es')}`; }
@@ -752,7 +778,6 @@ function topbar(showBerries = false, showAuto = showBerries) {
     <div class="logo">GRAND<span>LINE</span>LIKE</div>
     ${showBerries && run ? `<div class="floating-berries"><div class="berries">${berriesHTML(run.berries)}</div></div>` : ''}
     <div class="floating-controls">
-      <button class="btn small gray" id="btn-mute" title="Activar/Silenciar música">${isMuted ? '🔇 MÚSICA' : '🎵 MÚSICA'}</button>
       <button class="btn small gray" id="btn-settings" title="Ajustes de juego">⚙️ AJUSTES</button>
       ${showAuto ? `<button class="btn small ${autoBtnClass}" id="btn-topbar-auto" title="Cambiar velocidad o activar/pausar modo auto">${autoLabel}</button>` : ''}
     </div>
@@ -776,6 +801,16 @@ function showSettingsModal() {
     <div class="modal" style="max-width:440px;width:90%;">
       <h2 style="margin-top:0;color:var(--sea);font-size:14px;border-bottom:2px solid var(--gold);padding-bottom:6px;">⚙️ AJUSTES DE JUEGO</h2>
       <div style="display:flex;flex-direction:column;gap:12px;margin:16px 0;">
+        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.05);padding:10px;border-radius:6px;border:1px solid #ccc;">
+          <div style="flex:1;padding-right:10px;">
+            <div style="font-size:9.5px;font-weight:bold;color:var(--ink);">🎵 Música de Fondo</div>
+            <div style="font-size:7.5px;color:#555;margin-top:2px;">Activar o silenciar la música ambiental y soundtracks de batalla.</div>
+          </div>
+          <button class="btn small ${isMuted ? 'gray' : 'blue'}" id="chk-music-toggle" style="min-width:100px;">
+            ${isMuted ? '🔇 MÚSICA: OFF' : '🎵 MÚSICA: ON'}
+          </button>
+        </div>
+
         <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.05);padding:10px;border-radius:6px;border:1px solid #ccc;">
           <div style="flex:1;padding-right:10px;">
             <div style="font-size:9.5px;font-weight:bold;color:var(--ink);">📜 Confirmación de Eventos en Mapa</div>
@@ -802,6 +837,10 @@ function showSettingsModal() {
     </div>
   `;
   document.body.appendChild(ov);
+
+  ov.querySelector('#chk-music-toggle').onclick = () => {
+    toggleMute();
+  };
 
   ov.querySelector('#chk-event-confirm').onchange = e => {
     meta.settings.showEventConfirm = e.target.checked;
@@ -1067,19 +1106,27 @@ function bestSagaDexProgress() {
   return maxPct;
 }
 
+function isVisibleAch(a) {
+  if (a.id.startsWith('tri_') || a.isCrossover) {
+    return a.check() >= a.goal;
+  }
+  return true;
+}
+
 function showAchievementsModal(savedScrollTop = 0) {
   meta.claimedAch = meta.claimedAch || {};
-  const completedCount = ACHIEVEMENTS.filter(a => a.check() >= a.goal).length;
+  const visibleList = ACHIEVEMENTS.filter(isVisibleAch);
+  const completedCount = visibleList.filter(a => a.check() >= a.goal).length;
 
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal" style="max-width:580px;">
-    <h2>🏆 Logros de Pirata (${completedCount}/${ACHIEVEMENTS.length})</h2>
+    <h2>🏆 Logros de Pirata (${completedCount}/${visibleList.length})</h2>
     <p style="font-size:8px;text-align:center;margin-bottom:12px;color:#666;">
       Completa desafíos en tus aventuras para ganar ⭐ Fama adicional.
     </p>
     <div class="achieve-list-container" style="max-height:360px;overflow-y:auto;">
-      ${ACHIEVEMENTS.map(a => {
+      ${visibleList.map(a => {
     const val = a.check();
     const done = val >= a.goal;
     const claimed = !!meta.claimedAch[a.id];
@@ -1111,10 +1158,13 @@ function showAchievementsModal(savedScrollTop = 0) {
     const shipBtn = $('#btn-ship');
     if (shipBtn) shipBtn.innerHTML = `🏪 Tienda (⭐${meta.fame})`;
     const achBtn = $('#btn-achievements');
-    const unclaimed = ACHIEVEMENTS.some(ach => ach.check() >= ach.goal && !(meta.claimedAch && meta.claimedAch[ach.id]));
+    const unclaimed = visibleList.some(ach => ach.check() >= ach.goal && !(meta.claimedAch && meta.claimedAch[ach.id]));
     if (achBtn) {
-      const completedAch = ACHIEVEMENTS.filter(a => a.check() >= a.goal).length;
-      achBtn.innerHTML = `🏆 Logros (${completedAch}/${ACHIEVEMENTS.length})${unclaimed ? ' <span class="ach-badge-dot" style="background:#e74c3c;color:#fff;font-size:7px;border-radius:50%;padding:1px 4px;margin-left:4px;font-weight:bold;animation:pulse 1s infinite alternate;border:1px solid #fff;">!</span>' : ''}`;
+      const completedAch = visibleList.filter(a => a.check() >= a.goal).length;
+      achBtn.innerHTML = `
+        <span>🏆 Logros${unclaimed ? ' <span class="ach-badge-dot" style="background:#e74c3c;color:#fff;font-size:7px;border-radius:50%;padding:1px 4px;margin-left:2px;font-weight:bold;animation:pulse 1s infinite alternate;border:1px solid #fff;">!</span>' : ''}</span>
+        <span style="font-size:8px;opacity:0.85;margin-top:2px;">(${completedAch}/${visibleList.length})</span>
+      `;
     }
     const topAchBtn = $('#btn-top-ach');
     if (topAchBtn) {
@@ -1494,6 +1544,58 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
   ov.onclick = e => { if (e.target === ov) ov.remove(); };
 }
 
+function showSagaInfoModal(sagaIdx = 0) {
+  const s = SAGAS[sagaIdx];
+  if (!s) return;
+
+  const existingOverlay = document.querySelector('#saga-info-overlay');
+  if (existingOverlay) existingOverlay.remove();
+
+  const islandsHTML = s.islands.map((isl, idx) => {
+    const bossesHTML = (isl.boss || []).map((bId, bIdx) => {
+      const c = CHARS[bId];
+      const bLvl = (isl.bossLvl && isl.bossLvl[bIdx]) ? isl.bossLvl[bIdx] : '?';
+      if (!c) return `<span>💀 ${bId} (Nv. ${bLvl})</span>`;
+      return `<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,0,0,0.04);padding:4px 8px;border-radius:4px;border:1px solid #ddd;margin:2px;">
+        ${charIcon(bId, 22)}
+        <span><b>${c.name}</b> <small style="color:var(--red);font-weight:bold;">Nv. ${bLvl}</small></span>
+      </div>`;
+    }).join(' ');
+
+    return `
+      <div style="background:#fff;border:1px solid var(--ink);border-radius:6px;padding:8px 12px;margin-bottom:8px;text-align:left;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+          <span style="font-weight:bold;font-size:10px;color:var(--gold-dark,#b8860b);">🏝️ Isla ${idx + 1}: ${isl.name}</span>
+          <span style="font-size:8px;background:var(--sky,#e0f7fa);padding:2px 6px;border-radius:4px;border:1px solid #90caf9;">Rango Nivel: Nv. ${isl.lvl ? isl.lvl[0] + ' - ' + isl.lvl[1] : '?'}</span>
+        </div>
+        <div style="font-size:8px;color:#555;margin-top:6px;display:flex;flex-wrap:wrap;align-items:center;gap:4px;">
+          <b>Jefes:</b> ${bossesHTML || 'Sin jefes'}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  const ov = document.createElement('div');
+  ov.id = 'saga-info-overlay';
+  ov.className = 'overlay';
+  ov.innerHTML = `
+    <div class="modal" style="max-width:520px;max-height:85vh;display:flex;flex-direction:column;">
+      <h2 style="margin-bottom:4px;">ℹ️ Información: ${s.name}</h2>
+      <p style="font-size:9px;color:#666;margin-bottom:12px;">Niveles de esbirros y bosses de cada isla de esta saga.</p>
+      <div style="overflow-y:auto;flex:1;padding-right:4px;">
+        ${islandsHTML}
+      </div>
+      <div class="actions" style="margin-top:12px;text-align:center;">
+        <button class="btn gray" id="sim-close">CERRAR</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(ov);
+
+  ov.querySelector('#sim-close').onclick = () => ov.remove();
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+}
+
 let storyMode = 'classic';
 
 function screenSagas() {
@@ -1589,8 +1691,9 @@ function screenSagas() {
                     </span>`;
         }).join('')}
                 </div>
-                <div class="saga-stats-btn-wrap">
+                <div class="saga-stats-btn-wrap" style="display:flex;gap:4px;align-items:center;margin-top:6px;">
                   <button class="btn small gray btn-saga-probs" data-saga="${idx}" style="font-size:7px;padding:3px 6px;">📊 PROBABILIDADES</button>
+                  <button class="btn small blue btn-saga-info" data-saga-info="${idx}" style="font-size:9px;padding:3px 7px;font-weight:bold;min-width:24px;" title="Información de Jefes y Niveles">ℹ️</button>
                 </div>
               </div>
             `}
@@ -1627,6 +1730,13 @@ function screenSagas() {
       e.stopPropagation();
       selectedDiff = +item.dataset.diff;
       screenSagas();
+    };
+  });
+
+  document.querySelectorAll('[data-saga-info]').forEach(btn => {
+    btn.onclick = e => {
+      e.stopPropagation();
+      showSagaInfoModal(+btn.dataset.sagaInfo);
     };
   });
 
@@ -1963,6 +2073,8 @@ function starterSlotsCount() {
   return Math.min(6, count);
 }
 
+let currentStarterUpdateFn = null;
+
 function screenStarter(sagaIdx) {
   playMusic('menu');
   const saga = SAGAS[sagaIdx];
@@ -1973,22 +2085,36 @@ function screenStarter(sagaIdx) {
 
   const renderSlotsGrid = () => {
     let slotsHTML = '';
+    const cap = maxStartLvlCap();
     for (let i = 0; i < maxSlots; i++) {
       const id = picked[i];
       if (id && CHARS[id]) {
         const c = CHARS[id];
         const startLvl = startLvlOf(id);
+        const cost = logPoseUpgradeCost(startLvl);
+        const isMax = startLvl >= cap;
+        const canAfford = (meta.logPoses || 0) >= cost;
+
         slotsHTML += `
           <div class="starter-slot-card occupied" data-slot="${i}">
             <div class="starter-slot-badge">HUECO ${i + 1}</div>
             <div style="margin-top:14px;" class="emoji">${charIcon(id, 40)}</div>
-            <div style="font-size:10px;font-weight:bold;margin:4px 0;">${c.name}</div>
+            <div style="font-size:10px;font-weight:bold;margin:3px 0;">${c.name}</div>
             <div class="char-lvl" style="font-size:8px;">Nv. ${startLvl} · ${'⭐'.repeat(c.rareza)}</div>
-            <div class="type-badges" style="margin:4px 0;justify-content:center;">${typeBadges(c.types)}</div>
-            <div style="display:flex;gap:4px;margin-top:6px;width:100%;justify-content:center;">
-              <button class="btn small blue btn-swap-slot" data-slot="${i}" style="font-size:7.5px;padding:3px 6px;">🔄 Cambiar</button>
-              <button class="btn small gray btn-info-slot" data-id="${id}" style="font-size:7.5px;padding:3px 6px;">ℹ️</button>
-              <button class="btn small red btn-remove-slot" data-slot="${i}" style="font-size:7.5px;padding:3px 6px;">✕</button>
+            <div class="type-badges" style="margin:3px 0;justify-content:center;">${typeBadges(c.types)}</div>
+            <div style="margin:4px 0;width:100%;">
+              ${isMax ? `
+                <span style="font-size:7.5px;color:var(--green);font-weight:bold;background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:3px;display:inline-block;">🔒 Nv. Máx (${cap})</span>
+              ` : `
+                <button class="btn small gold btn-upg-slot" data-id="${id}" ${canAfford ? '' : 'disabled'} style="font-size:7.5px;padding:3px 6px;width:100%;" title="Cuesta ${cost} Log Poses">
+                  ⬆️ Subir Nv (${cost} 🧭)
+                </button>
+              `}
+            </div>
+            <div style="display:flex;gap:3px;margin-top:2px;width:100%;justify-content:center;">
+              <button class="btn small blue btn-swap-slot" data-slot="${i}" style="font-size:7.5px;padding:3px 5px;flex:1;">🔄 Cambiar</button>
+              <button class="btn small gray btn-info-slot" data-id="${id}" style="font-size:7.5px;padding:3px 5px;">ℹ️</button>
+              <button class="btn small red btn-remove-slot" data-slot="${i}" style="font-size:7.5px;padding:3px 5px;">✕</button>
             </div>
           </div>
         `;
@@ -2033,8 +2159,13 @@ function screenStarter(sagaIdx) {
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
     <div class="subtitle" style="font-size:14px;">Aventura en ${saga.name}</div>
     <div class="panel">
-      <h2 style="margin-bottom:4px;">🏴‍☠️ Configuración de la Banda (${picked.length}/${maxSlots})</h2>
-      <p style="font-size:8.5px;color:#555;margin-bottom:12px;">Toca un personaje para cambiarlo o pulsa un hueco vacío para abrir el inventario y elegir a tu nakama.</p>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
+        <h2 style="margin:0;">🏴‍☠️ Configuración de la Banda (${picked.length}/${maxSlots})</h2>
+        <div id="starter-logpose-info" style="font-size:9.5px;font-weight:bold;color:var(--gold);background:var(--ink);padding:4px 8px;border-radius:4px;border:1px solid var(--gold);cursor:pointer;" title="Toca para saber más sobre los Log Poses">
+          🧭 Log Poses: ${meta.logPoses || 0} ℹ️
+        </div>
+      </div>
+      <p style="font-size:8.5px;color:#555;margin-bottom:12px;">Toca un personaje para cambiarlo, sube su nivel con 🧭 Log Poses o pulsa un hueco vacío para abrir el inventario.</p>
       
       <div id="starter-slots-container"></div>
       ${renderPresetsBar()}
@@ -2069,6 +2200,21 @@ function screenStarter(sagaIdx) {
   };
 
   const bindEvents = () => {
+    const logPoseBtn = $('#starter-logpose-info');
+    if (logPoseBtn) {
+      logPoseBtn.onclick = () => {
+        modalInfo(
+          '🧭 Log Poses de Navegación',
+          `<div style="font-size:8.5px;line-height:1.5;color:#333;text-align:left;padding:4px;">
+            Los <b>Log Poses 🧭</b> son brújulas de navegación de Grand Line que obtienes al derrotar enemigos durante tu travesía.<br><br>
+            • <b>¿Para qué sirven?</b> Se consumen para entrenar y <b>subir el nivel base permanente</b> de tus nakamas.<br>
+            • <b>Subida directa:</b> Puedes pulsar el botón <b>⬆️ Subir Nv</b> en cada hueco de personaje o abrir el inventario.<br>
+            • <b>Coste incremental:</b> Cuanto mayor sea el nivel de un nakama, más Log Poses necesitarás para subirlo al siguiente nivel (hasta el límite de tu saga actual: Nv. ${maxStartLvlCap()}).
+          </div>`
+        );
+      };
+    }
+
     const slotsContainer = $('#starter-slots-container');
     if (slotsContainer) {
       makeListReorderable(slotsContainer, '.starter-slot-card.occupied', (from, to) => {
@@ -2080,6 +2226,14 @@ function screenStarter(sagaIdx) {
 
       slotsContainer.querySelectorAll('.starter-slot-card.empty-slot').forEach(card => {
         card.onclick = () => openInventoryPicker(+card.dataset.slot);
+      });
+      slotsContainer.querySelectorAll('.btn-upg-slot').forEach(btn => {
+        btn.onclick = (e) => {
+          e.stopPropagation();
+          if (upgradeCharLvl(btn.dataset.id)) {
+            update();
+          }
+        };
       });
       slotsContainer.querySelectorAll('.btn-swap-slot').forEach(btn => {
         btn.onclick = (e) => {
@@ -2155,8 +2309,11 @@ function screenStarter(sagaIdx) {
     if (slotsContainer) slotsContainer.innerHTML = renderSlotsGrid();
     const presetBarCont = document.querySelector('.preset-bar');
     if (presetBarCont) presetBarCont.outerHTML = renderPresetsBar();
+    const lpCont = $('#starter-logpose-info');
+    if (lpCont) lpCont.innerHTML = `🧭 Log Poses: ${meta.logPoses || 0} ℹ️`;
     bindEvents();
   };
+  currentStarterUpdateFn = update;
 
   update();
 }
@@ -2259,13 +2416,13 @@ function screenMap() {
   const island = saga.islands[run.islandIdx];
   const reach = reachableNodes();
   const rows = run.map.rows;
-  const H = Math.max(520, rows.length * 78);
+  const H = Math.max(650, rows.length * 90);
 
   let nodesHTML = '', edgesHTML = '';
   const posOf = (r, i) => {
     const row = rows[r];
     const x = (i + 1) / (row.length + 1) * 100;
-    const y = 92 - (r / (rows.length - 1)) * 80;
+    const y = 92 - (r / (rows.length - 1)) * 82;
     return [x, y];
   };
   for (const e of run.map.edges) {
@@ -2465,7 +2622,37 @@ function useItemFromMap(id) {
     if (item.stat === 1) { f.atkBonus += 2; f.atk += 2; toast(`+2 ATQ para ${charName(f)}`); }
     else { f.defBonus += 2; f.def += 2; toast(`+2 DEF para ${charName(f)}`); }
     run.items[id]--;
+    trackItemCollected(1);
     saveRun(); screenMap();
+  } else if (item.kind === 'fruta') {
+    const activeTeam = run.team.filter(x => x.hp > 0);
+    if (!activeTeam.length) return toast('No tienes nakamas conscientes para consumir la fruta.');
+    const candidates = [...activeTeam];
+    const chosen = [];
+    while (chosen.length < Math.min(2, candidates.length)) {
+      const idx = rnd(0, candidates.length - 1);
+      chosen.push(candidates.splice(idx, 1)[0]);
+    }
+    const allPossibleTypes = Object.keys(TYPES);
+    const grantedLog = [];
+    chosen.forEach(f => {
+      f.extraTypes = f.extraTypes || [];
+      const current = fighterTypes(f);
+      const available = allPossibleTypes.filter(t => !current.includes(t));
+      if (available.length > 0) {
+        const newTag = pick(available);
+        f.extraTypes.push(newTag);
+        grantedLog.push(`<b>${charName(f)}</b> despierta el tag ${TYPES[newTag].emoji} <b>${newTag}</b>`);
+      }
+    });
+    run.items[id]--;
+    trackItemCollected(1);
+    saveRun();
+    if (grantedLog.length) {
+      modalInfo('🍈 ¡Poder de la Fruta del Diablo!', `<div class="reward-list">La Fruta del Diablo otorga nuevas fuerzas a tu banda:<br><br>${grantedLog.join('<br>')}<br><br><small style="color:var(--gold);">¡Nuevos tags y sinergias activadas!</small></div>`, screenMap);
+    } else {
+      screenMap();
+    }
   } else {
     toast('Eso solo se usa en combate.');
   }
@@ -2519,9 +2706,10 @@ function enterNode(r, i) {
       break;
     }
     case 'item': {
-      const lootIds = ['carne', 'carne', 'carnereal', 'cartel', 'cartel', 'carteldorado', 'sake', 'bocadillo'];
+      const lootIds = ['carne', 'carne', 'carnereal', 'cartel', 'cartel', 'carteldorado', 'sake', 'bocadillo', 'fruta_diablo'];
       const id = pick(lootIds);
       run.items[id] = (run.items[id] || 0) + 1;
+      trackItemCollected(1);
       saveRun();
       modalInfo('🎁 ¡Objeto encontrado!', `<div class="reward-list">${ITEMS[id].emoji} <b>${ITEMS[id].name}</b><br><small>${ITEMS[id].desc}</small></div>`, screenMap);
       break;
@@ -2911,6 +3099,12 @@ function showCharModal(fOrId) {
   const future = c.learnset.filter(([l, m]) => l > f.lvl && !known.includes(m));
   const starsTag = f.stars ? `<span style="color:var(--gold);font-size:16px;margin-left:6px;">⭐${f.stars}</span>` : '';
   const hasUpgrades = (f.hpBonus || 0) + (f.atkBonus || 0) + (f.defBonus || 0) + (f.spatkBonus || 0) + (f.spdefBonus || 0) + (f.spdBonus || 0) > 0;
+  
+  const cap = maxStartLvlCap();
+  const upgCost = logPoseUpgradeCost(f.lvl);
+  const canAffordUpg = (meta.logPoses || 0) >= upgCost;
+  const isMaxLvl = f.lvl >= cap;
+  
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal char-sheet">
@@ -2918,6 +3112,20 @@ function showCharModal(fOrId) {
     ${typeBadges(c.types)}
     ${f.stars ? `<div class="sheet-line" style="color:var(--gold);background:rgba(255,215,0,0.1);padding:4px 8px;border-radius:4px;"><b>⭐ Fusión ${f.stars} Estrellas</b> — +${f.stars * 5}% a todas las características en esta partida</div>` : ''}
     ${isLive ? `<div class="sheet-line" style="color:var(--gold);font-weight:bold;">📍 Características reales en combate (Nivel, Fusiones y Barco)</div>` : `<div class="sheet-line" style="color:var(--gold);font-weight:bold;">📍 Nivel base e incentivos del barco actuales${hasUpgrades ? ' (incluye mejoras del barco)' : ''}</div>`}
+    ${!isLive ? `
+      <div style="margin:6px 0;text-align:center;background:rgba(0,0,0,0.04);padding:8px;border-radius:6px;border:1px solid #ddd;">
+        <div style="font-size:8px;color:#555;margin-bottom:4px;">
+          Nivel base actual: <b>Nv. ${f.lvl}</b> ${isMaxLvl ? `(Máx. ${cap})` : `· Siguiente nivel cuesta <b>${upgCost} 🧭 Log Poses</b> (Tienes ${meta.logPoses || 0} 🧭)`}
+        </div>
+        ${isMaxLvl ? `
+          <span style="font-size:8px;color:var(--green);font-weight:bold;">🔒 Nivel máximo alcanzado para tus sagas</span>
+        ` : `
+          <button class="btn small gold" id="sheet-upg-btn" ${canAffordUpg ? '' : 'disabled'} style="font-size:8.5px;padding:4px 10px;">
+            ⬆️ Subir a Nivel ${f.lvl + 1} (${upgCost} 🧭)
+          </button>
+        `}
+      </div>
+    ` : ''}
     ${isFru || isHak ? `<div class="sheet-line">
       ${isFru ? '<b>🍈 Tag FRUTA</b> — recibe la mitad de daño de atacantes sin HAKI. ' : ''}
       ${isHak ? '<b>👁️ Tag HAKI</b> — sus ataques anulan la defensa pasiva de los usuarios FRUTA.' : ''}
@@ -3228,6 +3436,7 @@ function screenShop() {
       if (run.berries < ITEMS[id].price) return;
       run.berries -= ITEMS[id].price;
       run.items[id] = (run.items[id] || 0) + 1;
+      trackItemCollected(1);
       saveRun();
       toast(`Comprado: ${ITEMS[id].name} ${ITEMS[id].emoji}`);
       screenShop();
@@ -3583,21 +3792,23 @@ function nakamaStatMult(team) {
 function showSynergyModal(team) {
   const ov = document.createElement('div');
   ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal">
-    <h2>🧩 Sinergias de equipo</h2>
-    <p style="font-size:8px;text-align:center;margin-bottom:10px;">2+ nakamas vivos que comparten tipo activan la Sinergia I;
+  ov.innerHTML = `<div class="modal" style="display:flex;flex-direction:column;max-height:85vh;max-width:580px;position:relative;overflow:hidden;padding-bottom:0;">
+    <h2 style="flex-shrink:0;">🧩 Sinergias de equipo</h2>
+    <p style="font-size:8px;text-align:center;margin-bottom:10px;flex-shrink:0;">2+ nakamas vivos que comparten tipo activan la Sinergia I;
     si el equipo entero lo comparte, la Sinergia II.</p>
-    ${Object.keys(SYNERGIES).map(t => {
-    const tier = team ? synergyTier(team, t) : 0;
-    const s = SYNERGIES[t];
-    return `<div class="sheet-section" style="${tier ? 'background:#fff8e0;' : ''}">
-        <b>${synEmoji(t)} ${t} — ${s.name} ${tier ? `<span style="color:var(--accent);">— ACTIVA ${tier === 2 ? 'Ⅱ' : 'Ⅰ'}</span>` : ''}</b>
-        <p>Ⅰ: ${s.d1}<br>Ⅱ: ${s.d2}</p>
-      </div>`;
-  }).join('')}
-    <div class="actions">
-      <button class="btn blue" id="syn-chart">📊 TABLA DE TIPOS</button>
-      <button class="btn gray" id="syn-close">CERRAR</button>
+    <div style="overflow-y:auto;flex:1;padding-right:4px;margin-bottom:6px;">
+      ${Object.keys(SYNERGIES).map(t => {
+        const tier = team ? synergyTier(team, t) : 0;
+        const s = SYNERGIES[t];
+        return `<div class="sheet-section" style="${tier ? 'background:#fff8e0;' : ''}">
+            <b>${synEmoji(t)} ${t} — ${s.name} ${tier ? `<span style="color:var(--accent);">— ACTIVA ${tier === 2 ? 'Ⅱ' : 'Ⅰ'}</span>` : ''}</b>
+            <p>Ⅰ: ${s.d1}<br>Ⅱ: ${s.d2}</p>
+          </div>`;
+      }).join('')}
+    </div>
+    <div class="actions" style="background:var(--paper);padding:10px 18px;margin-left:-18px;margin-right:-18px;border-top:2px solid var(--ink);box-shadow:0 -4px 12px rgba(0,0,0,0.18);z-index:20;display:flex;gap:10px;justify-content:center;flex-shrink:0;">
+      <button class="btn blue" id="syn-chart">📊 TABLA DE DEBILIDADES</button>
+      <button class="btn gray" id="syn-close">✖️ CERRAR</button>
     </div>
   </div>`;
   document.body.appendChild(ov);
@@ -3621,36 +3832,38 @@ function showTypeChartModal(team) {
   }).join('');
   const ov = document.createElement('div');
   ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="max-width:560px;">
-    <h2>📊 Tabla de debilidades</h2>
-    <div style="overflow-x:auto;">
-      <table class="chart-table">
-        <tr><th>Atacante</th><th>+25% fuerte contra</th><th>-25% débil contra</th><th>Efecto especial</th></tr>
-        ${rows}
-      </table>
+  ov.innerHTML = `<div class="modal" style="display:flex;flex-direction:column;max-height:85vh;max-width:560px;position:relative;overflow:hidden;padding-bottom:0;">
+    <h2 style="flex-shrink:0;">📊 Tabla de debilidades</h2>
+    <div style="overflow-y:auto;flex:1;padding-right:4px;margin-bottom:6px;">
+      <div style="overflow-x:auto;">
+        <table class="chart-table">
+          <tr><th>Atacante</th><th>+25% fuerte contra</th><th>-25% débil contra</th><th>Efecto especial</th></tr>
+          ${rows}
+        </table>
+      </div>
+      <div class="sheet-section" style="margin-top:10px;">
+        <b>🍈👁️ Tags de Naturaleza</b>
+        <p><b>FRUTA</b>: usuario de Fruta del Diablo · <b>HAKI</b>: capaz de imbuir Haki.<br><br>
+        ⚖️ <b>Regla núcleo:</b> si el atacante NO tiene HAKI y el defensor tiene el tag FRUTA,
+        el daño se reduce un <b>50%</b>. Si el atacante tiene HAKI (propio o por la sinergia Haki Ⅰ+),
+        esta reducción se anula por completo.</p>
+      </div>
+      <div class="sheet-section">
+        <b>📐 Categorías de daño</b>
+        <p>⚔️👊🎯 Corte, Golpe y Disparo usan <b>ATQ</b> contra <b>DEF</b>.<br>
+        El resto de tipos (elementales, Oscuridad, Haki y Fruta) usan <b>ESP_ATQ</b> contra <b>ESP_DEF</b>.<br>
+        Base de todos: <b>EVA</b> ${Math.round(BASE_EVA * 100)}% · <b>CRIT</b> ${Math.round(BASE_CRIT * 100)}% (x${BASE_CRIT_DMG} de daño).</p>
+      </div>
+      <div class="sheet-section">
+        <b>⚔️ Clímax de combate</b>
+        <p>A partir de la ronda ${CLIMAX_ROUND} el daño de ambos bandos aumenta un <b>+10% acumulativo
+        por ronda</b> y todas las curaciones (movimientos de apoyo y pasivas) pierden un <b>20% de eficacia
+        por ronda</b> hasta anularse. Ningún combate puede durar para siempre.</p>
+      </div>
     </div>
-    <div class="sheet-section" style="margin-top:10px;">
-      <b>🍈👁️ Tags de Naturaleza</b>
-      <p><b>FRUTA</b>: usuario de Fruta del Diablo · <b>HAKI</b>: capaz de imbuir Haki.<br><br>
-      ⚖️ <b>Regla núcleo:</b> si el atacante NO tiene HAKI y el defensor tiene el tag FRUTA,
-      el daño se reduce un <b>50%</b>. Si el atacante tiene HAKI (propio o por la sinergia Haki Ⅰ+),
-      esta reducción se anula por completo.</p>
-    </div>
-    <div class="sheet-section">
-      <b>📐 Categorías de daño</b>
-      <p>⚔️👊🎯 Corte, Golpe y Disparo usan <b>ATQ</b> contra <b>DEF</b>.<br>
-      El resto de tipos (elementales, Oscuridad, Haki y Fruta) usan <b>ESP_ATQ</b> contra <b>ESP_DEF</b>.<br>
-      Base de todos: <b>EVA</b> ${Math.round(BASE_EVA * 100)}% · <b>CRIT</b> ${Math.round(BASE_CRIT * 100)}% (x${BASE_CRIT_DMG} de daño).</p>
-    </div>
-    <div class="sheet-section">
-      <b>⚔️ Clímax de combate</b>
-      <p>A partir de la ronda ${CLIMAX_ROUND} el daño de ambos bandos aumenta un <b>+10% acumulativo
-      por ronda</b> y todas las curaciones (movimientos de apoyo y pasivas) pierden un <b>20% de eficacia
-      por ronda</b> hasta anularse. Ningún combate puede durar para siempre.</p>
-    </div>
-    <div class="actions">
+    <div class="actions" style="background:var(--paper);padding:10px 18px;margin-left:-18px;margin-right:-18px;border-top:2px solid var(--ink);box-shadow:0 -4px 12px rgba(0,0,0,0.18);z-index:20;display:flex;gap:10px;justify-content:center;flex-shrink:0;">
       <button class="btn blue" id="tc-syn">🧩 SINERGIAS</button>
-      <button class="btn gray" id="tc-close">CERRAR</button>
+      <button class="btn gray" id="tc-close">✖️ CERRAR</button>
     </div>
   </div>`;
   document.body.appendChild(ov);
@@ -4714,7 +4927,7 @@ function sagaComplete() {
   const isFirstDiffWin = !meta.sagaDiffWins[saga.id][diffLevel];
   meta.sagaDiffWins[saga.id][diffLevel] = true;
 
-  const baseFame = run.mode === 'nuzlocke' ? 150 : 100;
+  const baseFame = 500;
   let fameWon = 0;
   let rewardMessage = '';
 
