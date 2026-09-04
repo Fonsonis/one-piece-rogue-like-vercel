@@ -452,12 +452,17 @@ button { font-family: inherit; cursor: pointer; }
   border: 2px dashed var(--red); padding: 6px; background: #fdeaea;
 }
 
-/* --- Equipo: arrastrar para reordenar --- */
-.team-slot { cursor: grab; user-select: none; }
+/* --- Equipo: arrastrar / deslizar para reordenar --- */
+.team-slot { cursor: grab; user-select: none; touch-action: pan-x; transition: transform 0.15s, background 0.15s; }
 .team-slot:active { cursor: grabbing; }
-.team-slot .drag-handle { color: #999; font-size: 12px; }
-.team-slot.dragging { opacity: .4; }
-.team-slot.dragover { border-color: var(--gold); background: #ffe9b3; }
+.team-slot .drag-handle { color: #999; font-size: 12px; cursor: grab; }
+.team-slot.dragging { opacity: 0.4; transform: scale(0.97); }
+.team-slot.dragover { border-color: var(--gold); background: #ffe9b3; transform: scale(1.02); }
+
+.starter-slot-card.occupied { cursor: grab; user-select: none; touch-action: pan-y; transition: transform 0.15s, background 0.15s; }
+.starter-slot-card.occupied:active { cursor: grabbing; }
+.starter-slot-card.occupied.dragging { opacity: 0.4; transform: scale(0.96); }
+.starter-slot-card.occupied.dragover { border-color: var(--gold); background: #ffe9b3; transform: scale(1.03); }
 
 /* --- Ficha de personaje --- */
 .char-sheet h2 small { font-size: 9px; color: #888; }
