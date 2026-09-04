@@ -1334,7 +1334,8 @@ const STRAW_HAT_MEMBERS = ['luffy', 'zoro', 'nami', 'usopp', 'sanji',
   'chopper', 'robin', 'franky', 'brook', 'jinbe'].filter(id => CHARS[id]);
 
 const SAGAS = SAGA_DEFS.map((d, i) => {
-  const startLvl = 5 + i * 6;
+  // Dificultad entre sagas aumenta de forma exponencial (East Blue: 8, Alabasta: 15, Skypiea: 22...)
+  const startLvl = Math.round(8 + 7 * i + (i >= 3 ? Math.pow(i - 2, 2.2) * 2.2 : 0));
   const totalIslands = d.islands.length;
   const mobs = Object.keys(CHARS).filter(id =>
     CHARS[id].saga === d.id && !CHARS[id].boss && !CHARS[id].nakama && !EVOLVED_FORMS.has(id));
@@ -1346,12 +1347,13 @@ const SAGAS = SAGA_DEFS.map((d, i) => {
     starters: NAKAMA_STARTERS,
     islands: d.islands.map(([name, bossesRaw], k) => {
       const bosses = bossesRaw.map(b => BOSS_ALIASES[b] || b).filter(b => CHARS[b]);
-      const lvl0 = startLvl + k * 4;
+      // Dificultad entre islas dentro de una saga aumenta de forma lineal pero considerable (+8 niveles por isla)
+      const lvl0 = startLvl + k * 8;
       const rowsCount = totalIslands === 1 ? 14 : (6 + Math.min(3, Math.floor(k / 2)));
       return {
         name, boss: bosses,
-        bossLvl: bosses.map((b, j) => lvl0 + 4 + j + CHARS[b].rareza),
-        pool, lvl: [lvl0, lvl0 + 4],
+        bossLvl: bosses.map((b, j) => lvl0 + 6 + j + CHARS[b].rareza),
+        pool, lvl: [lvl0, lvl0 + 6],
         rows: rowsCount,
         singleIslandSaga: totalIslands === 1,
         final: k === d.islands.length - 1,
