@@ -1983,9 +1983,9 @@ function screenMap() {
         <div class="map-title">📍 SAGA: <b>${saga.name}</b> · Isla ${run.islandIdx + 1}/${saga.islands.length}: <b>${island.name}</b> (${run.mode === 'nuzlocke' ? 'NUZLOCKE' : 'CLÁSICO'})</div>
         <svg class="map-svg">${edgesHTML}</svg>
         ${nodesHTML}
-        <div style="position:absolute;bottom:12px;left:12px;z-index:20;">
-          <button class="btn gold small" id="btn-map-reroll" ${rerollUsed ? 'disabled' : ''} style="font-size:8.5px;padding:6px 10px;box-shadow:0 3px 6px rgba(0,0,0,0.5);font-weight:bold;">
-            🎲 REROLL ISLA ${rerollUsed ? '(0/1)' : '(1/1)'}
+        <div style="position:absolute;top:6px;right:10px;z-index:20;">
+          <button class="btn gold small" id="btn-map-reroll" ${rerollUsed ? 'disabled' : ''} style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
+            Reroll x${rerollUsed ? 0 : 1}
           </button>
         </div>
       </div>
