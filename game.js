@@ -3845,6 +3845,8 @@ function endBattle(victory, fled, recruited) {
     const newVets = unlockRoster();
     gainFame(20);
     const saga = SAGAS[run.saga];
+    // Al vencer al jefe de la isla (en modo Clásico), toda la banda (incluyendo caídos) se recupera al 100% de PS
+    run.team.forEach(f => { f.hp = f.maxhp; });
     if (run.islandIdx >= saga.islands.length - 1) {
       saveRun();
       const diffLevel = (run && run.diff) || 1;
@@ -3856,8 +3858,6 @@ function endBattle(victory, fled, recruited) {
     run.islandIdx++;
     run.map = genMap(saga.islands[run.islandIdx]);
     run.pos = null;
-    // travesía entre islas: la banda viva se recupera al completo
-    run.team.forEach(f => { if (f.hp > 0) f.hp = f.maxhp; });
     saveRun();
     modalInfo('🏅 ¡Emblema conseguido!',
       `<div class="reward-list">¡Has conquistado la isla!<br>+20 ⭐ Fama<br><br>Rumbo a <b>${saga.islands[run.islandIdx].name}</b> 🧭<br>Tu equipo se recupera durante la travesía.${newVets.length ? `<br><br><small>🏅 Veteranos desbloqueados para futuras aventuras:<br>${newVets.map(id => `${charIcon(id, 16)} ${CHARS[id].name}`).join(' · ')}</small>` : ''
