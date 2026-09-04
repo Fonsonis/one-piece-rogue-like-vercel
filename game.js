@@ -35,6 +35,214 @@ let session = null;
 try { session = JSON.parse(localStorage.getItem('oplike_session')); } catch (e) { }
 const storeKey = base => session ? `${base}_${session.user}` : base;
 
+let autoMode = false;
+let autoTimer = null;
+let autoSettings = {
+  healThreshold: 50, // 0 = desactivo, 25, 50, 75, 99
+  nodePriority: 'random', // 'random', 'item', 'battle', 'rest'
+  wildAction: 'fight', // 'fight', 'recruit', 'chains'
+  shopItems: [
+    { id: 'carne', qty: 3 },
+    { id: 'sake', qty: 2 },
+    { id: 'cartel', qty: 2 },
+  ],
+};
+
+function stopAutoMode() {
+  autoMode = false;
+  if (autoTimer) {
+    clearTimeout(autoTimer);
+    autoTimer = null;
+  }
+  toast('⏹️ Modo Automático DETENIDO');
+  screenMap();
+}
+
+function scheduleAutoStep(fn, ms = 700) {
+  if (!autoMode) return;
+  if (autoTimer) clearTimeout(autoTimer);
+  autoTimer = setTimeout(() => {
+    autoTimer = null;
+    if (autoMode) fn();
+  }, ms);
+}
+
+function runAutoItems() {
+  if (!autoMode || !autoSettings.healThreshold || !run || !run.items || !run.team) return;
+  const isNuz = run.mode === 'nuzlocke';
+  const thresh = autoSettings.healThreshold;
+  if (!isNuz && (run.items.sake || 0) > 0) {
+    const dead = run.team.find(f => f.hp <= 0);
+    if (dead) {
+      run.items.sake--;
+      dead.hp = Math.floor(dead.maxhp * 0.5);
+      toast(`🤖 Auto: ${charName(dead)} revivido con Sake 🍶`);
+    }
+  }
+  for (const f of run.team) {
+    if (f.hp > 0) {
+      const pct = (f.hp / f.maxhp) * 100;
+      if (pct <= thresh) {
+        if ((run.items.carnereal || 0) > 0 && f.hp < f.maxhp * 0.5) {
+          run.items.carnereal--;
+          f.hp = f.maxhp;
+          toast(`🤖 Auto: Carne Real usada en ${charName(f)} 🥩`);
+        } else if ((run.items.carne || 0) > 0) {
+          run.items.carne--;
+          f.hp = Math.min(f.maxhp, f.hp + 40);
+          toast(`🤖 Auto: Carne usada en ${charName(f)} 🍖`);
+        } else if ((run.items.bocadillo || 0) > 0) {
+          run.items.bocadillo--;
+          f.hp = Math.min(f.maxhp, f.hp + 25);
+          toast(`🤖 Auto: Bocadillo usado en ${charName(f)} 🥪`);
+        }
+      }
+    }
+  }
+  saveRun();
+}
+
+function pickAutoNode(reach) {
+  if (!reach || !reach.length) return null;
+  const pref = autoSettings.nodePriority;
+  if (pref === 'random') return pick(reach);
+
+  const rows = run.map.rows;
+  let matches = [];
+  if (pref === 'item') {
+    matches = reach.filter(([r, i]) => ['item', 'mystery', 'shop'].includes(rows[r][i].type));
+  } else if (pref === 'battle') {
+    matches = reach.filter(([r, i]) => ['wild', 'marine', 'boss'].includes(rows[r][i].type));
+  } else if (pref === 'rest') {
+    matches = reach.filter(([r, i]) => ['rest', 'shop', 'item'].includes(rows[r][i].type));
+  }
+
+  if (matches.length > 0) return pick(matches);
+  return pick(reach);
+}
+
+function showAutoSettingsModal() {
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal" style="max-width:440px;">
+    <h2>🤖 Opciones del Modo Automático</h2>
+    
+    <div style="display:flex;flex-direction:column;gap:12px;margin:14px 0;text-align:left;">
+      
+      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
+        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
+          🍖 Consumo Automático de Objetos
+        </label>
+        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Usar objetos de curación o Sake cuando el PS baje de:</div>
+        <select id="auto-heal-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
+          <option value="0" ${autoSettings.healThreshold === 0 ? 'selected' : ''}>❌ Desactivado (no usar objetos)</option>
+          <option value="25" ${autoSettings.healThreshold === 25 ? 'selected' : ''}>❤️ Crítico: Menos del 25% de PS</option>
+          <option value="50" ${autoSettings.healThreshold === 50 ? 'selected' : ''}>🧡 Medio: Menos del 50% de PS</option>
+          <option value="75" ${autoSettings.healThreshold === 75 ? 'selected' : ''}>💛 Leve: Menos del 75% de PS</option>
+          <option value="99" ${autoSettings.healThreshold === 99 ? 'selected' : ''}>💚 Cualquier daño recibido (<100% PS)</option>
+        </select>
+      </div>
+
+      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
+        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
+          🗺️ Prioridad de Rutas en el Mapa
+        </label>
+        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Tipo de casilla preferida al elegir camino:</div>
+        <select id="auto-node-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
+          <option value="random" ${autoSettings.nodePriority === 'random' ? 'selected' : ''}>🎲 Al azar / Sin preferencia</option>
+          <option value="item" ${autoSettings.nodePriority === 'item' ? 'selected' : ''}>🎁 Priorizar Tesoros, Misterios y Tiendas</option>
+          <option value="battle" ${autoSettings.nodePriority === 'battle' ? 'selected' : ''}>⚔️ Priorizar Enfrentamientos y Combates</option>
+          <option value="rest" ${autoSettings.nodePriority === 'rest' ? 'selected' : ''}>⛺ Priorizar Campamentos y Descanso</option>
+        </select>
+      </div>
+
+      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
+        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
+          🏴‍☠️ Encuentros con Piratas Salvajes
+        </label>
+        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Acción por defecto al encontrar un pirata salvaje:</div>
+        <select id="auto-wild-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
+          <option value="fight" ${autoSettings.wildAction === 'fight' ? 'selected' : ''}>⚔️ Luchar (ganar Experiencia para la banda)</option>
+          <option value="recruit" ${autoSettings.wildAction === 'recruit' ? 'selected' : ''}>💋 Reclutar / Seducir (pagando Berries)</option>
+          <option value="chains" ${autoSettings.wildAction === 'chains' ? 'selected' : ''}>⛓️ Tentar a la suerte (3 Cadenas)</option>
+        </select>
+      </div>
+
+      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
+        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
+          🏪 Compras Automáticas en Tiendas (Prioridad de 3 Objetos)
+        </label>
+        <div style="font-size:7.5px;color:#aaa;margin-bottom:8px;">
+          Elige 3 objetos en orden de prioridad y cuántos deseas mantener en inventario:
+        </div>
+        ${[0, 1, 2].map(idx => {
+          const sList = autoSettings.shopItems || [];
+          const itemSetting = sList[idx] || { id: 'none', qty: 0 };
+          return `
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
+            <span style="font-size:9px;font-weight:bold;color:var(--gold);width:16px;">#${idx + 1}</span>
+            <select id="auto-shop-item-${idx}" style="flex:1;padding:4px;font-size:8.5px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
+              <option value="none" ${itemSetting.id === 'none' ? 'selected' : ''}>❌ Ninguno (vacío)</option>
+              <option value="carne" ${itemSetting.id === 'carne' ? 'selected' : ''}>🍖 Carne de Cerdo (40 PS)</option>
+              <option value="carnereal" ${itemSetting.id === 'carnereal' ? 'selected' : ''}>🥩 Carne Real (100% PS)</option>
+              <option value="bocadillo" ${itemSetting.id === 'bocadillo' ? 'selected' : ''}>🥪 Bocadillo de Arroz (25 PS)</option>
+              <option value="sake" ${itemSetting.id === 'sake' ? 'selected' : ''}>🍶 Sake de Binks (Revivir)</option>
+              <option value="cartel" ${itemSetting.id === 'cartel' ? 'selected' : ''}>📜 Cartel de Recluta (1 Cadena)</option>
+              <option value="carteldorado" ${itemSetting.id === 'carteldorado' ? 'selected' : ''}>🏅 Cartel Dorado (2 Cadenas)</option>
+              <option value="cartelbuster" ${itemSetting.id === 'cartelbuster' ? 'selected' : ''}>📯 Buster Call (3 Cadenas)</option>
+              <option value="hierro" ${itemSetting.id === 'hierro' ? 'selected' : ''}>🛡️ Hierro Forjado (Exp)</option>
+            </select>
+            <span style="font-size:8px;color:#aaa;">Hasta:</span>
+            <select id="auto-shop-qty-${idx}" style="width:50px;padding:4px;font-size:8.5px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
+              <option value="0" ${itemSetting.qty === 0 ? 'selected' : ''}>0</option>
+              ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(q => `<option value="${q}" ${itemSetting.qty === q ? 'selected' : ''}>${q}</option>`).join('')}
+            </select>
+          </div>`;
+        }).join('')}
+      </div>
+
+    </div>
+
+    <div class="actions" style="flex-direction:column;gap:6px;">
+      <button class="btn green" id="auto-apply-start">▶️ ${autoMode ? 'GUARDAR Y CONTINUAR' : 'ACTIVAR MODO AUTOMÁTICO'}</button>
+      ${autoMode ? `<button class="btn red" id="auto-apply-stop">⏹️ DESACTIVAR MODO AUTOMÁTICO</button>` : ''}
+      <button class="btn gray" id="auto-apply-close">CANCELAR / CERRAR</button>
+    </div>
+  </div>`;
+
+  document.body.appendChild(ov);
+
+  const saveFormSettings = () => {
+    autoSettings.healThreshold = +ov.querySelector('#auto-heal-sel').value;
+    autoSettings.nodePriority = ov.querySelector('#auto-node-sel').value;
+    autoSettings.wildAction = ov.querySelector('#auto-wild-sel').value;
+    autoSettings.shopItems = [0, 1, 2].map(idx => ({
+      id: ov.querySelector(`#auto-shop-item-${idx}`).value,
+      qty: +ov.querySelector(`#auto-shop-qty-${idx}`).value
+    }));
+  };
+
+  ov.querySelector('#auto-apply-start').onclick = () => {
+    saveFormSettings();
+    autoMode = true;
+    ov.remove();
+    toast('🤖 Modo Automático ACTIVADO');
+    screenMap();
+  };
+
+  if (autoMode) {
+    const stopBtn = ov.querySelector('#auto-apply-stop');
+    if (stopBtn) {
+      stopBtn.onclick = () => {
+        ov.remove();
+        stopAutoMode();
+      };
+    }
+  }
+
+  ov.querySelector('#auto-apply-close').onclick = () => ov.remove();
+}
+
 // ---------- Dificultades de la aventura ----------
 const DIFFICULTIES = [
   { id: 1, name: 'Grumete', emoji: '⚓', mult: 1.10, desc: 'Normal (rivales +10% atributos)' },
@@ -1170,6 +1378,29 @@ function screenStarter(sagaIdx) {
     }
   };
 
+  const renderActiveTeamTop = () => {
+    return `
+      <div class="active-team-bar" style="background:rgba(0,0,0,0.35);padding:10px 14px;border-radius:8px;border:1px solid rgba(255,215,0,0.3);margin-bottom:10px;text-align:center;">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+          <span style="font-size:11px;font-weight:bold;color:var(--gold);">
+            🏴‍☠️ BANDA SELECCIONADA (${picked.length}/${maxSlots})
+          </span>
+          <button class="btn green small btn-zarpar-top" ${picked.length >= 1 ? '' : 'disabled'} style="font-size:10px;padding:6px 14px;font-weight:bold;">
+            ⚔️ INICIAR COMBATE (${picked.length}/${maxSlots})
+          </button>
+        </div>
+        <div class="selected-team-chips" style="display:flex;gap:8px;justify-content:center;flex-wrap:wrap;min-height:36px;align-items:center;">
+          ${picked.length ? picked.map(id => `
+            <div class="sel-chip" data-remove="${id}" style="display:flex;align-items:center;gap:6px;background:rgba(255,255,255,0.1);border:1px solid var(--gold);padding:4px 8px;border-radius:20px;cursor:pointer;" title="Toca para quitar a ${CHARS[id].name}">
+              <span>${charIcon(id, 22)}</span>
+              <span style="font-size:9.5px;font-weight:bold;">${CHARS[id].name}</span>
+              <span style="font-size:9px;color:var(--red);margin-left:2px;font-weight:bold;">✕</span>
+            </div>
+          `).join('') : '<div style="font-size:9px;color:#aaa;font-style:italic;">No has seleccionado a ningún nakama aún. Toca en los personajes de abajo para añadirlos a tu banda.</div>'}
+        </div>
+      </div>`;
+  };
+
   const renderPresetsBar = () => {
     return `
       <div class="preset-bar" style="display:flex;flex-direction:column;gap:6px;align-items:center;margin:8px 0;background:rgba(0,0,0,0.25);padding:8px 12px;border-radius:6px;border:1px solid rgba(255,255,255,0.1);">
@@ -1197,6 +1428,7 @@ function screenStarter(sagaIdx) {
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
     <div class="subtitle" id="starter-subtitle" style="font-size:14px;"></div>
     <div class="panel">
+      <div id="active-team-container"></div>
       ${renderPresetsBar()}
       ${charControlsHTML(starterView)}
       <div id="char-grid"></div>
@@ -1217,14 +1449,14 @@ function screenStarter(sagaIdx) {
       btn.onclick = () => {
         const slot = +btn.dataset.slot;
         const p = meta.teamPresets[slot] || [];
-        const valid = p.filter(id => id === 'luffy' || (meta.roster && meta.roster.includes(id)));
+        const valid = p.filter(id => allIds.includes(id));
         if (valid.length) {
           picked = valid.slice(0, maxSlots);
           toast(`📂 Equipo Preset ${slot} cargado (${picked.length} miembro/s)`);
           updateSubTitle();
           update();
         } else {
-          toast(`⚠️ Preset ${slot} está vacío o no contiene personajes desbloqueados.`);
+          toast(`⚠️ Preset ${slot} está vacío o no contiene personajes disponibles en esta saga.`);
         }
       };
     });
@@ -1249,17 +1481,44 @@ function screenStarter(sagaIdx) {
   };
 
   const update = () => {
+    const activeCont = $('#active-team-container');
+    if (activeCont) {
+      activeCont.innerHTML = renderActiveTeamTop();
+      const topBtn = $('.btn-zarpar-top');
+      if (topBtn) topBtn.onclick = () => {
+        if (picked.length >= 1) startRun(sagaIdx, picked);
+      };
+      activeCont.querySelectorAll('.sel-chip').forEach(chip => {
+        chip.onclick = () => {
+          const id = chip.dataset.remove;
+          const idx = picked.indexOf(id);
+          if (idx >= 0) picked.splice(idx, 1);
+          updateSubTitle();
+          if (zarparBtn) {
+            zarparBtn.disabled = picked.length < 1;
+            zarparBtn.textContent = `🏴‍☠️ ZARPAR CON TU BANDA (${picked.length}/${maxSlots})`;
+          }
+          update();
+        };
+      });
+    }
+
+    if (zarparBtn) {
+      zarparBtn.disabled = picked.length < 1;
+      zarparBtn.textContent = `🏴‍☠️ ZARPAR CON TU BANDA (${picked.length}/${maxSlots})`;
+    }
+
     const ids = filterSortChars(allIds, starterView);
     renderCharGrid($('#char-grid'), ids, starterView,
       id => {
-        const isUnlocked = id === 'luffy' || (meta.roster && meta.roster.includes(id));
+        const isUnlocked = id === 'luffy' || allIds.includes(id);
         return selCardHTML(id, veterans.includes(id), picked.includes(id), isUnlocked);
       },
       el => {
         el.querySelectorAll('.sel-card').forEach(card => {
           card.onclick = () => {
             const id = card.dataset.id;
-            const isUnlocked = id === 'luffy' || (meta.roster && meta.roster.includes(id));
+            const isUnlocked = id === 'luffy' || allIds.includes(id);
             if (!isUnlocked) {
               toast('🔒 Personaje bloqueado. ¡Conquista islas/sagas para desbloquearlo!');
               return;
@@ -1278,10 +1537,6 @@ function screenStarter(sagaIdx) {
               }
             }
             updateSubTitle();
-            if (zarparBtn) {
-              zarparBtn.disabled = picked.length < 1;
-              zarparBtn.textContent = `🏴‍☠️ ZARPAR CON TU BANDA (${picked.length}/${maxSlots})`;
-            }
             update();
           };
         });
@@ -1389,7 +1644,7 @@ function screenMap() {
             <div class="team-slot ${f.hp <= 0 ? 'dead' : ''}" data-idx="${idx}" draggable="true">
               <span class="drag-handle">≡</span>
               <span class="emoji">${charIcon(f.id, 18)}</span>
-              <div class="info">${idx + 1}. ${charName(f)}<br>Nv${f.lvl}
+              <div class="info">${idx + 1}. ${charName(f)}${f.stars ? ` <span style="color:var(--gold);font-weight:bold;font-size:9.5px;">⭐${f.stars}</span>` : ''}<br>Nv${f.lvl}
                 <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>
               </div>
             </div>`).join('')}
@@ -1409,7 +1664,24 @@ function screenMap() {
     `<div class="badge-slot ${run.badges.includes(i) ? '' : 'empty'}" title="${isl.name}">${run.badges.includes(i) ? '🏅' : '·'}</div>`
   ).join('')}
           </div>
-          <button class="btn red small" id="btn-abandon" style="margin-top:12px;width:100%;">ABANDONAR</button>
+          ${autoMode ? `
+            <div class="auto-mode-box" style="margin-top:10px;background:rgba(217,83,79,0.15);padding:8px;border-radius:6px;border:1px solid var(--red);text-align:center;">
+              <button class="btn red small" id="btn-stop-auto" style="width:100%;font-size:9px;font-weight:bold;padding:6px 8px;">
+                🛑 PARAR MODO AUTO
+              </button>
+              <button class="btn gray small" id="btn-config-auto" style="width:100%;font-size:7.5px;margin-top:4px;padding:3px 6px;">
+                ⚙️ Opciones del Auto
+              </button>
+            </div>
+          ` : `
+            <div class="auto-mode-box" style="margin-top:10px;background:rgba(0,0,0,0.35);padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);text-align:center;">
+              <button class="btn gold small" id="btn-toggle-auto" style="width:100%;font-size:8.5px;font-weight:bold;padding:5px 8px;">
+                🤖 MODO AUTO: OFF ⚙️
+              </button>
+              <div style="font-size:7px;color:#aaa;margin-top:4px;">Toca para activar u opciones</div>
+            </div>
+          `}
+          <button class="btn red small" id="btn-abandon" style="margin-top:10px;width:100%;">ABANDONAR</button>
           <button class="btn gray small" id="btn-home" style="margin-top:6px;width:100%;">MENÚ</button>
         </div>
       </div>
@@ -1481,6 +1753,26 @@ function screenMap() {
   };
   $('#btn-syn-info').onclick = () => showSynergyModal(run.team);
   $('#btn-chart-info').onclick = () => showTypeChartModal(run.team);
+
+  const stopAutoBtn = $('#btn-stop-auto');
+  if (stopAutoBtn) stopAutoBtn.onclick = stopAutoMode;
+  const configAutoBtn = $('#btn-config-auto');
+  if (configAutoBtn) configAutoBtn.onclick = showAutoSettingsModal;
+  const toggleAutoBtn = $('#btn-toggle-auto');
+  if (toggleAutoBtn) toggleAutoBtn.onclick = showAutoSettingsModal;
+
+  if (autoMode && run) {
+    runAutoItems();
+    if (reach.length > 0) {
+      const target = pickAutoNode(reach);
+      if (target) {
+        const [r, i] = target;
+        scheduleAutoStep(() => {
+          if (autoMode && run) enterNode(r, i);
+        }, 750);
+      }
+    }
+  }
 }
 
 function useItemFromMap(id) {
@@ -1654,6 +1946,20 @@ function wildEncounter(wild) {
     </div>
   </div>`;
   document.body.appendChild(ov);
+  if (autoMode) {
+    scheduleAutoStep(() => {
+      if (!document.body.contains(ov)) return;
+      if (autoSettings.wildAction === 'recruit') {
+        const payBtn = ov.querySelector('#we-pay');
+        if (payBtn && !payBtn.disabled) { payBtn.click(); return; }
+      } else if (autoSettings.wildAction === 'chains') {
+        const chainBtn = ov.querySelector('#we-chains');
+        if (chainBtn && !chainBtn.disabled) { chainBtn.click(); return; }
+      }
+      const fightBtn = ov.querySelector('#we-fight');
+      if (fightBtn) fightBtn.click();
+    }, 700);
+  }
   const recruit = () => {
     const f = { ...wild };
     applyUpgrades(f);
@@ -1987,6 +2293,12 @@ function doSpecialPirate(island) {
     </div>
   </div>`;
   document.body.appendChild(ov);
+  if (autoMode) {
+    scheduleAutoStep(() => {
+      const btn = ov.querySelector('#sp-leave');
+      if (btn && document.body.contains(ov)) btn.click();
+    }, 700);
+  }
   ov.querySelector('#sp-rates').onclick = showDropRatesModal;
   ov.querySelector('#sp-leave').onclick = () => { ov.remove(); screenMap(); };
   if (!blocked) {
@@ -2132,6 +2444,14 @@ function modalInfo(title, html, onClose) {
     <div class="actions"><button class="btn green" id="modal-ok">CONTINUAR</button></div></div>`;
   document.body.appendChild(ov);
   ov.querySelector('#modal-ok').onclick = () => { ov.remove(); onClose && onClose(); };
+  if (autoMode) {
+    scheduleAutoStep(() => {
+      if (document.body.contains(ov)) {
+        ov.remove();
+        onClose && onClose();
+      }
+    }, 700);
+  }
 }
 
 // Confirmación gráfica (sustituye a los confirm() del navegador)
@@ -2183,6 +2503,38 @@ function screenShop() {
     };
   });
   $('#btn-leave').onclick = screenMap;
+  if (autoMode) {
+    scheduleAutoStep(() => {
+      if (!autoMode || !run) return;
+      const targets = autoSettings.shopItems || [
+        { id: 'carne', qty: 3 },
+        { id: 'sake', qty: 2 },
+        { id: 'cartel', qty: 2 }
+      ];
+      let boughtAny = false;
+
+      for (const t of targets) {
+        if (!t || !t.id || t.id === 'none' || t.qty <= 0) continue;
+        const currentQty = (run.items && run.items[t.id]) || 0;
+        if (currentQty < t.qty) {
+          const itemPrice = ITEMS[t.id] ? ITEMS[t.id].price : 999999;
+          if (run.berries >= itemPrice) {
+            const buyBtn = document.querySelector(`[data-buy="${t.id}"]`);
+            if (buyBtn && !buyBtn.disabled) {
+              buyBtn.click();
+              boughtAny = true;
+              break;
+            }
+          }
+        }
+      }
+
+      if (!boughtAny) {
+        const leaveBtn = $('#btn-leave');
+        if (leaveBtn) leaveBtn.click();
+      }
+    }, 750);
+  }
 }
 
 // ============ BATALLA AUTOMÁTICA ============
@@ -2518,7 +2870,7 @@ function fighterCardHTML(f, side, idx, active) {
   const ps = passiveInfo(f);
   const starTag = f.stars ? `<span style="color:var(--gold);font-size:9px;">⭐${f.stars}</span>` : '';
   return `<div class="fcard ${f.hp <= 0 ? 'ko' : ''} ${f === active ? 'active' : ''}" id="fc-${side}-${idx}">
-    <div class="fcard-title">${c.name} Nv${f.lvl} ${starTag} <span class="fcard-tags">${tagIcons(f)}</span><span class="fcard-st">${stIcons(f)}</span></div>
+    <div class="fcard-title">${c.name} ${starTag} Nv${f.lvl} <span class="fcard-tags">${tagIcons(f)}</span><span class="fcard-st">${stIcons(f)}</span></div>
     <div class="fcard-hp">
       <div class="hp-bar"><i class="${hpBarClass(f)}" style="width:${clamp(f.hp / f.maxhp * 100, 0, 100)}%"></i></div>
       <div class="hp-nums">${f.hp}/${f.maxhp}</div>
@@ -3150,7 +3502,11 @@ function endBattle(victory, fled, recruited) {
     const saga = SAGAS[run.saga];
     if (run.islandIdx >= saga.islands.length - 1) {
       saveRun();
-      return offerCrossoverPath(newVets);
+      const diffLevel = (run && run.diff) || 1;
+      if (diffLevel === 5) {
+        return offerCrossoverPath(newVets);
+      }
+      return sagaComplete();
     }
     run.islandIdx++;
     run.map = genMap(saga.islands[run.islandIdx]);
@@ -3168,13 +3524,11 @@ function endBattle(victory, fled, recruited) {
   screenMap();
 }
 
-// ============ EVENTO: CROSSOVER DE ANIME ============
-// Tras el combate de jefe de final de saga se abre un camino alternativo
-// aparentemente sin salida (un nodo con una única conexión). Dentro, un jefe
-// de otra serie con +50% de Daño y Defensa; al vencerlo, eliges 1 de 3
-// personajes predefinidos de esa serie.
+// ============ EVENTO: CROSSOVER DE ANIME (SOLO REY PIRATA) ============
+// Tras el combate del jefe final en Dificultad Rey Pirata se abre un camino alternativo
+// con un rival reforzado (+50% Daño y Defensa). Al vencerlo, eliges 1 de 3 personajes de 4⭐
+// (o un Boss de 5⭐ si ya tienes todos los de 4⭐).
 function offerCrossoverPath(newVets) {
-  // partidas guardadas con mapas anteriores: asegura que el nodo exista
   const rows = run.map.rows;
   const last = rows[rows.length - 1];
   if (!(last && last[0] && last[0].type === 'crossover')) {
@@ -3190,16 +3544,22 @@ function offerCrossoverPath(newVets) {
     <p style="font-size:9px;text-align:center;line-height:1.9;margin-bottom:10px;">
       Has vencido al último capitán de la saga. +20 ⭐ Fama<br>
       ${newVets && newVets.length ? `<small>🏅 Veteranos desbloqueados: ${newVets.map(id => CHARS[id].name).join(' · ')}</small><br>` : ''}
-      <br>Pero al recoger el emblema, el aire vibra... Un <b>camino alternativo</b> 🌀
+      <br>Pero al recoger el emblema en Dificultad Rey Pirata, el aire vibra... Un <b>camino alternativo</b> 🌀
       aparece donde antes no había salida.<br><br>
-      Puedes explorarlo (te espera un rival de otro mundo, <b>mucho más fuerte</b>...
-      ¡y una recompensa legendaria!) o zarpar y conquistar la saga sin arriesgarte.</p>
+      Puedes explorarlo (te espera un rival de otro mundo, <b>mucho más fuerte (+50% stats)</b>...
+      ¡y una recompensa Crossover!) o zarpar y conquistar la saga sin arriesgarte.</p>
     <div class="actions" style="flex-direction:column;align-items:stretch;">
       <button class="btn gold" id="cx-explore">🌀 EXPLORAR EL CAMINO</button>
       <button class="btn green" id="cx-finish">🏴‍☠️ CONQUISTAR LA SAGA</button>
     </div>
   </div>`;
   document.body.appendChild(ov);
+  if (autoMode) {
+    scheduleAutoStep(() => {
+      const btn = ov.querySelector('#cx-explore');
+      if (btn && document.body.contains(ov)) btn.click();
+    }, 700);
+  }
   ov.querySelector('#cx-explore').onclick = () => { ov.remove(); screenMap(); };
   ov.querySelector('#cx-finish').onclick = () => { ov.remove(); sagaComplete(); };
 }
@@ -3236,7 +3596,7 @@ function doCrossoverEvent(island) {
       El camino sin salida era una grieta entre mundos:<br>
       ¡personajes de <b>${s.name}</b> ${s.emoji} han cruzado a este mar!<br><br>
       Su líder llega reforzado: <b>+${Math.round(CROSSOVER_BOOST * 100)}% de Daño y Defensa</b>.<br>
-      Si lo derrotas, podrás reclutar a <b>1 héroe pendiente</b> de la serie.<br>
+      Si lo derrotas, podrás reclutar a <b>1 héroe de 4⭐</b> (o Boss 5⭐ si los tienes todos).<br>
       <small>(Tu banda ha recuperado un 50% de PS con el aire dimensional.)</small></p>
     <div class="actions" style="flex-direction:column;align-items:stretch;">
       <button class="btn red" id="cx-fight">⚔️ ACEPTAR EL DUELO</button>
@@ -3244,6 +3604,12 @@ function doCrossoverEvent(island) {
     </div>
   </div>`;
   document.body.appendChild(ov);
+  if (autoMode) {
+    scheduleAutoStep(() => {
+      const btn = ov.querySelector('#cx-fight');
+      if (btn && document.body.contains(ov)) btn.click();
+    }, 700);
+  }
   ov.querySelector('#cx-fight').onclick = () => {
     ov.remove();
     startBattle(enemies, {
@@ -3254,44 +3620,83 @@ function doCrossoverEvent(island) {
   ov.querySelector('#cx-leave').onclick = () => { ov.remove(); sagaComplete(); };
 }
 
-// Recompensa del crossover: pantalla para elegir 1 de los personajes pendientes de la serie
+// Recompensa del crossover: pantalla para elegir 1 de 3 personajes (4⭐ o 5⭐ Boss si tiene todos de 4⭐)
 function crossoverReward(key) {
   const s = CROSSOVER_SERIES[key];
   const island = SAGAS[run.saga].islands[run.islandIdx];
   const lvl = island.bossLvl[island.bossLvl.length - 1];
-  let rewardPool = s.rewards.filter(id => !meta.recruited.includes(id) && !meta.roster.includes(id));
-  if (!rewardPool.length) rewardPool = s.rewards;
+
+  const c4Series = s.rewards.filter(id => CHARS[id] && CHARS[id].rareza === 4);
+  let pending4 = c4Series.filter(id => !meta.roster.includes(id));
+  
+  if (!pending4.length) {
+    const c4All = Object.keys(CHARS).filter(id => CHARS[id].saga === 'crossover' && CHARS[id].rareza === 4);
+    pending4 = c4All.filter(id => !meta.roster.includes(id));
+  }
+
+  let pool = [];
+  let isBossReward = false;
+
+  if (pending4.length > 0) {
+    const shuffled = [...pending4].sort(() => Math.random() - 0.5);
+    pool = shuffled.slice(0, Math.min(3, shuffled.length));
+  } else {
+    isBossReward = true;
+    const c5Series = s.bosses.filter(id => CHARS[id] && (CHARS[id].rareza === 5 || CHARS[id].boss));
+    let pending5 = c5Series.filter(id => !meta.roster.includes(id));
+    if (!pending5.length) {
+      const c5All = Object.keys(CHARS).filter(id => CHARS[id].saga === 'crossover' && (CHARS[id].rareza === 5 || CHARS[id].boss));
+      pending5 = c5All.filter(id => !meta.roster.includes(id));
+    }
+    if (!pending5.length) pending5 = s.bosses;
+    const shuffled = [...pending5].sort(() => Math.random() - 0.5);
+    pool = shuffled.slice(0, Math.min(3, shuffled.length));
+  }
+
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal">
-    <h2>🎁 Recompensa del crossover</h2>
+    <h2>🎁 RECOMPENSA DE CROSSOVER ${isBossReward ? '(5⭐ BOSS)' : '(4⭐)'}</h2>
     <p style="font-size:9px;text-align:center;line-height:1.9;margin-bottom:10px;">
-      ¡Victoria! La grieta se cierra, pero antes... elige a <b>1 héroe</b>
-      de <b>${s.name}</b> ${s.emoji} para que se una a tu leyenda. (+30 ⭐ Fama)</p>
+      ${isBossReward 
+        ? `🔥 ¡Victoria en el duelo de <b>${s.name}</b>! Ya tienes todos los personajes de 4⭐.<br>Elige a 1 <b>Boss Crossover de 5⭐</b> (+30 ⭐ Fama):`
+        : `🌀 ¡Victoria en el duelo de <b>${s.name}</b> ${s.emoji}!<br>Elige a 1 personaje Crossover (4⭐) para tu banda (+30 ⭐ Fama):`}
+    </p>
     <div class="pick-grid">
-      ${rewardPool.map(id => {
-    const c = CHARS[id];
-    return `<div class="pick-row" data-pick="${id}">
+      ${pool.map(id => {
+        const c = CHARS[id];
+        return `<div class="pick-row" data-pick="${id}">
           <span class="emoji">${c.emoji}</span>
-          <div class="info"><b>${c.name}</b> ${'⭐'.repeat(c.rareza)} · Nv${lvl}<br><small>${c.types.join(' / ')}</small></div>
-          <span style="font-size:8px;color:var(--green);">RECLUTAR</span>
+          <div class="info"><b>${c.name}</b> ${'⭐'.repeat(c.rareza)} · Nv${lvl}<br><small style="color:var(--accent);">${c.types.join(' / ')}</small></div>
+          <span style="font-size:8px;color:var(--green);font-weight:bold;">RECLUTAR</span>
         </div>`;
-  }).join('')}
+      }).join('')}
     </div>
   </div>`;
   document.body.appendChild(ov);
+  if (autoMode) {
+    scheduleAutoStep(() => {
+      const picks = ov.querySelectorAll('[data-pick]');
+      if (picks.length && document.body.contains(ov)) {
+        const p = pick([...picks]);
+        p.click();
+      }
+    }, 700);
+  }
+
   ov.querySelectorAll('[data-pick]').forEach(el => {
     el.onclick = () => {
       const id = el.dataset.pick;
       ov.remove();
+      if (!meta.roster.includes(id)) meta.roster.push(id);
+      if (!meta.recruited.includes(id)) meta.recruited.push(id);
+      if (!meta.dex.includes(id)) meta.dex.push(id);
+      saveMeta();
       const f = applyUpgrades(makeChar(id, lvl));
       addToTeam(f, ok => {
         if (ok) {
-          registerRecruit(id);
-          unlockRoster(true);
-          saveRun();
           modalInfo('🎉 ¡Nuevo nakama legendario!',
-            `<div class="reward-list"><span style="font-size:34px;">${CHARS[id].emoji}</span><br><b>${CHARS[id].name}</b> Nv${lvl} se une a tu banda<br>y queda desbloqueado como veterano.</div>`,
+            `<div class="reward-list"><span style="font-size:34px;">${CHARS[id].emoji}</span><br><b>${CHARS[id].name}</b> (${CHARS[id].rareza}⭐) Nv${lvl} se une a tu banda<br>y queda desbloqueado como veterano.</div>`,
             sagaComplete);
         } else {
           modalInfo('🌊 Se desvanece',
@@ -3304,6 +3709,8 @@ function crossoverReward(key) {
 }
 
 function sagaComplete() {
+  autoMode = false;
+  if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
   playMusic('menu');
   const saga = SAGAS[run.saga];
   const diffLevel = (run && run.diff) || 1;
@@ -3356,7 +3763,7 @@ function sagaComplete() {
       <p style="margin:14px 0;">¡Has derrotado a todos los capitanes del ${saga.name} en Dificultad <b>${dObj.emoji} ${dObj.name}</b>!<br>
       Tu banda ya es leyenda en este mar.<br><br>
       <span style="font-size:30px;">${team.map(f => charIcon(f.id, 38)).join(' ')}</span><br><br>
-      ${team.map(f => `${charName(f)} Nv${f.lvl}`).join(' · ')}<br><br>
+      ${team.map(f => `${charName(f)}${f.stars ? ` ⭐${f.stars}` : ''} Nv${f.lvl}`).join(' · ')}<br><br>
       ${rewardMessage}</p>
       <p style="font-size:9px;color:#666;margin-bottom:14px;">Tus nakamas ${addedLegendaries.length ? '(¡incluyendo legendarios!) ' : ''}quedan disponibles como veteranos para próximas aventuras<br>
       y empezarán los próximos viajes con +3 niveles por esta conquista.<br></p>
@@ -3367,6 +3774,8 @@ function sagaComplete() {
 }
 
 function gameOver() {
+  autoMode = false;
+  if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
   playMusic('dead');
   battle = null;
   const wasNuz = run && run.mode === 'nuzlocke';

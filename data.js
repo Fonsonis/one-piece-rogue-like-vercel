@@ -1172,7 +1172,7 @@ defineGenChars('crossover', [
   // Jujutsu Kaisen
   ['itadori', 'Yuji Itadori', '👊', 4, ['Golpe', 'Oscuridad'], ''],
   ['yuta', 'Yuta Okkotsu', '⚔️', 4, ['Corte', 'Haki'], ''],
-  ['gojo', 'Satoru Gojo', '🕶️', 5, ['Oscuridad', 'Haki'], ''],
+  ['gojo', 'Satoru Gojo', '🕶️', 4, ['Oscuridad', 'Haki'], ''],
   ['sukuna', 'Ryomen Sukuna', '👹', 5, ['Corte', 'Oscuridad'], 'b'],
   // Kimetsu no Yaiba
   ['tanjiro', 'Tanjiro Kamado', '🌊', 4, ['Agua', 'Fuego'], ''],
@@ -1181,8 +1181,8 @@ defineGenChars('crossover', [
   ['nezuko', 'Nezuko Kamado', '🎀', 4, ['Fuego', 'Oscuridad'], ''],
   ['kibutsuji', 'Muzan Kibutsuji', '🩸', 5, ['Oscuridad', 'Veneno'], 'b'],
   // Dragon Ball
-  ['goku', 'Goku', '🐒', 5, ['Golpe', 'Haki'], ''],
-  ['vegeta', 'Vegeta', '💥', 5, ['Golpe', 'Rayo'], ''],
+  ['goku', 'Goku', '🐒', 4, ['Golpe', 'Haki'], ''],
+  ['vegeta', 'Vegeta', '💥', 4, ['Golpe', 'Rayo'], ''],
   ['gohan', 'Gohan', '🥋', 4, ['Golpe', 'Rayo'], ''],
   ['gokuui', 'Goku Ultra Instinto', '✨', 5, ['Golpe', 'Haki'], 'b'],
   ['jiren', 'Jiren', '👽', 5, ['Golpe', 'Haki'], 'b'],
