@@ -42,19 +42,10 @@ button { font-family: inherit; cursor: pointer; }
 
 #app { max-width: 900px; margin: 0 auto; padding: 16px; min-height: 100vh; }
 
-/* --- Cabecera --- */
+/* --- Cabecera y Elementos Superpuestos (Floating Overlay) --- */
 .topbar {
-  display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 14px; gap: 10px; flex-wrap: wrap;
-}
-.topbar-left {
-  display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-}
-.topbar-right {
-  display: flex; flex-direction: column; align-items: flex-end; gap: 4px; margin-left: auto;
-}
-.topbar-right .btn {
-  padding: 4px 6px; font-size: 8px; white-space: nowrap;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 14px;
 }
 .logo {
   font-size: 26px; letter-spacing: 2px; color: #fff;
@@ -62,9 +53,23 @@ button { font-family: inherit; cursor: pointer; }
     1px -1px 0 var(--ink), -1px 1px 0 var(--ink);
 }
 .logo span { color: var(--gold); }
-.berries {
-  background: var(--ink); color: var(--gold); padding: 8px 12px;
-  border: 2px solid var(--gold); box-shadow: var(--shadow); font-size: 11px;
+
+.floating-controls {
+  position: fixed; top: 10px; right: 10px; z-index: 999;
+  display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+}
+.floating-controls .btn {
+  padding: 5px 8px; font-size: 8px; box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
+  white-space: nowrap;
+}
+
+.floating-berries {
+  position: fixed; top: 48px; left: 10px; z-index: 999;
+}
+.floating-berries .berries {
+  padding: 6px 10px; font-size: 10.5px; background: var(--ink);
+  color: var(--gold); border: 2px solid var(--gold);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
 }
 
 .subtitle { text-align: center; color: #fff; text-shadow: 2px 2px 0 rgba(0,0,0,.4); margin-bottom: 18px; }
@@ -662,10 +667,11 @@ button { font-family: inherit; cursor: pointer; }
   }
   #app { padding: 10px; }
   .logo { font-size: 18px; }
-  .topbar { margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; width: 100%; gap: 6px; }
-  .topbar-left { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
-  .topbar-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; margin-left: auto; flex-shrink: 0; }
-  .berries { padding: 4px 8px; font-size: 9.5px; }
+  .topbar { margin-bottom: 10px; }
+  .floating-controls { top: 8px; right: 8px; gap: 4px; }
+  .floating-controls .btn { padding: 4px 6px; font-size: 7.5px; }
+  .floating-berries { top: 38px; left: 8px; }
+  .floating-berries .berries { padding: 4px 8px; font-size: 9px; }
   .panel { padding: 10px; }
   .modes { gap: 10px; }
   .mode-card { width: 100%; max-width: 300px; }
