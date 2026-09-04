@@ -718,13 +718,13 @@ function topbar(showBerries) {
   const autoLabel = !autoMode ? '🤖 PAUSADO' : (autoSettings.speed === 'x1' ? '🤖 AUTO x1' : '🤖 AUTO x2');
   const autoBtnClass = !autoMode ? 'gray' : 'green';
   return `<div class="topbar">
-    <div class="logo">GRAND<span>LINE</span>LIKE</div>
-    <div style="display:flex;align-items:center;gap:6px;">
+    <div class="topbar-left">
+      <div class="logo">GRAND<span>LINE</span>LIKE</div>
       ${showBerries && run ? `<div class="berries">${berriesHTML(run.berries)}</div>` : ''}
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
-        <button class="btn small gray" id="btn-mute" style="padding:4px 6px;font-size:10px;" title="Activar/Silenciar música">${isMuted ? '🔇 MÚSICA' : '🎵 MÚSICA'}</button>
-        <button class="btn small ${autoBtnClass}" id="btn-topbar-auto" style="padding:3px 6px;font-size:7.5px;white-space:nowrap;" title="Cambiar velocidad o activar/pausar modo auto">${autoLabel}</button>
-      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn small gray" id="btn-mute" title="Activar/Silenciar música">${isMuted ? '🔇 MÚSICA' : '🎵 MÚSICA'}</button>
+      <button class="btn small ${autoBtnClass}" id="btn-topbar-auto" title="Cambiar velocidad o activar/pausar modo auto">${autoLabel}</button>
     </div>
   </div>`;
 }
