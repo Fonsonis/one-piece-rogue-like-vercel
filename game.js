@@ -202,9 +202,9 @@ function showAutoSettingsModal() {
           Elige 3 objetos en orden de prioridad y cuántos deseas mantener en inventario:
         </div>
         ${[0, 1, 2].map(idx => {
-          const sList = autoSettings.shopItems || [];
-          const itemSetting = sList[idx] || { id: 'none', qty: 0 };
-          return `
+    const sList = autoSettings.shopItems || [];
+    const itemSetting = sList[idx] || { id: 'none', qty: 0 };
+    return `
           <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
             <span style="font-size:9px;font-weight:bold;color:var(--gold);width:16px;">#${idx + 1}</span>
             <select id="auto-shop-item-${idx}" style="flex:1;padding:4px;font-size:8.5px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
@@ -224,7 +224,7 @@ function showAutoSettingsModal() {
               ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(q => `<option value="${q}" ${itemSetting.qty === q ? 'selected' : ''}>${q}</option>`).join('')}
             </select>
           </div>`;
-        }).join('')}
+  }).join('')}
       </div>
 
     </div>
@@ -397,6 +397,9 @@ function gainFame(n) {
 // ---------- Estado de la partida ----------
 let run = null; // partida actual (historia)
 function saveRun() {
+  if (run && run.mode === 'nuzlocke' && run.team) {
+    run.team = run.team.filter(f => f && f.hp > 0);
+  }
   try { localStorage.setItem(storeKey('oplike_run'), JSON.stringify(run)); } catch (e) { }
   scheduleSync();
 }
@@ -411,7 +414,9 @@ function loadRun() {
     const r = localStorage.getItem(storeKey('oplike_run'));
     if (r) run = JSON.parse(r);
   } catch (e) { }
-  // migración: partidas anteriores a los stats ESP_ATQ/ESP_DEF
+  if (run && run.mode === 'nuzlocke' && run.team) {
+    run.team = run.team.filter(f => f && f.hp > 0);
+  }
   if (run && run.team) run.team.forEach(migrateFighter);
 }
 function migrateFighter(f) {
@@ -460,7 +465,9 @@ function applyUpgrades(f) {
   f.hpBonus = (u.hp || 0) * 3;
   f.spdBonus = (u.spd || 0);
   f.maxhp += f.hpBonus;
-  f.hp = Math.min(f.maxhp, f.hp + f.hpBonus);
+  if (f.hp > 0) {
+    f.hp = Math.min(f.maxhp, f.hp + f.hpBonus);
+  }
   f.atkBonus += u.atk || 0; f.atk += u.atk || 0;
   f.defBonus += u.def || 0; f.def += u.def || 0;
   f.spatkBonus = (f.spatkBonus || 0) + (u.spatk || 0); f.spatk += u.spatk || 0;
@@ -481,7 +488,9 @@ function gainXP(f, amount, log) {
     const c = CHARS[f.id];
     const oldMax = f.maxhp;
     f.maxhp = hpAt(c.base[0], f.lvl) + (f.hpBonus || 0);
-    f.hp = Math.min(f.maxhp, f.hp + (f.maxhp - oldMax));
+    if (f.hp > 0) {
+      f.hp = Math.min(f.maxhp, f.hp + (f.maxhp - oldMax));
+    }
     f.atk = statAt(c.base[1], f.lvl) + f.atkBonus;
     f.def = statAt(c.base[2], f.lvl) + f.defBonus;
     f.spatk = statAt(c.base[3], f.lvl) + (f.spatkBonus || 0);
@@ -502,7 +511,8 @@ function gainXP(f, amount, log) {
       msgs.push(`✨ ¡${c.name} se transforma en ${CHARS[to].name}!`);
       f.id = to;
       const nc = CHARS[to];
-      f.maxhp = hpAt(nc.base[0], f.lvl) + (f.hpBonus || 0); f.hp = f.maxhp;
+      f.maxhp = hpAt(nc.base[0], f.lvl) + (f.hpBonus || 0);
+      if (f.hp > 0) f.hp = f.maxhp;
       f.atk = statAt(nc.base[1], f.lvl) + f.atkBonus;
       f.def = statAt(nc.base[2], f.lvl) + f.defBonus;
       f.spatk = statAt(nc.base[3], f.lvl) + (f.spatkBonus || 0);
@@ -968,8 +978,8 @@ function screenHome() {
       ${meta.towerRecord ? `<div style="color:var(--gold);text-shadow:1px 1px 2px #000;font-size:9.5px;font-weight:bold;">🗼 Récord Torre Marine: ${meta.towerRecord} Pisos</div>` : ''}
       <div style="margin-top:2px;">
         ${session
-        ? '<button class="btn small gray" id="btn-logout">CERRAR SESIÓN</button>'
-        : '<button class="btn small blue" id="btn-login">INICIAR SESIÓN / REGISTRO</button>'}
+      ? '<button class="btn small gray" id="btn-logout">CERRAR SESIÓN</button>'
+      : '<button class="btn small blue" id="btn-login">INICIAR SESIÓN / REGISTRO</button>'}
       </div>
     </div>
     <div style="text-align:center;margin-top:10px;display:flex;gap:10px;justify-content:center;align-items:center;flex-wrap:wrap;">
@@ -1667,6 +1677,9 @@ function startRun(sagaIdx, starterIds) {
 // ============ PANTALLA: MAPA ============
 function screenMap() {
   playMusic('menu');
+  if (run && run.mode === 'nuzlocke' && run.team) {
+    run.team = run.team.filter(f => f && f.hp > 0);
+  }
   const saga = SAGAS[run.saga];
   const island = saga.islands[run.islandIdx];
   const reach = reachableNodes();
@@ -1740,7 +1753,7 @@ function screenMap() {
           ` : `
             <div class="auto-mode-box" style="margin-top:10px;background:rgba(0,0,0,0.35);padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);text-align:center;">
               <button class="btn gold small" id="btn-toggle-auto" style="width:100%;font-size:8.5px;font-weight:bold;padding:5px 8px;">
-                🤖 MODO AUTO: OFF ⚙️
+                🤖 MODO AUTO
               </button>
               <div style="font-size:7px;color:#aaa;margin-top:4px;">Toca para activar u opciones</div>
             </div>
@@ -2203,7 +2216,9 @@ function addToTeam(f, done) {
     }
     const boostHP = Math.max(1, Math.floor(existing.maxhp * 0.05));
     existing.maxhp += boostHP;
-    existing.hp = Math.min(existing.maxhp, existing.hp + boostHP);
+    if (existing.hp > 0) {
+      existing.hp = Math.min(existing.maxhp, existing.hp + boostHP);
+    }
     existing.atk = Math.floor(existing.atk * 1.05);
     existing.def = Math.floor(existing.def * 1.05);
     existing.spatk = Math.floor(existing.spatk * 1.05);
@@ -2297,12 +2312,12 @@ function showCharModal(fOrId) {
     </div>
     <div class="sheet-section"><b>⚔️ Movimientos Ataque</b>
       ${known.map(m => {
-        const mv = MOVES[m];
-        if (!mv) return '';
-        const cat = mv.power === 0 ? '' : isPhysType(mv.type) ? ' · FÍS' : ' · ESP';
-        return `<div class="sheet-move"><span class="type-badge" style="background:${TYPES[mv.type]?.color || '#888'}">${mv.type.toUpperCase()}</span>
+    const mv = MOVES[m];
+    if (!mv) return '';
+    const cat = mv.power === 0 ? '' : isPhysType(mv.type) ? ' · FÍS' : ' · ESP';
+    return `<div class="sheet-move"><span class="type-badge" style="background:${TYPES[mv.type]?.color || '#888'}">${mv.type.toUpperCase()}</span>
               ${mv.name} <small>${mv.power ? mv.power + ' PWR · ' + Math.round((mv.acc || 0.9) * 100) + '%' + cat : 'APOYO'}</small></div>`;
-      }).join('')}
+  }).join('')}
       ${future.map(([l, m]) => `<div class="sheet-move future">🔒 Nv${l} — ${MOVES[m] ? MOVES[m].name : m}</div>`).join('')}
     </div>
     ${pInfo ? `<div class="sheet-section"><b>✨ Pasiva — ${pInfo.label}</b><p>${pInfo.desc}</p></div>` : ''}
@@ -2699,7 +2714,7 @@ const STAR_45_PASSIVES = {
   jupeter: { name: 'Devorador Terrestre', desc: 'Aumenta los PS máximos y la defensa.' },
   im: { name: 'Sombra del Trono', desc: 'Aumenta el daño de Oscuridad y Haki un 25%.' },
   xebec: { name: 'Furia Salvaje', desc: 'Aumenta el ataque un 25%.' },
-  
+
   // Crossover 4⭐ / 5⭐
   naruto: { name: 'Modo Senjutsu', desc: 'Aumenta el daño de Viento y la velocidad un 15%.' },
   sasuke: { name: 'Sharingan', desc: '+15% de crítico y aumenta el daño de Rayo.' },
@@ -3601,9 +3616,10 @@ function afterRound() {
     if (f.st.slow && --f.st.slow <= 0) delete f.st.slow;
     if (f.st.gust && --f.st.gust <= 0) delete f.st.gust;
   }
-  // Pasiva Brook (Segunda Vida) y sinergia Nakama Ⅱ (sobrevive con 1 PS, una vez por viaje)
   const checkRevive = f => {
     if (!f || f.hp > 0) return;
+    const isPlayer = b.pTeam.includes(f) || (run && run.team && run.team.includes(f));
+    if (isPlayer && run && run.mode === 'nuzlocke' && !b.tower) return; // En Nuzlocke los aliados no sobreviven ni reviven
     if (isP(f, 'brook') && !f.reviveUsed) {
       f.reviveUsed = true;
       f.hp = Math.max(1, Math.floor(f.maxhp * 0.2));
@@ -3611,7 +3627,6 @@ function afterRound() {
       return;
     }
     if (synergyTier(teamOf(f), 'Nakama') === 2) {
-      const isPlayer = b.pTeam.includes(f);
       const used = isPlayer
         ? (b.tower ? tower && tower.nakamaGuardUsed : run && run.nakamaGuardUsed)
         : b.eGuardUsed;
@@ -3639,15 +3654,18 @@ function afterRound() {
     b.pTeam.forEach(f => { if (f.hp > 0) gainXP(f, xp, log); });
     changed = true;
   }
-  if (deadP) {
-    log(`¡${charName(b.curP)} está debilitado!`);
-    if (run && run.mode === 'nuzlocke' && !b.tower) {
-      const idx = run.team.indexOf(b.curP);
-      if (idx >= 0) {
-        run.team.splice(idx, 1);
-        log(`☠️ ${charName(b.curP)} abandona la banda para siempre...`);
+  if (run && run.mode === 'nuzlocke' && !b.tower) {
+    for (let i = run.team.length - 1; i >= 0; i--) {
+      if (run.team[i].hp <= 0) {
+        const deadF = run.team[i];
+        log(`☠️ ${charName(deadF)} ha caído en combate y abandona la banda para siempre...`);
+        run.team.splice(i, 1);
+        changed = true;
       }
     }
+    saveRun();
+  } else if (deadP) {
+    log(`¡${charName(b.curP)} está debilitado!`);
     changed = true;
   }
 
@@ -3799,6 +3817,9 @@ function endBattle(victory, fled, recruited) {
   if (battle && battle.tower) { battle = null; return endTowerBattle(victory); }
   const opts = battle ? battle.opts : {};
   battle = null;
+  if (run && run.mode === 'nuzlocke') {
+    run.team = run.team.filter(f => f && f.hp > 0);
+  }
   const notes = [];
   if (victory) {
     // cada enfrentamiento ganado sube 1 nivel completo a toda la banda viva
@@ -3835,8 +3856,8 @@ function endBattle(victory, fled, recruited) {
     run.islandIdx++;
     run.map = genMap(saga.islands[run.islandIdx]);
     run.pos = null;
-    // travesía entre islas: toda la banda revive y se recupera al completo
-    run.team.forEach(f => { f.hp = f.maxhp; });
+    // travesía entre islas: la banda viva se recupera al completo
+    run.team.forEach(f => { if (f.hp > 0) f.hp = f.maxhp; });
     saveRun();
     modalInfo('🏅 ¡Emblema conseguido!',
       `<div class="reward-list">¡Has conquistado la isla!<br>+20 ⭐ Fama<br><br>Rumbo a <b>${saga.islands[run.islandIdx].name}</b> 🧭<br>Tu equipo se recupera durante la travesía.${newVets.length ? `<br><br><small>🏅 Veteranos desbloqueados para futuras aventuras:<br>${newVets.map(id => `${charIcon(id, 16)} ${CHARS[id].name}`).join(' · ')}</small>` : ''
@@ -3952,7 +3973,7 @@ function crossoverReward(key) {
 
   const c4Series = s.rewards.filter(id => CHARS[id] && CHARS[id].rareza === 4);
   let pending4 = c4Series.filter(id => !meta.roster.includes(id));
-  
+
   if (!pending4.length) {
     const c4All = Object.keys(CHARS).filter(id => CHARS[id].saga === 'crossover' && CHARS[id].rareza === 4);
     pending4 = c4All.filter(id => !meta.roster.includes(id));
@@ -3982,9 +4003,9 @@ function crossoverReward(key) {
   ov.innerHTML = `<div class="modal">
     <h2>🎁 RECOMPENSA DE CROSSOVER ${isBossReward ? '(5⭐ BOSS)' : '(4⭐)'}</h2>
     <p style="font-size:9px;text-align:center;line-height:1.9;margin-bottom:10px;">
-      ${isBossReward 
-        ? `🔥 ¡Victoria en el duelo de <b>${s.name}</b>! Ya tienes todos los personajes de 4⭐.<br>Elige a 1 <b>Boss Crossover de 5⭐</b> (+30 ⭐ Fama):`
-        : `🌀 ¡Victoria en el duelo de <b>${s.name}</b> ${s.emoji}!<br>Elige a 1 personaje Crossover (4⭐) para tu banda (+30 ⭐ Fama):`}
+      ${isBossReward
+      ? `🔥 ¡Victoria en el duelo de <b>${s.name}</b>! Ya tienes todos los personajes de 4⭐.<br>Elige a 1 <b>Boss Crossover de 5⭐</b> (+30 ⭐ Fama):`
+      : `🌀 ¡Victoria en el duelo de <b>${s.name}</b> ${s.emoji}!<br>Elige a 1 personaje Crossover (4⭐) para tu banda (+30 ⭐ Fama):`}
     </p>
     <div class="pick-grid">
       ${pool.map(id => {
@@ -4308,6 +4329,46 @@ let shipExpanded = {};
 
 function upgCost(lvl) { return (Math.floor(lvl / 2) + 1) * 30; }
 
+function charTotalUpgSpent(id) {
+  const u = meta.upgrades[id] || {};
+  let total = 0;
+  for (const [st] of UPG_STATS) {
+    const lvl = u[st] || 0;
+    for (let i = 0; i < lvl; i++) {
+      total += upgCost(i);
+    }
+  }
+  return total;
+}
+
+function showSellStatsConfirmModal(id, spent, refund, onConfirm) {
+  const c = CHARS[id];
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal" style="max-width:420px;text-align:center;">
+    <h2 style="color:var(--red);margin-bottom:8px;">⚠️ Vender Mejoras de ${c.name}</h2>
+    <div style="font-size:9.5px;line-height:1.7;color:#333;margin:12px 0;background:rgba(0,0,0,0.04);padding:12px;border-radius:6px;border:1px solid #ddd;">
+      Has invertido un total de <b style="color:var(--gold);">⭐${spent} Fama</b> en los atributos de <b>${c.name}</b>.<br><br>
+      Si vendes sus mejoras de golpe:<br>
+      • <b>Todos sus stats volverán a Nv.0.</b><br>
+      • Recibirás únicamente la mitad del coste gastado (50%):<br>
+      <span style="font-size:16px;color:var(--green);font-weight:bold;display:block;margin-top:6px;">+⭐${refund} Fama</span>
+    </div>
+    <div class="actions" style="margin-top:14px;display:flex;gap:10px;justify-content:center;">
+      <button class="btn gray" id="sell-cancel">CANCELAR</button>
+      <button class="btn red" id="sell-confirm">💰 VENDER TODO (⭐+${refund})</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+
+  ov.querySelector('#sell-cancel').onclick = () => ov.remove();
+  ov.querySelector('#sell-confirm').onclick = () => {
+    ov.remove();
+    onConfirm();
+  };
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+}
+
 function screenShip() {
   playMusic('menu');
   const roster = meta.roster.filter(id => CHARS[id]);
@@ -4360,89 +4421,176 @@ function screenShip() {
       </div>
 
       <h2 style="font-size:11px;">👥 Casillas de Nakamas Iniciales</h2>
-      <div class="shop-item">
-        <span class="emoji">${nextSlot.emoji}</span>
-        <div class="info">
-          <b>${nextSlot.name}</b> ${nextSlot.maxed ? '' : `— <span class="price">⭐${nextSlot.cost}</span>`}<br>
-          <small>${nextSlot.desc} (Actualmente: ${starterSlotsCount()}/6 casillas)</small>
+      <div class="global-upg-row ${nextSlot.maxed ? 'owned' : accLvl < nextSlot.lvl ? 'locked' : ''}">
+        <span class="upg-emoji">${nextSlot.emoji}</span>
+        <div class="upg-details">
+          <div class="upg-head">
+            <b class="upg-name">${nextSlot.name}</b>
+            ${nextSlot.maxed ? '' : `<span class="price">⭐${nextSlot.cost}</span>`}
+          </div>
+          <div class="upg-desc">${nextSlot.desc} (Actualmente: ${starterSlotsCount()}/6 casillas)</div>
         </div>
-        ${nextSlot.maxed ? `<span style="font-size:8px;color:var(--green);font-weight:bold;">✓ MÁXIMO (6/6)</span>`
-      : accLvl < nextSlot.lvl ? `<span style="font-size:8px;color:#888;">🔒 Cuenta Nv${nextSlot.lvl}</span>`
-        : meta.fame >= nextSlot.cost
-          ? `<button class="btn small green" id="btn-buy-starter-slot">COMPRAR</button>`
-          : `<button class="btn small gray" disabled>COMPRAR</button>`}
+        <div class="upg-action">
+          ${nextSlot.maxed ? `<span class="upg-badge bought">✓ MÁXIMO (6/6)</span>`
+      : accLvl < nextSlot.lvl ? `<span class="upg-badge locked">🔒 Cuenta Nv${nextSlot.lvl}</span>`
+        : `<button class="btn small ${meta.fame >= nextSlot.cost ? 'green' : 'gray'}" id="btn-buy-starter-slot" ${meta.fame >= nextSlot.cost ? '' : 'disabled'}>COMPRAR</button>`}
+        </div>
       </div>
 
-      <h2 style="font-size:11px;margin-top:16px;">⚓ Límite de Entrenamiento de Veteranos</h2>
-      <div class="shop-item">
-        <span class="emoji">${nextCap.emoji}</span>
-        <div class="info">
-          <b>${nextCap.name}</b> — <span class="price">⭐${nextCap.cost}</span><br>
-          <small>${nextCap.desc} (Límite actual: Nv.${nextCap.curMax})</small>
+      <h2 style="font-size:11px;margin-top:14px;">⚓ Límite de Entrenamiento de Veteranos</h2>
+      <div class="global-upg-row ${accLvl < nextCap.lvl ? 'locked' : ''}">
+        <span class="upg-emoji">${nextCap.emoji}</span>
+        <div class="upg-details">
+          <div class="upg-head">
+            <b class="upg-name">${nextCap.name}</b>
+            <span class="price">⭐${nextCap.cost}</span>
+          </div>
+          <div class="upg-desc">${nextCap.desc} (Límite actual: Nv.${nextCap.curMax})</div>
         </div>
-        ${accLvl < nextCap.lvl ? `<span style="font-size:8px;color:#888;">🔒 Cuenta Nv${nextCap.lvl}</span>`
-      : meta.fame >= nextCap.cost
-        ? `<button class="btn small green" id="btn-buy-capitania">COMPRAR (+5 NV)</button>`
-        : `<button class="btn small gray" disabled>COMPRAR (+5 NV)</button>`}
+        <div class="upg-action">
+          ${accLvl < nextCap.lvl ? `<span class="upg-badge locked">🔒 Cuenta Nv${nextCap.lvl}</span>`
+      : `<button class="btn small ${meta.fame >= nextCap.cost ? 'green' : 'gray'}" id="btn-buy-capitania" ${meta.fame >= nextCap.cost ? '' : 'disabled'}>COMPRAR (+5 NV)</button>`}
+        </div>
       </div>
 
-      <h2 style="font-size:11px;margin-top:16px;">🌍 Añadidos globales</h2>
-      ${availableGlobals.map(([id, it]) => {
-          const owned = !!meta.global[id];
-          const locked = accLvl < it.lvl;
-          const can = !owned && !locked && meta.fame >= it.cost;
-          return `<div class="shop-item">
-          <span class="emoji">${it.emoji}</span>
-          <div class="info"><b>${it.name}</b> — <span class="price">⭐${it.cost}</span><br><small>${it.desc}</small></div>
-          ${owned ? '<span style="font-size:8px;color:var(--green);">✓ COMPRADO</span>'
-              : locked ? `<span style="font-size:8px;color:#888;">🔒 Cuenta Nv${it.lvl}</span>`
-                : `<button class="btn small ${can ? 'green' : 'gray'}" data-global="${id}" ${can ? '' : 'disabled'}>COMPRAR</button>`}
-        </div>`;
-        }).join('')}
+      <h2 style="font-size:11px;margin-top:14px;">🌍 Añadidos globales</h2>
+      <div class="global-upg-grid">
+        ${availableGlobals.map(([id, it]) => {
+        const owned = !!meta.global[id];
+        const locked = accLvl < it.lvl;
+        const can = !owned && !locked && meta.fame >= it.cost;
+        return `<div class="global-upg-row ${owned ? 'owned' : locked ? 'locked' : ''}">
+            <span class="upg-emoji">${it.emoji}</span>
+            <div class="upg-details">
+              <div class="upg-head">
+                <b class="upg-name">${it.name}</b>
+                ${owned ? '' : `<span class="price">⭐${it.cost}</span>`}
+              </div>
+              <div class="upg-desc">${it.desc}</div>
+            </div>
+            <div class="upg-action">
+              ${owned ? '<span class="upg-badge bought">✓ COMPRADO</span>'
+            : locked ? `<span class="upg-badge locked">🔒 Cuenta Nv${it.lvl}</span>`
+              : `<button class="btn small ${can ? 'green' : 'gray'}" data-global="${id}" ${can ? '' : 'disabled'}>COMPRAR</button>`}
+            </div>
+          </div>`;
+      }).join('')}
+      </div>
 
       <h2 style="font-size:11px;margin-top:16px;">⚓ Mi Barco — Entrenamiento de veteranos</h2>
       <div style="margin:8px 0;">
         <input id="ship-search-q" placeholder="🔎 Buscar veterano por nombre..." value="${(shipSearchQ || '').replace(/"/g, '&quot;')}" style="width:100%;padding:8px;border:2px solid var(--ink);font-family:inherit;font-size:9px;background:#fff;">
       </div>
-      ${filteredRoster.length ? filteredRoster.map(id => {
-          const c = CHARS[id];
-          const u = meta.upgrades[id] || {};
-          const isExpanded = !!shipExpanded[id];
-          const totalStats = UPG_STATS.reduce((acc, [st]) => acc + (u[st] || 0), 0);
-          return `<div class="ship-card-acc">
-          <div class="ship-card-header" data-toggle-ship="${id}">
-            <span class="emoji">${charIcon(id, 28)}</span>
-            <div style="flex:1;">
-              <b>${c.name}</b> ${typeBadges(c.types)}<br>
-              <small style="color:#666;font-size:7px;">Stats mejorados: <b>${totalStats}</b> (Límite: Nv${maxLvl})</small>
-            </div>
-            <button class="btn small gray">${isExpanded ? '▲ CERRAR' : '▼ MEJORAR'}</button>
-          </div>
-          ${isExpanded ? `
-            <div class="ship-card-body">
-              <div class="ship-upgs" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:8px;">
-                ${UPG_STATS.map(([stat, label, desc]) => {
-            const lvl = u[stat] || 0;
-            const cost = upgCost(lvl);
-            const maxed = lvl >= maxLvl;
-            const can = !maxed && meta.fame >= cost;
-            return `<div class="upg">
-                    <span class="upg-label">${label} ${lvl}/${maxLvl}</span>
-                    <button class="btn small ${can ? 'green' : 'gray'}" data-up="${id}" data-stat="${stat}"
-                      title="${desc}" ${can ? '' : 'disabled'}>${maxed ? 'MÁX' : `⭐${cost}`}</button>
-                  </div>`;
-          }).join('')}
-              </div>
-            </div>
-          ` : ''}
-        </div>`;
-        }).join('') : '<p style="text-align:center;font-size:9px;color:#888;padding:12px;">No se han encontrado veteranos con ese nombre.</p>'}
+      <div id="ship-roster-list"></div>
     </div>
   `);
 
+  const renderRosterUI = () => {
+    const q = (shipSearchQ || '').trim().toLowerCase();
+    const filteredRoster = roster.filter(id => {
+      if (!q) return true;
+      return CHARS[id].name.toLowerCase().includes(q);
+    });
+    const container = $('#ship-roster-list');
+    if (!container) return;
+
+    container.innerHTML = filteredRoster.length ? filteredRoster.map(id => {
+      const c = CHARS[id];
+      const u = meta.upgrades[id] || {};
+      const isExpanded = !!shipExpanded[id];
+      const totalStats = UPG_STATS.reduce((acc, [st]) => acc + (u[st] || 0), 0);
+      const totalSpent = charTotalUpgSpent(id);
+      const refund = Math.floor(totalSpent * 0.5);
+      return `<div class="ship-card-acc">
+        <div class="ship-card-header" data-toggle-ship="${id}">
+          <span class="emoji">${charIcon(id, 28)}</span>
+          <div style="flex:1;">
+            <b>${c.name}</b> ${typeBadges(c.types)}<br>
+            <small style="color:#666;font-size:7px;">Stats mejorados: <b>${totalStats}</b> (Límite: Nv${maxLvl})</small>
+          </div>
+          <button class="btn small gray">${isExpanded ? '▲ CERRAR' : '▼ MEJORAR'}</button>
+        </div>
+        ${isExpanded ? `
+          <div class="ship-card-body">
+            <div class="ship-upgs" style="display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:8px;">
+              ${UPG_STATS.map(([stat, label, desc]) => {
+        const lvl = u[stat] || 0;
+        const cost = upgCost(lvl);
+        const maxed = lvl >= maxLvl;
+        const can = !maxed && meta.fame >= cost;
+        return `<div class="upg">
+                  <span class="upg-label">${label} ${lvl}/${maxLvl}</span>
+                  <button class="btn small ${can ? 'green' : 'gray'}" data-up="${id}" data-stat="${stat}"
+                    title="${desc}" ${can ? '' : 'disabled'}>${maxed ? 'MÁX' : `⭐${cost}`}</button>
+                </div>`;
+      }).join('')}
+            </div>
+            ${totalSpent > 0 ? `
+              <div style="margin-top:10px;padding-top:8px;border-top:1px dashed #ccc;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px;">
+                <span style="font-size:8px;color:#666;">
+                  Inversión: <b style="color:var(--gold);">⭐${totalSpent}</b> · Recibes al vender (50%): <b style="color:var(--green);">⭐${refund}</b>
+                </span>
+                <button class="btn small red btn-sell-stats" data-sell-stats="${id}" style="font-size:8px;padding:4px 10px;">
+                  💰 VENDER MEJORAS (⭐+${refund})
+                </button>
+              </div>
+            ` : ''}
+          </div>
+        ` : ''}
+      </div>`;
+    }).join('') : '<p style="text-align:center;font-size:9px;color:#888;padding:12px;">No se han encontrado veteranos con ese nombre.</p>';
+
+    container.querySelectorAll('[data-toggle-ship]').forEach(hdr => {
+      hdr.onclick = () => {
+        const id = hdr.dataset.toggleShip;
+        shipExpanded[id] = !shipExpanded[id];
+        renderRosterUI();
+      };
+    });
+
+    container.querySelectorAll('[data-up]').forEach(btn => {
+      btn.onclick = () => {
+        if (Date.now() - shipBuyLock < 300) return;
+        shipBuyLock = Date.now();
+        const id = btn.dataset.up;
+        const stat = btn.dataset.stat;
+        const u = meta.upgrades[id] = meta.upgrades[id] || {};
+        const lvl = u[stat] || 0;
+        if (lvl >= maxLvl) return;
+        const cost = upgCost(lvl);
+        if (meta.fame < cost) return;
+        meta.fame -= cost;
+        u[stat] = lvl + 1;
+        saveMeta();
+        toast(`✨ ${CHARS[id].name}: ${stat.toUpperCase()} sube a Nv.${u[stat]}`);
+        screenShip();
+      };
+    });
+
+    container.querySelectorAll('[data-sell-stats]').forEach(btn => {
+      btn.onclick = () => {
+        const id = btn.dataset.sellStats;
+        const c = CHARS[id];
+        const spent = charTotalUpgSpent(id);
+        const refund = Math.floor(spent * 0.5);
+        if (!spent || refund <= 0) return;
+
+        showSellStatsConfirmModal(id, spent, refund, () => {
+          meta.fame += refund;
+          delete meta.upgrades[id];
+          saveMeta();
+          toast(`💰 Has recibido ⭐${refund} Fama al vender las mejoras de ${c.name}.`);
+          screenShip();
+        });
+      };
+    });
+  };
+
+  renderRosterUI();
+
   $('#btn-back').onclick = screenHome;
   const searchInput = $('#ship-search-q');
-  if (searchInput) searchInput.oninput = e => { shipSearchQ = e.target.value; screenShip(); };
+  if (searchInput) searchInput.oninput = e => { shipSearchQ = e.target.value; renderRosterUI(); };
 
   const buySlotBtn = $('#btn-buy-starter-slot');
   if (buySlotBtn) {
