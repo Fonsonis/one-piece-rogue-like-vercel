@@ -1233,10 +1233,22 @@ function screenHome() {
       </div>
     </div>
     <div class="home-main-buttons">
-      <button class="btn blue small" id="btn-dex">📖 Dex (${meta.dex.length}/${Object.keys(CHARS).length})</button>
-      <button class="btn purple small" id="btn-inventory">🎒 Inventario (${(meta.roster || []).length})</button>
-      <button class="btn gold small" id="btn-ship">🏪 Tienda (⭐${meta.fame})</button>
-      <button class="btn gold small" id="btn-achievements">🏆 Logros (${completedAch}/${ACHIEVEMENTS.length})${hasUnclaimedAch ? ' <span class="ach-badge-dot" style="background:#e74c3c;color:#fff;font-size:7px;border-radius:50%;padding:1px 4px;margin-left:4px;font-weight:bold;animation:pulse 1s infinite alternate;border:1px solid #fff;">!</span>' : ''}</button>
+      <button class="btn blue small" id="btn-dex">
+        <span>📖 Dex</span>
+        <span style="font-size:8px;opacity:0.85;margin-top:2px;">(${meta.dex.length}/${Object.keys(CHARS).length})</span>
+      </button>
+      <button class="btn purple small" id="btn-inventory">
+        <span>🎒 Inventario</span>
+        <span style="font-size:8px;opacity:0.85;margin-top:2px;">(${(meta.roster || []).length})</span>
+      </button>
+      <button class="btn gold small" id="btn-ship">
+        <span>🏪 Tienda</span>
+        <span style="font-size:8px;opacity:0.85;margin-top:2px;">(⭐${meta.fame})</span>
+      </button>
+      <button class="btn gold small" id="btn-achievements">
+        <span style="position:relative;">🏆 Logros${hasUnclaimedAch ? ' <span class="ach-badge-dot" style="background:#e74c3c;color:#fff;font-size:7px;border-radius:50%;padding:1px 4px;margin-left:2px;font-weight:bold;animation:pulse 1s infinite alternate;border:1px solid #fff;">!</span>' : ''}</span>
+        <span style="font-size:8px;opacity:0.85;margin-top:2px;">(${completedAch}/${ACHIEVEMENTS.length})</span>
+      </button>
     </div>
     <div style="text-align:center;margin-top:8px;">
       <button class="btn gray small" id="btn-guide" style="padding:6px 14px;font-size:9px;">📊 Tipos y Sinergias</button>
