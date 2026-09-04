@@ -1090,7 +1090,7 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
     }));
 
     // 3. Mercado Clandestino (Carteles SE BUSCA)
-    const weights = [41, 30, 21, 7, 1];
+    const weights = [41.5, 30, 21, 7, 0.5];
     const totalWeight = 100;
     const gachaTiers = [1, 2, 3, 4, 5].map(r => {
       const pool = sagaPoolByRareza(s.id, r);
@@ -1101,14 +1101,22 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
 
     let tabHTML = '';
     if (currentProbTab === 'wild') {
+      const leg5 = wildPool.filter(id => CHARS[id] && CHARS[id].rareza === 5);
+      const others = wildPool.filter(id => !CHARS[id] || CHARS[id].rareza !== 5);
       const rows = wildPool.map(id => {
         const c = CHARS[id];
         const isLeg = c.rareza === 5;
+        let pct = 0;
+        if (isLeg) {
+          pct = leg5.length ? (0.5 / leg5.length) : 0;
+        } else {
+          pct = others.length ? (99.5 / others.length) : 0;
+        }
         return `<tr>
           <td style="white-space:nowrap;">${charIcon(id, 20)} <b>${c.name}</b></td>
           <td>${'⭐'.repeat(c.rareza)}</td>
           <td>${typeBadges(c.types)}</td>
-          <td><b>${wildPct.toFixed(2)}%</b> ${isLeg ? '<br><small style="color:var(--red);font-weight:bold;">⚔️ Solo combate (+6 Nv)</small>' : ''}</td>
+          <td><b>${pct.toFixed(2)}%</b> ${isLeg ? '<br><small style="color:var(--red);font-weight:bold;">⚔️ Solo combate (+6 Nv)</small>' : ''}</td>
         </tr>`;
       }).join('');
       tabHTML = `
@@ -1965,13 +1973,21 @@ function screenMap() {
       style="left:${x}%;top:${y}%" data-r="${r}" data-i="${i}" title="${NODE_TYPES[n.type].label}">${NODE_TYPES[n.type].emoji}</div>`;
   }));
 
+  run.rerollsUsed = run.rerollsUsed || {};
+  const rerollUsed = !!run.rerollsUsed[run.islandIdx];
+
   render(`
     ${topbar(true)}
     <div class="map-wrap">
-      <div class="map-board" style="min-height:${H}px">
+      <div class="map-board" style="min-height:${H}px;position:relative;">
         <div class="map-title">📍 SAGA: <b>${saga.name}</b> · Isla ${run.islandIdx + 1}/${saga.islands.length}: <b>${island.name}</b> (${run.mode === 'nuzlocke' ? 'NUZLOCKE' : 'CLÁSICO'})</div>
         <svg class="map-svg">${edgesHTML}</svg>
         ${nodesHTML}
+        <div style="position:absolute;bottom:12px;left:12px;z-index:20;">
+          <button class="btn gold small" id="btn-map-reroll" ${rerollUsed ? 'disabled' : ''} style="font-size:8.5px;padding:6px 10px;box-shadow:0 3px 6px rgba(0,0,0,0.5);font-weight:bold;">
+            🎲 REROLL ISLA ${rerollUsed ? '(0/1)' : '(1/1)'}
+          </button>
+        </div>
       </div>
       <div class="side-panel">
         <div class="panel">
@@ -2023,6 +2039,19 @@ function screenMap() {
       </div>
     </div>
   `);
+
+  const mapRerollBtn = $('#btn-map-reroll');
+  if (mapRerollBtn && !rerollUsed) {
+    mapRerollBtn.onclick = () => {
+      run.rerollsUsed = run.rerollsUsed || {};
+      run.rerollsUsed[run.islandIdx] = true;
+      run.map = genMap(island);
+      run.pos = null;
+      saveRun();
+      toast('🎲 ¡Mapa de la isla regenerado!');
+      screenMap();
+    };
+  }
 
   document.querySelectorAll('.map-node.reachable').forEach(el => {
     el.onclick = () => enterNode(+el.dataset.r, +el.dataset.i);
@@ -2139,6 +2168,19 @@ function useItemFromMap(id) {
   }
 }
 
+function pickWildEnemy(pool) {
+  if (!pool || !pool.length) return null;
+  const leg5 = pool.filter(id => CHARS[id] && CHARS[id].rareza === 5);
+  const others = pool.filter(id => !CHARS[id] || CHARS[id].rareza !== 5);
+  if (leg5.length > 0 && others.length > 0) {
+    if (Math.random() < 0.005) {
+      return pick(leg5);
+    }
+    return pick(others);
+  }
+  return pick(pool);
+}
+
 // ============ ENTRAR EN NODO ============
 function enterNode(r, i) {
   const node = run.map.rows[r][i];
@@ -2150,7 +2192,7 @@ function enterNode(r, i) {
 
   switch (node.type) {
     case 'wild': {
-      const id = pick(island.pool);
+      const id = pickWildEnemy(island.pool);
       let lvl = rnd(island.lvl[0], island.lvl[1]);
       if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
       wildEncounter(makeChar(id, lvl, true));
@@ -2160,7 +2202,7 @@ function enterNode(r, i) {
       const n = Math.random() < 0.45 ? 3 : 2;
       const enemies = [];
       for (let k = 0; k < n; k++) {
-        const id = pick(island.pool);
+        const id = pickWildEnemy(island.pool);
         let lvl = rnd(island.lvl[0], island.lvl[1] + 1);
         if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
         enemies.push(makeChar(id, lvl, true));
@@ -2211,7 +2253,7 @@ function doMystery(island) {
     }
     case 'battle': {
       modalInfo('❓ ¡Emboscada!', `<div class="reward-list">${ev.text}</div>`, () => {
-        const id = pick(island.pool);
+        const id = pickWildEnemy(island.pool);
         let lvl = rnd(island.lvl[0] + 1, island.lvl[1] + 2);
         if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
         startBattle([makeChar(id, lvl, true)], { wild: true });
@@ -2241,7 +2283,7 @@ function doMystery(island) {
         run.berries += 200; saveRun();
         modalInfo('❓ Misterio', `<div class="reward-list">Un pirata quería unirse, pero la regla Nuzlocke lo impide.<br>Te deja 200 Berries de regalo.</div>`, screenMap);
       } else {
-        const id = pick(island.pool);
+        const id = pickWildEnemy(island.pool);
         const recLvl = Math.max(1, Math.floor(island.lvl[0] * 0.85));
         const f = applyUpgrades(makeChar(id, recLvl));
         addToTeam(f, ok => {
@@ -2727,8 +2769,8 @@ function renderSpecialCatalog(lvl) {
 }
 
 function renderSpecialGacha(lvl) {
-  // pesos: 1⭐ -> 41%, 2⭐ -> 30%, 3⭐ -> 21%, 4⭐ -> 7%, 5⭐ (legendarios) -> 1%
-  const weights = [41, 30, 21, 7, 1];
+  // pesos: 1⭐ -> 41.5%, 2⭐ -> 30%, 3⭐ -> 21%, 4⭐ -> 7%, 5⭐ (legendarios) -> 0.5%
+  const weights = [41.5, 30, 21, 7, 0.5];
   let roll = Math.random() * 100, stopIdx = 4;
   for (let i = 0; i < 5; i++) { roll -= weights[i]; if (roll <= 0) { stopIdx = i; break; } }
   const prizeId = pick(poolByRareza(stopIdx + 1)) || pick(basePirateIds());
@@ -2776,7 +2818,7 @@ function renderSpecialGacha(lvl) {
 // Tabla de probabilidades (drop rates) del gacha de carteles SE BUSCA:
 // probabilidad de cada cartel/rareza y de cada personaje dentro de su rareza.
 function showDropRatesModal() {
-  const weights = [41, 30, 21, 7, 1];
+  const weights = [41.5, 30, 21, 7, 0.5];
   const total = 100;
   const rows = [1, 2, 3, 4, 5].map(r => {
     const pool = poolByRareza(r);
