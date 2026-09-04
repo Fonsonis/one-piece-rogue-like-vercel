@@ -1328,8 +1328,9 @@ for (const [id, s] of Object.entries(SAGA_FIXES)) if (CHARS[id]) CHARS[id].saga 
 // 'whitebeard2' era un duplicado sin nombre de Barbablanca: newgate ocupa su sitio
 delete CHARS.whitebeard2;
 
-// Iniciales: los 10 Sombrero de Paja como nakamas seleccionables al zarpar
-const NAKAMA_STARTERS = ['luffy', 'zoro', 'nami', 'usopp', 'sanji',
+// Iniciales: solo Luffy está desbloqueado al inicio. El resto de nakamas deben encontrarse o reclutarse.
+const NAKAMA_STARTERS = ['luffy'];
+const STRAW_HAT_MEMBERS = ['luffy', 'zoro', 'nami', 'usopp', 'sanji',
   'chopper', 'robin', 'franky', 'brook', 'jinbe'].filter(id => CHARS[id]);
 
 const SAGAS = SAGA_DEFS.map((d, i) => {
