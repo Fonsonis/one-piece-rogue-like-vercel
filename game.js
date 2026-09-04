@@ -1081,7 +1081,7 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
     }));
 
     // 3. Mercado Clandestino (Carteles SE BUSCA)
-    const weights = [35, 28, 21, 14, 2];
+    const weights = [41, 30, 21, 7, 1];
     const totalWeight = 100;
     const gachaTiers = [1, 2, 3, 4, 5].map(r => {
       const pool = sagaPoolByRareza(s.id, r);
@@ -1094,11 +1094,12 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
     if (currentProbTab === 'wild') {
       const rows = wildPool.map(id => {
         const c = CHARS[id];
+        const isLeg = c.rareza === 5;
         return `<tr>
           <td style="white-space:nowrap;">${charIcon(id, 20)} <b>${c.name}</b></td>
           <td>${'⭐'.repeat(c.rareza)}</td>
           <td>${typeBadges(c.types)}</td>
-          <td><b>${wildPct.toFixed(2)}%</b></td>
+          <td><b>${wildPct.toFixed(2)}%</b> ${isLeg ? '<br><small style="color:var(--red);font-weight:bold;">⚔️ Solo combate (+6 Nv)</small>' : ''}</td>
         </tr>`;
       }).join('');
       tabHTML = `
@@ -1718,13 +1719,12 @@ function startRun(sagaIdx, starterIds) {
   const items = {
     cartel: 3 + (meta.global.cartelesplus2 ? 4 : meta.global.cartelesplus ? 2 : 0),
   };
-  if (meta.global.platosanjiplus || meta.global.carnerealplus2) {
-    items.carnereal = 2;
-    items.bocadillo = 2;
-  } else if (meta.global.carnerealplus) {
-    items.carnereal = 2;
-  } else {
+  if (meta.global.carneplus3 || meta.global.platosanjiplus) {
+    items.carne = 3;
+  } else if (meta.global.carneplus2 || meta.global.carnerealplus) {
     items.carne = 2;
+  } else if (meta.global.carneplus) {
+    items.carne = 1;
   }
   const berries = 300 + (meta.global.berriesplus3 ? 700 : meta.global.berriesplus2 ? 400 : meta.global.berriesplus ? 200 : 0);
 
@@ -1962,15 +1962,19 @@ function enterNode(r, i) {
   switch (node.type) {
     case 'wild': {
       const id = pick(island.pool);
-      const lvl = rnd(island.lvl[0], island.lvl[1]);
-      wildEncounter(makeChar(id, lvl));
+      let lvl = rnd(island.lvl[0], island.lvl[1]);
+      if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
+      wildEncounter(makeChar(id, lvl, true));
       break;
     }
     case 'marine': {
       const n = Math.random() < 0.45 ? 3 : 2;
       const enemies = [];
       for (let k = 0; k < n; k++) {
-        enemies.push(makeChar(pick(island.pool), rnd(island.lvl[0], island.lvl[1] + 1)));
+        const id = pick(island.pool);
+        let lvl = rnd(island.lvl[0], island.lvl[1] + 1);
+        if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
+        enemies.push(makeChar(id, lvl, true));
       }
       startBattle(enemies, { wild: false, reward: rnd(120, 260) * (run.islandIdx + 1) });
       break;
@@ -2019,7 +2023,9 @@ function doMystery(island) {
     case 'battle': {
       modalInfo('❓ ¡Emboscada!', `<div class="reward-list">${ev.text}</div>`, () => {
         const id = pick(island.pool);
-        startBattle([makeChar(id, rnd(island.lvl[0] + 1, island.lvl[1] + 2))], { wild: true });
+        let lvl = rnd(island.lvl[0] + 1, island.lvl[1] + 2);
+        if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
+        startBattle([makeChar(id, lvl, true)], { wild: true });
       });
       break;
     }
@@ -2065,14 +2071,11 @@ function doMystery(island) {
 }
 
 // ============ ENCUENTRO SALVAJE ============
-// Secuencia de 3 opciones: combatir (gana XP), seducir pagando Berries, o
-// tentar a la suerte con las 3 cadenas (cada una tiene un 50% de romperse;
-// si las tres se rompen, el pirata se une; si una aguanta, eliges entre pagar
-// 3 Carteles de Recluta o luchar contra él potenciado a cambio de más XP).
 function wildRecruitPrice(c) { return c.rareza * 150 * (run.islandIdx + 1); }
 
 function wildEncounter(wild) {
   const c = charData(wild);
+  const isLegendary = c.rareza === 5;
   const price = wildRecruitPrice(c);
   const nuzBlock = run.mode === 'nuzlocke' && run.nuzCaught[run.islandIdx];
   const ov = document.createElement('div');
@@ -2085,21 +2088,23 @@ function wildEncounter(wild) {
       <div class="special-stars">${'⭐'.repeat(c.rareza)}</div>
       ${typeBadges(c.types)}
     </div>
-    ${nuzBlock ? '<div class="special-fail">Regla Nuzlocke: ya reclutaste en esta isla (solo puedes combatir).</div>' : ''}
+    ${isLegendary ? '<div class="special-fail" style="color:var(--gold);border-color:var(--gold);background:#fffbe8;">👑 ¡PIRATA LEGENDARIO (5⭐)!<br>Inmune al reclutamiento salvaje. ¡Únicamente puedes combatirlo!</div>' : nuzBlock ? '<div class="special-fail">Regla Nuzlocke: ya reclutaste en esta isla (solo puedes combatir).</div>' : ''}
     <div class="actions" style="flex-direction:column;align-items:stretch;">
       <button class="btn red" id="we-fight">⚔️ COMBATIR — gana XP para la banda</button>
-      <button class="btn green" id="we-pay" ${nuzBlock || run.berries < price ? 'disabled' : ''}>💋 SEDUCIR — ${berriesHTML(price)}</button>
-      <button class="btn gold" id="we-chains" ${nuzBlock ? 'disabled' : ''}>⛓️ TENTAR A LA SUERTE — las 3 cadenas</button>
+      ${!isLegendary ? `
+        <button class="btn green" id="we-pay" ${nuzBlock || run.berries < price ? 'disabled' : ''}>💋 SEDUCIR — ${berriesHTML(price)}</button>
+        <button class="btn gold" id="we-chains" ${nuzBlock ? 'disabled' : ''}>⛓️ TENTAR A LA SUERTE — las 3 cadenas</button>
+      ` : ''}
     </div>
   </div>`;
   document.body.appendChild(ov);
   if (autoMode) {
     scheduleAutoStep(() => {
       if (!document.body.contains(ov)) return;
-      if (autoSettings.wildAction === 'recruit') {
+      if (!isLegendary && autoSettings.wildAction === 'recruit') {
         const payBtn = ov.querySelector('#we-pay');
         if (payBtn && !payBtn.disabled) { payBtn.click(); return; }
-      } else if (autoSettings.wildAction === 'chains') {
+      } else if (!isLegendary && autoSettings.wildAction === 'chains') {
         const chainBtn = ov.querySelector('#we-chains');
         if (chainBtn && !chainBtn.disabled) { chainBtn.click(); return; }
       }
@@ -2108,6 +2113,7 @@ function wildEncounter(wild) {
     }, 700);
   }
   const recruit = () => {
+    if (isLegendary) return;
     const f = { ...wild };
     applyUpgrades(f);
     addToTeam(f, ok => {
@@ -2123,14 +2129,14 @@ function wildEncounter(wild) {
   };
   ov.querySelector('#we-fight').onclick = () => { ov.remove(); startBattle([wild], { wild: true }); };
   const payBtn = ov.querySelector('#we-pay');
-  if (!nuzBlock && run.berries >= price) payBtn.onclick = () => {
+  if (payBtn && !nuzBlock && run.berries >= price) payBtn.onclick = () => {
     run.berries -= price;
     saveRun();
     ov.remove();
     recruit();
   };
   const chainsBtn = ov.querySelector('#we-chains');
-  if (!nuzBlock) chainsBtn.onclick = () => { ov.remove(); renderChains(wild, recruit); };
+  if (chainsBtn && !nuzBlock) chainsBtn.onclick = () => { ov.remove(); renderChains(wild, recruit); };
 }
 
 // Las 3 cadenas: 50% de romperse cada una. Cada cadena puede romperse gastando
@@ -2530,8 +2536,8 @@ function renderSpecialCatalog(lvl) {
 }
 
 function renderSpecialGacha(lvl) {
-  // pesos: 1⭐ -> 35%, 2⭐ -> 28%, 3⭐ -> 21%, 4⭐ -> 14%, 5⭐ (legendarios) -> 2%
-  const weights = [35, 28, 21, 14, 2];
+  // pesos: 1⭐ -> 41%, 2⭐ -> 30%, 3⭐ -> 21%, 4⭐ -> 7%, 5⭐ (legendarios) -> 1%
+  const weights = [41, 30, 21, 7, 1];
   let roll = Math.random() * 100, stopIdx = 4;
   for (let i = 0; i < 5; i++) { roll -= weights[i]; if (roll <= 0) { stopIdx = i; break; } }
   const prizeId = pick(poolByRareza(stopIdx + 1)) || pick(basePirateIds());
@@ -2579,7 +2585,7 @@ function renderSpecialGacha(lvl) {
 // Tabla de probabilidades (drop rates) del gacha de carteles SE BUSCA:
 // probabilidad de cada cartel/rareza y de cada personaje dentro de su rareza.
 function showDropRatesModal() {
-  const weights = [35, 28, 21, 14, 2];
+  const weights = [41, 30, 21, 7, 1];
   const total = 100;
   const rows = [1, 2, 3, 4, 5].map(r => {
     const pool = poolByRareza(r);
