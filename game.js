@@ -714,17 +714,15 @@ function typeBadges(types) {
 
 function berriesHTML(v) { return `฿${v.toLocaleString('es')}`; }
 
-function topbar(showBerries) {
+function topbar(showBerries = false, showAuto = showBerries) {
   const autoLabel = !autoMode ? '🤖 PAUSADO' : (autoSettings.speed === 'x1' ? '🤖 AUTO x1' : '🤖 AUTO x2');
   const autoBtnClass = !autoMode ? 'gray' : 'green';
   return `<div class="topbar">
-    <div class="topbar-left">
-      <div class="logo">GRAND<span>LINE</span>LIKE</div>
-      ${showBerries && run ? `<div class="berries">${berriesHTML(run.berries)}</div>` : ''}
-    </div>
-    <div class="topbar-right">
+    <div class="logo">GRAND<span>LINE</span>LIKE</div>
+    ${showBerries && run ? `<div class="floating-berries"><div class="berries">${berriesHTML(run.berries)}</div></div>` : ''}
+    <div class="floating-controls">
       <button class="btn small gray" id="btn-mute" title="Activar/Silenciar música">${isMuted ? '🔇 MÚSICA' : '🎵 MÚSICA'}</button>
-      <button class="btn small ${autoBtnClass}" id="btn-topbar-auto" title="Cambiar velocidad o activar/pausar modo auto">${autoLabel}</button>
+      ${showAuto ? `<button class="btn small ${autoBtnClass}" id="btn-topbar-auto" title="Cambiar velocidad o activar/pausar modo auto">${autoLabel}</button>` : ''}
     </div>
   </div>`;
 }
@@ -2578,7 +2576,7 @@ function screenShop() {
   playMusic('menu');
   const stock = ['carne', 'carnereal', 'bocadillo', 'sake', 'cartel', 'carteldorado', 'cartelbuster', 'hierro'];
   render(`
-    ${topbar(true)}
+    ${topbar(true, false)}
     <div class="panel">
       <h2>🏪 Tienda del puerto</h2>
       <p style="font-size:9px;margin-bottom:10px;">"¡Bienvenido! Todo pirata necesita provisiones."</p>
