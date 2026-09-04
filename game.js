@@ -747,7 +747,7 @@ const BASE_ACHIEVEMENTS = [
   { id: 'saga_1', title: 'Conquistador I', emoji: '⚔️', desc: 'Supera 1 saga en cualquier modo.', goal: 1, check: () => totalWinsCount(), fame: 100 },
   { id: 'saga_5', title: 'Conquistador V', emoji: '👑', desc: 'Supera 5 sagas en cualquier modo.', goal: 5, check: () => totalWinsCount(), fame: 300 },
   { id: 'saga_10', title: 'Gran Pirata de Grand Line', emoji: '⚓', desc: 'Supera las 10 sagas principales.', goal: 10, check: () => Object.keys(meta.wins || {}).filter(k => (meta.wins[k] || 0) + (meta.nuzWins[k] || 0) > 0).length, fame: 600 },
-  { id: 'straw_hats', title: 'Los 10 Sombrero de Paja', emoji: '🏴‍☠️', desc: 'Desbloquea o recluta a los 10 nakamas principales.', goal: 10, check: () => NAKAMA_STARTERS.filter(id => isNakamaUnlocked(id)).length, fame: 250 },
+  { id: 'straw_hats', title: 'Los 10 Sombrero de Paja', emoji: '🏴‍☠️', desc: 'Desbloquea o recluta a los 10 nakamas principales.', goal: 10, check: () => STRAW_HAT_MEMBERS.filter(id => isNakamaUnlocked(id)).length, fame: 250 },
   { id: 'saga_full', title: 'Compendio de Saga', emoji: '📜', desc: 'Completa al 100% los personajes de 1 saga en la Dex.', goal: 100, check: () => bestSagaDexProgress(), fame: 200 },
   { id: 'dex_full', title: 'Leyenda Viviente', emoji: '📖', desc: 'Consigue a todos los personajes del juego en la Dex.', goal: Object.keys(CHARS).length, check: () => (meta.dex ? meta.dex.length : 0), fame: 1000 },
   { id: 'tri_naruto', title: 'Trío Shinobi', emoji: '🍥', desc: 'Registra a Naruto, Sasuke y Kakashi en la Dex.', goal: 3, check: () => countInDex(['naruto', 'sasuke', 'kakashi']), fame: 150 },
@@ -773,8 +773,7 @@ function countInDex(ids) {
 }
 
 function isNakamaUnlocked(id) {
-  const defaultStarters = ['luffy', 'zoro', 'nami', 'usopp', 'sanji'];
-  if (defaultStarters.includes(id)) return true;
+  if (id === 'luffy') return true;
   if (meta.roster && meta.roster.includes(id)) return true;
   if (meta.recruited && meta.recruited.includes(id)) return true;
   if (meta.dex && meta.dex.includes(id)) return true;
@@ -1425,8 +1424,9 @@ function starterSlotsCount() {
 function screenStarter(sagaIdx) {
   playMusic('menu');
   const saga = SAGAS[sagaIdx];
-  const veterans = meta.roster.filter(id => CHARS[id] && !saga.starters.includes(id));
-  const allIds = [...saga.starters, ...veterans];
+  const rosterChars = (meta.roster || []).filter(id => CHARS[id]);
+  const allIds = [...new Set(['luffy', ...STRAW_HAT_MEMBERS, ...rosterChars])];
+  const veterans = rosterChars.filter(id => id !== 'luffy');
   starterView.page = 0;
   const maxSlots = starterSlotsCount();
   let picked = [];
@@ -1575,16 +1575,16 @@ function screenStarter(sagaIdx) {
     const ids = filterSortChars(allIds, starterView);
     renderCharGrid($('#char-grid'), ids, starterView,
       id => {
-        const isUnlocked = id === 'luffy' || allIds.includes(id);
-        return selCardHTML(id, veterans.includes(id), picked.includes(id), isUnlocked);
+        const unlocked = isNakamaUnlocked(id);
+        return selCardHTML(id, veterans.includes(id), picked.includes(id), unlocked);
       },
       el => {
         el.querySelectorAll('.sel-card').forEach(card => {
           card.onclick = () => {
             const id = card.dataset.id;
-            const isUnlocked = id === 'luffy' || allIds.includes(id);
-            if (!isUnlocked) {
-              toast('🔒 Personaje bloqueado. ¡Conquista islas/sagas para desbloquearlo!');
+            const unlocked = isNakamaUnlocked(id);
+            if (!unlocked) {
+              toast('🔒 Personaje bloqueado. ¡Encuéntralo o reclútalo en tus aventuras para desbloquearlo!');
               return;
             }
             const idx = picked.indexOf(id);
@@ -4649,7 +4649,7 @@ function startBossChallenge(bossId) {
 
   const pTeam = (run && run.team && run.team.length)
     ? run.team
-    : NAKAMA_STARTERS.slice(0, 6).map(id => applyUpgrades(makeChar(id, 65)));
+    : STRAW_HAT_MEMBERS.slice(0, 6).map(id => applyUpgrades(makeChar(id, 65)));
 
   startBattle([boss], {
     wild: false,
