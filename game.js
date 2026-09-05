@@ -396,6 +396,19 @@ function importSaveFile(file) {
 }
 
 // Nivel de cuenta: sube de forma exponencial con los PX de cuenta (se ganan a la par que la Fama)
+const SAGA_LEVEL_CAPS = [7, 15, 20, 25, 30, 35, 40, 45, 50, 55, 100];
+
+function getMaxAccountLevelCap() {
+  if (typeof SAGAS === 'undefined' || !SAGAS.length) return 7;
+  let highest = 0;
+  for (let i = 0; i < SAGAS.length; i++) {
+    if (typeof sagaUnlocked === 'function' && sagaUnlocked(i)) {
+      highest = i;
+    }
+  }
+  return SAGA_LEVEL_CAPS[highest] !== undefined ? SAGA_LEVEL_CAPS[highest] : 100;
+}
+
 function xpForAccLevel(lvl) {
   if (lvl <= 1) return 0;
   return Math.floor(100 * (Math.pow(1.115, lvl - 1) - 1) / 0.115);
@@ -407,7 +420,8 @@ function accountLevel() {
     lvl++;
     if (lvl >= 100) break;
   }
-  return lvl;
+  const cap = getMaxAccountLevelCap();
+  return Math.min(lvl, cap);
 }
 function accountNextAt() {
   const lvl = accountLevel();
@@ -757,16 +771,18 @@ function typeBadges(types) {
   ).join('')}</div>`;
 }
 
-function trackItemCollected(qty = 1) {
+function trackStat(key, qty = 1) {
   meta.stats = meta.stats || { kills: 0, items: 0 };
-  meta.stats.items = (meta.stats.items || 0) + qty;
+  meta.stats[key] = (meta.stats[key] || 0) + qty;
   saveMeta();
 }
 
+function trackItemCollected(qty = 1) {
+  trackStat('items', qty);
+}
+
 function trackKills(qty = 1) {
-  meta.stats = meta.stats || { kills: 0, items: 0 };
-  meta.stats.kills = (meta.stats.kills || 0) + qty;
-  saveMeta();
+  trackStat('kills', qty);
 }
 
 function berriesHTML(v) { return `฿${v.toLocaleString('es')}`; }
@@ -1032,44 +1048,7 @@ function makeListReorderable(container, itemSelector, onReorder) {
 }
 
 // ============ LOGROS / ACHIEVEMENTS ============
-const TIER_GOALS = [10, 20, 40, 80, 160, 320, 640, 1000];
-const TIER_FAMES = [50, 75, 100, 150, 250, 400, 600, 1000];
 const ROMANS = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
-
-const DYNAMIC_ACHIEVEMENTS = [
-  ...TIER_GOALS.map((g, i) => ({
-    id: `kills_${g}`, title: `Cazador de Piratas ${ROMANS[i]}`, emoji: '⚔️',
-    desc: `Derrota a ${g} enemigos en combate.`, goal: g, check: () => (meta.stats && meta.stats.kills) || 0, fame: TIER_FAMES[i]
-  })),
-  ...TIER_GOALS.map((g, i) => ({
-    id: `items_${g}`, title: `Recolector de Tesoros ${ROMANS[i]}`, emoji: '🎒',
-    desc: `Consigue o usa ${g} objetos.`, goal: g, check: () => (meta.stats && meta.stats.items) || 0, fame: TIER_FAMES[i]
-  })),
-  ...TIER_GOALS.map((g, i) => ({
-    id: `seen_${g}`, title: `Avistador de Grand Line ${ROMANS[i]}`, emoji: '👁️',
-    desc: `Descubre o avista a ${g} personajes en la Dex.`, goal: g, check: () => (meta.dex ? meta.dex.length : 0), fame: TIER_FAMES[i]
-  })),
-  { id: 'solo_sailor', title: 'Lobo de Mar Solitario', emoji: '🐺', desc: 'Zarpa y completa una saga con solo 1 personaje.', goal: 1, check: () => (meta.soloWins || 0), fame: 300 },
-];
-
-const BASE_ACHIEVEMENTS = [
-  { id: 'isl_10', title: 'Primer Navegante', emoji: '🏝️', desc: 'Recorre al menos 10 islas.', goal: 10, check: () => (meta.totalIslands || 0), fame: 50 },
-  { id: 'isl_50', title: 'Lobo de Mar', emoji: '🗺️', desc: 'Recorre al menos 50 islas.', goal: 50, check: () => (meta.totalIslands || 0), fame: 150 },
-  { id: 'isl_100', title: 'Rey de los Mares', emoji: '🌊', desc: 'Recorre al menos 100 islas.', goal: 100, check: () => (meta.totalIslands || 0), fame: 300 },
-  { id: 'saga_1', title: 'Conquistador I', emoji: '⚔️', desc: 'Supera 1 saga en cualquier modo.', goal: 1, check: () => totalWinsCount(), fame: 100 },
-  { id: 'saga_5', title: 'Conquistador V', emoji: '👑', desc: 'Supera 5 sagas en cualquier modo.', goal: 5, check: () => totalWinsCount(), fame: 300 },
-  { id: 'saga_10', title: 'Gran Pirata de Grand Line', emoji: '⚓', desc: 'Supera las 10 sagas principales.', goal: 10, check: () => Object.keys(meta.wins || {}).filter(k => (meta.wins[k] || 0) + (meta.nuzWins[k] || 0) > 0).length, fame: 600 },
-  { id: 'straw_hats', title: 'Los 10 Sombrero de Paja', emoji: '🏴‍☠️', desc: 'Desbloquea o recluta a los 10 nakamas principales.', goal: 10, check: () => STRAW_HAT_MEMBERS.filter(id => isNakamaUnlocked(id)).length, fame: 250 },
-  { id: 'saga_full', title: 'Compendio de Saga', emoji: '📜', desc: 'Completa al 100% los personajes de 1 saga en la Dex.', goal: 100, check: () => bestSagaDexProgress(), fame: 200 },
-  { id: 'dex_full', title: 'Leyenda Viviente', emoji: '📖', desc: 'Consigue a todos los personajes del juego en la Dex.', goal: Object.keys(CHARS).length, check: () => (meta.dex ? meta.dex.length : 0), fame: 1000 },
-  { id: 'tri_naruto', title: 'Trío Shinobi', emoji: '🍥', desc: 'Registra a Naruto, Sasuke y Kakashi en la Dex.', goal: 3, check: () => countInDex(['naruto', 'sasuke', 'kakashi']), fame: 150 },
-  { id: 'tri_jjk', title: 'Trío Hechicero', emoji: '👹', desc: 'Registra a Itadori, Yuta y Gojo en la Dex.', goal: 3, check: () => countInDex(['itadori', 'yuta', 'gojo']), fame: 150 },
-  { id: 'tri_kimetsu', title: 'Trío Cazador', emoji: '🩸', desc: 'Registra a Tanjiro, Zenitsu e Inosuke en la Dex.', goal: 3, check: () => countInDex(['tanjiro', 'zenitsu', 'inosuke']), fame: 150 },
-  { id: 'tri_db', title: 'Trío Saiyan', emoji: '🐉', desc: 'Registra a Goku, Vegeta y Gohan en la Dex.', goal: 3, check: () => countInDex(['goku', 'vegeta', 'gohan']), fame: 150 },
-  { id: 'tri_opm', title: 'Trío Héroes OPM', emoji: '👊', desc: 'Registra a Genos, Garou y Tatsumaki en la Dex.', goal: 3, check: () => countInDex(['genos', 'garou', 'tatsumaki']), fame: 150 },
-];
-
-const ACHIEVEMENTS = [...BASE_ACHIEVEMENTS, ...DYNAMIC_ACHIEVEMENTS];
 
 function totalWinsCount() {
   return Object.values(meta.wins || {}).reduce((a, b) => a + b, 0) +
@@ -1106,6 +1085,203 @@ function bestSagaDexProgress() {
   return maxPct;
 }
 
+const PROGRESSIVE_ACHIEVEMENTS = [
+  {
+    id: 'kills',
+    title: 'Cazador de Piratas',
+    emoji: '⚔️',
+    desc: 'Derrota a enemigos en combate.',
+    goals: [10, 25, 50, 100, 250, 500, 1000],
+    fames: [50, 100, 150, 250, 400, 600, 1000],
+    check: () => (meta.stats && meta.stats.kills) || 0,
+    legacyIds: ['kills_10', 'kills_20', 'kills_40', 'kills_80', 'kills_160', 'kills_320', 'kills_640', 'kills_1000']
+  },
+  {
+    id: 'islands',
+    title: 'Navegante de Grand Line',
+    emoji: '🗺️',
+    desc: 'Recorre islas en tus travesías.',
+    goals: [10, 25, 50, 100, 200, 500, 1000],
+    fames: [50, 100, 150, 250, 400, 600, 1000],
+    check: () => (meta.totalIslands || 0),
+    legacyIds: ['isl_10', 'isl_50', 'isl_100']
+  },
+  {
+    id: 'sagas',
+    title: 'Conquistador de Sagas',
+    emoji: '👑',
+    desc: 'Supera sagas completas en cualquier modo.',
+    goals: [1, 3, 5, 10, 20, 50],
+    fames: [100, 200, 300, 600, 1000, 2000],
+    check: () => totalWinsCount(),
+    legacyIds: ['saga_1', 'saga_5', 'saga_10']
+  },
+  {
+    id: 'items',
+    title: 'Recolector de Tesoros',
+    emoji: '🎒',
+    desc: 'Consigue u obtén objetos para la bolsa.',
+    goals: [10, 25, 50, 100, 250, 500, 1000],
+    fames: [50, 100, 150, 250, 400, 600, 1000],
+    check: () => (meta.stats && meta.stats.items) || 0,
+    legacyIds: ['items_10', 'items_20', 'items_40', 'items_80', 'items_160', 'items_320', 'items_640', 'items_1000']
+  },
+  {
+    id: 'dex',
+    title: 'Avistador de la Dex',
+    emoji: '👁️',
+    desc: 'Descubre y recluta personajes en la Dex.',
+    goals: [10, 25, 50, 100, 150, 200, 300],
+    fames: [50, 100, 150, 250, 400, 600, 1000],
+    check: () => (meta.dex ? meta.dex.length : 0),
+    legacyIds: ['seen_10', 'seen_20', 'seen_40', 'seen_80', 'seen_160', 'seen_320', 'seen_640', 'seen_1000']
+  },
+  {
+    id: 'mystery_visit',
+    title: 'Explorador del Misterio',
+    emoji: '❓',
+    desc: 'Visita nodos de Evento Misterioso.',
+    goals: [5, 15, 30, 60, 120, 250],
+    fames: [50, 100, 150, 250, 400, 600],
+    check: () => (meta.stats && meta.stats.mystery_visit) || 0,
+  },
+  {
+    id: 'mystery_heal',
+    title: 'Fuente de Vida',
+    emoji: '♨️',
+    desc: 'Recupera a tu banda en eventos misteriosos.',
+    goals: [3, 10, 25, 50, 100],
+    fames: [50, 100, 200, 350, 500],
+    check: () => (meta.stats && meta.stats.mystery_heal) || 0,
+  },
+  {
+    id: 'mystery_train',
+    title: 'Entrenamiento Intenso',
+    emoji: '💪',
+    desc: 'Obtén mejoras de ataque en eventos misteriosos.',
+    goals: [3, 10, 25, 50, 100],
+    fames: [50, 100, 200, 350, 500],
+    check: () => (meta.stats && meta.stats.mystery_train) || 0,
+  },
+  {
+    id: 'shop_buy',
+    title: 'Cliente VIP del Puerto',
+    emoji: '🏪',
+    desc: 'Compra objetos en las tiendas de la isla.',
+    goals: [5, 15, 35, 75, 150, 300],
+    fames: [50, 100, 180, 300, 500, 800],
+    check: () => (meta.stats && meta.stats.shop_buy) || 0,
+  },
+  {
+    id: 'rest_visit',
+    title: 'Descanso del Pirata',
+    emoji: '⛺',
+    desc: 'Pasa por zonas de campamento a descansar.',
+    goals: [5, 15, 35, 75, 150],
+    fames: [50, 100, 180, 300, 500],
+    check: () => (meta.stats && meta.stats.rest_visit) || 0,
+  },
+  {
+    id: 'special_visit',
+    title: 'Encuentros Especiales',
+    emoji: '🌟',
+    desc: 'Visita nodos de piratas especiales.',
+    goals: [5, 15, 35, 75, 150],
+    fames: [50, 100, 180, 300, 500],
+    check: () => (meta.stats && meta.stats.special_visit) || 0,
+  },
+  {
+    id: 'fruit_use',
+    title: 'Poder de las Frutas',
+    emoji: '🍈',
+    desc: 'Consume Frutas del Diablo con tus nakamas.',
+    goals: [1, 3, 5, 10, 25],
+    fames: [100, 200, 350, 500, 1000],
+    check: () => (meta.stats && meta.stats.fruit_use) || 0,
+  },
+  {
+    id: 'nuzlocke_wins',
+    title: 'Superviviente Nuzlocke',
+    emoji: '☠️',
+    desc: 'Supera sagas en Modo Nuzlocke.',
+    goals: [1, 3, 5, 10, 20],
+    fames: [300, 500, 800, 1200, 2000],
+    check: () => Object.values(meta.nuzWins || {}).reduce((a, b) => a + b, 0),
+    legacyIds: ['nuzlocke_win', 'nuzlocke_wins_5']
+  },
+  {
+    id: 'all_nakama_wins',
+    title: 'Espíritu Nakama',
+    emoji: '🏴‍☠️',
+    desc: 'Supera sagas con equipos 100% Nakama.',
+    goals: [1, 3, 5, 10, 20],
+    fames: [300, 500, 800, 1200, 2000],
+    check: () => (meta.allNakamaWins || 0),
+    legacyIds: ['all_nakama_win', 'all_nakama_wins_5']
+  }
+];
+
+const STATIC_ACHIEVEMENTS = [
+  { id: 'solo_sailor', title: 'Lobo de Mar Solitario', emoji: '🐺', desc: 'Zarpa y completa una saga con solo 1 personaje.', goal: 1, check: () => (meta.soloWins || 0), fame: 300, cat: 'desafios' },
+  { id: 'straw_hats', title: 'Los 10 Sombrero de Paja', emoji: '🏴‍☠️', desc: 'Desbloquea o recluta a los 10 nakamas principales.', goal: 10, check: () => STRAW_HAT_MEMBERS.filter(id => isNakamaUnlocked(id)).length, fame: 250, cat: 'desafios' },
+  { id: 'saga_full', title: 'Compendio de Saga', emoji: '📜', desc: 'Completa al 100% los personajes de 1 saga en la Dex.', goal: 100, check: () => bestSagaDexProgress(), fame: 200, cat: 'desafios' },
+  { id: 'dex_full', title: 'Leyenda Viviente', emoji: '📖', desc: 'Consigue a todos los personajes del juego en la Dex.', goal: Object.keys(CHARS).length, check: () => (meta.dex ? meta.dex.length : 0), fame: 1000, cat: 'desafios' },
+  { id: 'tri_naruto', title: 'Trío Shinobi', emoji: '🍥', desc: 'Registra a Naruto, Sasuke y Kakashi en la Dex.', goal: 3, check: () => countInDex(['naruto', 'sasuke', 'kakashi']), fame: 150, cat: 'desafios' },
+  { id: 'tri_jjk', title: 'Trío Hechicero', emoji: '👹', desc: 'Registra a Itadori, Yuta y Gojo en la Dex.', goal: 3, check: () => countInDex(['itadori', 'yuta', 'gojo']), fame: 150, cat: 'desafios' },
+  { id: 'tri_kimetsu', title: 'Trío Cazador', emoji: '🩸', desc: 'Registra a Tanjiro, Zenitsu e Inosuke en la Dex.', goal: 3, check: () => countInDex(['tanjiro', 'zenitsu', 'inosuke']), fame: 150, cat: 'desafios' },
+  { id: 'tri_db', title: 'Trío Saiyan', emoji: '🐉', desc: 'Registra a Goku, Vegeta y Gohan en la Dex.', goal: 3, check: () => countInDex(['goku', 'vegeta', 'gohan']), fame: 150, cat: 'desafios' },
+  { id: 'tri_opm', title: 'Trío Héroes OPM', emoji: '👊', desc: 'Registra a Genos, Garou y Tatsumaki en la Dex.', goal: 3, check: () => countInDex(['genos', 'garou', 'tatsumaki']), fame: 150, cat: 'desafios' },
+];
+
+const SAGA_DIFF_ACHIEVEMENTS = SAGA_DEFS.flatMap(s =>
+  DIFFICULTIES.map(d => ({
+    id: `saga_diff_${s.id}_${d.id}`,
+    title: `${d.emoji} ${s.name}: ${d.name}`,
+    emoji: d.emoji,
+    desc: `Supera la saga ${s.name} en Dificultad ${d.name}.`,
+    goal: 1,
+    check: () => (meta.sagaDiffWins && meta.sagaDiffWins[s.id] && meta.sagaDiffWins[s.id][d.id]) ? 1 : 0,
+    fame: 40 + d.id * 30,
+    cat: 'sagas'
+  }))
+);
+
+function getClaimedProgTier(p) {
+  meta.claimedProg = meta.claimedProg || {};
+  if (meta.claimedProg[p.id] !== undefined) {
+    return meta.claimedProg[p.id];
+  }
+  let count = 0;
+  if (p.legacyIds && meta.claimedAch) {
+    for (const legId of p.legacyIds) {
+      if (meta.claimedAch[legId]) count++;
+    }
+  }
+  return count;
+}
+
+function getAchievementsInfo() {
+  meta.claimedAch = meta.claimedAch || {};
+  meta.claimedProg = meta.claimedProg || {};
+  const visibleStaticList = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS).filter(isVisibleAch);
+  const completedStaticCount = visibleStaticList.filter(a => a.check() >= a.goal).length;
+  const completedProgTiers = PROGRESSIVE_ACHIEVEMENTS.reduce((acc, p) => acc + getClaimedProgTier(p), 0);
+  const totalCompleted = completedStaticCount + completedProgTiers;
+
+  const totalStaticCount = visibleStaticList.length;
+  const totalProgTiers = PROGRESSIVE_ACHIEVEMENTS.reduce((acc, p) => acc + p.goals.length, 0);
+  const totalAchievements = totalStaticCount + totalProgTiers;
+
+  const unclaimedStatic = visibleStaticList.some(ach => ach.check() >= ach.goal && !(meta.claimedAch && meta.claimedAch[ach.id]));
+  const unclaimedProg = PROGRESSIVE_ACHIEVEMENTS.some(p => {
+    const t = getClaimedProgTier(p);
+    return t < p.goals.length && p.check() >= p.goals[t];
+  });
+  const hasUnclaimedAch = unclaimedStatic || unclaimedProg;
+
+  return { totalCompleted, totalAchievements, hasUnclaimedAch };
+}
+
 function isVisibleAch(a) {
   if (a.id.startsWith('tri_') || a.isCrossover) {
     return a.check() >= a.goal;
@@ -1113,40 +1289,103 @@ function isVisibleAch(a) {
   return true;
 }
 
-function showAchievementsModal(savedScrollTop = 0) {
-  meta.claimedAch = meta.claimedAch || {};
-  const visibleList = ACHIEVEMENTS.filter(isVisibleAch);
-  const completedCount = visibleList.filter(a => a.check() >= a.goal).length;
+let currentAchCategory = 'all';
 
-  const ov = document.createElement('div');
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="max-width:580px;">
-    <h2>🏆 Logros de Pirata (${completedCount}/${visibleList.length})</h2>
-    <p style="font-size:8px;text-align:center;margin-bottom:12px;color:#666;">
-      Completa desafíos en tus aventuras para ganar ⭐ Fama adicional.
-    </p>
-    <div class="achieve-list-container" style="max-height:360px;overflow-y:auto;">
-      ${visibleList.map(a => {
+function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchCategory) {
+  meta.claimedAch = meta.claimedAch || {};
+  meta.claimedProg = meta.claimedProg || {};
+  currentAchCategory = initialCategory;
+
+  const visibleStaticList = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS).filter(isVisibleAch);
+  const { totalCompleted, totalAchievements } = getAchievementsInfo();
+
+  const renderProgCardHTML = p => {
+    const tierIdx = getClaimedProgTier(p);
+    const val = p.check();
+    const totalTiers = p.goals.length;
+    const isMax = tierIdx >= totalTiers;
+    const currentGoal = isMax ? p.goals[totalTiers - 1] : p.goals[tierIdx];
+    const currentFame = isMax ? p.fames[totalTiers - 1] : p.fames[tierIdx];
+    const done = !isMax && val >= currentGoal;
+    const pct = isMax ? 100 : Math.min(100, Math.floor((val / currentGoal) * 100));
+
+    return `<div class="achieve-row ${isMax ? 'done' : ''}">
+      <span class="emoji">${p.emoji}</span>
+      <div class="info">
+        <b>${p.title} ${isMax ? '(MÁXIMO)' : `Nivel ${tierIdx + 1}/${totalTiers}`}</b> — <span style="color:var(--accent);">⭐+${currentFame} Fama</span><br>
+        <small style="color:#555;">${p.desc}</small>
+        <div class="achieve-bar"><i style="width:${pct}%"></i></div>
+        <div style="font-size:7.5px;color:#666;margin-top:3px;font-weight:bold;">
+          ${isMax ? `Completado: ${val}/${currentGoal} (100%)` : `Progreso Nivel ${tierIdx + 1}: ${val}/${currentGoal} (${pct}%)`}
+        </div>
+      </div>
+      ${isMax
+        ? '<span style="font-size:8px;color:var(--green);font-weight:bold;">✓ MÁXIMO</span>'
+        : done
+          ? `<button class="btn small green" data-claim-prog="${p.id}">RECLAMAR ⭐${currentFame}</button>`
+          : '<span style="font-size:8px;color:#888;">🔒 EN PROGRESO</span>'}
+    </div>`;
+  };
+
+  const renderStaticCardHTML = a => {
     const val = a.check();
     const done = val >= a.goal;
     const claimed = !!meta.claimedAch[a.id];
     const pct = Math.min(100, Math.floor((val / a.goal) * 100));
     return `<div class="achieve-row ${claimed ? 'done' : ''}">
-          <span class="emoji">${a.emoji}</span>
-          <div class="info">
-            <b>${a.title}</b> — <span style="color:var(--accent);">⭐+${a.fame} Fama</span><br>
-            <small style="color:#555;">${a.desc}</small>
-            <div class="achieve-bar"><i style="width:${pct}%"></i></div>
-            <div style="font-size:7px;color:#666;margin-top:2px;">Progreso: ${val}/${a.goal} (${pct}%)</div>
-          </div>
-          ${claimed ? '<span style="font-size:8px;color:var(--green);font-weight:bold;">✓ RECLAMADO</span>'
+      <span class="emoji">${a.emoji}</span>
+      <div class="info">
+        <b>${a.title}</b> — <span style="color:var(--accent);">⭐+${a.fame} Fama</span><br>
+        <small style="color:#555;">${a.desc}</small>
+        <div class="achieve-bar"><i style="width:${pct}%"></i></div>
+        <div style="font-size:7.5px;color:#666;margin-top:3px;font-weight:bold;">Progreso: ${val}/${a.goal} (${pct}%)</div>
+      </div>
+      ${claimed ? '<span style="font-size:8px;color:var(--green);font-weight:bold;">✓ RECLAMADO</span>'
         : done ? `<button class="btn small green" data-claim="${a.id}">RECLAMAR ⭐${a.fame}</button>`
-          : '<span style="font-size:8px;color:#888;">🔒 EN PROGRESO</span>'}
-        </div>`;
-  }).join('')}
-    </div>
-    <div class="actions" style="margin-top:12px;"><button class="btn gray" id="ach-close">CERRAR</button></div>
-  </div>`;
+        : '<span style="font-size:8px;color:#888;">🔒 EN PROGRESO</span>'}
+    </div>`;
+  };
+
+  const renderModalContent = () => {
+    let html = '';
+    if (currentAchCategory === 'all') {
+      html += PROGRESSIVE_ACHIEVEMENTS.map(renderProgCardHTML).join('');
+      html += visibleStaticList.map(renderStaticCardHTML).join('');
+    } else if (currentAchCategory === 'prog') {
+      html += PROGRESSIVE_ACHIEVEMENTS.map(renderProgCardHTML).join('');
+    } else if (currentAchCategory === 'sagas') {
+      html += visibleStaticList.filter(a => a.id.startsWith('saga_diff_')).map(renderStaticCardHTML).join('');
+    } else if (currentAchCategory === 'desafios') {
+      html += visibleStaticList.filter(a => !a.id.startsWith('saga_diff_')).map(renderStaticCardHTML).join('');
+    }
+
+    if (!html) html = '<div style="font-size:9px;color:#888;text-align:center;padding:20px;">No hay logros en esta categoría.</div>';
+
+    return `
+      <h2>🏆 Logros de Pirata (${totalCompleted}/${totalAchievements})</h2>
+      <p style="font-size:8px;text-align:center;margin-bottom:8px;color:#666;">
+        Completa desafíos en tus aventuras para ganar ⭐ Fama adicional.
+      </p>
+      <div class="tabs" style="margin-bottom:10px;flex-wrap:wrap;gap:4px;">
+        <div class="tab ${currentAchCategory === 'all' ? 'active' : ''}" id="ach-cat-all" style="font-size:8px;padding:4px 6px;">TODOS</div>
+        <div class="tab ${currentAchCategory === 'prog' ? 'active' : ''}" id="ach-cat-prog" style="font-size:8px;padding:4px 6px;">🔄 PROGRESIVOS (${PROGRESSIVE_ACHIEVEMENTS.length})</div>
+        <div class="tab ${currentAchCategory === 'sagas' ? 'active' : ''}" id="ach-cat-sagas" style="font-size:8px;padding:4px 6px;">📜 SAGAS (${visibleStaticList.filter(a=>a.id.startsWith('saga_diff_')).length})</div>
+        <div class="tab ${currentAchCategory === 'desafios' ? 'active' : ''}" id="ach-cat-desafios" style="font-size:8px;padding:4px 6px;">🎯 DESAFÍOS (${visibleStaticList.filter(a=>!a.id.startsWith('saga_diff_')).length})</div>
+      </div>
+      <div class="achieve-list-container" style="max-height:340px;overflow-y:auto;">
+        ${html}
+      </div>
+      <div class="actions" style="margin-top:12px;"><button class="btn gray" id="ach-close">CERRAR</button></div>
+    `;
+  };
+
+  const existingOverlay = document.querySelector('#achievements-overlay');
+  if (existingOverlay) existingOverlay.remove();
+
+  const ov = document.createElement('div');
+  ov.id = 'achievements-overlay';
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal" style="max-width:600px;">${renderModalContent()}</div>`;
   document.body.appendChild(ov);
 
   const container = ov.querySelector('.achieve-list-container');
@@ -1158,42 +1397,75 @@ function showAchievementsModal(savedScrollTop = 0) {
     const shipBtn = $('#btn-ship');
     if (shipBtn) shipBtn.innerHTML = `🏪 Tienda (⭐${meta.fame})`;
     const achBtn = $('#btn-achievements');
-    const unclaimed = visibleList.some(ach => ach.check() >= ach.goal && !(meta.claimedAch && meta.claimedAch[ach.id]));
+    const { totalCompleted, totalAchievements, hasUnclaimedAch } = getAchievementsInfo();
+
     if (achBtn) {
-      const completedAch = visibleList.filter(a => a.check() >= a.goal).length;
       achBtn.innerHTML = `
-        <span>🏆 Logros${unclaimed ? ' <span class="ach-badge-dot" style="background:#e74c3c;color:#fff;font-size:7px;border-radius:50%;padding:1px 4px;margin-left:2px;font-weight:bold;animation:pulse 1s infinite alternate;border:1px solid #fff;">!</span>' : ''}</span>
-        <span style="font-size:8px;opacity:0.85;margin-top:2px;">(${completedAch}/${visibleList.length})</span>
+        <span>🏆 Logros${hasUnclaimedAch ? ' <span class="ach-badge-dot" style="background:#e74c3c;color:#fff;font-size:7px;border-radius:50%;padding:1px 4px;margin-left:2px;font-weight:bold;animation:pulse 1s infinite alternate;border:1px solid #fff;">!</span>' : ''}</span>
+        <span style="font-size:8px;opacity:0.85;margin-top:2px;">(${totalCompleted}/${totalAchievements})</span>
       `;
     }
     const topAchBtn = $('#btn-top-ach');
     if (topAchBtn) {
-      topAchBtn.innerHTML = `🏆${unclaimed ? '🔴' : ''}`;
+      topAchBtn.innerHTML = `🏆${hasUnclaimedAch ? '🔴' : ''}`;
     }
   };
 
-  const closeFn = () => {
-    ov.remove();
-    syncFameUI();
+  const bindEvents = () => {
+    const cont = ov.querySelector('.achieve-list-container');
+    ['all', 'prog', 'sagas', 'desafios'].forEach(cat => {
+      const tabEl = ov.querySelector(`#ach-cat-${cat}`);
+      if (tabEl) tabEl.onclick = () => {
+        currentAchCategory = cat;
+        ov.querySelector('.modal').innerHTML = renderModalContent();
+        bindEvents();
+      };
+    });
+
+    ov.querySelectorAll('[data-claim]').forEach(btn => {
+      btn.onclick = () => {
+        const st = cont ? cont.scrollTop : 0;
+        const id = btn.dataset.claim;
+        const a = visibleStaticList.find(x => x.id === id);
+        if (!a || meta.claimedAch[id] || a.check() < a.goal) return;
+        meta.claimedAch[id] = true;
+        gainFame(a.fame);
+        saveMeta();
+        syncFameUI();
+        toast(`🏆 Logro completado: ¡+${a.fame} Fama!`);
+        ov.querySelector('.modal').innerHTML = renderModalContent();
+        bindEvents();
+        if (cont) cont.scrollTop = st;
+      };
+    });
+
+    ov.querySelectorAll('[data-claim-prog]').forEach(btn => {
+      btn.onclick = () => {
+        const st = cont ? cont.scrollTop : 0;
+        const id = btn.dataset.claimProg;
+        const p = PROGRESSIVE_ACHIEVEMENTS.find(x => x.id === id);
+        if (!p) return;
+        const tierIdx = getClaimedProgTier(p);
+        if (tierIdx >= p.goals.length || p.check() < p.goals[tierIdx]) return;
+
+        meta.claimedProg = meta.claimedProg || {};
+        meta.claimedProg[id] = tierIdx + 1;
+        gainFame(p.fames[tierIdx]);
+        saveMeta();
+        syncFameUI();
+        toast(`🏆 Logro Nivel ${tierIdx + 1} completado: ¡+${p.fames[tierIdx]} Fama!`);
+        ov.querySelector('.modal').innerHTML = renderModalContent();
+        bindEvents();
+        if (cont) cont.scrollTop = st;
+      };
+    });
+
+    const closeBtn = ov.querySelector('#ach-close');
+    if (closeBtn) closeBtn.onclick = () => { ov.remove(); syncFameUI(); };
   };
 
-  ov.querySelector('#ach-close').onclick = closeFn;
-  ov.querySelectorAll('[data-claim]').forEach(btn => {
-    btn.onclick = () => {
-      const st = container ? container.scrollTop : 0;
-      const id = btn.dataset.claim;
-      const a = ACHIEVEMENTS.find(x => x.id === id);
-      if (!a || meta.claimedAch[id] || a.check() < a.goal) return;
-      meta.claimedAch[id] = true;
-      gainFame(a.fame);
-      saveMeta();
-      syncFameUI();
-      toast(`🏆 Logro completado: ¡+${a.fame} Fama!`);
-      ov.remove();
-      showAchievementsModal(st);
-    };
-  });
-  ov.onclick = e => { if (e.target === ov) closeFn(); };
+  bindEvents();
+  ov.onclick = e => { if (e.target === ov) { ov.remove(); syncFameUI(); } };
 }
 
 // ============ LOGIN / REGISTRO ============
@@ -1228,28 +1500,40 @@ function showLoginModal() {
     session = { user, pass };
     try { localStorage.setItem('oplike_session', JSON.stringify(session)); } catch (e) { }
     // el progreso del usuario sustituye en memoria al del invitado (que queda intacto en su clave)
-    meta = Object.assign(META_DEFAULTS(), serverMeta || {});
-    run = serverRun || null;
-    saveMeta();
-    if (run) saveRun(); else clearRun();
+    if (serverMeta) meta = serverMeta;
+    if (serverRun) run = serverRun;
+    saveMeta(); saveRun();
     ov.remove();
     toast(msg);
     screenHome();
   };
   ov.querySelector('#lg-login').onclick = async () => {
     const { user, pass } = creds();
+    if (!user || !pass) return showErr('Introduce usuario y contraseña.');
     try {
-      const data = await apiCall('login', { user, pass });
-      finish(user, pass, data.meta, data.run, `⚓ ¡Bienvenido de vuelta, ${user}!`);
-    } catch (e) { showErr(e.message); }
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user, pass }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showErr(data.error || 'Error al iniciar sesión.');
+      finish(user, pass, data.meta, data.run, `¡Bienvenido de nuevo, ${user}!`);
+    } catch (e) { showErr('Error de conexión con el servidor.'); }
   };
   ov.querySelector('#lg-register').onclick = async () => {
     const { user, pass } = creds();
+    if (!user || !pass) return showErr('Introduce usuario y contraseña.');
     try {
-      // el registro hereda el progreso actual del invitado como punto de partida
-      await apiCall('register', { user, pass, meta, run });
-      finish(user, pass, meta, run, `🏴‍☠️ ¡Cuenta creada! Bienvenido, ${user}.`);
-    } catch (e) { showErr(e.message); }
+      const res = await fetch('/api/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user, pass, meta, run }),
+      });
+      const data = await res.json();
+      if (!res.ok) return showErr(data.error || 'Error al registrarte.');
+      finish(user, pass, data.meta, data.run, `¡Cuenta creada! Bienvenido, ${user}.`);
+    } catch (e) { showErr('Error de conexión con el servidor.'); }
   };
   ov.querySelector('#lg-cancel').onclick = () => ov.remove();
 }
@@ -1260,8 +1544,7 @@ function screenHome() {
   const accLvl = accountLevel();
   const towerUnlocked = accLvl >= 20;
   const challengeUnlocked = accLvl >= 50;
-  const completedAch = ACHIEVEMENTS.filter(a => a.check() >= a.goal).length;
-  const hasUnclaimedAch = ACHIEVEMENTS.some(ach => ach.check() >= ach.goal && !(meta.claimedAch && meta.claimedAch[ach.id]));
+  const { totalCompleted: completedAch, totalAchievements: totalAchCount, hasUnclaimedAch } = getAchievementsInfo();
   render(`
     ${topbar(false)}
     <div class="subtitle">ONE PIECE ROGUELIKE | v1.1</div>
@@ -1297,7 +1580,7 @@ function screenHome() {
       </button>
       <button class="btn gold small" id="btn-achievements">
         <span style="position:relative;">🏆 Logros${hasUnclaimedAch ? ' <span class="ach-badge-dot" style="background:#e74c3c;color:#fff;font-size:7px;border-radius:50%;padding:1px 4px;margin-left:2px;font-weight:bold;animation:pulse 1s infinite alternate;border:1px solid #fff;">!</span>' : ''}</span>
-        <span style="font-size:8px;opacity:0.85;margin-top:2px;">(${completedAch}/${ACHIEVEMENTS.length})</span>
+        <span style="font-size:8px;opacity:0.85;margin-top:2px;">(${completedAch}/${totalAchCount})</span>
       </button>
     </div>
     <div style="text-align:center;margin-top:8px;">
@@ -1384,28 +1667,52 @@ let currentProbSagaIdx = 0;
 let currentProbTab = 'wild';
 
 function showSagaProbabilitiesModal(initialSagaIdx = 0) {
+  const dm = $('#diff-dropdown-menu'); if (dm) dm.classList.add('hidden');
   currentProbSagaIdx = initialSagaIdx;
-  currentProbTab = 'wild';
+  if (!currentProbTab) currentProbTab = 'wild';
 
   const renderModalContent = () => {
-    const s = SAGAS[currentProbSagaIdx];
-    if (!s) return '';
+    const isAll = currentProbSagaIdx === -1;
+    const s = !isAll ? SAGAS[currentProbSagaIdx] : null;
 
     // 1. Wild Pool
-    const wildPool = (s.islands && s.islands[0] && s.islands[0].pool) || [];
+    let wildPool = [];
+    if (isAll) {
+      const allIds = SAGAS.flatMap(sg => (sg.islands && sg.islands[0] && sg.islands[0].pool) || []);
+      wildPool = [...new Set(allIds)];
+    } else if (s) {
+      wildPool = (s.islands && s.islands[0] && s.islands[0].pool) || [];
+    }
     const wildPct = wildPool.length ? (100 / wildPool.length) : 0;
 
     // 2. Bosses (por isla)
-    const islandBosses = s.islands.map(isl => ({
-      name: isl.name,
-      bosses: (isl.boss || []).filter(b => CHARS[b])
-    }));
+    let islandBosses = [];
+    if (isAll) {
+      SAGAS.forEach(sg => {
+        sg.islands.forEach(isl => {
+          islandBosses.push({
+            name: `${sg.name} — ${isl.name}`,
+            bosses: (isl.boss || []).filter(b => CHARS[b])
+          });
+        });
+      });
+    } else if (s) {
+      islandBosses = s.islands.map(isl => ({
+        name: isl.name,
+        bosses: (isl.boss || []).filter(b => CHARS[b])
+      }));
+    }
 
     // 3. Mercado Clandestino (Carteles SE BUSCA)
     const weights = [41.5, 30, 21, 7, 0.5];
     const totalWeight = 100;
     const gachaTiers = [1, 2, 3, 4, 5].map(r => {
-      const pool = sagaPoolByRareza(s.id, r);
+      let pool = [];
+      if (isAll) {
+        pool = Object.keys(CHARS).filter(id => CHARS[id].rareza === r && !CHARS[id].boss && !EVOLVED_FORMS.has(id));
+      } else if (s) {
+        pool = sagaPoolByRareza(s.id, r);
+      }
       const pct = (weights[r - 1] / totalWeight) * 100;
       const each = pool.length ? (pct / pool.length) : 0;
       return { rareza: r, pct, pool, each };
@@ -1417,7 +1724,7 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
       const others = wildPool.filter(id => !CHARS[id] || CHARS[id].rareza !== 5);
       const rows = wildPool.map(id => {
         const c = CHARS[id];
-        const isLeg = c.rareza === 5;
+        const isLeg = c ? c.rareza === 5 : false;
         let pct = 0;
         if (isLeg) {
           pct = leg5.length ? (0.5 / leg5.length) : 0;
@@ -1425,16 +1732,16 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
           pct = others.length ? (99.5 / others.length) : 0;
         }
         return `<tr>
-          <td style="white-space:nowrap;">${charIcon(id, 20)} <b>${c.name}</b></td>
-          <td>${'⭐'.repeat(c.rareza)}</td>
-          <td>${typeBadges(c.types)}</td>
+          <td style="white-space:nowrap;">${charIcon(id, 20)} <b>${c ? c.name : id}</b></td>
+          <td>${'⭐'.repeat(c ? c.rareza : 1)}</td>
+          <td>${typeBadges(c ? c.types : [])}</td>
           <td><b>${pct.toFixed(2)}%</b> ${isLeg ? '<br><small style="color:var(--red);font-weight:bold;">⚔️ Solo combate (+6 Nv)</small>' : ''}</td>
         </tr>`;
       }).join('');
       tabHTML = `
         <div style="font-size:8px;line-height:1.7;margin-bottom:8px;color:#555;">
           Aparición en nodos de piratas salvajes 🏴‍☠️ y marines ⚓ durante el viaje.<br>
-          <b>${wildPool.length}</b> personajes en el pool salvaje (${wildPct.toFixed(2)}% por slot de enemigo).
+          <b>${wildPool.length}</b> personajes en el pool (${wildPct.toFixed(2)}% por slot de enemigo).
         </div>
         <div style="max-height:280px;overflow-y:auto;border:1px solid var(--ink);">
           <table class="chart-table">
@@ -1460,8 +1767,107 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
         </div>
         <div style="max-height:280px;overflow-y:auto;border:1px solid var(--ink);">
           <table class="chart-table">
-            <thead><tr><th>Isla</th><th>Jefe(s)</th><th>Probabilidad</th></tr></thead>
+            <thead><tr><th>Isla / Saga</th><th>Jefe(s)</th><th>Probabilidad</th></tr></thead>
             <tbody>${rows}</tbody>
+          </table>
+        </div>`;
+    } else if (currentProbTab === 'items') {
+      tabHTML = `
+        <div style="font-size:8px;line-height:1.7;margin-bottom:8px;color:#555;">
+          Probabilidades de obtención de objetos al abrir un cofre en nodos de Objeto 🎁.
+        </div>
+        <div style="max-height:280px;overflow-y:auto;border:1px solid var(--ink);">
+          <table class="chart-table">
+            <thead><tr><th>Objeto</th><th>Efecto / Descripción</th><th>Prob. Caída</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>🍈 Fruta del Diablo</b></td>
+                <td>Otorga un nuevo Tag elemental a 2 nakamas activos.</td>
+                <td><b style="color:var(--gold);">1.00%</b> <small>(Muy Raro)</small></td>
+              </tr>
+              <tr>
+                <td><b>🍖 Carne</b></td>
+                <td>Recupera 50 PS a un nakama consciente.</td>
+                <td><b>24.75%</b></td>
+              </tr>
+              <tr>
+                <td><b>📜 Cartel de Reclutamiento</b></td>
+                <td>Permite intentar seducir o tentar piratas salvajes.</td>
+                <td><b>24.75%</b></td>
+              </tr>
+              <tr>
+                <td><b>🥩 Carne Real</b></td>
+                <td>Recupera 100 PS a un nakama consciente.</td>
+                <td><b>12.38%</b></td>
+              </tr>
+              <tr>
+                <td><b>🏅 Cartel Dorado</b></td>
+                <td>Aumenta la suerte de reclutar piratas de alta rareza.</td>
+                <td><b>12.38%</b></td>
+              </tr>
+              <tr>
+                <td><b>🍶 Sake de Hermandad</b></td>
+                <td>Recupera PS a toda la banda.</td>
+                <td><b>12.38%</b></td>
+              </tr>
+              <tr>
+                <td><b>🥪 Bocadillo</b></td>
+                <td>Recupera 25 PS a un nakama consciente.</td>
+                <td><b>12.38%</b></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>`;
+    } else if (currentProbTab === 'events') {
+      tabHTML = `
+        <div style="font-size:8px;line-height:1.7;margin-bottom:8px;color:#555;">
+          Probabilidades de eventos aleatorios al entrar en nodos de Misterio ❓.
+        </div>
+        <div style="max-height:280px;overflow-y:auto;border:1px solid var(--ink);">
+          <table class="chart-table">
+            <thead><tr><th>Evento</th><th>Efecto de la sala</th><th>Prob. Evento</th></tr></thead>
+            <tbody>
+              <tr>
+                <td><b>🍈 Fruta del Diablo Silvestre</b></td>
+                <td>Encuentras una Fruta del Diablo lista para usar.</td>
+                <td><b style="color:var(--gold);">2.00%</b> <small>(Muy Raro)</small></td>
+              </tr>
+              <tr>
+                <td><b>💰 Cofre Enterrado</b></td>
+                <td>Obtienes Berries (150-400 por nivel de isla).</td>
+                <td><b>14.00%</b></td>
+              </tr>
+              <tr>
+                <td><b>🎁 Regalo de Aldeano</b></td>
+                <td>Recibes un objeto aleatorio.</td>
+                <td><b>14.00%</b></td>
+              </tr>
+              <tr>
+                <td><b>⚔️ Emboscada Pirata</b></td>
+                <td>Combate inmediato contra un pirata salvaje.</td>
+                <td><b>14.00%</b></td>
+              </tr>
+              <tr>
+                <td><b>♨️ Aguas Termales</b></td>
+                <td>Todo el equipo consciente recupera el 100% de PS.</td>
+                <td><b>14.00%</b></td>
+              </tr>
+              <tr>
+                <td><b>🥋 Entrenamiento Maestro</b></td>
+                <td>El nakama activo gana +2 ATQ permanente.</td>
+                <td><b>14.00%</b></td>
+              </tr>
+              <tr>
+                <td><b>🕸️ Trampa de Red</b></td>
+                <td>El nakama activo sufre 10 PS de daño.</td>
+                <td><b>14.00%</b></td>
+              </tr>
+              <tr>
+                <td><b>🏴‍☠️ Pirata Errante</b></td>
+                <td>Un pirata errante se une a tu banda.</td>
+                <td><b>14.00%</b></td>
+              </tr>
+            </tbody>
           </table>
         </div>`;
     } else if (currentProbTab === 'gacha') {
@@ -1486,16 +1892,19 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
     }
 
     return `
-      <h2>📊 Probabilidades: ${s.name}</h2>
+      <h2>📊 Probabilidades: ${isAll ? 'TODAS LAS SAGAS' : s.name}</h2>
       <div style="display:flex;justify-content:center;margin-bottom:10px;">
         <select id="spm-saga-sel" style="font-family:inherit;font-size:9px;padding:6px 10px;border:2px solid var(--ink);background:#fff;">
+          <option value="-1" ${currentProbSagaIdx === -1 ? 'selected' : ''}>🌐 TODAS LAS SAGAS (Compendio Global)</option>
           ${SAGAS.map((sg, i) => `<option value="${i}" ${i === currentProbSagaIdx ? 'selected' : ''}>${sg.sub}: ${sg.name}</option>`).join('')}
         </select>
       </div>
-      <div class="tabs" style="margin-bottom:10px;">
-        <div class="tab ${currentProbTab === 'wild' ? 'active' : ''}" id="spm-tab-wild">🏴‍☠️ SALVAJES (${wildPool.length})</div>
-        <div class="tab ${currentProbTab === 'boss' ? 'active' : ''}" id="spm-tab-boss">💀 JEFES</div>
-        <div class="tab ${currentProbTab === 'gacha' ? 'active' : ''}" id="spm-tab-gacha">🎰 MERCADO</div>
+      <div class="tabs" style="margin-bottom:10px;flex-wrap:wrap;gap:4px;">
+        <div class="tab ${currentProbTab === 'wild' ? 'active' : ''}" id="spm-tab-wild" style="font-size:8px;padding:4px 6px;">🏴‍☠️ SALVAJES</div>
+        <div class="tab ${currentProbTab === 'boss' ? 'active' : ''}" id="spm-tab-boss" style="font-size:8px;padding:4px 6px;">💀 JEFES</div>
+        <div class="tab ${currentProbTab === 'items' ? 'active' : ''}" id="spm-tab-items" style="font-size:8px;padding:4px 6px;">🎁 OBJETOS</div>
+        <div class="tab ${currentProbTab === 'events' ? 'active' : ''}" id="spm-tab-events" style="font-size:8px;padding:4px 6px;">❓ MISTERIO</div>
+        <div class="tab ${currentProbTab === 'gacha' ? 'active' : ''}" id="spm-tab-gacha" style="font-size:8px;padding:4px 6px;">🎰 MERCADO</div>
       </div>
       ${tabHTML}
       <div class="actions" style="margin-top:12px;"><button class="btn gray" id="spm-close">CERRAR</button></div>
@@ -1508,34 +1917,24 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
   const ov = document.createElement('div');
   ov.id = 'saga-prob-overlay';
   ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="max-width:580px;">${renderModalContent()}</div>`;
+  ov.innerHTML = `<div class="modal" style="max-width:620px;">${renderModalContent()}</div>`;
   document.body.appendChild(ov);
 
   const bindEvents = () => {
     const sel = ov.querySelector('#spm-saga-sel');
     if (sel) sel.onchange = e => {
-      currentProbSagaIdx = +e.target.value;
+      currentProbSagaIdx = parseInt(e.target.value, 10);
       ov.querySelector('.modal').innerHTML = renderModalContent();
       bindEvents();
     };
-    const twild = ov.querySelector('#spm-tab-wild');
-    if (twild) twild.onclick = () => {
-      currentProbTab = 'wild';
-      ov.querySelector('.modal').innerHTML = renderModalContent();
-      bindEvents();
-    };
-    const tboss = ov.querySelector('#spm-tab-boss');
-    if (tboss) tboss.onclick = () => {
-      currentProbTab = 'boss';
-      ov.querySelector('.modal').innerHTML = renderModalContent();
-      bindEvents();
-    };
-    const tgacha = ov.querySelector('#spm-tab-gacha');
-    if (tgacha) tgacha.onclick = () => {
-      currentProbTab = 'gacha';
-      ov.querySelector('.modal').innerHTML = renderModalContent();
-      bindEvents();
-    };
+    ['wild', 'boss', 'items', 'events', 'gacha'].forEach(tabKey => {
+      const tabEl = ov.querySelector(`#spm-tab-${tabKey}`);
+      if (tabEl) tabEl.onclick = () => {
+        currentProbTab = tabKey;
+        ov.querySelector('.modal').innerHTML = renderModalContent();
+        bindEvents();
+      };
+    });
     const cbtn = ov.querySelector('#spm-close');
     if (cbtn) cbtn.onclick = () => ov.remove();
   };
@@ -1545,6 +1944,7 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
 }
 
 function showSagaInfoModal(sagaIdx = 0) {
+  const dm = $('#diff-dropdown-menu'); if (dm) dm.classList.add('hidden');
   const s = SAGAS[sagaIdx];
   if (!s) return;
 
@@ -1723,7 +2123,7 @@ function screenSagas() {
   }
 
   const allProbsBtn = $('#btn-saga-probs-all');
-  if (allProbsBtn) allProbsBtn.onclick = () => showSagaProbabilitiesModal(0);
+  if (allProbsBtn) allProbsBtn.onclick = () => showSagaProbabilitiesModal(-1);
 
   document.querySelectorAll('.diff-dropdown-item').forEach(item => {
     item.onclick = e => {
@@ -2461,6 +2861,7 @@ function screenMap() {
               <span class="drag-handle">≡</span>
               <span class="emoji">${charIcon(f.id, 18)}</span>
               <div class="info">${idx + 1}. ${charName(f)}${f.stars ? ` <span style="color:var(--gold);font-weight:bold;font-size:9.5px;">⭐${f.stars}</span>` : ''}<br>Nv${f.lvl}
+                ${typeBadges(fighterTypes(f))}
                 <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>
               </div>
             </div>`).join('')}
@@ -2627,32 +3028,97 @@ function useItemFromMap(id) {
   } else if (item.kind === 'fruta') {
     const activeTeam = run.team.filter(x => x.hp > 0);
     if (!activeTeam.length) return toast('No tienes nakamas conscientes para consumir la fruta.');
-    const candidates = [...activeTeam];
-    const chosen = [];
-    while (chosen.length < Math.min(2, candidates.length)) {
-      const idx = rnd(0, candidates.length - 1);
-      chosen.push(candidates.splice(idx, 1)[0]);
-    }
-    const allPossibleTypes = Object.keys(TYPES);
-    const grantedLog = [];
-    chosen.forEach(f => {
-      f.extraTypes = f.extraTypes || [];
-      const current = fighterTypes(f);
-      const available = allPossibleTypes.filter(t => !current.includes(t));
-      if (available.length > 0) {
-        const newTag = pick(available);
-        f.extraTypes.push(newTag);
-        grantedLog.push(`<b>${charName(f)}</b> despierta el tag ${TYPES[newTag].emoji} <b>${newTag}</b>`);
+    const maxSelect = Math.min(2, activeTeam.length);
+    let selectedIndices = [];
+    
+    const ov = document.createElement('div');
+    ov.className = 'overlay';
+    
+    const renderFruitModal = () => {
+      ov.innerHTML = `<div class="modal">
+        <h2>🍈 ¡Poder de la Fruta del Diablo!</h2>
+        <p style="font-size:9px;text-align:center;margin-bottom:10px;">
+          Selecciona a los <b>${maxSelect}</b> nakamas que consumirán la Fruta del Diablo para despertar un nuevo Tag elemental.
+        </p>
+        <div style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;margin-bottom:12px;">
+          ${activeTeam.map((f, idx) => {
+            const isSel = selectedIndices.includes(idx);
+            const fTypes = fighterTypes(f);
+            return `<div class="shop-item fruit-select-item" data-idx="${idx}" style="cursor:pointer;background:${isSel ? 'rgba(255,215,0,0.18)' : 'rgba(0,0,0,0.2)'};border:${isSel ? '2px solid var(--gold)' : '1px solid #555'};border-radius:6px;padding:6px 10px;">
+              <span class="emoji">${charIcon(f.id, 24)}</span>
+              <div class="info">
+                <b>${charName(f)}</b> <small>(Nv.${f.lvl})</small><br>
+                ${typeBadges(fTypes)}
+              </div>
+              <div style="font-size:16px;">${isSel ? '✅' : '⚪'}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="text-align:center;font-size:9px;color:var(--gold);margin-bottom:10px;">
+          Seleccionados: ${selectedIndices.length} / ${maxSelect}
+        </div>
+        <div class="actions">
+          <button class="btn green" id="btn-confirm-fruit" ${selectedIndices.length === maxSelect ? '' : 'disabled'}>
+            ✨ OTORGAR PODER (${selectedIndices.length}/${maxSelect})
+          </button>
+          <button class="btn gray" id="btn-cancel-fruit">CANCELAR</button>
+        </div>
+      </div>`;
+      
+      ov.querySelectorAll('.fruit-select-item').forEach(el => {
+        el.onclick = () => {
+          const idx = parseInt(el.dataset.idx, 10);
+          if (selectedIndices.includes(idx)) {
+            selectedIndices = selectedIndices.filter(i => i !== idx);
+          } else {
+            if (selectedIndices.length < maxSelect) {
+              selectedIndices.push(idx);
+            } else if (maxSelect === 1) {
+              selectedIndices = [idx];
+            }
+          }
+          renderFruitModal();
+        };
+      });
+      
+      const confirmBtn = ov.querySelector('#btn-confirm-fruit');
+      if (confirmBtn) {
+        confirmBtn.onclick = () => {
+          if (selectedIndices.length !== maxSelect) return;
+          ov.remove();
+          const chosen = selectedIndices.map(i => activeTeam[i]);
+          const allPossibleTypes = Object.keys(TYPES);
+          const grantedLog = [];
+          chosen.forEach(f => {
+            f.extraTypes = f.extraTypes || [];
+            const current = fighterTypes(f);
+            const available = allPossibleTypes.filter(t => !current.includes(t));
+            if (available.length > 0) {
+              const newTag = pick(available);
+              f.extraTypes.push(newTag);
+              grantedLog.push(`<b>${charName(f)}</b> despierta el tag ${TYPES[newTag].emoji} <b>${newTag}</b>`);
+            }
+          });
+          run.items[id]--;
+          trackItemCollected(1);
+          trackStat('fruit_use', 1);
+          saveRun();
+          if (grantedLog.length) {
+            modalInfo('🍈 ¡Poder de la Fruta del Diablo!', `<div class="reward-list">La Fruta del Diablo otorga nuevas fuerzas a tu banda:<br><br>${grantedLog.join('<br>')}<br><br><small style="color:var(--gold);">¡Nuevos tags y sinergias activadas!</small></div>`, screenMap);
+          } else {
+            screenMap();
+          }
+        };
       }
-    });
-    run.items[id]--;
-    trackItemCollected(1);
-    saveRun();
-    if (grantedLog.length) {
-      modalInfo('🍈 ¡Poder de la Fruta del Diablo!', `<div class="reward-list">La Fruta del Diablo otorga nuevas fuerzas a tu banda:<br><br>${grantedLog.join('<br>')}<br><br><small style="color:var(--gold);">¡Nuevos tags y sinergias activadas!</small></div>`, screenMap);
-    } else {
-      screenMap();
-    }
+      
+      const cancelBtn = ov.querySelector('#btn-cancel-fruit');
+      if (cancelBtn) {
+        cancelBtn.onclick = () => { ov.remove(); };
+      }
+    };
+    
+    document.body.appendChild(ov);
+    renderFruitModal();
   } else {
     toast('Eso solo se usa en combate.');
   }
@@ -2706,19 +3172,25 @@ function enterNode(r, i) {
       break;
     }
     case 'item': {
-      const lootIds = ['carne', 'carne', 'carnereal', 'cartel', 'cartel', 'carteldorado', 'sake', 'bocadillo', 'fruta_diablo'];
-      const id = pick(lootIds);
+      let id;
+      if (Math.random() < 0.01) {
+        id = 'fruta_diablo';
+      } else {
+        const commonLoot = ['carne', 'carne', 'carnereal', 'cartel', 'cartel', 'carteldorado', 'sake', 'bocadillo'];
+        id = pick(commonLoot);
+      }
       run.items[id] = (run.items[id] || 0) + 1;
       trackItemCollected(1);
       saveRun();
       modalInfo('🎁 ¡Objeto encontrado!', `<div class="reward-list">${ITEMS[id].emoji} <b>${ITEMS[id].name}</b><br><small>${ITEMS[id].desc}</small></div>`, screenMap);
       break;
     }
-    case 'mystery': doMystery(island); break;
-    case 'special': doSpecialPirate(island); break;
+    case 'mystery': trackStat('mystery_visit', 1); doMystery(island); break;
+    case 'special': trackStat('special_visit', 1); doSpecialPirate(island); break;
     case 'crossover': doCrossoverEvent(island); break;
     case 'shop': screenShop(); break;
     case 'rest': {
+      trackStat('rest_visit', 1);
       run.team.forEach(f => { if (f.hp > 0) f.hp = Math.min(f.maxhp, f.hp + Math.floor(f.maxhp * 0.5)); });
       saveRun();
       modalInfo('⛺ Campamento', `<div class="reward-list">Tu banda descansa junto al fuego.<br>Los nakamas conscientes recuperan el 50% de sus PS. 🔥</div>`, screenMap);
@@ -2728,7 +3200,13 @@ function enterNode(r, i) {
 }
 
 function doMystery(island) {
-  const ev = pick(MYSTERY_EVENTS);
+  let ev;
+  if (Math.random() < 0.02) {
+    ev = MYSTERY_EVENTS.find(e => e.kind === 'fruta') || MYSTERY_EVENTS[7];
+  } else {
+    const commonEvents = MYSTERY_EVENTS.filter(e => e.kind !== 'fruta');
+    ev = pick(commonEvents);
+  }
   switch (ev.kind) {
     case 'berries': {
       const n = rnd(ev.min, ev.max) * (run.islandIdx + 1);
@@ -2752,12 +3230,14 @@ function doMystery(island) {
       break;
     }
     case 'healall': {
+      trackStat('mystery_heal', 1);
       run.team.forEach(f => { if (f.hp > 0) f.hp = f.maxhp; });
       saveRun();
       modalInfo('❓ Misterio', `<div class="reward-list">${ev.text} ♨️</div>`, screenMap);
       break;
     }
     case 'boost': {
+      trackStat('mystery_train', 1);
       const f = run.team[0];
       f.atkBonus += 2; f.atk += 2; saveRun();
       modalInfo('❓ Misterio', `<div class="reward-list">${ev.text}<br>(${charName(f)})</div>`, screenMap);
@@ -2788,6 +3268,13 @@ function doMystery(island) {
           }
         });
       }
+      break;
+    }
+    case 'fruta': {
+      run.items['fruta_diablo'] = (run.items['fruta_diablo'] || 0) + 1;
+      trackItemCollected(1);
+      saveRun();
+      modalInfo('❓ Misterio', `<div class="reward-list">${ev.text}<br><br>${ITEMS['fruta_diablo'].emoji} <b>${ITEMS['fruta_diablo'].name}</b> añadida a tu bolsa.</div>`, screenMap);
       break;
     }
   }
@@ -3094,7 +3581,8 @@ function showCharModal(fOrId) {
     ...(spVal !== null ? [['SP', spVal, 20, 0]] : []),
     ['VEL', f.spd, 20, f.spdBonus || 0],
   ];
-  const isFru = c.types.includes('Fruta'), isHak = c.types.includes('Haki');
+  const fTypes = fighterTypes(f);
+  const isFru = fTypes.includes('Fruta'), isHak = fTypes.includes('Haki');
   const known = f.moves;
   const future = c.learnset.filter(([l, m]) => l > f.lvl && !known.includes(m));
   const starsTag = f.stars ? `<span style="color:var(--gold);font-size:16px;margin-left:6px;">⭐${f.stars}</span>` : '';
@@ -3109,7 +3597,7 @@ function showCharModal(fOrId) {
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal char-sheet">
     <h2><span style="font-size:26px;">${charIcon(f.id, 34)}</span> ${c.name}${starsTag} <small>Nv.${f.lvl}</small></h2>
-    ${typeBadges(c.types)}
+    ${typeBadges(fTypes)}
     ${f.stars ? `<div class="sheet-line" style="color:var(--gold);background:rgba(255,215,0,0.1);padding:4px 8px;border-radius:4px;"><b>⭐ Fusión ${f.stars} Estrellas</b> — +${f.stars * 5}% a todas las características en esta partida</div>` : ''}
     ${isLive ? `<div class="sheet-line" style="color:var(--gold);font-weight:bold;">📍 Características reales en combate (Nivel, Fusiones y Barco)</div>` : `<div class="sheet-line" style="color:var(--gold);font-weight:bold;">📍 Nivel base e incentivos del barco actuales${hasUpgrades ? ' (incluye mejoras del barco)' : ''}</div>`}
     ${!isLive ? `
@@ -3412,16 +3900,28 @@ function modalConfirm(title, html, onYes, onNo) {
 function screenShop() {
   playMusic('menu');
   const stock = ['carne', 'carnereal', 'bocadillo', 'sake', 'cartel', 'carteldorado', 'cartelbuster', 'hierro'];
+  const inventorySummary = Object.entries((run && run.items) || {})
+    .filter(([, n]) => n > 0)
+    .map(([id, n]) => `${ITEMS[id] ? ITEMS[id].emoji : ''} ×${n}`)
+    .join(' · ');
+
   render(`
     ${topbar(true, false)}
     <div class="panel">
       <h2>🏪 Tienda del puerto</h2>
-      <p style="font-size:9px;margin-bottom:10px;">"¡Bienvenido! Todo pirata necesita provisiones."</p>
+      <p style="font-size:9px;margin-bottom:6px;">"¡Bienvenido! Todo pirata necesita provisiones."</p>
+      <div style="font-size:9.5px;background:rgba(255,215,0,0.12);padding:6px 10px;border-radius:6px;border:1px solid var(--gold);margin-bottom:10px;text-align:center;">
+        <b>🎒 Tu Bolsa:</b> ${inventorySummary || 'Vacía'}
+      </div>
       ${stock.map(id => {
     const it = ITEMS[id];
+    const owned = (run && run.items && run.items[id]) || 0;
     return `<div class="shop-item">
           <span class="emoji">${it.emoji}</span>
-          <div class="info"><b>${it.name}</b> — <span class="price">${berriesHTML(it.price)}</span><br><small>${it.desc}</small></div>
+          <div class="info">
+            <b>${it.name}</b> <span style="font-size:8.5px;color:var(--gold);font-weight:bold;margin-left:4px;">(Tienes: ${owned})</span> — <span class="price">${berriesHTML(it.price)}</span><br>
+            <small>${it.desc}</small>
+          </div>
           <button class="btn small ${run.berries >= it.price ? 'green' : 'gray'}" data-buy="${id}" ${run.berries >= it.price ? '' : 'disabled'}>COMPRAR</button>
         </div>`;
   }).join('')}
@@ -3437,6 +3937,7 @@ function screenShop() {
       run.berries -= ITEMS[id].price;
       run.items[id] = (run.items[id] || 0) + 1;
       trackItemCollected(1);
+      trackStat('shop_buy', 1);
       saveRun();
       toast(`Comprado: ${ITEMS[id].name} ${ITEMS[id].emoji}`);
       screenShop();
@@ -4919,6 +5420,14 @@ function sagaComplete() {
 
   if ((run.team && run.team.length === 1) || run.isSolo) {
     meta.soloWins = (meta.soloWins || 0) + 1;
+  }
+
+  const isAllNakamas = run.team && run.team.length > 0 && run.team.every(f => {
+    const c = CHARS[f.id];
+    return c && (c.nakama || STRAW_HAT_MEMBERS.includes(f.id));
+  });
+  if (isAllNakamas) {
+    meta.allNakamaWins = (meta.allNakamaWins || 0) + 1;
   }
 
   meta.sagaDiffWins = meta.sagaDiffWins || {};
