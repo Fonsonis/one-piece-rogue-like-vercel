@@ -291,6 +291,7 @@ const META_DEFAULTS = () => ({
   relics: [],
   soloWins: 0,
   logPoses: 0,
+  starPity: 0,
   charUpgrades: {},
   settings: { showEventConfirm: true, customSounds: false },
 });
@@ -302,6 +303,7 @@ function loadMeta() {
     if (m) meta = Object.assign(meta, JSON.parse(m));
   } catch (e) { }
   meta.logPoses = meta.logPoses || 0;
+  meta.starPity = meta.starPity || 0;
   meta.charUpgrades = meta.charUpgrades || {};
   meta.roster = meta.roster || [];
   if (!meta.roster.includes('luffy')) {
@@ -1342,7 +1344,7 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
       </div>
       ${claimed ? '<span style="font-size:8px;color:var(--green);font-weight:bold;">✓ RECLAMADO</span>'
         : done ? `<button class="btn small green" data-claim="${a.id}">RECLAMAR ⭐${a.fame}</button>`
-        : '<span style="font-size:8px;color:#888;">🔒 EN PROGRESO</span>'}
+          : '<span style="font-size:8px;color:#888;">🔒 EN PROGRESO</span>'}
     </div>`;
   };
 
@@ -1369,8 +1371,8 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
       <div class="tabs" style="margin-bottom:10px;flex-wrap:wrap;gap:4px;">
         <div class="tab ${currentAchCategory === 'all' ? 'active' : ''}" id="ach-cat-all" style="font-size:8px;padding:4px 6px;">TODOS</div>
         <div class="tab ${currentAchCategory === 'prog' ? 'active' : ''}" id="ach-cat-prog" style="font-size:8px;padding:4px 6px;">🔄 PROGRESIVOS (${PROGRESSIVE_ACHIEVEMENTS.length})</div>
-        <div class="tab ${currentAchCategory === 'sagas' ? 'active' : ''}" id="ach-cat-sagas" style="font-size:8px;padding:4px 6px;">📜 SAGAS (${visibleStaticList.filter(a=>a.id.startsWith('saga_diff_')).length})</div>
-        <div class="tab ${currentAchCategory === 'desafios' ? 'active' : ''}" id="ach-cat-desafios" style="font-size:8px;padding:4px 6px;">🎯 DESAFÍOS (${visibleStaticList.filter(a=>!a.id.startsWith('saga_diff_')).length})</div>
+        <div class="tab ${currentAchCategory === 'sagas' ? 'active' : ''}" id="ach-cat-sagas" style="font-size:8px;padding:4px 6px;">📜 SAGAS (${visibleStaticList.filter(a => a.id.startsWith('saga_diff_')).length})</div>
+        <div class="tab ${currentAchCategory === 'desafios' ? 'active' : ''}" id="ach-cat-desafios" style="font-size:8px;padding:4px 6px;">🎯 DESAFÍOS (${visibleStaticList.filter(a => !a.id.startsWith('saga_diff_')).length})</div>
       </div>
       <div class="achieve-list-container" style="max-height:340px;overflow-y:auto;">
         ${html}
@@ -1466,6 +1468,203 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
 
   bindEvents();
   ov.onclick = e => { if (e.target === ov) { ov.remove(); syncFameUI(); } };
+}
+
+// ============ LOG POSE GACHA CARTELES ============
+let logPoseBlockedSagaIds = [];
+
+function showLogPoseGachaModal() {
+  meta.logPoses = meta.logPoses || 0;
+  meta.starPity = meta.starPity || 0;
+  const unlockedSagas = SAGAS.filter((s, i) => sagaUnlocked(i));
+
+  logPoseBlockedSagaIds = logPoseBlockedSagaIds.filter(id => unlockedSagas.some(s => s.id === id));
+
+  const renderModalContent = () => {
+    const baseCost = 1000;
+    const blockCost = logPoseBlockedSagaIds.length * 200;
+    const totalCost = baseCost + blockCost;
+    const canAfford = meta.logPoses >= totalCost;
+
+    const sagaItemsHTML = unlockedSagas.map(s => {
+      const isBlocked = logPoseBlockedSagaIds.includes(s.id);
+      return `<div class="saga-block-pill ${isBlocked ? 'blocked' : 'active'}" data-saga="${s.id}" style="cursor:pointer;padding:6px 8px;border-radius:6px;border:1px solid ${isBlocked ? '#e74c3c' : '#2ecc71'};background:${isBlocked ? 'rgba(231,76,60,0.15)' : 'rgba(46,204,113,0.15)'};font-size:8.5px;display:flex;align-items:center;justify-content:space-between;gap:6px;">
+        <span>📜 <b>${s.name}</b></span>
+        <span style="font-weight:bold;color:${isBlocked ? '#e74c3c' : '#2ecc71'};">${isBlocked ? '🔒 BLOQUEADA (+200)' : '✓ ACTIVA'}</span>
+      </div>`;
+    }).join('');
+
+    return `
+      <h2>🎰 Mercado de Carteles</h2>
+      <p style="font-size:8.5px;text-align:center;margin-bottom:6px;line-height:1.8;">
+        Gasta tus Log Poses para destapar carteles de SE BUSCA de tus sagas desbloqueadas.<br>
+        ¡Pueden tocarte reclutas de 1⭐ hasta 5⭐ legendarios!
+      </p>
+      <div style="font-size:10px;text-align:center;margin-bottom:6px;color:var(--gold);font-weight:bold;background:rgba(255,215,0,0.1);padding:6px;border-radius:6px;border:1px solid var(--gold);">
+        🧭 Saldo: <b>${meta.logPoses} Log Poses</b>
+      </div>
+      <div style="font-size:9.5px;text-align:center;margin-bottom:10px;color:#f39c12;background:rgba(243,156,18,0.12);padding:6px 10px;border-radius:6px;border:1px solid rgba(243,156,18,0.4);display:flex;align-items:center;justify-content:center;gap:6px;">
+        <span>⭐ Estrellas acumuladas (Pity): <b>${meta.starPity || 0} / 1000</b></span>
+        ${(meta.starPity || 0) >= 1000 ? '<span style="color:#2ecc71;font-weight:bold;">¡LEGENDARIO ASEGURADO!</span>' : ''}
+      </div>
+      <div style="font-size:8.5px;margin-bottom:6px;font-weight:bold;color:#aaa;">
+        🛡️ Bloquear sagas para que no salgan en los carteles (+200 🧭 cada una):
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:6px;max-height:160px;overflow-y:auto;margin-bottom:10px;padding:4px;background:rgba(0,0,0,0.2);border-radius:6px;">
+        ${sagaItemsHTML}
+      </div>
+      <div style="font-size:9px;text-align:center;margin-bottom:12px;color:#fff;background:rgba(255,255,255,0.05);padding:6px;border-radius:6px;">
+        <b>Coste de la tirada:</b> <span style="color:var(--gold);font-weight:bold;">🧭 ${totalCost} Log Poses</span>
+        <small style="display:block;color:#888;font-size:7.5px;">(Base 1000 🧭 ${logPoseBlockedSagaIds.length ? ` + ${blockCost} 🧭 por ${logPoseBlockedSagaIds.length} saga(s) bloqueada(s)` : ''})</small>
+      </div>
+      <div class="actions" style="flex-direction:column;gap:6px;">
+        <button class="btn red" id="lp-start-gacha" ${canAfford ? '' : 'disabled'}>
+          🎰 JUGAR CARTELES — 🧭 ${totalCost} Log Poses
+        </button>
+        <button class="btn gray" id="lp-close-modal">CERRAR</button>
+      </div>
+    `;
+  };
+
+  const existingOverlay = document.querySelector('#logpose-gacha-overlay');
+  if (existingOverlay) existingOverlay.remove();
+
+  const ov = document.createElement('div');
+  ov.id = 'logpose-gacha-overlay';
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal" style="max-width:500px;">${renderModalContent()}</div>`;
+  document.body.appendChild(ov);
+
+  const bindEvents = () => {
+    ov.querySelectorAll('[data-saga]').forEach(el => {
+      el.onclick = () => {
+        const sId = el.dataset.saga;
+        if (logPoseBlockedSagaIds.includes(sId)) {
+          logPoseBlockedSagaIds = logPoseBlockedSagaIds.filter(id => id !== sId);
+        } else {
+          if (unlockedSagas.length - logPoseBlockedSagaIds.length <= 1) {
+            toast('⚠️ Debes mantener al menos 1 saga activa.');
+            return;
+          }
+          logPoseBlockedSagaIds.push(sId);
+        }
+        ov.querySelector('.modal').innerHTML = renderModalContent();
+        bindEvents();
+      };
+    });
+
+    const startBtn = ov.querySelector('#lp-start-gacha');
+    if (startBtn) {
+      startBtn.onclick = () => {
+        const baseCost = 1000;
+        const totalCost = baseCost + (logPoseBlockedSagaIds.length * 200);
+        if (meta.logPoses < totalCost) return;
+        meta.logPoses -= totalCost;
+        saveMeta();
+        ov.remove();
+        const activeSagas = unlockedSagas.filter(s => !logPoseBlockedSagaIds.includes(s.id));
+        startLogPoseGacha(activeSagas);
+      };
+    }
+
+    const closeBtn = ov.querySelector('#lp-close-modal');
+    if (closeBtn) closeBtn.onclick = () => ov.remove();
+  };
+
+  bindEvents();
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+}
+
+function startLogPoseGacha(activeSagas) {
+  meta.starPity = meta.starPity || 0;
+  const weights = [41.5, 30, 21, 7, 0.5];
+  let roll = Math.random() * 100, stopIdx = 4;
+  if (meta.starPity >= 1000) {
+    stopIdx = 4; // Pity activado: legendario asegurado (5⭐)
+  } else {
+    for (let i = 0; i < 5; i++) {
+      roll -= weights[i];
+      if (roll <= 0) { stopIdx = i; break; }
+    }
+  }
+
+  const activeSagaIds = activeSagas.map(s => s.id);
+  const activePirates = activeSagaIds.flatMap(sId => sagaBasePirateIds(sId));
+  const targetRarity = stopIdx + 1;
+  let pool = activePirates.filter(id => CHARS[id] && CHARS[id].rareza === targetRarity);
+
+  if (!pool.length) {
+    for (let d = 1; d <= 4; d++) {
+      for (const r of [targetRarity - d, targetRarity + d]) {
+        if (r >= 1 && r <= 5) {
+          const fallback = activePirates.filter(id => CHARS[id] && CHARS[id].rareza === r);
+          if (fallback.length) { pool = fallback; break; }
+        }
+      }
+      if (pool.length) break;
+    }
+  }
+  if (!pool.length) pool = activePirates.length ? activePirates : Object.keys(CHARS);
+
+  const prizeId = pick(pool);
+
+  if (stopIdx === 4 || (CHARS[prizeId] && CHARS[prizeId].rareza === 5)) {
+    meta.starPity = 0;
+  } else {
+    meta.starPity += (stopIdx + 1);
+  }
+  saveMeta();
+
+  let current = 0;
+
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal">
+    <h2>🎰 Carteles de SE BUSCA (Log Pose)</h2>
+    <p style="font-size:8px;text-align:center;margin-bottom:6px;">Destapa los carteles en orden. ¡En uno de ellos está tu nuevo recluta!</p>
+    <div style="font-size:9px;text-align:center;margin-bottom:10px;color:#f39c12;">
+      ⭐ Estrellas acumuladas (Pity): <b>${meta.starPity} / 1000</b>
+    </div>
+    <div class="poster-row">
+      ${[0, 1, 2, 3, 4].map(i => `
+        <div class="poster" data-p="${i}">
+          <div class="poster-stars">${'⭐'.repeat(i + 1)}</div>
+          <div class="poster-face" id="pf-${i}">📜<br><span>SE BUSCA</span></div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+
+  const update = () => {
+    ov.querySelectorAll('.poster').forEach((el, i) => {
+      el.classList.toggle('next', i === current);
+      el.onclick = i === current ? () => flip(i) : null;
+    });
+  };
+
+  const flip = i => {
+    const face = ov.querySelector(`#pf-${i}`);
+    const el = ov.querySelector(`[data-p="${i}"]`);
+    if (i === stopIdx) {
+      const c = CHARS[prizeId];
+      face.innerHTML = `${charIcon(prizeId, 28)}<br><span>${c.name}</span>`;
+      el.classList.add('hit'); el.classList.remove('next');
+      registerRecruit(prizeId);
+      const b = baseFormOf(prizeId);
+      if (!meta.roster.includes(b)) { meta.roster.push(b); saveMeta(); }
+      ov.querySelectorAll('.poster').forEach(p => { p.onclick = null; });
+      setTimeout(() => {
+        ov.remove();
+        modalInfo('🎉 ¡Nuevo personaje reclutado!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(prizeId, 44)}</span><br><b>${c.name}</b> ${'⭐'.repeat(c.rareza)}<br><small style="color:var(--gold);">${c.types.join(' / ')}</small><br><br><span style="font-size:9px;color:var(--green);">¡Añadido a tu Dex e Inventario de Tripulación!</span></div>`, () => screenHome());
+      }, 1400);
+    } else {
+      face.innerHTML = `💨<br><span>VACÍO</span>`;
+      el.classList.add('empty');
+      current++;
+      update();
+    }
+  };
+  update();
 }
 
 // ============ LOGIN / REGISTRO ============
@@ -1584,6 +1783,11 @@ function screenHome() {
       </button>
     </div>
     <div style="text-align:center;margin-top:8px;">
+      <button class="btn red small" id="btn-logpose-gacha" style="padding:7px 16px;font-size:9.5px;font-weight:bold;width:100%;max-width:280px;box-shadow:0 2px 6px rgba(231,76,60,0.4);">
+        🎰 TIRADA DE CARTELES (🧭 ${meta.logPoses || 0})
+      </button>
+    </div>
+    <div style="text-align:center;margin-top:8px;">
       <button class="btn gray small" id="btn-guide" style="padding:6px 14px;font-size:9px;">📊 Tipos y Sinergias</button>
     </div>
     <div style="text-align:center;margin-top:14px;display:flex;flex-direction:column;gap:6px;align-items:center;">
@@ -1615,6 +1819,7 @@ function screenHome() {
   if (invBtn) invBtn.onclick = () => showInventoryModal();
   $('#btn-ship').onclick = screenShip;
   $('#btn-achievements').onclick = showAchievementsModal;
+  $('#btn-logpose-gacha').onclick = showLogPoseGachaModal;
   $('#btn-guide').onclick = () => showTypeChartModal(run ? run.team : null);
   const loginBtn = $('#btn-login');
   if (loginBtn) loginBtn.onclick = showLoginModal;
@@ -2084,12 +2289,12 @@ function screenSagas() {
               <div>
                 <div class="saga-diff-badges">
                   ${DIFFICULTIES.map(d => {
-          const beaten = !!diffWinsMap[d.id];
-          const unlocked = sagaDiffUnlocked(s.id, d.id);
-          return `<span class="saga-diff-badge ${beaten ? 'beaten' : ''} ${!unlocked ? 'locked-badge' : ''}" title="${d.name}: ${beaten ? 'Superada ✓' : unlocked ? 'Disponible' : 'Bloqueada'}">
+            const beaten = !!diffWinsMap[d.id];
+            const unlocked = sagaDiffUnlocked(s.id, d.id);
+            return `<span class="saga-diff-badge ${beaten ? 'beaten' : ''} ${!unlocked ? 'locked-badge' : ''}" title="${d.name}: ${beaten ? 'Superada ✓' : unlocked ? 'Disponible' : 'Bloqueada'}">
                       ${d.emoji}${beaten ? '✓' : !unlocked ? '🔒' : ''}
                     </span>`;
-        }).join('')}
+          }).join('')}
                 </div>
                 <div class="saga-stats-btn-wrap" style="display:flex;gap:4px;align-items:center;margin-top:6px;">
                   <button class="btn small gray btn-saga-probs" data-saga="${idx}" style="font-size:7px;padding:3px 6px;">📊 PROBABILIDADES</button>
@@ -2538,8 +2743,8 @@ function screenStarter(sagaIdx) {
         <span style="font-size:9px;font-weight:bold;color:var(--gold);">💾 EQUIPOS PREDEFINIDOS</span>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;width:100%;">
           ${[1, 2, 3].map(slot => {
-            const p = meta.teamPresets[slot] || [];
-            return `
+      const p = meta.teamPresets[slot] || [];
+      return `
               <div class="preset-slot-box" style="display:flex;align-items:center;gap:4px;background:rgba(0,0,0,0.4);padding:4px 8px;border-radius:4px;border:1px solid #555;">
                 <span style="font-size:8.5px;color:var(--gold);font-weight:bold;">P${slot}:</span>
                 <button class="btn small gray btn-load-preset" data-slot="${slot}" style="font-size:7.5px;padding:3px 6px;">
@@ -2549,7 +2754,7 @@ function screenStarter(sagaIdx) {
                   💾 Guardar
                 </button>
               </div>`;
-          }).join('')}
+    }).join('')}
         </div>
       </div>`;
   };
@@ -3030,10 +3235,10 @@ function useItemFromMap(id) {
     if (!activeTeam.length) return toast('No tienes nakamas conscientes para consumir la fruta.');
     const maxSelect = Math.min(2, activeTeam.length);
     let selectedIndices = [];
-    
+
     const ov = document.createElement('div');
     ov.className = 'overlay';
-    
+
     const renderFruitModal = () => {
       ov.innerHTML = `<div class="modal">
         <h2>🍈 ¡Poder de la Fruta del Diablo!</h2>
@@ -3042,9 +3247,9 @@ function useItemFromMap(id) {
         </p>
         <div style="display:flex;flex-direction:column;gap:6px;max-height:240px;overflow-y:auto;margin-bottom:12px;">
           ${activeTeam.map((f, idx) => {
-            const isSel = selectedIndices.includes(idx);
-            const fTypes = fighterTypes(f);
-            return `<div class="shop-item fruit-select-item" data-idx="${idx}" style="cursor:pointer;background:${isSel ? 'rgba(255,215,0,0.18)' : 'rgba(0,0,0,0.2)'};border:${isSel ? '2px solid var(--gold)' : '1px solid #555'};border-radius:6px;padding:6px 10px;">
+        const isSel = selectedIndices.includes(idx);
+        const fTypes = fighterTypes(f);
+        return `<div class="shop-item fruit-select-item" data-idx="${idx}" style="cursor:pointer;background:${isSel ? 'rgba(255,215,0,0.18)' : 'rgba(0,0,0,0.2)'};border:${isSel ? '2px solid var(--gold)' : '1px solid #555'};border-radius:6px;padding:6px 10px;">
               <span class="emoji">${charIcon(f.id, 24)}</span>
               <div class="info">
                 <b>${charName(f)}</b> <small>(Nv.${f.lvl})</small><br>
@@ -3052,7 +3257,7 @@ function useItemFromMap(id) {
               </div>
               <div style="font-size:16px;">${isSel ? '✅' : '⚪'}</div>
             </div>`;
-          }).join('')}
+      }).join('')}
         </div>
         <div style="text-align:center;font-size:9px;color:var(--gold);margin-bottom:10px;">
           Seleccionados: ${selectedIndices.length} / ${maxSelect}
@@ -3064,7 +3269,7 @@ function useItemFromMap(id) {
           <button class="btn gray" id="btn-cancel-fruit">CANCELAR</button>
         </div>
       </div>`;
-      
+
       ov.querySelectorAll('.fruit-select-item').forEach(el => {
         el.onclick = () => {
           const idx = parseInt(el.dataset.idx, 10);
@@ -3080,7 +3285,7 @@ function useItemFromMap(id) {
           renderFruitModal();
         };
       });
-      
+
       const confirmBtn = ov.querySelector('#btn-confirm-fruit');
       if (confirmBtn) {
         confirmBtn.onclick = () => {
@@ -3110,13 +3315,13 @@ function useItemFromMap(id) {
           }
         };
       }
-      
+
       const cancelBtn = ov.querySelector('#btn-cancel-fruit');
       if (cancelBtn) {
         cancelBtn.onclick = () => { ov.remove(); };
       }
     };
-    
+
     document.body.appendChild(ov);
     renderFruitModal();
   } else {
@@ -3587,12 +3792,12 @@ function showCharModal(fOrId) {
   const future = c.learnset.filter(([l, m]) => l > f.lvl && !known.includes(m));
   const starsTag = f.stars ? `<span style="color:var(--gold);font-size:16px;margin-left:6px;">⭐${f.stars}</span>` : '';
   const hasUpgrades = (f.hpBonus || 0) + (f.atkBonus || 0) + (f.defBonus || 0) + (f.spatkBonus || 0) + (f.spdefBonus || 0) + (f.spdBonus || 0) > 0;
-  
+
   const cap = maxStartLvlCap();
   const upgCost = logPoseUpgradeCost(f.lvl);
   const canAffordUpg = (meta.logPoses || 0) >= upgCost;
   const isMaxLvl = f.lvl >= cap;
-  
+
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal char-sheet">
@@ -3699,6 +3904,7 @@ function specialJoin(id, lvl) {
 }
 
 function doSpecialPirate(island) {
+  meta.starPity = meta.starPity || 0;
   const lvl = island.lvl[1] + 2;
   const gachaPrice = 300 * (run.islandIdx + 1);
   const blocked = specialBlockedReason();
@@ -3707,10 +3913,14 @@ function doSpecialPirate(island) {
   ov.innerHTML = `<div class="modal">
     <h2>🌟 Mercado clandestino</h2>
     <p style="font-size:9px;line-height:1.9;text-align:center;">Un contacto de los bajos fondos te ofrece reclutas (Nv${lvl}).<br><br>
-    <b>🎯 Elegir:</b> cualquier pirata del catálogo, pagando su caché completo.<br>
+    <b>🎯 Elegir:</b> cualquier pirata del catálogo (hasta 4⭐), pagando su caché completo.<br>
     <b>🎰 Carteles:</b> 5 carteles de SE BUSCA boca abajo. Destápalos en orden:
     el 1º es el más probable (recluta de 1⭐)... y el 5º, el premio gordo (5⭐).</p>
     ${cartelesBadgeHTML()}
+    <div style="font-size:9.5px;text-align:center;margin-top:6px;margin-bottom:6px;color:#f39c12;background:rgba(243,156,18,0.12);padding:6px 10px;border-radius:6px;border:1px solid rgba(243,156,18,0.4);display:flex;align-items:center;justify-content:center;gap:6px;">
+      <span>⭐ Estrellas acumuladas (Pity): <b>${meta.starPity || 0} / 1000</b></span>
+      ${(meta.starPity || 0) >= 1000 ? '<span style="color:#2ecc71;font-weight:bold;">¡LEGENDARIO ASEGURADO!</span>' : ''}
+    </div>
     ${blocked ? `<div class="special-fail">${blocked}</div>` : ''}
     <div class="actions" style="flex-direction:column;align-items:stretch;">
       <button class="btn blue" id="sp-choose" ${blocked ? 'disabled' : ''}>🎯 ELEGIR PIRATA — catálogo</button>
@@ -3783,17 +3993,33 @@ function renderSpecialCatalog(lvl) {
 }
 
 function renderSpecialGacha(lvl) {
+  meta.starPity = meta.starPity || 0;
   // pesos: 1⭐ -> 41.5%, 2⭐ -> 30%, 3⭐ -> 21%, 4⭐ -> 7%, 5⭐ (legendarios) -> 0.5%
   const weights = [41.5, 30, 21, 7, 0.5];
   let roll = Math.random() * 100, stopIdx = 4;
-  for (let i = 0; i < 5; i++) { roll -= weights[i]; if (roll <= 0) { stopIdx = i; break; } }
+  if (meta.starPity >= 1000) {
+    stopIdx = 4; // Pity activado: legendario asegurado (5⭐)
+  } else {
+    for (let i = 0; i < 5; i++) { roll -= weights[i]; if (roll <= 0) { stopIdx = i; break; } }
+  }
   const prizeId = pick(poolByRareza(stopIdx + 1)) || pick(basePirateIds());
+
+  if (stopIdx === 4 || (CHARS[prizeId] && CHARS[prizeId].rareza === 5)) {
+    meta.starPity = 0;
+  } else {
+    meta.starPity += (stopIdx + 1);
+  }
+  saveMeta();
+
   let current = 0;
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal">
     <h2>🎰 Los 5 carteles de SE BUSCA</h2>
-    <p style="font-size:8px;text-align:center;margin-bottom:10px;">Destapa los carteles en orden. ¡En uno de ellos está tu recluta!</p>
+    <p style="font-size:8px;text-align:center;margin-bottom:6px;">Destapa los carteles en orden. ¡En uno de ellos está tu recluta!</p>
+    <div style="font-size:9px;text-align:center;margin-bottom:10px;color:#f39c12;">
+      ⭐ Estrellas acumuladas (Pity): <b>${meta.starPity} / 1000</b>
+    </div>
     <div class="poster-row">
       ${[0, 1, 2, 3, 4].map(i => `
         <div class="poster" data-p="${i}">
@@ -4299,13 +4525,13 @@ function showSynergyModal(team) {
     si el equipo entero lo comparte, la Sinergia II.</p>
     <div style="overflow-y:auto;flex:1;padding-right:4px;margin-bottom:6px;">
       ${Object.keys(SYNERGIES).map(t => {
-        const tier = team ? synergyTier(team, t) : 0;
-        const s = SYNERGIES[t];
-        return `<div class="sheet-section" style="${tier ? 'background:#fff8e0;' : ''}">
+    const tier = team ? synergyTier(team, t) : 0;
+    const s = SYNERGIES[t];
+    return `<div class="sheet-section" style="${tier ? 'background:#fff8e0;' : ''}">
             <b>${synEmoji(t)} ${t} — ${s.name} ${tier ? `<span style="color:var(--accent);">— ACTIVA ${tier === 2 ? 'Ⅱ' : 'Ⅰ'}</span>` : ''}</b>
             <p>Ⅰ: ${s.d1}<br>Ⅱ: ${s.d2}</p>
           </div>`;
-      }).join('')}
+  }).join('')}
     </div>
     <div class="actions" style="background:var(--paper);padding:10px 18px;margin-left:-18px;margin-right:-18px;border-top:2px solid var(--ink);box-shadow:0 -4px 12px rgba(0,0,0,0.18);z-index:20;display:flex;gap:10px;justify-content:center;flex-shrink:0;">
       <button class="btn blue" id="syn-chart">📊 TABLA DE DEBILIDADES</button>
