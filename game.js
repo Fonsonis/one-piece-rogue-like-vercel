@@ -2329,22 +2329,24 @@ function screenSagas() {
                   Debes completar Dificultad <b>⚔️ Capitán</b> en <b>${SAGAS[idx - 1] ? SAGAS[idx - 1].name : ''}</b>
                 </span>
               </div>` : `
-              <div>
-                ${isSelectedCleared
+              <div class="saga-stats-top">
+                <div class="saga-tag-header">
+                  ${isSelectedCleared
         ? `<span class="diff-cleared-tag">⭐ ${curDiffName} SUPERADA</span>`
         : isDiffUnlocked
           ? `<span class="diff-pending-tag">🎯 ${curDiffName} PENDIENTE</span>`
           : `<span class="diff-locked-tag">🔒 ${curDiffName} BLOQUEADA</span>`}
-                Victorias Clásico <b>${meta.wins[s.id] || 0}</b><br>
-                Victorias Nuzlocke <b>${meta.nuzWins[s.id] || 0}</b><br>
-                Dificultades Superadas <b>${diffWins}/5 ⭐</b>
+                </div>
+                <div class="saga-stat-line"><span>Victorias Clásico</span> <b>${meta.wins[s.id] || 0}</b></div>
+                <div class="saga-stat-line"><span>Victorias Nuzlocke</span> <b>${meta.nuzWins[s.id] || 0}</b></div>
+                <div class="saga-stat-line"><span>Dificultades Superadas</span> <b>${diffWins}/5 ⭐</b></div>
                 ${!isDiffUnlocked && prevDiffObj ? `
-                  <div style="color:#e65c5c;font-size:8px;margin-top:6px;background:rgba(0,0,0,0.3);padding:4px 6px;border-radius:4px;line-height:1.4;">
+                  <div class="saga-req-box">
                     ⚠️ Requisito: Supera esta saga en Dificultad <b>${prevDiffObj.emoji} ${prevDiffObj.name}</b> primero.
                   </div>
                 ` : ''}
               </div>
-              <div>
+              <div class="saga-stats-bottom">
                 <div class="saga-diff-badges">
                   ${DIFFICULTIES.map(d => {
             const beaten = !!diffWinsMap[d.id];
@@ -2354,9 +2356,9 @@ function screenSagas() {
                     </span>`;
           }).join('')}
                 </div>
-                <div class="saga-stats-btn-wrap" style="display:flex;gap:4px;align-items:center;margin-top:6px;">
-                  <button class="btn small gray btn-saga-probs" data-saga="${idx}" style="font-size:7px;padding:3px 6px;">📊 PROBABILIDADES</button>
-                  <button class="btn small blue btn-saga-info" data-saga-info="${idx}" style="font-size:9px;padding:3px 7px;font-weight:bold;min-width:24px;" title="Información de Jefes y Niveles">ℹ️</button>
+                <div class="saga-stats-btn-wrap">
+                  <button class="btn small gray btn-saga-probs" data-saga="${idx}">📊 PROBABILIDADES</button>
+                  <button class="btn small blue btn-saga-info" data-saga-info="${idx}" title="Información de Jefes y Niveles">ℹ️</button>
                 </div>
               </div>
             `}
@@ -3070,7 +3072,7 @@ function startRun(sagaIdx, starterIds) {
 }
 
 // ============ PANTALLA: MAPA ============
-function screenMap() {
+function screenMap(activePageIdx = 0) {
   playMusic('menu');
   if (run && run.mode === 'nuzlocke' && run.team) {
     run.team = run.team.filter(f => f && f.hp > 0);
@@ -3227,6 +3229,27 @@ function screenMap() {
         });
       }, 50);
     };
+
+    if (activePageIdx > 0) {
+      carousel.style.scrollBehavior = 'auto';
+      const applyPage = () => {
+        const pageWidth = carousel.clientWidth;
+        if (pageWidth > 0) {
+          carousel.scrollLeft = activePageIdx * pageWidth;
+          tabs.forEach((t, i) => {
+            if (i === activePageIdx) t.classList.add('active');
+            else t.classList.remove('active');
+          });
+        }
+      };
+      applyPage();
+      requestAnimationFrame(() => {
+        applyPage();
+        setTimeout(() => {
+          if (carousel) carousel.style.scrollBehavior = 'smooth';
+        }, 50);
+      });
+    }
   }
 
   const mapRerollBtn = $('#btn-map-reroll');
@@ -3253,68 +3276,103 @@ function screenMap() {
       }
     };
   });
+
   let pickedIdx = null;
+
+  const renderTeamSlotItemHTML = (f, idx) => {
+    const c = CHARS[f.id] || {};
+    const rarityTag = c.rareza ? `<span style="color:var(--gold);font-size:7.5px;margin-left:3px;" title="Rareza ${c.rareza} estrellas">${'⭐'.repeat(c.rareza)}</span>` : '';
+    const fusionTag = f.stars ? `<span style="color:#ff6b6b;font-weight:bold;font-size:8px;margin-left:3px;" title="Fusión +${f.stars}">[+${f.stars}⭐]</span>` : '';
+    return `
+      <div class="team-slot ${f.hp <= 0 ? 'dead' : ''}" data-idx="${idx}" draggable="true">
+        <span class="drag-handle">≡</span>
+        <span class="emoji">${charIcon(f.id, 36)}</span>
+        <div class="info">${idx + 1}. <b>${charName(f)}</b> ${rarityTag}${fusionTag}<br>Nv${f.lvl}
+          ${typeBadges(fighterTypes(f))}
+          <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>
+        </div>
+        ${run.team.length > 1 ? `<span class="btn-dismiss-slot" data-dismiss-idx="${idx}" title="Expulsar de la banda" style="color:#e74c3c;font-size:11px;cursor:pointer;padding:2px 4px;margin-left:auto;opacity:0.75;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.75">🗑️</span>` : ''}
+      </div>`;
+  };
+
+  const bindTeamSlots = () => {
+    pickedIdx = null;
+    makeListReorderable('.team-slots-list', '.team-slot', (from, to) => {
+      moveSlot(from, to);
+    });
+
+    document.querySelectorAll('.team-slot').forEach(el => {
+      const idx = +el.dataset.idx;
+      const dismissBtn = el.querySelector('[data-dismiss-idx]');
+      if (dismissBtn) {
+        dismissBtn.onclick = e => {
+          e.stopPropagation();
+          if (!run || !run.team) return;
+          if (run.team.length <= 1) {
+            toast('⚠️ Debes mantener al menos 1 nakama en tu banda.');
+            return;
+          }
+          const f = run.team[idx];
+          if (!f) return;
+          const cName = charName(f);
+          modalConfirm('🗑️ Expulsar de la banda',
+            `¿Estás seguro de que quieres expulsar a <b>${cName}</b> de tu tripulación?<br><small style="color:#aaa;">Esta acción no se puede deshacer en esta partida.</small>`,
+            () => {
+              run.team.splice(idx, 1);
+              updateTeamInPlace();
+              toast(`👋 ${cName} ha abandonado la banda.`);
+            }
+          );
+        };
+      }
+      const handle = el.querySelector('.drag-handle');
+      if (handle) handle.onclick = e => {
+        e.stopPropagation();
+        if (pickedIdx === null) {
+          pickedIdx = idx;
+          el.classList.add('dragging');
+        } else if (pickedIdx === idx) {
+          pickedIdx = null;
+          el.classList.remove('dragging');
+        } else {
+          moveSlot(pickedIdx, idx);
+        }
+      };
+      el.onclick = (e) => {
+        if (e.target.closest('.drag-handle') || e.target.closest('[data-dismiss-idx]')) return;
+        if (pickedIdx !== null) {
+          if (pickedIdx !== idx) moveSlot(pickedIdx, idx);
+          else {
+            pickedIdx = null;
+            el.classList.remove('dragging');
+          }
+          return;
+        }
+        showCharModal(run.team[idx]);
+      };
+    });
+  };
+
+  const updateTeamInPlace = () => {
+    saveRun();
+    const listEl = document.querySelector('.team-slots-list');
+    if (listEl) {
+      listEl.innerHTML = run.team.map(renderTeamSlotItemHTML).join('');
+      bindTeamSlots();
+    }
+    const synEl = document.querySelector('#page-team .syn-chips');
+    if (synEl) synEl.innerHTML = synChipsHTML(run.team);
+    const tabTeamEl = document.querySelector('#tab-page-team');
+    if (tabTeamEl) tabTeamEl.textContent = `👥 EQUIPO (${run.team.length})`;
+  };
+
   const moveSlot = (from, to) => {
     const [f] = run.team.splice(from, 1);
     run.team.splice(to, 0, f);
-    saveRun(); screenMap();
+    updateTeamInPlace();
   };
 
-  makeListReorderable('.team-slots-list', '.team-slot', (from, to) => {
-    moveSlot(from, to);
-  });
-
-  document.querySelectorAll('.team-slot').forEach(el => {
-    const idx = +el.dataset.idx;
-    const dismissBtn = el.querySelector('[data-dismiss-idx]');
-    if (dismissBtn) {
-      dismissBtn.onclick = e => {
-        e.stopPropagation();
-        if (!run || !run.team) return;
-        if (run.team.length <= 1) {
-          toast('⚠️ Debes mantener al menos 1 nakama en tu banda.');
-          return;
-        }
-        const f = run.team[idx];
-        if (!f) return;
-        const cName = charName(f);
-        modalConfirm('🗑️ Expulsar de la banda',
-          `¿Estás seguro de que quieres expulsar a <b>${cName}</b> de tu tripulación?<br><small style="color:#aaa;">Esta acción no se puede deshacer en esta partida.</small>`,
-          () => {
-            run.team.splice(idx, 1);
-            saveRun();
-            toast(`👋 ${cName} ha abandonado la banda.`);
-            screenMap();
-          }
-        );
-      };
-    }
-    const handle = el.querySelector('.drag-handle');
-    if (handle) handle.onclick = e => {
-      e.stopPropagation();
-      if (pickedIdx === null) {
-        pickedIdx = idx;
-        el.classList.add('dragging');
-      } else if (pickedIdx === idx) {
-        pickedIdx = null;
-        el.classList.remove('dragging');
-      } else {
-        moveSlot(pickedIdx, idx);
-      }
-    };
-    el.onclick = (e) => {
-      if (e.target.closest('.drag-handle') || e.target.closest('[data-dismiss-idx]')) return;
-      if (pickedIdx !== null) {
-        if (pickedIdx !== idx) moveSlot(pickedIdx, idx);
-        else {
-          pickedIdx = null;
-          el.classList.remove('dragging');
-        }
-        return;
-      }
-      showCharModal(run.team[idx]);
-    };
-  });
+  bindTeamSlots();
   document.querySelectorAll('.item-row').forEach(el => {
     el.onclick = () => useItemFromMap(el.dataset.item);
   });
@@ -3348,31 +3406,45 @@ function screenMap() {
   }
 }
 
+function showItemTargetModal(item, title, renderRow, onSelect) {
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.innerHTML = `
+    <div class="modal">
+      <h2>${item.emoji} ${title}</h2>
+      <p style="font-size:9px;text-align:center;margin-bottom:10px;color:#aaa;">
+        ${item.desc}<br>Selecciona a qué nakama de tu equipo dárselo:
+      </p>
+      <div style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto;margin-bottom:12px;">
+        ${run.team.map((f, idx) => renderRow(f, idx)).join('')}
+      </div>
+      <div class="actions">
+        <button class="btn gray" id="btn-cancel-item-target">CANCELAR</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(ov);
+  const cancelBtn = ov.querySelector('#btn-cancel-item-target');
+  if (cancelBtn) cancelBtn.onclick = () => ov.remove();
+  ov.querySelectorAll('.item-target-row.clickable').forEach(el => {
+    el.onclick = () => {
+      const idx = parseInt(el.dataset.idx, 10);
+      const target = run.team[idx];
+      ov.remove();
+      onSelect(target);
+    };
+  });
+}
+
 function useItemFromMap(id) {
   const item = ITEMS[id];
-  if (item.kind === 'heal') {
-    const f = run.team.find(x => x.hp > 0 && x.hp < x.maxhp);
-    if (!f) return toast('Nadie necesita curarse ahora.');
-    f.hp = Math.min(f.maxhp, f.hp + item.val);
-    run.items[id]--;
-    toast(`${charName(f)} recupera PS. ${item.emoji}`);
-    saveRun(); screenMap();
-  } else if (item.kind === 'revive') {
-    if (run.mode === 'nuzlocke') return toast('En Nuzlocke los caídos no vuelven...');
-    const f = run.team.find(x => x.hp <= 0);
-    if (!f) return toast('Nadie está debilitado.');
-    f.hp = Math.floor(f.maxhp * item.val);
-    run.items[id]--;
-    toast(`¡${charName(f)} vuelve a la lucha!`);
-    saveRun(); screenMap();
-  } else if (item.kind === 'boost') {
-    const f = run.team[0];
-    if (item.stat === 1) { f.atkBonus += 2; f.atk += 2; toast(`+2 ATQ para ${charName(f)}`); }
-    else { f.defBonus += 2; f.def += 2; toast(`+2 DEF para ${charName(f)}`); }
-    run.items[id]--;
-    trackItemCollected(1);
-    saveRun(); screenMap();
-  } else if (item.kind === 'fruta') {
+  if (!item) return;
+
+  if (item.kind === 'ball') {
+    return toast(`📜 ${item.name}: Se usa automáticamente al intentar reclutar piratas.`);
+  }
+
+  if (item.kind === 'fruta') {
     const activeTeam = run.team.filter(x => x.hp > 0);
     if (!activeTeam.length) return toast('No tienes nakamas conscientes para consumir la fruta.');
     const maxSelect = Math.min(2, activeTeam.length);
@@ -3451,9 +3523,7 @@ function useItemFromMap(id) {
           trackStat('fruit_use', 1);
           saveRun();
           if (grantedLog.length) {
-            modalInfo('🍈 ¡Poder de la Fruta del Diablo!', `<div class="reward-list">La Fruta del Diablo otorga nuevas fuerzas a tu banda:<br><br>${grantedLog.join('<br>')}<br><br><small style="color:var(--gold);">¡Nuevos tags y sinergias activadas!</small></div>`, screenMap);
-          } else {
-            screenMap();
+            screenMap(2);
           }
         };
       }
@@ -3466,9 +3536,107 @@ function useItemFromMap(id) {
 
     document.body.appendChild(ov);
     renderFruitModal();
-  } else {
-    toast('Eso solo se usa en combate.');
+    return;
   }
+
+  if (item.kind === 'heal') {
+    const hasDamaged = run.team.some(f => f.hp > 0 && f.hp < f.maxhp);
+    if (!hasDamaged) {
+      return toast('Ningún nakama consciente necesita curación.');
+    }
+    showItemTargetModal(item, `Usar ${item.name}`, (f, idx) => {
+      const isDead = f.hp <= 0;
+      const isFull = f.hp >= f.maxhp;
+      const canUse = !isDead && !isFull;
+      return `
+        <div class="shop-item item-target-row ${canUse ? 'clickable' : ''}" data-idx="${idx}"
+          style="cursor:${canUse ? 'pointer' : 'not-allowed'};opacity:${canUse ? 1 : 0.55};background:rgba(0,0,0,0.2);border:1px solid #555;border-radius:6px;padding:6px 10px;display:flex;align-items:center;gap:10px;">
+          <span class="emoji">${charIcon(f.id, 28)}</span>
+          <div class="info" style="flex:1;">
+            <b>${charName(f)}</b> <small>(Nv.${f.lvl})</small><br>
+            <small>${isDead ? '☠️ Derrotado (Usa Sake)' : isFull ? '💚 PS al máximo' : `PS: ${f.hp}/${f.maxhp}`}</small>
+            <div class="hp-mini" style="margin-top:3px;"><i style="width:${Math.max(0, f.hp / f.maxhp * 100)}%"></i></div>
+          </div>
+          <div style="font-size:16px;">${canUse ? '👉' : '🔒'}</div>
+        </div>
+      `;
+    }, (target) => {
+      const val = item.val === 9999 ? target.maxhp : item.val;
+      const restored = Math.min(target.maxhp - target.hp, val);
+      target.hp = Math.min(target.maxhp, target.hp + val);
+      run.items[id]--;
+      trackItemCollected(1);
+      trackStat('item_use', 1);
+      saveRun();
+      toast(`💚 ¡${charName(target)} recupera ${restored} PS!`);
+      screenMap(2);
+    });
+    return;
+  }
+
+  if (item.kind === 'revive') {
+    const hasDead = run.team.some(f => f.hp <= 0);
+    if (!hasDead) {
+      return toast('No hay nakamas derrotados para revivir.');
+    }
+    showItemTargetModal(item, `Usar ${item.name}`, (f, idx) => {
+      const isDead = f.hp <= 0;
+      return `
+        <div class="shop-item item-target-row ${isDead ? 'clickable' : ''}" data-idx="${idx}"
+          style="cursor:${isDead ? 'pointer' : 'not-allowed'};opacity:${isDead ? 1 : 0.55};background:rgba(0,0,0,0.2);border:1px solid #555;border-radius:6px;padding:6px 10px;display:flex;align-items:center;gap:10px;">
+          <span class="emoji">${charIcon(f.id, 28)}</span>
+          <div class="info" style="flex:1;">
+            <b>${charName(f)}</b> <small>(Nv.${f.lvl})</small><br>
+            <small>${isDead ? '☠️ Derrotado (Toca para revivir)' : '💚 Consciente'}</small>
+          </div>
+          <div style="font-size:16px;">${isDead ? '✨' : '🔒'}</div>
+        </div>
+      `;
+    }, (target) => {
+      target.hp = Math.floor(target.maxhp * (item.val || 0.5));
+      run.items[id]--;
+      trackItemCollected(1);
+      trackStat('item_use', 1);
+      saveRun();
+      toast(`✨ ¡${charName(target)} ha sido revivido con ${target.hp} PS!`);
+      screenMap(2);
+    });
+    return;
+  }
+
+  if (item.kind === 'boost') {
+    const isAtk = id === 'proteina';
+    showItemTargetModal(item, `Usar ${item.name}`, (f, idx) => {
+      return `
+        <div class="shop-item item-target-row clickable" data-idx="${idx}"
+          style="cursor:pointer;background:rgba(0,0,0,0.2);border:1px solid #555;border-radius:6px;padding:6px 10px;display:flex;align-items:center;gap:10px;">
+          <span class="emoji">${charIcon(f.id, 28)}</span>
+          <div class="info" style="flex:1;">
+            <b>${charName(f)}</b> <small>(Nv.${f.lvl})</small><br>
+            <small>${isAtk ? `ATQ actual: ${f.atk} (+2 ATQ)` : `DEF actual: ${f.def} (+2 DEF)`}</small>
+          </div>
+          <div style="font-size:16px;">⚡</div>
+        </div>
+      `;
+    }, (target) => {
+      if (isAtk) {
+        target.atkBonus = (target.atkBonus || 0) + 2;
+        target.atk += 2;
+      } else {
+        target.defBonus = (target.defBonus || 0) + 2;
+        target.def += 2;
+      }
+      run.items[id]--;
+      trackItemCollected(1);
+      trackStat('item_use', 1);
+      saveRun();
+      toast(`⚡ ¡${charName(target)} ha ganado +2 ${isAtk ? 'ATQ' : 'DEF'} permanentemente!`);
+      screenMap(2);
+    });
+    return;
+  }
+
+  toast('No se puede usar este objeto ahora.');
 }
 
 function pickWildEnemy(pool) {
