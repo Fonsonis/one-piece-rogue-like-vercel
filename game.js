@@ -1383,18 +1383,41 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
     </div>`;
   };
 
+  const getProgCardItem = p => {
+    const tierIdx = getClaimedProgTier(p);
+    const val = p.check();
+    const totalTiers = p.goals.length;
+    const isMax = tierIdx >= totalTiers;
+    const currentGoal = isMax ? p.goals[totalTiers - 1] : p.goals[tierIdx];
+    const canClaim = !isMax && val >= currentGoal;
+    return { canClaim, html: renderProgCardHTML(p) };
+  };
+
+  const getStaticCardItem = a => {
+    const val = a.check();
+    const done = val >= a.goal;
+    const claimed = !!meta.claimedAch[a.id];
+    const canClaim = !claimed && done;
+    return { canClaim, html: renderStaticCardHTML(a) };
+  };
+
   const renderModalContent = () => {
-    let html = '';
+    let items = [];
     if (currentAchCategory === 'all') {
-      html += PROGRESSIVE_ACHIEVEMENTS.map(renderProgCardHTML).join('');
-      html += visibleStaticList.map(renderStaticCardHTML).join('');
+      items = [
+        ...PROGRESSIVE_ACHIEVEMENTS.map(getProgCardItem),
+        ...visibleStaticList.map(getStaticCardItem)
+      ];
     } else if (currentAchCategory === 'prog') {
-      html += PROGRESSIVE_ACHIEVEMENTS.map(renderProgCardHTML).join('');
+      items = PROGRESSIVE_ACHIEVEMENTS.map(getProgCardItem);
     } else if (currentAchCategory === 'sagas') {
-      html += visibleStaticList.filter(a => a.id.startsWith('saga_diff_')).map(renderStaticCardHTML).join('');
+      items = visibleStaticList.filter(a => a.id.startsWith('saga_diff_')).map(getStaticCardItem);
     } else if (currentAchCategory === 'desafios') {
-      html += visibleStaticList.filter(a => !a.id.startsWith('saga_diff_')).map(renderStaticCardHTML).join('');
+      items = visibleStaticList.filter(a => !a.id.startsWith('saga_diff_')).map(getStaticCardItem);
     }
+
+    items.sort((a, b) => (b.canClaim ? 1 : 0) - (a.canClaim ? 1 : 0));
+    let html = items.map(x => x.html).join('');
 
     if (!html) html = '<div style="font-size:9px;color:#888;text-align:center;padding:20px;">No hay logros en esta categoría.</div>';
 
@@ -3083,68 +3106,128 @@ function screenMap() {
   render(`
     ${topbar(true)}
     <div class="map-wrap">
-      <div class="map-board" style="min-height:${H}px;position:relative;">
-        <div class="map-title">📍 SAGA: <b>${saga.name}</b> · Isla ${run.islandIdx + 1}/${saga.islands.length}: <b>${island.name}</b> (${run.mode === 'nuzlocke' ? 'NUZLOCKE' : 'CLÁSICO'})</div>
-        <svg class="map-svg">${edgesHTML}</svg>
-        ${nodesHTML}
-        <div style="position:absolute;top:42px;left:10px;z-index:20;">
-          <button class="btn gold small" id="btn-map-reroll" ${canReroll ? '' : 'disabled'} style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
-            Reroll x${canReroll ? 1 : 0}
-          </button>
+      <div class="map-carousel" id="island-carousel">
+        <!-- PÁGINA 1: MAPA (ANCHO Y ALTO COMPLETO) -->
+        <div class="carousel-page" id="page-map">
+          <div class="map-board" style="min-height: max(calc(100vh - 170px), ${H}px); flex: 1;">
+            <div class="map-title">📍 SAGA: <b>${saga.name}</b> · Isla ${run.islandIdx + 1}/${saga.islands.length}: <b>${island.name}</b> (${run.mode === 'nuzlocke' ? 'NUZLOCKE' : 'CLÁSICO'})</div>
+            <svg class="map-svg">${edgesHTML}</svg>
+            ${nodesHTML}
+            <div style="position:absolute;top:42px;left:10px;z-index:20;">
+              <button class="btn gold small" id="btn-map-reroll" ${canReroll ? '' : 'disabled'} style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
+                Reroll x${canReroll ? 1 : 0}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- PÁGINA 2: EQUIPO (ANCHO COMPLETO) -->
+        <div class="carousel-page" id="page-team">
+          <div class="panel">
+            <h3>EQUIPO DE NAKAMAS ${run.mode === 'nuzlocke' ? '☠️' : ''}</h3>
+            <div class="team-slots-list">
+              ${run.team.map((f, idx) => {
+                const c = CHARS[f.id] || {};
+                const rarityTag = c.rareza ? `<span style="color:var(--gold);font-size:7.5px;margin-left:3px;" title="Rareza ${c.rareza} estrellas">${'⭐'.repeat(c.rareza)}</span>` : '';
+                const fusionTag = f.stars ? `<span style="color:#ff6b6b;font-weight:bold;font-size:8px;margin-left:3px;" title="Fusión +${f.stars}">[+${f.stars}⭐]</span>` : '';
+                return `
+                  <div class="team-slot ${f.hp <= 0 ? 'dead' : ''}" data-idx="${idx}" draggable="true">
+                    <span class="drag-handle">≡</span>
+                    <span class="emoji">${charIcon(f.id, 36)}</span>
+                    <div class="info">${idx + 1}. <b>${charName(f)}</b> ${rarityTag}${fusionTag}<br>Nv${f.lvl}
+                      ${typeBadges(fighterTypes(f))}
+                      <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>
+                    </div>
+                    ${run.team.length > 1 ? `<span class="btn-dismiss-slot" data-dismiss-idx="${idx}" title="Expulsar de la banda" style="color:#e74c3c;font-size:11px;cursor:pointer;padding:2px 4px;margin-left:auto;opacity:0.75;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.75">🗑️</span>` : ''}
+                  </div>`;
+              }).join('')}
+            </div>
+            <div style="font-size:7.5px;color:#666;margin-top:8px;">¡El orden importa! Combaten de arriba a abajo. Arrastra (o toca ≡ y luego el destino) para reordenar · toca para ver la ficha.</div>
+            <h3 style="margin-top:12px;">SINERGIAS DE TRIPULACIÓN <button class="btn small gray" id="btn-syn-info" style="font-size:7px;padding:2px 6px;">ℹ️ VER TODAS</button>
+              <button class="btn small gray" id="btn-chart-info" style="font-size:7px;padding:2px 6px;">📊 TIPOS</button></h3>
+            <div class="syn-chips">${synChipsHTML(run.team)}</div>
+          </div>
+        </div>
+
+        <!-- PÁGINA 3: MOCHILA Y EMBLEMAS (ANCHO COMPLETO) -->
+        <div class="carousel-page" id="page-bag">
+          <div class="panel">
+            <h3>🎒 MOCHILA DE OBJETOS</h3>
+            ${Object.entries(run.items).filter(([, n]) => n > 0).map(([id, n]) =>
+              `<div class="item-row" data-item="${id}"><span>${ITEMS[id].emoji}</span> ${ITEMS[id].name} ×${n}</div>`
+            ).join('') || '<div style="font-size:8px;color:#888;">Bolsa vacía</div>'}
+            <h3 style="margin-top:14px;">🏅 EMBLEMAS DE LA SAGA</h3>
+            <div class="badge-grid">
+              ${saga.islands.map((isl, i) =>
+                `<div class="badge-slot ${run.badges.includes(i) ? '' : 'empty'}" title="${isl.name}">${run.badges.includes(i) ? '🏅' : '·'}</div>`
+              ).join('')}
+            </div>
+            <h3 style="margin-top:14px;">🤖 MODO AUTOMÁTICO</h3>
+            ${autoMode ? `
+              <div class="auto-mode-box" style="margin-top:6px;background:rgba(217,83,79,0.15);padding:8px;border-radius:6px;border:1px solid var(--red);text-align:center;">
+                <button class="btn red small" id="btn-stop-auto" style="width:100%;font-size:9px;font-weight:bold;padding:6px 8px;">
+                  🛑 PARAR MODO AUTO
+                </button>
+                <button class="btn gray small" id="btn-config-auto" style="width:100%;font-size:7.5px;margin-top:4px;padding:3px 6px;">
+                  ⚙️ Opciones del Auto
+                </button>
+              </div>
+            ` : `
+              <div class="auto-mode-box" style="margin-top:6px;background:rgba(0,0,0,0.35);padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);text-align:center;">
+                <button class="btn gold small" id="btn-toggle-auto" style="width:100%;font-size:8.5px;font-weight:bold;padding:5px 8px;">
+                  🤖 MODO AUTO
+                </button>
+                <div style="font-size:7px;color:#aaa;margin-top:4px;">Toca para activar u opciones</div>
+              </div>
+            `}
+            <div style="display:flex;gap:8px;margin-top:14px;">
+              <button class="btn red small" id="btn-abandon" style="flex:1;">ABANDONAR</button>
+              <button class="btn gray small" id="btn-home" style="flex:1;">MENÚ PRINCIPAL</button>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="side-panel">
-        <div class="panel">
-          <h3>EQUIPO ${run.mode === 'nuzlocke' ? '☠️' : ''}</h3>
-          ${run.team.map((f, idx) => `
-            <div class="team-slot ${f.hp <= 0 ? 'dead' : ''}" data-idx="${idx}" draggable="true">
-              <span class="drag-handle">≡</span>
-              <span class="emoji">${charIcon(f.id, 18)}</span>
-              <div class="info">${idx + 1}. ${charName(f)}${f.stars ? ` <span style="color:var(--gold);font-weight:bold;font-size:9.5px;">⭐${f.stars}</span>` : ''}<br>Nv${f.lvl}
-                ${typeBadges(fighterTypes(f))}
-                <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>
-              </div>
-              ${run.team.length > 1 ? `<span class="btn-dismiss-slot" data-dismiss-idx="${idx}" title="Expulsar de la banda" style="color:#e74c3c;font-size:11px;cursor:pointer;padding:2px 4px;margin-left:auto;opacity:0.75;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.75">🗑️</span>` : ''}
-            </div>`).join('')}
-          <div style="font-size:7px;color:#666;margin-top:6px;">¡El orden importa! Combaten de arriba a abajo. Arrastra (o toca ≡ y luego el destino) para reordenar · toca para ver la ficha.</div>
-          <h3 style="margin-top:8px;">SINERGIAS <button class="btn small gray" id="btn-syn-info" style="font-size:7px;padding:2px 6px;">ℹ️ VER TODAS</button>
-            <button class="btn small gray" id="btn-chart-info" style="font-size:7px;padding:2px 6px;">📊 TIPOS</button></h3>
-          <div class="syn-chips">${synChipsHTML(run.team)}</div>
-        </div>
-        <div class="panel">
-          <h3>OBJETOS</h3>
-          ${Object.entries(run.items).filter(([, n]) => n > 0).map(([id, n]) =>
-    `<div class="item-row" data-item="${id}"><span>${ITEMS[id].emoji}</span> ${ITEMS[id].name} ×${n}</div>`
-  ).join('') || '<div style="font-size:8px;color:#888;">Bolsa vacía</div>'}
-          <h3 style="margin-top:10px;">EMBLEMAS</h3>
-          <div class="badge-grid">
-            ${saga.islands.map((isl, i) =>
-    `<div class="badge-slot ${run.badges.includes(i) ? '' : 'empty'}" title="${isl.name}">${run.badges.includes(i) ? '🏅' : '·'}</div>`
-  ).join('')}
-          </div>
-          ${autoMode ? `
-            <div class="auto-mode-box" style="margin-top:10px;background:rgba(217,83,79,0.15);padding:8px;border-radius:6px;border:1px solid var(--red);text-align:center;">
-              <button class="btn red small" id="btn-stop-auto" style="width:100%;font-size:9px;font-weight:bold;padding:6px 8px;">
-                🛑 PARAR MODO AUTO
-              </button>
-              <button class="btn gray small" id="btn-config-auto" style="width:100%;font-size:7.5px;margin-top:4px;padding:3px 6px;">
-                ⚙️ Opciones del Auto
-              </button>
-            </div>
-          ` : `
-            <div class="auto-mode-box" style="margin-top:10px;background:rgba(0,0,0,0.35);padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);text-align:center;">
-              <button class="btn gold small" id="btn-toggle-auto" style="width:100%;font-size:8.5px;font-weight:bold;padding:5px 8px;">
-                🤖 MODO AUTO
-              </button>
-              <div style="font-size:7px;color:#aaa;margin-top:4px;">Toca para activar u opciones</div>
-            </div>
-          `}
-          <button class="btn red small" id="btn-abandon" style="margin-top:10px;width:100%;">ABANDONAR</button>
-          <button class="btn gray small" id="btn-home" style="margin-top:6px;width:100%;">MENÚ</button>
-        </div>
+
+      <!-- BOTONES DE NAVEGACIÓN INFERIORES -->
+      <div class="map-nav-tabs">
+        <div class="tab active" id="tab-page-map" data-page="0">📍 MAPA</div>
+        <div class="tab" id="tab-page-team" data-page="1">👥 EQUIPO (${run.team.length})</div>
+        <div class="tab" id="tab-page-bag" data-page="2">🎒 MOCHILA</div>
       </div>
     </div>
   `);
+
+  // --- Lógica del carrusel y pestañas superiores ---
+  const carousel = $('#island-carousel');
+  const tabs = document.querySelectorAll('.map-nav-tabs .tab');
+
+  tabs.forEach(tab => {
+    tab.onclick = () => {
+      const pageIdx = parseInt(tab.dataset.page, 10);
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+      if (carousel) {
+        const pageWidth = carousel.clientWidth;
+        carousel.scrollTo({ left: pageIdx * pageWidth, behavior: 'smooth' });
+      }
+    };
+  });
+
+  if (carousel) {
+    let scrollTimeout = null;
+    carousel.onscroll = () => {
+      if (scrollTimeout) clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(() => {
+        const pageWidth = carousel.clientWidth;
+        if (!pageWidth) return;
+        const pageIdx = Math.round(carousel.scrollLeft / pageWidth);
+        tabs.forEach((t, i) => {
+          if (i === pageIdx) t.classList.add('active');
+          else t.classList.remove('active');
+        });
+      }, 50);
+    };
+  }
 
   const mapRerollBtn = $('#btn-map-reroll');
   if (mapRerollBtn && canReroll) {
@@ -3177,7 +3260,7 @@ function screenMap() {
     saveRun(); screenMap();
   };
 
-  makeListReorderable('.side-panel', '.team-slot', (from, to) => {
+  makeListReorderable('.team-slots-list', '.team-slot', (from, to) => {
     moveSlot(from, to);
   });
 
@@ -3775,9 +3858,7 @@ function addToTeam(f, done) {
     }
     const boostHP = Math.max(1, Math.floor(existing.maxhp * 0.05));
     existing.maxhp += boostHP;
-    if (existing.hp > 0) {
-      existing.hp = Math.min(existing.maxhp, existing.hp + boostHP);
-    }
+    existing.hp = existing.maxhp; // Restaura la vida por completo al fusionarse
     existing.atk = Math.floor(existing.atk * 1.05);
     existing.def = Math.floor(existing.def * 1.05);
     existing.spatk = Math.floor(existing.spatk * 1.05);
@@ -3785,7 +3866,7 @@ function addToTeam(f, done) {
     existing.spd = Math.floor(existing.spd * 1.05);
 
     saveRun();
-    toast(`⭐ ¡FUSIÓN! ${charData(existing).emoji} ${charName(existing)} alcanza ⭐${existing.stars} estrella(s) (Nv${existing.lvl}).`);
+    toast(`⭐ ¡FUSIÓN Y CURACIÓN! ${charData(existing).emoji} ${charName(existing)} alcanza ⭐${existing.stars} estrella(s) (Nv${existing.lvl}) y recupera todos sus PS.`);
     done && done(true);
     return;
   }
@@ -3802,12 +3883,17 @@ function addToTeam(f, done) {
     <p style="font-size:9px;text-align:center;margin-bottom:10px;">
       ${charData(f).emoji} <b>${charName(f)}</b> Nv${f.lvl} quiere unirse.<br>Elige a quién despedir para hacerle sitio.</p>
     <div class="pick-grid">
-      ${run.team.map((m, i) => `
-        <div class="pick-row" data-out="${i}">
-          <span class="emoji">${charIcon(m.id, 20)}</span>
-          <div class="info"><b>${charName(m)}</b> ${m.stars ? '⭐' + m.stars + ' ' : ''}Nv${m.lvl}<br>${m.hp}/${m.maxhp} PS</div>
-          <span style="font-size:8px;color:var(--red);">DESPEDIR</span>
-        </div>`).join('')}
+      ${run.team.map((m, i) => {
+        const mc = CHARS[m.id] || {};
+        const rTag = mc.rareza ? `<span style="color:var(--gold);font-size:7.5px;">${'⭐'.repeat(mc.rareza)}</span>` : '';
+        const fTag = m.stars ? `<span style="color:#ff6b6b;font-size:7.5px;font-weight:bold;">[+${m.stars}⭐]</span>` : '';
+        return `
+          <div class="pick-row" data-out="${i}">
+            <span class="emoji">${charIcon(m.id, 34)}</span>
+            <div class="info"><b>${charName(m)}</b> ${rTag} ${fTag} Nv${m.lvl}<br>${m.hp}/${m.maxhp} PS</div>
+            <span style="font-size:8px;color:var(--red);">DESPEDIR</span>
+          </div>`;
+      }).join('')}
     </div>
     <div class="actions"><button class="btn gray" id="swap-cancel">NO RECLUTAR</button></div>
   </div>`;
@@ -3849,7 +3935,8 @@ function showCharModal(fOrId) {
   const isFru = fTypes.includes('Fruta'), isHak = fTypes.includes('Haki');
   const known = f.moves;
   const future = c.learnset.filter(([l, m]) => l > f.lvl && !known.includes(m));
-  const starsTag = f.stars ? `<span style="color:var(--gold);font-size:16px;margin-left:6px;">⭐${f.stars}</span>` : '';
+  const rarityTag = c.rareza ? `<span style="color:var(--gold);font-size:14px;margin-left:6px;" title="Rareza: ${c.rareza} estrellas">${'⭐'.repeat(c.rareza)}</span>` : '';
+  const fusionTag = f.stars ? `<span style="color:#ff6b6b;font-size:11px;font-weight:bold;margin-left:6px;">[+${f.stars}⭐ Fusión]</span>` : '';
   const hasUpgrades = (f.hpBonus || 0) + (f.atkBonus || 0) + (f.defBonus || 0) + (f.spatkBonus || 0) + (f.spdefBonus || 0) + (f.spdBonus || 0) > 0;
 
   const cap = maxStartLvlCap();
@@ -3860,7 +3947,14 @@ function showCharModal(fOrId) {
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal char-sheet">
-    <h2><span style="font-size:26px;">${charIcon(f.id, 34)}</span> ${c.name}${starsTag} <small>Nv.${f.lvl}</small></h2>
+    <h2><span style="font-size:26px;vertical-align:middle;">${charIcon(f.id, 34)}</span> ${c.name}${rarityTag}${fusionTag} <small>Nv.${f.lvl}</small></h2>
+    <div class="char-sheet-hero" style="text-align:center;padding:12px;margin:8px 0 12px;background:radial-gradient(ellipse at center, rgba(232, 200, 50, 0.22) 0%, rgba(0,0,0,0.35) 75%);border:2px solid var(--gold);border-radius:8px;position:relative;">
+      <div class="char-sheet-sprite" style="display:inline-block;filter:drop-shadow(3px 5px 8px rgba(0,0,0,0.6));">
+        ${charIcon(f.id, 90)}
+      </div>
+      <div class="platform" style="width:120px;height:24px;margin:-10px auto 0;background:radial-gradient(ellipse at center, #7ec850 0%, #4aa557 70%, transparent 72%);border-radius:50%;box-shadow:inset 0 0 0 2px rgba(217, 131, 46, 0.35);"></div>
+      <div style="margin-top:6px;font-size:9px;color:var(--gold);"><b>Rareza:</b> ${'⭐'.repeat(c.rareza || 1)} (${c.rareza || 1} Estrellas)</div>
+    </div>
     ${typeBadges(fTypes)}
     ${f.stars ? `<div class="sheet-line" style="color:var(--gold);background:rgba(255,215,0,0.1);padding:4px 8px;border-radius:4px;"><b>⭐ Fusión ${f.stars} Estrellas</b> — +${f.stars * 5}% a todas las características en esta partida</div>` : ''}
     ${isLive ? `<div class="sheet-line" style="color:var(--gold);font-weight:bold;">📍 Características reales en combate (Nivel, Fusiones y Barco)</div>` : `<div class="sheet-line" style="color:var(--gold);font-weight:bold;">📍 Nivel base e incentivos del barco actuales${hasUpgrades ? ' (incluye mejoras del barco)' : ''}</div>`}
@@ -4851,7 +4945,8 @@ const tagIcons = f => {
 function fighterCardHTML(f, side, idx, active) {
   const c = charData(f);
   const ps = passiveInfo(f);
-  const starTag = f.stars ? `<span style="color:var(--gold);font-size:9px;">⭐${f.stars}</span>` : '';
+  const rarityTag = c.rareza ? `<span style="color:var(--gold);font-size:7.5px;" title="Rareza ${c.rareza} estrellas">${'⭐'.repeat(c.rareza)}</span>` : '';
+  const fusionTag = f.stars ? `<span style="color:#ff6b6b;font-weight:bold;font-size:7.5px;" title="Fusión +${f.stars}">[+${f.stars}⭐]</span>` : '';
   const isUltUnlocked = f.lvl >= 20;
   const isUltReady = isUltUnlocked && (f.ultCharge || 0) >= 100;
   const ultPct = isUltUnlocked ? clamp(f.ultCharge || 0, 0, 100) : 0;
@@ -4862,7 +4957,7 @@ function fighterCardHTML(f, side, idx, active) {
     </div>` : '';
 
   return `<div class="fcard ${f.hp <= 0 ? 'ko' : ''} ${f === active ? 'active' : ''} ${isUltReady ? 'ult-ready' : ''}" id="fc-${side}-${idx}">
-    <div class="fcard-title">${c.name} ${starTag} Nv${f.lvl} <span class="fcard-tags">${tagIcons(f)}</span><span class="fcard-st">${stIcons(f)}</span></div>
+    <div class="fcard-title">${c.name} ${rarityTag} ${fusionTag} Nv${f.lvl} <span class="fcard-tags">${tagIcons(f)}</span><span class="fcard-st">${stIcons(f)}</span></div>
     <div class="fcard-hp">
       <div class="hp-bar"><i class="${hpBarClass(f)}" style="width:${clamp(f.hp / f.maxhp * 100, 0, 100)}%"></i></div>
       <div class="hp-nums">${f.hp}/${f.maxhp}</div>
@@ -4872,7 +4967,7 @@ function fighterCardHTML(f, side, idx, active) {
       ⚔️ ATQ ${f.atk} · 🛡️ DEF ${f.def} · ⚡ VEL ${f.spd}
     </div>
     <div class="fcard-sprite">
-      <span class="sprite ${side === 'e' ? 'flip' : ''}">${charIcon(f.id, 44)}</span>
+      <span class="sprite ${side === 'e' ? 'flip' : ''}">${charIcon(f.id, 64)}</span>
       <div class="platform"></div>
     </div>
     ${ps ? `<div class="fcard-passive ${ps.active ? 'on' : ''}" title="${ps.desc}">✨ ${ps.label}</div>` : ''}
@@ -6381,7 +6476,7 @@ function dexCardHTML(id) {
   const got = meta.recruited.includes(id);
   const vet = meta.roster.includes(id);
   return `<div class="dex-card ${seen ? 'seen' : 'unknown'}" data-id="${id}">
-    <div class="emoji">${seen ? charIcon(id, 32) : '❔'}</div>
+    <div class="emoji">${seen ? charIcon(id, 46) : '❔'}</div>
     <div>${c.name}</div>
     <div style="font-size:7px;">${'⭐'.repeat(c.rareza)}</div>
     ${vet ? '<div style="color:var(--accent)">🏅 veterano</div>' : got ? '<div style="color:var(--green)">✓ nakama</div>' : (seen ? '<div style="color:#999">visto</div>' : '<div style="color:#aaa">sin avistar</div>')}
