@@ -3069,6 +3069,7 @@ function screenMap() {
                 ${typeBadges(fighterTypes(f))}
                 <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>
               </div>
+              ${run.team.length > 1 ? `<span class="btn-dismiss-slot" data-dismiss-idx="${idx}" title="Expulsar de la banda" style="color:#e74c3c;font-size:11px;cursor:pointer;padding:2px 4px;margin-left:auto;opacity:0.75;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.75">🗑️</span>` : ''}
             </div>`).join('')}
           <div style="font-size:7px;color:#666;margin-top:6px;">¡El orden importa! Combaten de arriba a abajo. Arrastra (o toca ≡ y luego el destino) para reordenar · toca para ver la ficha.</div>
           <h3 style="margin-top:8px;">SINERGIAS <button class="btn small gray" id="btn-syn-info" style="font-size:7px;padding:2px 6px;">ℹ️ VER TODAS</button>
@@ -3147,6 +3148,29 @@ function screenMap() {
 
   document.querySelectorAll('.team-slot').forEach(el => {
     const idx = +el.dataset.idx;
+    const dismissBtn = el.querySelector('[data-dismiss-idx]');
+    if (dismissBtn) {
+      dismissBtn.onclick = e => {
+        e.stopPropagation();
+        if (!run || !run.team) return;
+        if (run.team.length <= 1) {
+          toast('⚠️ Debes mantener al menos 1 nakama en tu banda.');
+          return;
+        }
+        const f = run.team[idx];
+        if (!f) return;
+        const cName = charName(f);
+        modalConfirm('🗑️ Expulsar de la banda',
+          `¿Estás seguro de que quieres expulsar a <b>${cName}</b> de tu tripulación?<br><small style="color:#aaa;">Esta acción no se puede deshacer en esta partida.</small>`,
+          () => {
+            run.team.splice(idx, 1);
+            saveRun();
+            toast(`👋 ${cName} ha abandonado la banda.`);
+            screenMap();
+          }
+        );
+      };
+    }
     const handle = el.querySelector('.drag-handle');
     if (handle) handle.onclick = e => {
       e.stopPropagation();
@@ -3161,7 +3185,7 @@ function screenMap() {
       }
     };
     el.onclick = (e) => {
-      if (e.target.closest('.drag-handle')) return;
+      if (e.target.closest('.drag-handle') || e.target.closest('[data-dismiss-idx]')) return;
       if (pickedIdx !== null) {
         if (pickedIdx !== idx) moveSlot(pickedIdx, idx);
         else {
@@ -3850,9 +3874,35 @@ function showCharModal(fOrId) {
     ${ultMv ? `<div class="sheet-section"><b>💥 Habilidad Definitiva — ${ultMv.name}</b><p>${ultMv.type ? `<span class="type-badge" style="background:${TYPES[ultMv.type]?.color || '#888'}">${ultMv.type.toUpperCase()}</span> ` : ''}${ultMv.power ? ultMv.power + ' PWR · ' + Math.round((ultMv.acc || 0.9) * 100) + '% precisión' : 'MOVIMIENTO DEFINITIVO'}</p></div>` : ''}
     ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>Al nivel ${c.evo.lvl} se convierte en ${CHARS[c.evo.to] ? CHARS[c.evo.to].name : c.evo.to}.</p></div>` : ''}
     <p class="sheet-desc">${c.desc}</p>
-    <div class="actions"><button class="btn gray" id="sheet-close">CERRAR</button></div>
+    <div class="actions" style="flex-direction:column;gap:6px;">
+      ${isLive && run && run.team && run.team.includes(f) ? `<button class="btn red small" id="sheet-dismiss-btn" style="width:100%;">🗑️ EXPULSAR DE LA BANDA</button>` : ''}
+      <button class="btn gray" id="sheet-close" style="width:100%;">CERRAR</button>
+    </div>
   </div>`;
   document.body.appendChild(ov);
+  const dismissBtn = ov.querySelector('#sheet-dismiss-btn');
+  if (dismissBtn) {
+    dismissBtn.onclick = () => {
+      if (!run || !run.team) return;
+      if (run.team.length <= 1) {
+        toast('⚠️ Debes mantener al menos 1 nakama en tu banda.');
+        return;
+      }
+      modalConfirm('🗑️ Expulsar de la banda',
+        `¿Estás seguro de que quieres expulsar a <b>${c.name}</b> de tu tripulación?<br><small style="color:#aaa;">Esta acción no se puede deshacer en esta partida.</small>`,
+        () => {
+          const idx = run.team.findIndex(m => m === f);
+          if (idx !== -1) {
+            run.team.splice(idx, 1);
+            saveRun();
+            ov.remove();
+            toast(`👋 ${c.name} ha abandonado la banda.`);
+            screenMap();
+          }
+        }
+      );
+    };
+  }
   ov.querySelector('#sheet-close').onclick = () => ov.remove();
   ov.onclick = e => { if (e.target === ov) ov.remove(); };
 }
@@ -4131,14 +4181,32 @@ function screenShop() {
     .map(([id, n]) => `${ITEMS[id] ? ITEMS[id].emoji : ''} ×${n}`)
     .join(' · ');
 
+  const sellItems = Object.entries((run && run.items) || {})
+    .filter(([id, n]) => n > 0 && ITEMS[id]);
+
+  const sellItemsHTML = sellItems.length ? sellItems.map(([id, n]) => {
+    const it = ITEMS[id];
+    const sellPrice = Math.floor(it.price * 0.75);
+    return `<div class="shop-item" style="border-color:rgba(46,204,113,0.3);background:rgba(46,204,113,0.05);">
+      <span class="emoji">${it.emoji}</span>
+      <div class="info">
+        <b>${it.name}</b> <span style="font-size:8.5px;color:#aaa;">(Tienes: ${n})</span> — Venta (75%): <span class="price" style="color:#2ecc71;font-weight:bold;">+${berriesHTML(sellPrice)}</span><br>
+        <small style="color:#888;">${it.desc} · Valor original: ${it.price} 💰</small>
+      </div>
+      <button class="btn small green" data-sell="${id}">VENDER (+${sellPrice} 💰)</button>
+    </div>`;
+  }).join('') : '<div style="font-size:8.5px;color:#888;text-align:center;padding:8px;background:rgba(0,0,0,0.15);border-radius:6px;margin-bottom:10px;">Tu bolsa está vacía. No tienes objetos para vender.</div>';
+
   render(`
     ${topbar(true, false)}
     <div class="panel">
       <h2>🏪 Tienda del puerto</h2>
-      <p style="font-size:9px;margin-bottom:6px;">"¡Bienvenido! Todo pirata necesita provisiones."</p>
+      <p style="font-size:9px;margin-bottom:6px;">"¡Bienvenido! Todo pirata necesita provisiones o vender botín sobrante."</p>
       <div style="font-size:9.5px;background:rgba(255,215,0,0.12);padding:6px 10px;border-radius:6px;border:1px solid var(--gold);margin-bottom:10px;text-align:center;">
         <b>🎒 Tu Bolsa:</b> ${inventorySummary || 'Vacía'}
       </div>
+
+      <h3 style="margin-top:10px;margin-bottom:6px;font-size:11px;color:var(--gold);">🛒 COMPRAR PROVISIONES</h3>
       ${stock.map(id => {
     const it = ITEMS[id];
     const owned = (run && run.items && run.items[id]) || 0;
@@ -4151,6 +4219,10 @@ function screenShop() {
           <button class="btn small ${run.berries >= it.price ? 'green' : 'gray'}" data-buy="${id}" ${run.berries >= it.price ? '' : 'disabled'}>COMPRAR</button>
         </div>`;
   }).join('')}
+
+      <h3 style="margin-top:14px;margin-bottom:6px;font-size:11px;color:#2ecc71;">💰 VENDER OBJETOS DE TU BOLSA (75% del valor)</h3>
+      ${sellItemsHTML}
+
       <div class="actions" style="margin-top:14px;text-align:center;">
         <button class="btn blue" id="btn-leave">SEGUIR VIAJE →</button>
       </div>
@@ -4166,6 +4238,20 @@ function screenShop() {
       trackStat('shop_buy', 1);
       saveRun();
       toast(`Comprado: ${ITEMS[id].name} ${ITEMS[id].emoji}`);
+      screenShop();
+    };
+  });
+  document.querySelectorAll('[data-sell]').forEach(b => {
+    b.onclick = () => {
+      const id = b.dataset.sell;
+      if (!run || !run.items || !run.items[id] || run.items[id] <= 0) return;
+      const it = ITEMS[id];
+      const sellPrice = Math.floor(it.price * 0.75);
+      run.items[id] -= 1;
+      if (run.items[id] <= 0) delete run.items[id];
+      run.berries += sellPrice;
+      saveRun();
+      toast(`💰 Vendido: ${it.name} ${it.emoji} por +${sellPrice} Berries`);
       screenShop();
     };
   });
