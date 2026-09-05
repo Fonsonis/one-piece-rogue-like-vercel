@@ -1,4 +1,10 @@
-# No publicar el servidor local ni los datos de jugadores (contienen hashes de contraseña)
-server.js
-players/
-.claude/
+node_modules
+.git
+.openai
+.sites-runtime
+.wrangler
+.env*
+outputs
+dist
+tests
+docs

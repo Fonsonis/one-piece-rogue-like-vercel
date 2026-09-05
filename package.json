@@ -1,0 +1,14 @@
+{
+  "name": "one-piece-rogue-like-vercel",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "dev": "node scripts/serve-static.mjs",
+    "build": "node scripts/build-static.mjs",
+    "start": "node scripts/serve-static.mjs --production",
+    "test": "npm run build && node --test tests/*.test.mjs",
+    "lint": "node --check public/game.js && node --check public/data.js && node --check public/save-storage.js && node --check public/art/visuals.js && node --check public/runner/ui.mjs && node --check public/runner/engine.mjs"
+  }
+}

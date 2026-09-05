@@ -1,0 +1,17 @@
+{
+  "name": "One Piece Rogue Like",
+  "short_name": "OP Rogue Like",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#2f7fc4",
+  "theme_color": "#2f7fc4",
+  "icons": [
+    {
+      "src": "Images/Logo.png",
+      "sizes": "192x192 512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
