@@ -13,12 +13,47 @@ for (const [id, c] of Object.entries(CHARS)) if (c.evo) BASE_OF[c.evo.to] = id;
 function baseFormOf(id) { while (BASE_OF[id]) id = BASE_OF[id]; return id; }
 
 // ---------- Sprites de personajes ----------
-// Coloca cada PNG en la carpeta sprites/ con el nombre <id>.png y añade el id aquí.
-const SPRITES = ['luffy', 'zoro', 'nami', 'usopp', 'usopp2', 'sanji', 'arlong', 'bandido', 'marineraso'];
+// Coloca cada PNG en la carpeta sprites/ con el nombre <id>.png (o mapeado en SPRITES) y añade el id aquí.
+const SPRITES = {
+  luffy: 'luffy',
+  zoro: 'zoro',
+  nami: 'nami',
+  usopp: 'usopp',
+  usopp2: 'usopp2',
+  sanji: 'sanji',
+  arlong: 'arlong',
+  bandido: 'bandido',
+  marineraso: 'marineraso',
+  benn: 'benn',
+  brook: 'brook',
+  buggy: 'buggy',
+  morgan: 'morgan',
+  chopper: 'chopper',
+  coby: 'coby',
+  crocodile: 'crocodile',
+  enel: 'enel',
+  franky: 'franky',
+  gin: 'gin',
+  marco: 'marco',
+  mihawk: 'mihawk',
+  robin: 'robin',
+  lucci: 'lucci',
+  shanks: 'shanks',
+  smoker: 'smoker',
+  tashigi: 'tashigi',
+  vivi: 'vivi',
+  wapol: 'wapol',
+};
+
 function spriteOf(id) {
-  if (SPRITES.includes(id)) return id;
-  const b = baseFormOf(id); // las evoluciones reutilizan el sprite de su forma base
-  return SPRITES.includes(b) ? b : null;
+  if (Array.isArray(SPRITES)) {
+    if (SPRITES.includes(id)) return id;
+    const b = baseFormOf(id);
+    return SPRITES.includes(b) ? b : null;
+  }
+  if (SPRITES[id]) return SPRITES[id];
+  const b = baseFormOf(id);
+  return SPRITES[b] || null;
 }
 // Icono de personaje: sprite PNG si existe, emoji si no
 function charIcon(id, px = 26) {
