@@ -133,3 +133,14 @@ test('all advertised passive modifiers are applied and remain bounded',()=>{
  })()`);
  assert.deepEqual(Array.from(errors),[]);
 });
+
+
+test('two living nakamas can protect the first falling ally once per journey',()=>{
+ const h=combatHarness();
+ assert.ok(h.exec(`(()=>{
+  const p=makeChar('luffy',20),p2=makeChar('zoro',20),e=makeChar('bandido',20);
+  run={mode:'story',saga:0,team:[p,p2],items:{}};startBattle([e],{wild:true});
+  p.hp=0;afterRound();if(p.hp!==1||!run.nakamaGuardUsed)return false;
+  p.hp=0;afterRound();return p.hp===0&&battle.curP===p2;
+ })()`));
+});

@@ -4766,7 +4766,7 @@ const SYNERGIES = {
   },
   Nakama: {
     name: 'Espíritu de Tripulación',
-    d1: '+10% a todas las estadísticas si ningún miembro comparte tipo primario',
+    d1: '+10% al ataque, defensas y velocidad si ningún miembro comparte tipo primario',
     d2: 'Un aliado que caiga a 0 PS sobrevive con 1 PS una vez por viaje'
   },
 };
@@ -5525,7 +5525,8 @@ function afterRound() {
       log(`✨ ¡Segunda Vida! ${charName(f)} se niega a morir. ¡Yohohoho!`);
       return;
     }
-    if (synergyTier(teamOf(f), 'Nakama') === 2) {
+    const guardTeam = teamOf(f).map(ally => ally === f ? {...ally, hp:1} : ally);
+    if (synergyTier(guardTeam, 'Nakama') === 2) {
       const used = isPlayer
         ? (b.tower ? tower && tower.nakamaGuardUsed : run && run.nakamaGuardUsed)
         : b.eGuardUsed;
