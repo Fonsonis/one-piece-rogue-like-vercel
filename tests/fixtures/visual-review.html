@@ -16,7 +16,7 @@ document.querySelector('#qa-buggy').onclick=()=>{
  gameOver=()=>render('<div class="panel"><h2>Combate terminado: derrota</h2></div>');
 };
 document.querySelector('#qa-map').onclick=()=>{
- qaStop();run={mode:'story',saga:0,islandIdx:0,diff:1,team:[makeChar('luffy',5),makeChar('zoro',5)],items:{},berries:300,map:genMap(SAGAS[0].islands[0]),pos:null,emblems:[]};
+ qaStop();run={mode:'story',saga:0,islandIdx:0,diff:1,team:[makeChar('luffy',5),makeChar('zoro',5)],items:{},berries:300,map:genMap(SAGAS[0].islands[0]),pos:null,badges:[],nuzCaught:{},sagaRerollUsed:false};
  run.team[0].xp=75;screenMap();
 };
 </script></body></html>
