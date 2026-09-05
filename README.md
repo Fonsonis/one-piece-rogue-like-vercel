@@ -1,8 +1,12 @@
 # One Piece Rogue Like — edición estática para Vercel
 
-Juego fan de One Piece, sin ánimo de lucro. Esta versión conserva el motor, diseño, música, sprites, 457 personajes, 11 sagas, 57 islas, 140 logros y el minijuego Luffy Run de la versión mejorada.
+Juego fan de One Piece, sin ánimo de lucro. La edición Egghead actualiza el balance y la interfaz, conservando música, sprites, 457 personajes, 11 sagas, 57 islas, 140 logros y el minijuego Luffy Run de la versión mejorada.
 
 Todo se ejecuta en el navegador. No necesita Next.js, Cloudflare, cuentas, cookies de sesión, API, base de datos, Vercel Blob ni otro servicio de almacenamiento. No tiene dependencias npm; Node.js solo se utiliza para preparar los archivos y probarlos.
+
+## Edición Egghead
+
+Buggy contra Buggy ya no bloquea la partida. Se revisan pasivas y técnicas, se añade EXP visible, se ajustan las escalas de los 457 sprites y se incorporan doce escenarios ilustrados. Se conservan estadísticas base, niveles de enemigos y curvas de progresión. Consulta [la revisión de balance](docs/combat-balance.md), [las 457 fichas](docs/character-balance.csv) y [la dirección visual](docs/art-direction.md).
 
 ## Jugar en local
 
@@ -56,7 +60,7 @@ npm test
 npm run lint
 ```
 
-Las pruebas verifican contenido del juego, los 457 atlas y retratos, 2.239 escenarios con/sin efectos visuales, Nuzlocke, Luffy Run, JSON local, recuperación, importaciones inválidas, almacenamiento bloqueado y copia exacta de todos los recursos al despliegue. Las pruebas no requieren red ni dependencias.
+Las pruebas verifican contenido del juego, los 457 atlas y retratos, 2.240 escenarios con/sin efectos visuales, Nuzlocke, Luffy Run, JSON local, recuperación, importaciones inválidas, almacenamiento bloqueado y copia exacta de todos los recursos al despliegue. También validan 208.849 emparejamientos y simulan 2.742 combates. Las pruebas no requieren red ni dependencias. Para reproducir la comparación con la revisión anterior: `node scripts/audit-balance.mjs 607b860`.
 
 ## Estructura
 

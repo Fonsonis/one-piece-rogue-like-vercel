@@ -1,0 +1,580 @@
+{
+  "baseline": "607b860",
+  "allStatsAndProgressionUnchanged": true,
+  "scenarios": 855,
+  "oldWins": 114,
+  "newWins": 122,
+  "stalled": 0,
+  "results": [
+    {
+      "saga": "eastblue",
+      "island": "Shells Town",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 12.4,
+      "newMeanRounds": 12.4,
+      "stalled": 0
+    },
+    {
+      "saga": "eastblue",
+      "island": "Orange Town",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 12.07,
+      "newMeanRounds": 12.07,
+      "stalled": 0
+    },
+    {
+      "saga": "eastblue",
+      "island": "Villa Syrup",
+      "oldWins": 3,
+      "newWins": 3,
+      "trials": 15,
+      "oldMeanRounds": 11.93,
+      "newMeanRounds": 11.6,
+      "stalled": 0
+    },
+    {
+      "saga": "eastblue",
+      "island": "Baratie",
+      "oldWins": 3,
+      "newWins": 3,
+      "trials": 15,
+      "oldMeanRounds": 11.8,
+      "newMeanRounds": 11.8,
+      "stalled": 0
+    },
+    {
+      "saga": "eastblue",
+      "island": "Arlong Park",
+      "oldWins": 1,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 12.07,
+      "newMeanRounds": 12.13,
+      "stalled": 0
+    },
+    {
+      "saga": "eastblue",
+      "island": "Loguetown",
+      "oldWins": 1,
+      "newWins": 2,
+      "trials": 15,
+      "oldMeanRounds": 10.67,
+      "newMeanRounds": 9.93,
+      "stalled": 0
+    },
+    {
+      "saga": "alabasta",
+      "island": "Whiskey Peak",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 10.07,
+      "newMeanRounds": 8.8,
+      "stalled": 0
+    },
+    {
+      "saga": "alabasta",
+      "island": "Little Garden",
+      "oldWins": 3,
+      "newWins": 3,
+      "trials": 15,
+      "oldMeanRounds": 9.07,
+      "newMeanRounds": 9.07,
+      "stalled": 0
+    },
+    {
+      "saga": "alabasta",
+      "island": "Isla Drum",
+      "oldWins": 3,
+      "newWins": 4,
+      "trials": 15,
+      "oldMeanRounds": 13.2,
+      "newMeanRounds": 12.67,
+      "stalled": 0
+    },
+    {
+      "saga": "alabasta",
+      "island": "Rainbase",
+      "oldWins": 4,
+      "newWins": 3,
+      "trials": 15,
+      "oldMeanRounds": 11.73,
+      "newMeanRounds": 11.4,
+      "stalled": 0
+    },
+    {
+      "saga": "alabasta",
+      "island": "Alubarna",
+      "oldWins": 1,
+      "newWins": 3,
+      "trials": 15,
+      "oldMeanRounds": 11.73,
+      "newMeanRounds": 10.07,
+      "stalled": 0
+    },
+    {
+      "saga": "skypiea",
+      "island": "Jaya",
+      "oldWins": 6,
+      "newWins": 6,
+      "trials": 15,
+      "oldMeanRounds": 10.2,
+      "newMeanRounds": 10.2,
+      "stalled": 0
+    },
+    {
+      "saga": "skypiea",
+      "island": "Playa Angel",
+      "oldWins": 5,
+      "newWins": 5,
+      "trials": 15,
+      "oldMeanRounds": 9.07,
+      "newMeanRounds": 9.07,
+      "stalled": 0
+    },
+    {
+      "saga": "skypiea",
+      "island": "Upper Yard",
+      "oldWins": 4,
+      "newWins": 4,
+      "trials": 15,
+      "oldMeanRounds": 11.8,
+      "newMeanRounds": 11.8,
+      "stalled": 0
+    },
+    {
+      "saga": "skypiea",
+      "island": "Santuario de Dios",
+      "oldWins": 1,
+      "newWins": 2,
+      "trials": 15,
+      "oldMeanRounds": 7.4,
+      "newMeanRounds": 7.53,
+      "stalled": 0
+    },
+    {
+      "saga": "water7",
+      "island": "Water 7",
+      "oldWins": 9,
+      "newWins": 9,
+      "trials": 15,
+      "oldMeanRounds": 10.07,
+      "newMeanRounds": 10.07,
+      "stalled": 0
+    },
+    {
+      "saga": "water7",
+      "island": "Tren Marino",
+      "oldWins": 6,
+      "newWins": 6,
+      "trials": 15,
+      "oldMeanRounds": 11.07,
+      "newMeanRounds": 9.93,
+      "stalled": 0
+    },
+    {
+      "saga": "water7",
+      "island": "Enies Lobby",
+      "oldWins": 3,
+      "newWins": 4,
+      "trials": 15,
+      "oldMeanRounds": 10.8,
+      "newMeanRounds": 10.33,
+      "stalled": 0
+    },
+    {
+      "saga": "water7",
+      "island": "Torre de la Justicia",
+      "oldWins": 2,
+      "newWins": 1,
+      "trials": 15,
+      "oldMeanRounds": 12.67,
+      "newMeanRounds": 10.67,
+      "stalled": 0
+    },
+    {
+      "saga": "thriller",
+      "island": "Niebla Fantasma",
+      "oldWins": 6,
+      "newWins": 6,
+      "trials": 15,
+      "oldMeanRounds": 8.47,
+      "newMeanRounds": 8.53,
+      "stalled": 0
+    },
+    {
+      "saga": "thriller",
+      "island": "Mansión Hogback",
+      "oldWins": 5,
+      "newWins": 6,
+      "trials": 15,
+      "oldMeanRounds": 9.47,
+      "newMeanRounds": 8.67,
+      "stalled": 0
+    },
+    {
+      "saga": "thriller",
+      "island": "Jardín Helado",
+      "oldWins": 3,
+      "newWins": 3,
+      "trials": 15,
+      "oldMeanRounds": 8.93,
+      "newMeanRounds": 7.73,
+      "stalled": 0
+    },
+    {
+      "saga": "thriller",
+      "island": "Mástil Mayor",
+      "oldWins": 2,
+      "newWins": 2,
+      "trials": 15,
+      "oldMeanRounds": 10.6,
+      "newMeanRounds": 10.27,
+      "stalled": 0
+    },
+    {
+      "saga": "marineford",
+      "island": "Amazon Lily",
+      "oldWins": 7,
+      "newWins": 7,
+      "trials": 15,
+      "oldMeanRounds": 7.93,
+      "newMeanRounds": 7.93,
+      "stalled": 0
+    },
+    {
+      "saga": "marineford",
+      "island": "Impel Down Nv1-3",
+      "oldWins": 6,
+      "newWins": 6,
+      "trials": 15,
+      "oldMeanRounds": 12.47,
+      "newMeanRounds": 12.47,
+      "stalled": 0
+    },
+    {
+      "saga": "marineford",
+      "island": "Impel Down Nv4-6",
+      "oldWins": 3,
+      "newWins": 3,
+      "trials": 15,
+      "oldMeanRounds": 7.47,
+      "newMeanRounds": 6.07,
+      "stalled": 0
+    },
+    {
+      "saga": "marineford",
+      "island": "Bahía de Marineford",
+      "oldWins": 3,
+      "newWins": 3,
+      "trials": 15,
+      "oldMeanRounds": 11.27,
+      "newMeanRounds": 11.27,
+      "stalled": 0
+    },
+    {
+      "saga": "marineford",
+      "island": "Plaza Ejecución",
+      "oldWins": 0,
+      "newWins": 1,
+      "trials": 15,
+      "oldMeanRounds": 12.27,
+      "newMeanRounds": 12,
+      "stalled": 0
+    },
+    {
+      "saga": "gyojin",
+      "island": "Bosque Marino",
+      "oldWins": 9,
+      "newWins": 9,
+      "trials": 15,
+      "oldMeanRounds": 10.33,
+      "newMeanRounds": 10.33,
+      "stalled": 0
+    },
+    {
+      "saga": "gyojin",
+      "island": "Distrito Gyojin",
+      "oldWins": 7,
+      "newWins": 7,
+      "trials": 15,
+      "oldMeanRounds": 11.2,
+      "newMeanRounds": 11.2,
+      "stalled": 0
+    },
+    {
+      "saga": "gyojin",
+      "island": "Palacio Ryugu",
+      "oldWins": 5,
+      "newWins": 6,
+      "trials": 15,
+      "oldMeanRounds": 11.2,
+      "newMeanRounds": 9.93,
+      "stalled": 0
+    },
+    {
+      "saga": "gyojin",
+      "island": "Plaza Gyoncorde",
+      "oldWins": 2,
+      "newWins": 2,
+      "trials": 15,
+      "oldMeanRounds": 8.53,
+      "newMeanRounds": 8.53,
+      "stalled": 0
+    },
+    {
+      "saga": "dressrosa",
+      "island": "Punk Hazard",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 6.93,
+      "newMeanRounds": 7.13,
+      "stalled": 0
+    },
+    {
+      "saga": "dressrosa",
+      "island": "Puerto de Acacia",
+      "oldWins": 0,
+      "newWins": 2,
+      "trials": 15,
+      "oldMeanRounds": 7.73,
+      "newMeanRounds": 7.53,
+      "stalled": 0
+    },
+    {
+      "saga": "dressrosa",
+      "island": "Coliseo Corrida",
+      "oldWins": 1,
+      "newWins": 1,
+      "trials": 15,
+      "oldMeanRounds": 8.07,
+      "newMeanRounds": 8,
+      "stalled": 0
+    },
+    {
+      "saga": "dressrosa",
+      "island": "Palacio Real",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 6.47,
+      "newMeanRounds": 7.13,
+      "stalled": 0
+    },
+    {
+      "saga": "dressrosa",
+      "island": "Campo de Flores",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 5.47,
+      "newMeanRounds": 5.47,
+      "stalled": 0
+    },
+    {
+      "saga": "dressrosa",
+      "island": "Puerto Final",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 5.13,
+      "newMeanRounds": 5.13,
+      "stalled": 0
+    },
+    {
+      "saga": "wholecake",
+      "island": "Bosque Seductor",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 5.87,
+      "newMeanRounds": 6,
+      "stalled": 0
+    },
+    {
+      "saga": "wholecake",
+      "island": "Ciudad Dulce",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 7.4,
+      "newMeanRounds": 7.4,
+      "stalled": 0
+    },
+    {
+      "saga": "wholecake",
+      "island": "Castillo Whole Cake",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 5.67,
+      "newMeanRounds": 5.67,
+      "stalled": 0
+    },
+    {
+      "saga": "wholecake",
+      "island": "La Boda",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 5.67,
+      "newMeanRounds": 5.47,
+      "stalled": 0
+    },
+    {
+      "saga": "wholecake",
+      "island": "Isla Cacao",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 4,
+      "newMeanRounds": 4,
+      "stalled": 0
+    },
+    {
+      "saga": "wholecake",
+      "island": "Huida Final",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 4.67,
+      "newMeanRounds": 4.67,
+      "stalled": 0
+    },
+    {
+      "saga": "wano",
+      "island": "Kuri",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 4.87,
+      "newMeanRounds": 4.87,
+      "stalled": 0
+    },
+    {
+      "saga": "wano",
+      "island": "Udon",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 5.47,
+      "newMeanRounds": 5.47,
+      "stalled": 0
+    },
+    {
+      "saga": "wano",
+      "island": "La Capital",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 6.6,
+      "newMeanRounds": 6.6,
+      "stalled": 0
+    },
+    {
+      "saga": "wano",
+      "island": "Onigashima Exterior",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 4.33,
+      "newMeanRounds": 4.33,
+      "stalled": 0
+    },
+    {
+      "saga": "wano",
+      "island": "Castillo del Cráneo",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 4.93,
+      "newMeanRounds": 4.53,
+      "stalled": 0
+    },
+    {
+      "saga": "wano",
+      "island": "Cúpula",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 4,
+      "newMeanRounds": 4,
+      "stalled": 0
+    },
+    {
+      "saga": "wano",
+      "island": "Techo del Mundo",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 4.67,
+      "newMeanRounds": 4.67,
+      "stalled": 0
+    },
+    {
+      "saga": "egghead",
+      "island": "Laboratorio",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 4.67,
+      "newMeanRounds": 4.67,
+      "stalled": 0
+    },
+    {
+      "saga": "egghead",
+      "island": "Fábrica",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 4.67,
+      "newMeanRounds": 4.67,
+      "stalled": 0
+    },
+    {
+      "saga": "egghead",
+      "island": "Ciudad Futura",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 4.27,
+      "newMeanRounds": 4.27,
+      "stalled": 0
+    },
+    {
+      "saga": "egghead",
+      "island": "Asalto Marine",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 4,
+      "newMeanRounds": 4,
+      "stalled": 0
+    },
+    {
+      "saga": "egghead",
+      "island": "Los Cinco Ancianos",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 4,
+      "newMeanRounds": 4,
+      "stalled": 0
+    },
+    {
+      "saga": "egghead",
+      "island": "Trono Vacío",
+      "oldWins": 0,
+      "newWins": 0,
+      "trials": 15,
+      "oldMeanRounds": 4,
+      "newMeanRounds": 4,
+      "stalled": 0
+    }
+  ]
+}

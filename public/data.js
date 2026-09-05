@@ -54,7 +54,7 @@ const CHART = {
 const CHART_NOTES = {
   Agua:      'Daño x1.5 a usuarios FRUTA',
   Viento:    'Propaga el 20% del daño al siguiente enemigo',
-  Veneno:    'Daño neutral: ignora el 20% de DEF/ESP_DEF',
+  Veneno:    'Ignora el 20% de DEF/ESP_DEF; -25% contra Veneno',
   Oscuridad: 'Daño x1.35 a cualquier usuario FRUTA',
 };
 
@@ -133,7 +133,7 @@ const MOVES = {
   remedytouch:   { name: 'Remedy Touch',        type: 'Golpe',   power: 0, acc: 1, effect: 'heal40' },
   monsterpoint:  { name: 'Monster Point',       type: 'Golpe',   power: 100, acc: 0.85 },
   clutch:        { name: 'Cien Fleurs: Clutch', type: 'Fruta',   power: 70, acc: 0.95 },
-  demoniofleur:  { name: 'Demonio Fleur',       type: 'Oscuridad', power: 100, acc: 0.85 },
+  demoniofleur:  { name: 'Demonio Fleur',       type: 'Fruta', power: 100, acc: 0.85 },
   strongright:   { name: 'Strong Right',        type: 'Golpe',   power: 70, acc: 0.95 },
   radicalbeam:   { name: 'Radical Beam',        type: 'Rayo',    power: 110, acc: 0.85 },
   soulsolid:     { name: 'Soul Solid',          type: 'Hielo',   power: 75, acc: 0.9 },
@@ -166,7 +166,7 @@ const MOVES = {
   rokuogan:      { name: 'Rokuogan',            type: 'Haki',    power: 120, acc: 0.85 },
   distortion:    { name: 'Distortion Future',   type: 'Fruta',   power: 80, acc: 0.9 },
   togentotsuka:  { name: 'Togen Totsuka',       type: 'Corte',   power: 135, acc: 0.8 },
-  raimeihakke:   { name: 'Raimei Hakke',        type: 'Rayo',    power: 115, acc: 0.85 },
+  raimeihakke:   { name: 'Raimei Hakke',        type: 'Haki',    power: 115, acc: 0.85 },
   llamalunaria:  { name: 'Llama Lunaria',       type: 'Fuego',   power: 110, acc: 0.85 },
   virusmomia:    { name: 'Virus Momia',         type: 'Veneno',  power: 105, acc: 0.85 },
   mochitsuki:    { name: 'Mochi Tsuki',         type: 'Fruta',   power: 105, acc: 0.85 },
@@ -186,10 +186,10 @@ const CHARS = {
     desc: 'Chico de goma que quiere ser Rey de los Piratas.',
   },
   luffy2: {
-    name: 'Luffy Gear 2', emoji: '👒', types: ['Golpe', 'Fruta'],
+    name: 'Luffy: Gears y Haki', emoji: '👒', types: ['Golpe', 'Fruta'],
     base: [30, 16, 10, 15], rareza: 4,
     learnset: [[20, 'jetpistol'], [30, 'hakiarm'], [38, 'kingkonggun']],
-    desc: 'Bombea sangre a toda velocidad. Golpes jet.',
+    desc: 'Gear Second al nivel 20, Armadura al 30 y Gear Fourth al 38.',
   },
   zoro: {
     name: 'Zoro', emoji: '🗡️', types: ['Corte'],
@@ -356,7 +356,7 @@ const CHARS = {
   buggy: {
     name: 'Buggy el Payaso', emoji: '🤡', types: ['Corte', 'Fruta'],
     base: [27, 13, 9, 10], rareza: 3, boss: true,
-    learnset: [[1, 'cuchillas'], [8, 'cortedoble'], [16, 'golpebajo']],
+    learnset: [[1, 'cuchillas'], [1, 'buggyball'], [8, 'cortedoble'], [16, 'muggyball']],
     desc: 'Comió la fruta Bara Bara. Las espadas no le hacen nada.',
   },
   sham: {
@@ -671,217 +671,146 @@ const LORE = {
   // --- Sombrero de Paja ---
   luffy: {
     sp: 10, clase: 'Zoan Mítica / Haki', faccion: 'Sombrero de Paja',
-    pasiva: { name: 'Espíritu Inquebrantable', desc: 'Gana +15% de ATQ cada vez que cae por debajo del 50% de PS.' },
-    ulti: { name: 'Bajrang Gun', desc: 'Daño masivo en área que ignora el 30% de la DEF rival y aturde 1 turno.' },
   },
   zoro: {
     sp: 8, clase: 'Haki / Marcial', faccion: 'Sombrero de Paja',
-    pasiva: { name: 'Camino del Ashura', desc: 'Su tasa de crítico aumenta cuanto menos PS le queden.' },
-    ulti: { name: 'Santoryu Ogi: Sanzen Sekai', desc: 'Tres cortes sucesivos que provocan sangrado garantizado.' },
   },
   nami: {
     sp: 12, clase: 'Científico / Clima', faccion: 'Sombrero de Paja',
-    pasiva: { name: 'Lectura Meteorológica', desc: 'Aumenta la evasión de todo el equipo un 10%.' },
-    ulti: { name: 'Zeus Breeze Tempo', desc: 'Descarga en cadena que golpea a todos los enemigos activos.' },
   },
   usopp: {
     sp: 9, clase: 'Científico / Francotirador', faccion: 'Sombrero de Paja',
-    pasiva: { name: 'Estrategia Cobarde', desc: 'Mayor probabilidad de escapar y de atacar primero.' },
-    ulti: { name: 'Hissatsu Firebird Star', desc: 'Disparo ígneo perforante de largo alcance que quema al objetivo.' },
   },
   sanji: {
     sp: 10, clase: 'Haki / Fuego / Científico', faccion: 'Sombrero de Paja',
-    pasiva: { name: 'Exoesqueleto Germa', desc: 'Reduce el daño físico recibido un 15%.' },
-    ulti: { name: 'Ifrit Jambe: Boeuf Burst', desc: 'Combo de fuego azul que quema e impide la curación rival.' },
   },
   chopper: {
     sp: 11, clase: 'Zoan / Médico', faccion: 'Sombrero de Paja',
-    pasiva: { name: 'Rumble Ball', desc: 'Cambia de forma según el rol que necesite el combate.' },
-    ulti: { name: 'Monster Point', desc: 'Se transforma, aumentando ATQ y DEF un 50% durante 3 turnos.' },
   },
   robin: {
     sp: 12, clase: 'Paramecia / Control', faccion: 'Sombrero de Paja',
-    pasiva: { name: 'Ojos en Todas Partes', desc: 'Revela las debilidades y tipos de los enemigos.' },
-    ulti: { name: 'Demonio Fleur', desc: 'Daño masivo continuo que además reduce el ATQ del equipo rival.' },
   },
   franky: {
     sp: 8, clase: 'Científico / Ciborg / Tanque', faccion: 'Sombrero de Paja',
-    pasiva: { name: 'Armadura Frontal', desc: 'Inmune a golpes críticos recibidos de frente.' },
-    ulti: { name: 'Franky Radical Beam', desc: 'Rayo láser de daño perforante puro en línea recta.' },
   },
   brook: {
     sp: 11, clase: 'Paramecia / Hielo / Soporte', faccion: 'Sombrero de Paja',
-    pasiva: { name: 'Segunda Vida', desc: 'Revive una vez por viaje con el 20% de sus PS.' },
-    ulti: { name: 'Lullaby Flurry', desc: 'Duerme a todo el bando rival y acelera a los aliados.' },
   },
   jinbe: {
     sp: 9, clase: 'Gyojin Karate / Tanque / Agua', faccion: 'Sombrero de Paja',
-    pasiva: { name: 'Coraza Marina', desc: 'Absorbe parte del daño y protege al aliado con menos PS.' },
-    ulti: { name: 'Gyojin Karate Ogi: Buraikan', desc: 'Onda de choque expansiva que dispersa al equipo rival.' },
   },
   // --- Emperadores, leyendas y jefes finales ---
   roger: {
     clase: 'Líder Legendario / Haki Puro', faccion: 'Piratas de Roger',
-    pasiva: { name: 'Voz de Todas las Cosas', desc: 'Anula emboscadas y otorga 100% de crítico durante 2 turnos.' },
-    ulti: { name: 'Kamusari (Divine Departure)', desc: 'Corte frontal de Haki que anula las mejoras defensivas del rival.' },
   },
   newgate: {
     clase: 'Coloso / Destructor', faccion: 'Piratas de Barbablanca',
-    pasiva: { name: 'El Hombre más Fuerte', desc: 'Inmune a retrocesos y aturdimientos mientras supere el 25% de PS.' },
-    ulti: { name: 'Shima Yurashi', desc: 'Resquebraja el espacio causando daño sísmico masivo a todos.' },
   },
   kaido: {
     clase: 'Super Tanque / Bestia', faccion: 'Piratas de las Bestias',
-    pasiva: { name: 'Bolo Breath', desc: 'Ráfaga de fuego que quema de forma persistente y destruye escudos.' },
-    ulti: { name: 'Kaen Daiko (Dragón Llameante)', desc: 'Se envuelve en magma y refleja el daño físico recibido.' },
   },
   bigmom: {
     clase: 'Control / Daño Híbrido', faccion: 'Piratas de Big Mom',
-    pasiva: { name: 'Soul Pocus', desc: 'Drena al instante el 30% de PS a los enemigos más lentos que ella.' },
-    ulti: { name: 'Ikoku Sovereignty', desc: 'Cañonazo de energía lineal con perforación total.' },
   },
   shanks: {
     clase: 'Asesino / Conquistador', faccion: 'Piratas del Pelirrojo',
-    pasiva: { name: 'Haki Asesino de Observación', desc: 'Impide que los rivales esquiven o anticipen ataques 3 turnos.' },
-    ulti: { name: 'Kamusari Carmesí', desc: 'Golpe certero que desactiva las pasivas del objetivo.' },
   },
   teach: {
     clase: 'Inhabilitador Dual', faccion: 'Piratas de Barbanegra',
-    pasiva: { name: 'Black Hole / Kurouzu', desc: 'Atrae a un enemigo y desactiva su Fruta del Diablo 2 turnos.' },
-    ulti: { name: 'Dualidad Caótica', desc: 'Maremoto oscuro que absorbe los buffs rivales y los da a sus aliados.' },
   },
   // --- Facciones del mundo ---
   law: {
     clase: 'Táctico / Soporte', faccion: 'Peor Generación / Piratas Heart',
-    ulti: { name: '(Ope Ope) Room & Shambles', desc: 'Intercambia posiciones en el campo e inflige daño interno con Gamma Knife.' },
   },
   kid: {
     clase: 'Brawler / Destructor', faccion: 'Peor Generación',
-    ulti: { name: 'Punk Rotten / Damned Punk', desc: 'Convierte la chatarra enemiga en un cañón electromagnético de repetición.' },
   },
   mihawk: {
     clase: 'Duelista / Asesino', faccion: 'Cross Guild / Ex-Shichibukai',
-    pasiva: { name: 'Ojos de Halcón', desc: 'Sus ataques nunca fallan e ignoran la evasión; +15% de crítico.' },
-    ulti: { name: 'Corte del Mejor Espadachín', desc: 'Crítico asegurado si el objetivo no tiene un estado defensivo activo.' },
   },
   akainu: {
     clase: 'Destructor Ofensivo', faccion: 'Marina (Almirante de Flota)',
-    pasiva: { name: 'Justicia de Magma', desc: '+20% de daño de Fuego e inflige Quemadura al atacar.' },
-    ulti: { name: 'Dai Funka & Meigo', desc: 'Aplica Quemadura Letal que consume el 15% del PS máximo por turno.' },
   },
   kizaru: {
     clase: 'Velocista / Sniper', faccion: 'Marina (Almirante)',
-    pasiva: { name: 'Velocidad de la Luz', desc: '+30% de VEL e iniciativa prioritaria en su turno.' },
-    ulti: { name: 'Yasakani no Magatama', desc: 'Ataca siempre primero, ignorando el orden natural de iniciativa.' },
   },
   aokiji: {
     clase: 'Control de Masas', faccion: 'Ex-Marina',
-    pasiva: { name: 'Edad de Hielo', desc: 'Reduce la VEL enemiga un 20% y ralentiza al ser atacado.' },
-    ulti: { name: 'Ice Age', desc: 'Congela el terreno anulando cambios de personaje y reduciendo la VEL rival un 50%.' },
   },
   garp: {
     clase: 'Luchador / Rompedor', faccion: 'Marina (Vicealmirante)',
-    pasiva: { name: 'Puños del Héroe', desc: 'Sus ataques físicos ignoran el 30% de la DEF rival.' },
-    ulti: { name: 'Galaxy Impact', desc: 'Daño masivo que destruye armaduras y coberturas enemigas.' },
   },
   dragon: {
     clase: 'Líder / Viento y Clima', faccion: 'Ejército Revolucionario',
-    pasiva: { name: 'Vientos de Libertad', desc: '+15% de VEL y Evasión a todo su bando.' },
-    ulti: { name: 'Vientos de Libertad', desc: 'Limpia todos los debuffs del equipo y aumenta la velocidad global un 30%.' },
   },
   oden: {
     clase: 'Espadachín Dual', faccion: 'País de Wano / Piratas de Roger',
-    pasiva: { name: 'Estilo de Dos Espadas', desc: '+20% de Daño Crítico y +10% de Probabilidad Crítica.' },
-    ulti: { name: 'Togen Totsuka', desc: 'Deja una cicatriz permanente que reduce la regeneración enemiga a 0.' },
   },
   smoker: {
     clase: 'Capitán de Humo', faccion: 'Marina',
-    pasiva: { name: 'Cuerpo de Humo', desc: '+20% de Evasión contra ataques de Golpe y Corte.' },
-    ulti: { name: 'White Blow', desc: 'Daño de viento que inmoviliza al rival.' },
   },
   crocodile: {
     clase: 'Control / Desecador', faccion: 'Cross Guild / Baroque Works',
-    ulti: { name: 'Desert Spada & Sables', desc: 'Deseca al rival reduciendo su DEF a 0 durante 1 turno.' },
   },
   doflamingo: {
     clase: 'Titiritero / DPS', faccion: 'Familia Donquixote',
-    ulti: { name: 'Parasite & Birdcage', desc: 'Obliga a un enemigo a golpear a sus propios compañeros.' },
   },
   kuma: {
     clase: 'Tanque / Expulsor', faccion: 'Revolucionarios / Ex-Shichibukai',
-    ulti: { name: 'Ursus Shock / Repel', desc: 'Expulsa temporalmente a un enemigo de la batalla y comprime dolor.' },
   },
   hancock: {
     clase: 'Inhabilitadora / DPS', faccion: 'Piratas Kuja',
-    ulti: { name: 'Mero Mero Mellow', desc: 'Petrifica al instante a cualquier enemigo con menos Haki que ella.' },
   },
   akainu: {
     clase: 'Destructor Ofensivo', faccion: 'Marina (Almirante de Flota)',
-    ulti: { name: 'Dai Funka & Meigo', desc: 'Aplica Quemadura Letal que consume el 15% del PS máximo por turno.' },
   },
   kizaru: {
     clase: 'Velocista / Sniper', faccion: 'Marina (Almirante)',
-    ulti: { name: 'Yasakani no Magatama', desc: 'Ataca siempre primero, ignorando el orden natural de iniciativa.' },
   },
   aokiji: {
     clase: 'Control de Masas', faccion: 'Ex-Marina',
-    ulti: { name: 'Ice Age', desc: 'Congela el terreno anulando cambios de personaje y reduciendo la VEL rival un 50%.' },
   },
   garp: {
     clase: 'Luchador / Rompedor', faccion: 'Marina (Vicealmirante)',
-    ulti: { name: 'Galaxy Impact', desc: 'Daño masivo que destruye armaduras y coberturas enemigas.' },
   },
   dragon: {
     clase: 'Líder / Viento y Clima', faccion: 'Ejército Revolucionario',
-    ulti: { name: 'Vientos de Libertad', desc: 'Limpia todos los debuffs del equipo y aumenta la velocidad global un 30%.' },
   },
   sabo: {
     clase: 'Artes Marciales / Fuego', faccion: 'Ejército Revolucionario',
-    ulti: { name: 'Ryusoken: Hiken', desc: 'Destruye la defensa del enemigo principal y quema a los adyacentes.' },
   },
   lucci: {
     clase: 'Asesino / Depredador', faccion: 'CP0 / Gobierno Mundial',
-    ulti: { name: 'Rokuogan Despertado', desc: 'Golpe de penetración pura que ignora el 100% de la armadura.' },
   },
   bonney: {
     clase: 'Alteradora Temporal', faccion: 'Peor Generación',
-    ulti: { name: 'Distortion Future', desc: 'Adopta temporalmente las estadísticas de una carta Legendaria.' },
   },
   vegapunk: {
     clase: 'Soporte Tecnológico', faccion: 'Ciencia de Egghead',
-    ulti: { name: 'Punk Records Shield', desc: 'Despliega escudos de luz sólida y regenera objetos consumibles en combate.' },
   },
   oden: {
     clase: 'Espadachín Dual', faccion: 'País de Wano / Piratas de Roger',
-    ulti: { name: 'Togen Totsuka', desc: 'Deja una cicatriz permanente que reduce la regeneración enemiga a 0.' },
   },
   yamato: {
     clase: 'Guardián / Hielo', faccion: 'País de Wano',
-    ulti: { name: 'Raimei Hakke & Espejo de Hielo', desc: 'Absorbe el primer golpe recibido y contraataca con Haki de Conquistador.' },
   },
   king: {
     clase: 'Modo Defensivo / Veloz (Lunaria)', faccion: 'Piratas de las Bestias',
-    ulti: { name: 'Llama Lunaria', desc: 'Alterna entre inmunidad al daño (Modo Llama) y +100% de VEL (Modo Rápido).' },
   },
   queen: {
     clase: 'Científico / Tanque Ciborg', faccion: 'Piratas de las Bestias / MADS',
-    ulti: { name: 'Virus Momia / Ice Demon', desc: 'Esparce plagas que infectan y debilitan los stats rivales cada turno.' },
   },
   katakuri: {
     clase: 'Duelista / Esquiva Pura', faccion: 'Piratas de Big Mom',
-    pasiva: { name: 'Futuro Inalterable', desc: 'Esquiva automáticamente los 2 primeros ataques de cada combate.' },
   },
   marco: {
     clase: 'Soporte Vital / Volador', faccion: 'Piratas de Barbablanca',
-    pasiva: { name: 'Llamas de la Resurrección', desc: 'Cura pasivamente al equipo cada turno y se regenera al ser golpeado.' },
   },
   ace: {
     clase: 'Artillero Elemental', faccion: 'Piratas de Barbablanca',
-    ulti: { name: 'Dai Enkai: Entei', desc: 'Sol en miniatura que limpia el campo infligiendo daño masivo de fuego.' },
   },
   buggy: {
     clase: 'Engañador / Inmune a Cortes', faccion: 'Cross Guild / Yonko',
-    pasiva: { name: 'Muggy Ball & Suerte Divina', desc: 'Inmune al daño de espadas; los golpes letales pueden fallar milagrosamente.' },
   },
 };
 
@@ -898,6 +827,32 @@ const TYPE_LADDER = {
   Oscuridad: ['golpebajo', 'soulpocus', 'blackhole'], Haki: ['hakiarm', 'rokuogan', 'hakirey'],
   Fruta: ['clutch', 'parasite', 'ursusshock'],
 };
+// Técnicas genéricas: mismas potencias y precisiones que las plantillas históricas,
+// pero sin atribuir a cientos de personajes las frutas o el Haki del Rey de otros.
+const GENERIC_MOVE_NAMES = {
+  Corte:['Corte básico','Corte doble','Corte certero'], Golpe:['Golpe básico','Golpe frontal','Impacto contundente'],
+  Disparo:['Disparo','Disparo preciso','Artillería'], Fuego:['Llamarada','Ráfaga ígnea','Explosión de fuego'],
+  Agua:['Chorro de agua','Onda marina','Torpedo acuático'], Rayo:['Descarga','Pulso eléctrico','Tormenta eléctrica'],
+  Hielo:['Golpe helado','Ráfaga helada','Ventisca'], Tierra:['Rocazo','Impacto sísmico','Ruptura terrestre'],
+  Viento:['Ráfaga','Vendaval','Tornado'], Veneno:['Púa venenosa','Gas tóxico','Nube venenosa'],
+  Oscuridad:['Golpe bajo','Presión sombría','Asalto sombrío'], Haki:['Armadura','Impacto de Haki','Haki concentrado'],
+  Fruta:['Técnica de Fruta','Dominio de Fruta','Poder de Fruta'],
+};
+for (const [type, names] of Object.entries(GENERIC_MOVE_NAMES)) {
+  TYPE_LADDER[type] = TYPE_LADDER[type].map((source, i) => {
+    const id = `generic_${type.toLowerCase()}_${i}`;
+    MOVES[id] = {...MOVES[source], name:names[i], type};
+    return id;
+  });
+}
+MOVES.buggyball = {name:'Buggy Ball', type:'Disparo', power:55, acc:.90};
+MOVES.muggyball = {name:'Muggy Ball', type:'Disparo', power:85, acc:.90};
+MOVES.tonfagin = {...MOVES.mutonshoot, name:'Tonfas del Demonio'};
+MOVES.sorukoby = {...MOVES.karatepez, name:'Golpe con Soru'};
+MOVES.jetgatling = {...MOVES.kingkonggun, name:'Jet Gatling'};
+CHARS.gin.learnset = CHARS.gin.learnset.map(([l,m]) => [l,m === 'mutonshoot' ? 'tonfagin' : m]);
+for (const id of ['coby','coby2']) CHARS[id].learnset = CHARS[id].learnset.map(([l,m]) => [l,m === 'karatepez' ? 'sorukoby' : m]);
+
 const R_BASE = { 1: [16, 8, 7, 8], 2: [20, 10, 8, 9], 3: [24, 12, 9, 11], 4: [28, 14, 11, 12], 5: [34, 16, 13, 13] };
 
 function defineGenChars(sagaId, rows) {
@@ -909,7 +864,7 @@ function defineGenChars(sagaId, rows) {
       CHARS[id] = {
         name, emoji: emoji || TYPES[t1].emoji, types,
         base: [hp + jit, atk + (jit > 0 ? 1 : 0), df, Math.max(4, spd - (jit < 0 ? 1 : 0))],
-        rareza,
+        rareza, generated:true,
         boss: flags.includes('b') || undefined,
         learnset: [[1, TYPE_LADDER[t1][0]], [10, TYPE_LADDER[t2][1]], [20, TYPE_LADDER[t1][2]]],
         desc: flags.includes('b') ? 'Un temible adversario que bloquea tu camino.'
@@ -1219,6 +1174,25 @@ for (const [id, c] of Object.entries(CHARS)) {
   }
 }
 
+// Definitivas propias: nunca se toma una técnica ajena por compartir tipo.
+const SIGNATURE_MOVES = {
+  zoro:'santoryuogi', zoro2:'ashura', nami:'thundertempo', nami2:'thundertempo',
+  usopp:'kabuto', usopp2:'estrellafuego', sanji:'diablejambe', chopper:'monsterpoint',
+  robin:'demoniofleur', franky:'radicalbeam', brook:'lullaby', jinbe:'buraikan',
+  buggy:'muggyball', roger:'kamusari', newgate:'shimayurashi', kaido:'kaendaiko',
+  bigmom:'ikoku', shanks:'kamusarirojo', teach:'blackhole', law:'gammaknife', kid:'punkrotten',
+  mihawk:'cortemundo', akainu:'daifunka', kizaru:'yasakani', aokiji:'iceage', garp:'galaxyimpact',
+  dragon:'vientolibre', oden:'togentotsuka', smoker:'humoblanco', crocodile:'desertspada',
+  doflamingo:'parasite', kuma:'ursusshock', hancock:'meromellow', sabo:'hiken', lucci:'rokuogan',
+  bonney:'distortion', yamato:'raimeihakke', king:'llamalunaria', queen:'virusmomia',
+  katakuri:'mochitsuki', ace:'daienkai',
+};
+for (const [id,move] of Object.entries(SIGNATURE_MOVES)) {
+  if (!CHARS[id]) continue;
+  CHARS[id].ultimate = move;
+  if (CHARS[id].generated) CHARS[id].learnset[2] = [20,move];
+}
+
 // ============ CONSTRUCCIÓN DE SAGAS E ISLAS ============
 const SAGA_DEFS = [
   { id: 'eastblue', name: 'EAST BLUE', img: 'Images/east-blue-portada.jpg', color: '#3f8fd6', islands: [
@@ -1345,7 +1319,7 @@ const SAGAS = SAGA_DEFS.map((d, i) => {
     CHARS[id].saga === d.id && CHARS[id].nakama && !EVOLVED_FORMS.has(id));
   const pool = [...new Set([...mobs, ...nakamas])]; // los nakamas y legendarios 5⭐ también aparecen en salvaje
   return {
-    id: d.id, name: d.name, sub: `Saga ${i + 1}`, img: d.img, color: d.color,
+    id: d.id, name: d.name, sub: `Saga ${i + 1}`, img: `/art/scenes/${d.id === 'thriller' ? 'thrillerbark' : d.id}.webp`, color: d.color,
     starters: NAKAMA_STARTERS,
     islands: d.islands.map(([name, bossesRaw], k) => {
       const bosses = bossesRaw.map(b => BOSS_ALIASES[b] || b).filter(b => CHARS[b]);

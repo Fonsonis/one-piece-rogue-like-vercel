@@ -1,4 +1,4 @@
-/* Presentation only. The original game and character database remain unchanged.
+/* Presentation only. Animations never modify combat rules or character data.
  * Four authored poses per character: guard, windup, attack and recoil.
  * Never consume the game's random stream, change state, or delay a game action.
  */
@@ -185,7 +185,7 @@
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }
-  // If the cloud save response rendered the home screen before this script
+  // If the local save rendered the home screen before this script
   // finished downloading, refresh its existing icons without rerunning a screen.
   safe(() => {
     document.querySelectorAll('img.pix[alt]').forEach(image => {

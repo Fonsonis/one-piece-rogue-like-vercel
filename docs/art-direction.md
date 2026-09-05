@@ -1,13 +1,23 @@
-# Dex art and combat presentation
+# Dirección visual · Egghead
 
-The visual layer follows the Luffy Run minigame: outlined pixel characters, readable silhouettes, a deep blue interface, sea blue surfaces, and warm gold actions. Every one of the 457 database IDs has its own generated character atlas, including evolved forms, minor enemies and crossover characters.
+Interfaz de superficies marfil, formas redondeadas, bordes finos, controles coral y azul marino suave. Inspiración en la arquitectura futurista de Egghead, evitando neones, brillos eléctricos y pergaminos envejecidos. Se conservan la estructura del juego, las animaciones pixel art y Luffy Run.
 
-Each RGBA atlas contains four 192 × 192 cells in this order: guard, windup, characteristic attack, and recoil. Poses share a scale and a ground anchor within each character. Still portraits are derived from the guard pose with a tighter crop for small menu and Dex icons. `public/art/manifest.json` records exact file hashes and pose bounds; the production review is recorded in `dex-art-review.json`.
+## Escenarios
 
-`public/art/visuals.js` replaces the character icon renderer and wraps attacks only to display animations. The original attack runs once, synchronously, with its original arguments and return value. The visual layer does not consume `Math.random`, edit fighter statistics, change cooldowns, delay turns, change rewards, unlock Dex entries, or write saves. An animation API failure is contained within the presentation layer. The original `public/game.js`, `public/data.js`, account backend and Luffy Run engine remain byte-for-byte unchanged.
+Doce ilustraciones nuevas: un salón de Egghead para el menú y un paisaje propio para cada una de las once sagas. Las portadas muestran su nombre como texto accesible del juego. El mapa y el combate utilizan el paisaje de la saga; la Torre Marine utiliza Marineford. Los escenarios están en `public/art/scenes`, codificados en WebP sin recortar ni modificar la composición generada; los doce suman aproximadamente 4,1 MiB. Solo se descargan los recursos utilizados por la pantalla.
 
-Combat plays the character's windup and attack poses, and the defender's recoil only when HP decreases. Hit effects use the actual move type; ultimate and healing effects have distinct emphasis. Splash damage also triggers recoil on affected teammates. A character sheet can replay its attack without starting a battle or changing the character. The reduced-motion preference disables continuous movement and transient effects.
+`generated-art.json` conserva los prompts y las rutas de destino. Las imágenes se generaron con la herramienta imagegen. No se añadieron servicios, cuentas, funciones de servidor o almacenamiento remoto.
 
-The existing discovery system remains in force: unseen Dex cards keep their question mark. The art files cover the entire database, but the game still reveals each character at the same point in the original progression.
+## Escala de personajes
 
-`tests/art-presentation.test.mjs` compares 2,239 real attack and ultimate scenarios against the original engine, including RNG consumption, HP, charge, status effects, logs and persistent state. It also checks inaccessible-animation fallback, discovery behavior and complete unique atlas coverage. The original game and runner tests cover saves, map content and minigame physics. These are source/runtime checks; browser visual testing was not part of this change.
+Se conservan los 457 atlas originales de cuatro poses (192 × 192 por celda). El escalado visual utiliza los límites transparentes medidos de cada personaje; no se redibujaron sus sprites. `public/art/sprite-sizes.css` aplica una escala común a todas las poses del personaje y centra su posición de guardia. Los pies comparten una línea de suelo. Se evita que una animación cambie accidentalmente el tamaño.
+
+Altura de referencia: 128 unidades visibles para humano estándar, ×0,70 para Chopper/Chouchou, ×0,62 para pequeños Tontatta, ×1,20 para personajes grandes como Kaido, Big Mom, Kuma o Barbablanca, y ×1,40 para gigantes como Oars, Dorry, Brogy y Zunesha. Es una escala legible para cartas, no una reproducción de alturas reales en metros. Los personajes muy anchos también respetan un límite horizontal. Los retratos del Dex tienen su propia medición para compensar sus recortes previos. `sprite-sizing.json` registra las 457 mediciones y escalas.
+
+## Presentación y verificación
+
+`visuals.js` sigue limitándose a animaciones; no cambia daño, azar ni guardados. `tests/art-presentation.test.mjs` contrasta 2.240 escenarios con y sin presentación y comprueba cobertura única de todos los personajes. La preferencia de movimiento reducido sigue vigente.
+
+La barra EXP es fina (3 px), tiene etiqueta y semántica de progreso accesible, y se muestra en equipo, ficha en partida y cartas de combate. Las cartas enemigas reservan el mismo espacio para mantener los sprites alineados.
+
+Revisión en navegador local a 390 × 844 y 1200 × 900: menú, portadas, mapas, combate Buggy y comparación de humanoides, pequeños y gigantes. Se corrigieron rutas de imágenes y controles superiores que se solapaban con contenido. El juego sigue siendo una distribución estática compatible con Vercel.
