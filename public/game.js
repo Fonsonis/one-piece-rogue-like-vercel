@@ -2857,25 +2857,27 @@ function screenIslands(sagaIdx) {
         ${saga.islands.map((island,i)=>{
         const active = current?.islandIdx === i, available = islandAvailable(sagaIdx,i) || active;
         const p=stops[i], destination=active || (!current && available && !done.includes(i));
-        const bosses=island.boss.map((id,k)=>({name:CHARS[id].name,level:island.bossLvl[k]}));
-        const bossSummary=bosses.map(b=>`${b.name}, nivel ${b.level}`).join('; ');
         const state=active ? `Continuar · mapa ${(current.mapIdx || 0)+1}/${islandMapCount(island)}` : done.includes(i) ? 'Completada · explorar' : available ? 'Preparar equipo' : 'Completa la isla anterior';
-        return `<button class="island-stop ${done.includes(i) ? 'is-complete' : ''} ${destination ? 'is-current' : ''}" style="--x:${p.x}%;--y:${p.y}%;--mx:${p.mx}%;--my:${p.my}%" data-island="${i}" ${available ? '' : 'disabled'} aria-label="Isla ${i+1}: ${island.name}. ${islandMapCount(island)} mapas y un combate final. Jefes: ${bossSummary}. ${state}">
+        return `<div class="island-stop ${done.includes(i) ? 'is-complete' : ''} ${destination ? 'is-current' : ''}" style="--x:${p.x}%;--y:${p.y}%;--mx:${p.mx}%;--my:${p.my}%">
+          <button class="island-select" data-island="${i}" ${available ? '' : 'disabled'} aria-label="Isla ${i+1}: ${island.name}. ${state}">
           <span class="island-land" aria-hidden="true">
             <svg viewBox="0 0 140 100"><ellipse class="island-water" cx="70" cy="72" rx="66" ry="24"/>
               <path class="island-sand" d="M12 69 Q17 49 39 48 Q46 25 67 38 Q92 25 105 49 Q126 51 130 69 Q125 88 94 90 L43 90 Q12 84 12 69Z"/>
               <path class="island-grass" d="M23 65 Q27 49 47 51 Q53 33 69 43 Q89 33 99 54 Q119 56 120 69 Q107 81 76 80 L45 80 Q26 78 23 65Z"/>
               ${i%3===1 ? '<path fill="#779091" stroke="#476c71" stroke-width="2" d="M36 64 60 24 77 49 89 33 112 69Z"/><path fill="#f6eed3" d="M49 42 60 24 71 41 61 36Z"/>' : i%3===2 ? '<path fill="#ecd9ad" stroke="#806d4b" stroke-width="2" d="M45 67V37H57V45H65V37H78V45H85V37H98V67Z"/><path fill="#4c6870" d="M66 67V54Q72 45 79 54V67"/>' : '<path fill="none" stroke="#876241" stroke-width="6" d="M69 70Q64 47 72 28"/><path fill="#326e55" d="M71 31Q42 15 37 39Q57 30 70 35Q81 9 101 26Q85 26 74 35Q102 32 102 52Q86 39 72 37Q54 48 47 53Q44 33 71 31"/>'}
-            </svg><span class="island-marker">${done.includes(i) ? '⚑' : available ? i+1 : '🔒'}</span>
+            </svg>
           </span>
-          <span class="island-label"><b>${island.name}</b><span>${islandMapCount(island)} mapas · ${bosses.length} ${bosses.length===1 ? 'jefe' : 'jefes'}</span>
-            <span class="island-bosses"><span class="island-boss-heading">COMBATE FINAL</span>${bosses.map(b=>`<span class="island-boss"><span>${b.name}</span><strong>Nv. ${b.level}</strong></span>`).join('')}</span>
-            <small>${state}</small></span>
-        </button>`;
+          <span class="island-label"><b>${island.name}</b><span>${islandMapCount(island)} mapas · ${island.boss.length} ${island.boss.length===1 ? 'jefe' : 'jefes'}</span><small>${state}</small></span>
+          </button>
+          <button class="island-marker" data-island-info="${i}" aria-label="${available ? 'Información' : 'Isla bloqueada: información'} de ${island.name}" aria-haspopup="dialog">${available ? 'ⓘ' : '🔒'}</button>
+        </div>`;
       }).join('')}</div>
       <p class="atlas-note">Sigue el Log Pose y elige una isla para zarpar.<br>Los reclutas se quedan contigo al completar la isla.</p>
     </section>`);
   $('#islands-back').onclick = screenSagas;
+  document.querySelectorAll('[data-island-info]').forEach(button => {
+    button.onclick = () => showIslandInfo(sagaIdx, Number(button.dataset.islandInfo), button);
+  });
   document.querySelectorAll('[data-island]').forEach(button => {
     button.onclick = () => {
       const index = Number(button.dataset.island);
@@ -2886,6 +2888,26 @@ function screenIslands(sagaIdx) {
       else choose();
     };
   });
+}
+
+function showIslandInfo(sagaIdx, index, trigger) {
+  const saga=SAGAS[sagaIdx], island=saga.islands[index];
+  const available=islandAvailable(sagaIdx,index) || (run?.saga===sagaIdx && run.islandIdx===index && run.mode===storyMode && (run.diff||1)===selectedDiff);
+  const ov=document.createElement('div');
+  ov.className='overlay';
+  ov.innerHTML=`<div class="modal island-info" role="dialog" aria-modal="true" aria-label="Información de ${island.name}">
+    <h2>${available ? 'ⓘ' : '🔒'} ${island.name}</h2>
+    <p>${islandMapCount(island)} mapas · ${island.boss.length} ${island.boss.length===1 ? 'jefe' : 'jefes'} en un único combate final.</p>
+    <div class="island-bosses"><h3>Jefes y niveles</h3>${island.boss.map((id,k)=>`<div class="island-boss"><span>${CHARS[id].name}</span><strong>Nv. ${island.bossLvl[k]}</strong></div>`).join('')}</div>
+    <p>${available ? 'Isla disponible. Selecciónala en el mapa para preparar tu banda o continuar tu viaje.' : `Completa ${saga.islands[index-1]?.name || 'la isla anterior'} para desbloquear esta isla.`}</p>
+    <div class="actions"><button class="btn gray" data-close-island-info>CERRAR</button></div>
+  </div>`;
+  const close=()=>{ov.remove();if(trigger?.isConnected)trigger.focus();};
+  ov.querySelector('[data-close-island-info]').onclick=close;
+  ov.onclick=e=>{if(e.target===ov)close();};
+  ov.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close();}else if(e.key==='Tab'){e.preventDefault();ov.querySelector('[data-close-island-info]').focus();}};
+  document.body.appendChild(ov);
+  ov.querySelector('[data-close-island-info]').focus();
 }
 
 function screenStarter(sagaIdx, islandIdx = 0) {
