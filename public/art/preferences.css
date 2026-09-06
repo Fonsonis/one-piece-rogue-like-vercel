@@ -1,13 +1,10 @@
-/* Pixel lettering and angular controls; shared by both Egghead palettes. */
-body { font-family:'Press Start 2P',monospace; font-size:10px; line-height:1.8; }
+/* Keep theme.css sizing and spacing; only restore pixel lettering and square corners. */
+body { font-family:'Press Start 2P',monospace; }
 button,input,select,.btn,.tab,.logo,.mode-title,.panel h2,.modal h2,.tower-hud,.runner-menu-button strong { font-family:'Press Start 2P',monospace; }
-.logo { font-size:clamp(15px,2vw,22px); line-height:1.7; }
-.subtitle { font-size:10px; }.panel h2,.modal h2 { font-size:13px; }
-.btn,.tab,.art-preview-button { border-radius:4px; border-width:2px; border-bottom-width:4px; font-size:9px; letter-spacing:0; line-height:1.65; }
-.btn.small,.floating-controls .btn { font-size:8px; }.mode-title { font-size:12px; }.mode-btn { font-size:10px; }
+.btn,.tab,.art-preview-button { border-radius:4px; }
 .runner-menu-button,.mode-card,.panel,.modal,.starter-card,.sel-card,.dex-card,.starter-slot-card,.special-card,.saga-row,.ship-card-acc { border-radius:8px; }
-.char-name,.dex-card,.fcard-title { font-size:10px; }.char-lvl { font-size:9px; }.type-badge { font-family:system-ui,sans-serif; }
-.runner-menu-button small { font:10px/1.8 'Press Start 2P',monospace; }
+.type-badge { font-family:system-ui,sans-serif; }
+.runner-menu-button small { font-family:'Press Start 2P',monospace; }
 .runner-small,.runner-action,.runner-dialog-card button { border-radius:4px; }
 .runner-dialog-card { border-radius:8px; }
 .runner-menu-button:disabled { opacity:.65; cursor:not-allowed; }.runner-menu-button:disabled:hover { transform:none; }
@@ -66,9 +63,8 @@ html[data-theme="dark"] .chart-table tr:nth-child(even) td { background:#263d47;
 html[data-theme="dark"] :is(#app,.modal) :is([style*="color:#333"],[style*="color:#555"],[style*="color:#666"],[style*="color:#777"],[style*="color:#888"],[style*="color:#444"]) { color:#c1d3d7!important; }
 html[data-theme="dark"] :is(#app,.modal) :is([style*="background:#fff"],[style*="background: #fff"],[style*="background:white"]) { background:#213a46!important; }
 @media(max-width:700px) {
-  .topbar .logo { font-size:16px; }.panel h2,.modal h2 { font-size:11px; }.mode-title { font-size:11px; }
-  .home-main-buttons .btn { font-size:8px; }.home-main-buttons .btn span { overflow-wrap:anywhere; }
-  .floating-controls { max-width:100%; }.floating-controls .btn { padding:7px; font-size:7px; }
+  .home-main-buttons .btn span { overflow-wrap:anywhere; }
+  .floating-controls { max-width:100%; }
   .ship-saga > summary { font-size:9px; }.ship-card-header { flex-wrap:wrap; }.ship-card-header > div { flex-basis:50%!important; }
   html[data-mobile-columns="2"] :is(.grid9,#inv-cards-grid) { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
   html[data-mobile-columns="3"] :is(.grid9,#inv-cards-grid) { grid-template-columns:repeat(3,minmax(0,1fr))!important; }
