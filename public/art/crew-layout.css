@@ -14,6 +14,29 @@ div:has(> #chk-music-toggle) { flex-direction:column; align-items:stretch!import
 .team-slot .dex-sprite { --sprite-size:80px!important; }
 
 /* Two active fighters share a wide stage; the whole crew stays within reach. */
+/* Keep the HUD geometry and interaction targets, but paint a single arena.
+   Transparent borders preserve existing spacing in both themes. */
+#app .battle-layout .battle-cols { isolation:isolate; }
+#app .battle-layout .battle-side,
+#app .battle-layout .battle-side .fcard.active {
+  background:transparent;
+  border-color:transparent;
+  box-shadow:none;
+  overflow:visible;
+  isolation:auto;
+}
+#app .battle-layout .fcard-sprite { overflow:visible; }
+#app .battle-layout :is(.side-head,.fcard-title,.fcard-hp,.fcard-meters,.fcard-stats-mini,.fcard-passive) {
+  position:relative;
+  z-index:5;
+}
+#app .battle-layout .fcard.active .fcard-sprite .sprite {
+  --sprite-size:min(clamp(140px,36vw,320px),calc((100cqh - 12px) * var(--motion-fit-y,1)));
+}
+#app .battle-layout :is(.fcard-hp,.fcard-meters) { background:var(--paper); }
+#app .battle-layout .fcard.ult-ready .fcard-title {
+  box-shadow:inset 0 0 0 2px var(--gold);
+}
 #app:has(.battle-layout) { max-width:1600px; width:100%; }
 .battle-layout .side-head { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px; padding:4px; font-size:10px; }
 .battle-layout .side-head .trainer { font-size:18px; margin:0; }
