@@ -26,6 +26,12 @@ npm start
 
 No abras el HTML con `file://`: Luffy Run carga módulos y recursos mediante HTTP.
 
+## Tripulación y relevo
+
+El combate mantiene un activo por bando y muestra la tripulación sobre los controles. Toca una reserva viva para hacer **un relevo manual por combate**, también en Torre Marine. El relevo es inmediato, conserva PS, estados y carga de Ultimate, y no añade ataques: el siguiente golpe pendiente usa al nuevo activo. Las sustituciones automáticas por derrota no gastan este relevo. Cada encuentro recupera su uso; el orden del equipo para el siguiente combate se conserva.
+
+Las fichas de combate y del equipo dan más espacio a los sprites. En móvil los activos ocupan dos fichas horizontales. Los logros se filtran mediante un desplegable y muestran la recompensa debajo del texto; el control de música también queda debajo de su descripción.
+
 ## Guardado en el dispositivo
 
 - **💾**: sobrescribe un único documento JSON en el almacenamiento local del navegador, bajo la clave `oplike_save`. No descarga archivos ni envía datos a un servidor.
