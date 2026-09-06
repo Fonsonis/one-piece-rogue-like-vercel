@@ -3104,26 +3104,26 @@ function screenMap(activePageIdx = 0) {
   const island = saga.islands[run.islandIdx];
   const reach = reachableNodes();
   const rows = run.map.rows;
-  const H = Math.max(650, rows.length * 90);
 
-  let nodesHTML = '', edgesHTML = '';
+  let nodesHTML = '', edgesHTML = '', landscapeEdgesHTML = '';
   const posOf = (r, i) => {
     const row = rows[r];
     const x = (i + 1) / (row.length + 1) * 100;
-    const y = 92 - (r / (rows.length - 1)) * 82;
+    const y = 100 - (r / Math.max(1, rows.length - 1)) * 100;
     return [x, y];
   };
   for (const e of run.map.edges) {
     const [x1, y1] = posOf(e[0], e[1]);
     const [x2, y2] = posOf(e[2], e[3]);
     edgesHTML += `<line x1="${x1}%" y1="${y1}%" x2="${x2}%" y2="${y2}%" stroke="#2b2b2b" stroke-width="2" stroke-dasharray="4 5" opacity="0.5"/>`;
+    landscapeEdgesHTML += `<line x1="${100-y1}%" y1="${x1}%" x2="${100-y2}%" y2="${x2}%"/>`;
   }
   rows.forEach((row, r) => row.forEach((n, i) => {
     const [x, y] = posOf(r, i);
     const isReach = reach.some(([rr, ii]) => rr === r && ii === i);
     const isCur = run.pos && run.pos[0] === r && run.pos[1] === i;
-    nodesHTML += `<div class="map-node ${n.done ? 'done' : ''} ${isReach ? 'reachable' : ''} ${isCur ? 'current' : ''}"
-      style="left:${x}%;top:${y}%" data-r="${r}" data-i="${i}" title="${NODE_TYPES[n.type].label}">${NODE_TYPES[n.type].emoji}</div>`;
+    nodesHTML += `<button type="button" class="map-node ${n.done ? 'done' : ''} ${isReach ? 'reachable' : ''} ${isCur ? 'current' : ''}"
+      style="--map-x:${x}%;--map-y:${y}%;--map-forward:${100-y}%" data-r="${r}" data-i="${i}" title="${NODE_TYPES[n.type].label}" aria-label="${NODE_TYPES[n.type].label}, etapa ${r+1}${isCur ? ", posición actual" : ''}" ${isReach ? '' : 'disabled'}>${NODE_TYPES[n.type].emoji}</button>`;
   }));
 
   const canReroll = run.islandIdx === 0 && run.pos === null && !run.sagaRerollUsed;
@@ -3134,14 +3134,17 @@ function screenMap(activePageIdx = 0) {
       <div class="map-carousel" id="island-carousel">
         <!-- PÁGINA 1: MAPA (ANCHO Y ALTO COMPLETO) -->
         <div class="carousel-page" id="page-map">
-          <div class="map-board" style="--scene:url('${SAGAS[run.saga]?.img}');min-height: max(calc(100vh - 170px), ${H}px); flex: 1;">
-            <div class="map-title">📍 SAGA: <b>${saga.name}</b> · Isla ${run.islandIdx + 1}/${saga.islands.length}: <b>${island.name}</b> (${run.mode === 'nuzlocke' ? 'NUZLOCKE' : 'CLÁSICO'})</div>
-            <svg class="map-svg">${edgesHTML}</svg>
-            ${nodesHTML}
-            <div style="position:absolute;top:42px;left:10px;z-index:20;">
-              <button class="btn gold small" id="btn-map-reroll" ${canReroll ? '' : 'disabled'} style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
-                Reroll x${canReroll ? 1 : 0}
+          <div class="map-board" style="--scene:url('${SAGAS[run.saga]?.img}');--map-rows:${rows.length}">
+            <div class="map-heading"><div class="map-title">📍 SAGA: <b>${saga.name}</b> · Isla ${run.islandIdx + 1}/${saga.islands.length}: <b>${island.name}</b> (${run.mode === 'nuzlocke' ? 'NUZLOCKE' : 'CLÁSICO'})</div>
+            <div class="map-tools">
+              <button class="btn gold small" id="btn-map-reroll" aria-label="Regenerar mapa" title="Regenerar mapa una vez por saga" ${canReroll ? '' : 'disabled'} style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
+                ↻ ${canReroll ? 1 : 0}
               </button>
+            </div></div>
+            <div class="map-route">
+              <svg class="map-svg map-portrait" aria-hidden="true">${edgesHTML}</svg>
+              <svg class="map-svg map-landscape" aria-hidden="true">${landscapeEdgesHTML}</svg>
+              ${nodesHTML}
             </div>
           </div>
         </div>
@@ -3215,9 +3218,9 @@ function screenMap(activePageIdx = 0) {
 
       <!-- BOTONES DE NAVEGACIÓN INFERIORES -->
       <div class="map-nav-tabs">
-        <div class="tab active" id="tab-page-map" data-page="0">📍 MAPA</div>
-        <div class="tab" id="tab-page-team" data-page="1">👥 EQUIPO (${run.team.length})</div>
-        <div class="tab" id="tab-page-bag" data-page="2">🎒 MOCHILA</div>
+        <button type="button" class="tab active" id="tab-page-map" data-page="0">📍 MAPA</button>
+        <button type="button" class="tab" id="tab-page-team" data-page="1">👥 EQUIPO (${run.team.length})</button>
+        <button type="button" class="tab" id="tab-page-bag" data-page="2">🎒 MOCHILA</button>
       </div>
     </div>
   `);
@@ -4139,7 +4142,7 @@ function showCharModal(fOrId) {
   ov.innerHTML = `<div class="modal char-sheet">
     <h2><span style="font-size:26px;vertical-align:middle;">${charIcon(f.id, 34)}</span> ${c.name}${rarityTag}${fusionTag} <small>Nv.${f.lvl}</small></h2>
     <div class="char-sheet-hero" style="text-align:center;padding:12px;margin:8px 0 12px;background:radial-gradient(ellipse at center, rgba(232, 200, 50, 0.22) 0%, rgba(0,0,0,0.35) 75%);border:2px solid var(--gold);border-radius:8px;position:relative;">
-      <div class="char-sheet-sprite" style="display:inline-block;filter:drop-shadow(3px 5px 8px rgba(0,0,0,0.6));">
+      <div class="char-sheet-sprite" data-character="${f.id}" style="display:inline-block;filter:drop-shadow(3px 5px 8px rgba(0,0,0,0.6));">
         ${charIcon(f.id, 90)}
       </div>
       <div class="platform" style="width:120px;height:24px;margin:-10px auto 0;background:radial-gradient(ellipse at center, #7ec850 0%, #4aa557 70%, transparent 72%);border-radius:50%;box-shadow:inset 0 0 0 2px rgba(217, 131, 46, 0.35);"></div>
@@ -4195,7 +4198,7 @@ function showCharModal(fOrId) {
     ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>Al nivel ${c.evo.lvl} se convierte en ${CHARS[c.evo.to] ? CHARS[c.evo.to].name : c.evo.to}.</p></div>` : ''}
     <p class="sheet-desc">${c.desc}</p>
     <div class="actions" style="flex-direction:column;gap:6px;">
-      ${isLive && run && run.team && run.team.includes(f) ? `<button class="btn red small" id="sheet-dismiss-btn" style="width:100%;">🗑️ EXPULSAR DE LA BANDA</button>` : ''}
+      ${isLive && (!battle || battle.over) && run && run.team && run.team.includes(f) ? `<button class="btn red small" id="sheet-dismiss-btn" style="width:100%;">🗑️ EXPULSAR DE LA BANDA</button>` : ''}
       <button class="btn gray" id="sheet-close" style="width:100%;">CERRAR</button>
     </div>
   </div>`;
@@ -4203,7 +4206,7 @@ function showCharModal(fOrId) {
   const dismissBtn = ov.querySelector('#sheet-dismiss-btn');
   if (dismissBtn) {
     dismissBtn.onclick = () => {
-      if (!run || !run.team) return;
+      if (!run || !run.team || (battle && !battle.over)) return;
       if (run.team.length <= 1) {
         toast('⚠️ Debes mantener al menos 1 nakama en tu banda.');
         return;
@@ -5093,12 +5096,35 @@ function fighterCardHTML(f, side, idx, active) {
     <div class="fcard-stats-mini" style="font-size:7.5px;color:#eee;text-align:center;margin:2px 0;background:rgba(0,0,0,0.3);padding:2px 4px;border-radius:3px;">
       ⚔️ ATQ ${f.atk} · 🛡️ DEF ${f.def} · ⚡ VEL ${f.spd}
     </div>
-    <div class="fcard-sprite">
+    <div class="fcard-sprite" data-character="${f.id}">
       <span class="sprite ${side === 'e' ? 'flip' : ''}">${charIcon(f.id, 64)}</span>
       <div class="platform"></div>
     </div>
     ${ps ? `<div class="fcard-passive ${ps.active ? 'on' : ''}" title="${ps.desc}">✨ ${ps.label}</div>` : ''}
   </div>`;
+}
+
+function showBattleCrew() {
+  const b = battle;
+  if (!b || b.over) return;
+  const wasWaiting = b.waiting;
+  pauseBattle();
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal battle-crew-modal"><h2>👥 Bandas en combate</h2>
+    ${[['Tu banda',b.pTeam,b.curP],['Enemigos',b.eTeam,b.curE]].map(([label,team,active],side)=>`
+      <h3>${label}</h3>${team.map((f,index)=>`<button class="battle-crew-row" data-crew-side="${side}" data-crew-index="${index}">
+        ${charIcon(f.id,36)}<span><b>${charName(f)}</b> · Nv${f.lvl}<small>${f.hp}/${f.maxhp} PS · ${f.hp <= 0 ? 'Fuera de combate' : f === active ? 'Activo' : 'En reserva'}</small></span><span>ℹ️</span>
+      </button>`).join('')}`).join('')}
+    <div class="actions"><button class="btn green" data-close-crew>VOLVER AL COMBATE</button></div></div>`;
+  document.body.appendChild(ov);
+  let closed = false;
+  const close = () => { if (closed) return; closed = true; ov.remove(); if (battle === b && !b.over && !wasWaiting) resumeBattle(); };
+  ov.querySelector('[data-close-crew]').onclick = close;
+  ov.querySelectorAll('[data-crew-index]').forEach(button => {
+    button.onclick = () => showCharModal((button.dataset.crewSide === '0' ? b.pTeam : b.eTeam)[Number(button.dataset.crewIndex)]);
+  });
+  ov.onclick = event => { if (event.target === ov) close(); };
 }
 
 function controlsHTML() {
@@ -5107,6 +5133,7 @@ function controlsHTML() {
   for (const id of ['carne', 'carnereal', 'bocadillo', 'sake']) {
     if (b.items[id] > 0) html += `<button class="btn small blue" data-ctl="item" data-arg="${id}" title="${ITEMS[id].name}">${ITEMS[id].emoji} ×${b.items[id]}</button>`;
   }
+  html += `<button class="btn small gray battle-crew-button" data-ctl="crew">👥 BANDAS</button>`;
   html += `<button class="btn small gray" data-ctl="speed" title="Atajo: barra espaciadora">⏩ VELOCIDAD x${b.speed}</button>`;
   html += `<button class="btn small gray" data-ctl="info">🧩 SINERGIAS Y TIPOS</button>`;
   if (b.opts.wild && !b.tower) html += `<button class="btn small red" data-ctl="run">🏃 HUIR</button>`;
@@ -5166,6 +5193,7 @@ function renderBattle(logLines) {
       }
     });
   });
+  keepActiveFightersVisible();
 }
 
 function renderBattlePreserveLog() {
@@ -5186,6 +5214,17 @@ function log(msg) {
   d.innerHTML = msg;
   el.appendChild(d);
   while (el.children.length > 5) el.removeChild(el.firstChild);
+}
+
+function keepActiveFightersVisible() {
+  for (const id of ['side-p','side-e']) {
+    const side = document.getElementById(id);
+    const active = side?.querySelector('.fcard.active');
+    if (!active?.getBoundingClientRect || side.scrollHeight <= side.clientHeight) continue;
+    const cardBox = active.getBoundingClientRect(), sideBox = side.getBoundingClientRect();
+    if (cardBox.top < sideBox.top) side.scrollTop += cardBox.top - sideBox.top - 8;
+    else if (cardBox.bottom > sideBox.bottom) side.scrollTop += cardBox.bottom - sideBox.bottom + 8;
+  }
 }
 
 function refreshHPCards() {
@@ -5219,6 +5258,7 @@ function refreshHPCards() {
   });
   const sp = $('#syn-p'); if (sp) sp.innerHTML = synChipsHTML(battle.pTeam);
   const se = $('#syn-e'); if (se) se.innerHTML = synChipsHTML(battle.eTeam);
+  keepActiveFightersVisible();
 }
 
 // Elige automáticamente el mejor movimiento según potencia, precisión, tipos y categoría
@@ -5677,6 +5717,7 @@ function bindControls() {
       const b = battle;
       if (!b || b.over) return;
       const kind = btn.dataset.ctl, arg = btn.dataset.arg;
+      if (kind === 'crew') { showBattleCrew(); return; }
       if (kind === 'speed') {
         cycleBattleSpeed();
         return;
