@@ -15,52 +15,63 @@
 @media(max-width:700px) {
   .toast { padding:10px 14px; font-size:12px; }
 }
-.island-atlas { margin:14px 0; overflow:hidden; border:2px solid #8a9e8e; border-radius:14px; color:#254650; background:#e9e1c9; box-shadow:0 8px 28px #173c4330; }
-.island-atlas header { padding:16px 12px 12px; text-align:center; background:linear-gradient(100deg,#d9ca9e,#fff7dd,#d9ca9e); border-bottom:3px double #9f9068; }
-.island-atlas h2 { font:800 clamp(20px,4vw,30px)/1.3 Georgia,serif; margin:5px 0; }
-.atlas-eyebrow { font:700 9px/1.4 system-ui,sans-serif; letter-spacing:3px; color:#786437; }
+.island-atlas { margin:14px 0; overflow:hidden; border:1px solid #a7b9b7; border-top:5px solid #e59178; border-radius:8px; color:var(--ink); background:var(--paper); box-shadow:var(--shadow); }
+.island-atlas header { padding:16px 12px 12px; text-align:center; background:var(--paper); border-bottom:2px solid #95aeae; }
+.island-atlas h2 { font:700 clamp(13px,2.3vw,19px)/1.7 'Press Start 2P',monospace; margin:5px 0; }
+.atlas-eyebrow { font:700 8px/1.7 'Press Start 2P',monospace; letter-spacing:0; color:var(--sea); }
 .island-atlas header p { font:12px/1.5 system-ui,sans-serif; margin:5px 0 0; }
-.island-route { position:relative; height:480px; isolation:isolate; background:#89bfc3 url('grand-line-chart.svg') center/cover; }
+.island-route { position:relative; height:660px; isolation:isolate; background:linear-gradient(#edf4ef30,#37738c14),url('grand-line-chart.svg') center/cover; }
 .island-trail { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
 .island-trail path { fill:none; stroke:#476f78; stroke-width:2; stroke-dasharray:5 7; vector-effect:non-scaling-stroke; }
-.island-trail path.sailed { stroke:#b68a34; stroke-width:3; stroke-dasharray:none; }
+.island-trail path.sailed { stroke:#437e68; stroke-width:3; stroke-dasharray:none; }
 .trail-tall { display:none; }
-.sea-caption { position:absolute; left:50%; top:10%; transform:translateX(-50%) rotate(-6deg); font:italic 700 clamp(22px,4vw,42px) Georgia,serif; letter-spacing:10px; color:#285e6a55; white-space:nowrap; pointer-events:none; }
-.sea-belt { position:absolute; bottom:5%; left:40%; font:10px Georgia,serif; letter-spacing:6px; color:#38697299; }
-.island-stop { position:absolute; top:var(--y); left:var(--x); transform:translate(-50%,-50%); width:140px; padding:0; background:none; color:#24454e; border:0; cursor:pointer; text-align:center; z-index:2; box-shadow:none; font-family:system-ui,sans-serif; }
+.sea-caption { position:absolute; left:50%; top:10%; transform:translateX(-50%) rotate(-6deg); font:700 clamp(18px,3vw,30px)/1.5 'Press Start 2P',monospace; letter-spacing:2px; color:#285e6a55; white-space:nowrap; pointer-events:none; }
+.sea-belt { position:absolute; bottom:5%; left:40%; font:8px 'Press Start 2P',monospace; letter-spacing:2px; color:#38697299; }
+.island-stop { position:absolute; top:var(--y); left:var(--x); transform:translate(-50%,-50%); width:140px; padding:0; background:none; color:var(--ink); border:0; cursor:pointer; text-align:center; z-index:2; box-shadow:none; font-family:system-ui,sans-serif; }
 .island-land { display:block; position:relative; width:110px; height:79px; margin:auto; transition:filter .15s; }
 .island-land svg { display:block; width:100%; height:100%; filter:drop-shadow(0 5px 2px #28596744); overflow:visible; }
 .island-water { fill:#c2e5db90; stroke:#e0eee180; stroke-width:2; }
 .island-sand { fill:#e6cc88; stroke:#9e8c54; stroke-width:1.5; }
 .island-grass { fill:#659b69; stroke:#427b62; stroke-width:1; }
-.island-marker { position:absolute; top:1px; right:9px; display:grid; place-items:center; width:23px; height:23px; border-radius:50%; background:#f9ebc0; border:1px solid #8e7546; color:#735b2d; font:700 12px system-ui,sans-serif; box-shadow:0 2px 4px #214a5140; }
-.island-label { display:block; margin:0 auto; padding:5px 4px; width:100%; border:1px solid #8e9c8580; border-radius:5px; background:#fff4dcd9; box-shadow:0 3px 6px #315b6322; }
-.island-label b { display:block; font:700 14px/1.2 Georgia,serif; }
+.island-marker { position:absolute; top:1px; right:9px; display:grid; place-items:center; width:23px; height:23px; border-radius:4px; background:var(--paper); border:2px solid #608692; color:var(--ink); font:700 12px system-ui,sans-serif; box-shadow:0 2px 4px #214a5140; }
+.island-label { display:block; margin:0 auto; padding:8px 6px; width:100%; border:1px solid #94acae; border-bottom:3px solid #94acae; border-radius:4px; background:var(--paper); box-shadow:0 3px 0 #33596612; }
+.island-label b { display:block; font:700 8px/1.7 'Press Start 2P',monospace; overflow-wrap:anywhere; }
 .island-label > span { display:block; font:10px/1.5 system-ui,sans-serif; margin-top:3px; }
 .island-label small { display:block; font:600 9px/1.5 system-ui,sans-serif; }
 .island-stop:disabled { cursor:default; }
 .island-stop:disabled .island-land { filter:grayscale(.75); opacity:.7; }
-.island-stop:disabled .island-label { background:#dce4d9c9; color:#56706e; }
+.island-stop:disabled .island-label { background:var(--paper-dark); color:var(--ink); }
 .island-stop.is-complete .island-marker { background:#346e59; color:#fff3bc; }
-.island-stop.is-current .island-water { stroke:#fff0aa; stroke-width:4; }
-.island-stop.is-current .island-label { border:2px solid #ad8335; background:#fff1c9; }
+.island-stop.is-current .island-water { stroke:#e59178; stroke-width:4; }
+.island-stop.is-current .island-label { border:2px solid #c67661; border-top:4px solid #e59178; background:var(--paper); }
 .island-stop:not(:disabled):hover .island-land { filter:drop-shadow(0 0 8px #fff3c4); }
 .island-stop:focus-visible { outline:3px solid #9c641f; outline-offset:5px; border-radius:8px; }
-.atlas-note { margin:0; padding:12px; border-top:3px double #9f9068; background:#eee3c5; text-align:center; font:12px/1.6 system-ui,sans-serif; }
+.atlas-note { margin:0; padding:12px; border-top:2px solid #95aeae; background:var(--paper-dark); text-align:center; font:12px/1.6 system-ui,sans-serif; }
 @media(max-width:900px) {
-  .island-route { height:max(520px,calc(var(--island-count) * 85px)); background-size:auto 100%; }
+  .island-route { height:max(720px,calc(var(--island-count) * 150px)); background-size:auto 100%; }
   .island-stop { top:var(--my); left:var(--mx); width:136px; }
   .trail-wide { display:none; }.trail-tall { display:block; }
-  .sea-caption { top:46%; left:50%; transform:translate(-50%,-50%) rotate(-80deg); font-size:30px; letter-spacing:8px; }
+  .sea-caption { top:46%; left:50%; transform:translate(-50%,-50%) rotate(-80deg); font-size:22px; letter-spacing:2px; }
   .sea-belt { left:5%; bottom:45%; writing-mode:vertical-rl; }
 }
 @media(max-width:700px) {
   #app:has(.island-atlas) > .topbar .logo { display:none; }
   .island-atlas header { padding:10px 8px; }
-  .atlas-eyebrow { font-size:8px; letter-spacing:2px; }
+  .atlas-eyebrow { font-size:7px; letter-spacing:0; }
   .atlas-note { font-size:11px; padding:8px; }
 }
 @media(max-width:360px) {
-  .island-stop { width:118px; }.island-label b { font-size:12px; }
+  .island-route { height:max(800px,calc(var(--island-count) * 175px)); }
+  .island-stop { width:118px; }.island-label b { font-size:7px; }
   .island-land { width:100px; height:72px; }
 }
+.island-label .island-bosses { display:block; margin:6px 0; padding:5px 0; border-block:1px solid #95aeae70; }
+.island-boss-heading { display:block; font:600 8px/1.6 system-ui,sans-serif; letter-spacing:.5px; color:var(--sea); margin-bottom:3px; }
+.island-boss { display:flex; align-items:baseline; justify-content:space-between; gap:4px; text-align:left; font:11px/1.5 system-ui,sans-serif; }
+.island-boss > span { min-width:0; overflow-wrap:anywhere; }
+.island-boss strong { flex-shrink:0; font:700 10px/1.5 system-ui,sans-serif; color:var(--accent); }
+html[data-theme="dark"] .island-atlas { border-color:#54717b; border-top-color:#c58270; }
+html[data-theme="dark"] .island-route { background:linear-gradient(#10263299,#102632aa),url('grand-line-chart.svg') center/cover; }
+html[data-theme="dark"] .island-trail path { stroke:#8db6c0; }
+html[data-theme="dark"] .island-trail path.sailed { stroke:#87c6a8; }
+html[data-theme="dark"] :is(.sea-caption,.sea-belt) { color:#93c4d266; }
