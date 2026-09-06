@@ -34,10 +34,10 @@ test('every character and move is valid; every directed matchup has a damaging c
   }
   return pairs;
  })()`);
- assert.equal(result,457*457);
+ assert.equal(result,460*460);
 });
 
-test('all 457 mirrors at four levels and 914 seeded mixed encounters terminate',()=>{
+test('all 460 mirrors at four levels and 920 seeded mixed encounters terminate',()=>{
  const h=combatHarness(); const ids=Array.from(h.exec('Object.keys(CHARS)'));
  let max=0,count=0;
  for(const level of [5,20,50,99])for(const id of ids){
@@ -82,7 +82,7 @@ test('canonical signatures and learned Haki; XP and evolution keep two moves',()
   const f=makeChar('luffy',19);f.xp=xpForLevel(19)-1;gainXP(f,1);
   if(f.id!=='luffy2'||f.lvl!==20||f.xp!==0||f.moves.length!==2)return false;
   f.xp=xpForLevel(20)/2;
-  if(!xpBarHTML(f).includes('width:50%')||!xpBarHTML({...f,lvl:99}).includes('Nivel máximo'))return false;
+  if(!xpBarHTML(f).includes('width:50%')||!xpBarHTML({...f,lvl:100}).includes('Nivel máximo'))return false;
   return true;
  })()`));
 });

@@ -7767,5 +7767,56 @@
     ],
     "atlasScale": 1.2549019607843137,
     "portraitScale": 0.8354430379746836
+  },
+  "luffy3": {
+    "ratio": 1,
+    "guardBounds": [
+      47,
+      79,
+      146,
+      180
+    ],
+    "portraitBounds": [
+      19,
+      18,
+      174,
+      176
+    ],
+    "atlasScale": 1.2673267326732673,
+    "portraitScale": 0.8354430379746836
+  },
+  "luffy4": {
+    "ratio": 1.2,
+    "guardBounds": [
+      54,
+      71,
+      139,
+      180
+    ],
+    "portraitBounds": [
+      35,
+      18,
+      158,
+      176
+    ],
+    "atlasScale": 1.4091743119266054,
+    "portraitScale": 1.0025316455696203
+  },
+  "luffy5": {
+    "ratio": 1,
+    "guardBounds": [
+      49,
+      75,
+      144,
+      180
+    ],
+    "portraitBounds": [
+      25,
+      18,
+      168,
+      176
+    ],
+    "atlasScale": 1.2190476190476192,
+    "portraitScale": 0.8354430379746836
   }
 }

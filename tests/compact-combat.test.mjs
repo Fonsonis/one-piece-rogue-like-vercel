@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {compactBounds} from '../scripts/compact-sprite-bounds.mjs';
 import {combatHarness} from './balance-harness.mjs';
 
-test('compact stages contain all four poses of all 457 characters, on both sides',()=>{
+test('compact stages contain all four poses of all 460 characters, on both sides',()=>{
   const sizing=JSON.parse(fs.readFileSync('docs/sprite-sizing.json'));
   const motion=JSON.parse(fs.readFileSync('docs/motion-bounds.json'));
   for(const [id,info] of Object.entries(sizing)) {

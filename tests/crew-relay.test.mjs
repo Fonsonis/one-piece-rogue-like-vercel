@@ -13,7 +13,7 @@ test('one manual relay preserves HP, states, ultimate and team order; resets nex
   assert.equal(h.exec(`(()=>{
     const f=run.team[1]; f.hp=42; f.st.poison=true; f.ultCharge=73;
     if(!switchBattleFighter(1)||battle.curP!==f||activeP()!==f)return false;
-    if(f.hp!==42||!f.st.poison||f.ultCharge!==73||run.team[0].id!=='luffy')return false;
+    if(f.hp!==42||!f.st.poison||f.ultCharge!==73||run.team[0].id!=='luffy2')return false;
     if(switchBattleFighter(2)||switchBattleFighter(0))return false;
     startBattle([makeChar('bandido',50)],{wild:true});
     return !battle.switchUsed&&battle.curP===run.team[0]&&switchBattleFighter(2);

@@ -12,6 +12,31 @@ const BASE_OF = {};
 for (const [id, c] of Object.entries(CHARS)) if (c.evo) BASE_OF[c.evo.to] = id;
 function baseFormOf(id) { while (BASE_OF[id]) id = BASE_OF[id]; return id; }
 
+// Only Luffy's new chain is resolved at creation; other characters keep their rules.
+function luffyFormAt(id, lvl) {
+  if (baseFormOf(id) !== 'luffy') return id;
+  let form = id;
+  while (CHARS[form].evo && lvl >= CHARS[form].evo.lvl) form = CHARS[form].evo.to;
+  return form;
+}
+function migrateLuffy(f) {
+  if (baseFormOf(f.id) !== 'luffy' || f.gearRulesVersion === 1) return;
+  const old = CHARS[f.id], nextId = luffyFormAt(f.id, f.lvl), next = CHARS[nextId];
+  // Apply only the base-stat difference, preserving equipment, fusion and event bonuses.
+  const deltaHP = hpAt(next.base[0], f.lvl) - hpAt(old.base[0], f.lvl);
+  f.maxhp += deltaHP;
+  if (f.hp > 0) f.hp = clamp(f.hp + deltaHP, 1, f.maxhp);
+  ['atk','def','spatk','spdef','spd'].forEach((key,i) => {
+    f[key] += statAt(next.base[i+1], f.lvl) - statAt(old.base[i+1], f.lvl);
+  });
+  f.id = nextId;
+  f.moves = luffyMovesAt(nextId, f.lvl);
+  f.gearRulesVersion = 1;
+}
+function luffyMovesAt(id, lvl) {
+  return CHARS[id].learnset.filter(([level]) => level <= lvl).map(([,move]) => move).slice(-2);
+}
+
 // ---------- Sprites de personajes ----------
 // Coloca cada PNG en la carpeta sprites/ con el nombre <id>.png (o mapeado en SPRITES) y añade el id aquí.
 const SPRITES = {
@@ -570,6 +595,7 @@ function migrateFighter(f) {
   if (f.spatkBonus == null) { f.spatkBonus = f.atkBonus || 0; f.spdefBonus = f.defBonus || 0; }
   if (f.ultCharge == null) f.ultCharge = 0;
   if (f.moves && f.moves.length > 2) f.moves = f.moves.slice(-2);
+  migrateLuffy(f);
   return f;
 }
 loadRun();
@@ -580,13 +606,14 @@ function hpAt(base, lvl) { return Math.floor(base * (1 + 0.11 * (lvl - 1))) + lv
 function xpForLevel(lvl) { return Math.floor(lvl * lvl * 6); }
 
 function xpBarHTML(f) {
-  const maxed = f.lvl >= 99, goal = xpForLevel(f.lvl);
+  const maxed = f.lvl >= 100, goal = xpForLevel(f.lvl);
   const value = maxed ? goal : clamp(Number(f.xp) || 0, 0, goal);
   const label = maxed ? 'Nivel máximo' : `EXP ${value}/${goal} · siguiente nivel ${f.lvl + 1}`;
   return `<div class="xp-progress" data-level="${f.lvl}" title="${label}"><span class="xp-caption">${maxed ? 'NV. MÁX.' : 'EXP · NV. ' + f.lvl}</span><div class="xp-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${goal}" aria-valuenow="${value}"><i style="width:${value / goal * 100}%"></i></div></div>`;
 }
 
 function makeChar(id, lvl, isEnemy = false) {
+  if (!isEnemy) id = luffyFormAt(id, lvl);
   const c = CHARS[id];
   const moves = c.learnset.filter(([l]) => l <= lvl).map(([, m]) => m).slice(-2);
   if (!moves.length) moves.push(c.learnset[0][1]); // nunca sin movimientos
@@ -606,6 +633,7 @@ function makeChar(id, lvl, isEnemy = false) {
     spd: Math.floor(statAt(c.base[5], lvl) * diffMult),
     atkBonus: 0, defBonus: 0, spatkBonus: 0, spdefBonus: 0,
     xp: 0, moves, ultCharge: 0, moveRulesVersion: 2,
+    ...(baseFormOf(id) === 'luffy' ? {gearRulesVersion:1} : {}),
   };
 }
 // Aplica las mejoras permanentes del Barco (solo a personajes del jugador)
@@ -636,7 +664,7 @@ const charName = f => CHARS[f.id].name;
 function gainXP(f, amount, log) {
   f.xp += amount;
   const msgs = [];
-  while (f.xp >= xpForLevel(f.lvl) && f.lvl < 99) {
+  while (f.xp >= xpForLevel(f.lvl) && f.lvl < 100) {
     f.xp -= xpForLevel(f.lvl);
     f.lvl++;
     const c = CHARS[f.id];
@@ -2529,28 +2557,28 @@ function bindCharControls(st, onChange) {
 }
 
 // Filtra (nombre, saga, tipo, rareza) y ordena la lista de personajes
-function filterSortChars(ids, st) {
+function filterSortChars(ids, st, resolve = id => id) {
   const q = (st.q || '').trim().toLowerCase();
   const out = ids.filter(id => {
-    const c = CHARS[id];
+    const c = CHARS[resolve(id)];
     if (q && !c.name.toLowerCase().includes(q)) return false;
     if (st.saga && c.saga !== st.saga) return false;
     if (st.type && !c.types.includes(st.type)) return false;
     if (+st.rarity && c.rareza !== +st.rarity) return false;
     return true;
   });
-  const byName = (a, b) => CHARS[a].name.localeCompare(CHARS[b].name);
-  const baseStatSum = id => CHARS[id].base.reduce((a, b) => a + b, 0);
+  const byName = (a, b) => CHARS[resolve(a)].name.localeCompare(CHARS[resolve(b)].name);
+  const baseStatSum = id => CHARS[resolve(id)].base.reduce((a, b) => a + b, 0);
   if (st.sort === 'name') out.sort(byName);
-  else if (st.sort === 'rarezaAsc') out.sort((a, b) => CHARS[a].rareza - CHARS[b].rareza || byName(a, b));
-  else if (st.sort === 'rarezaDesc') out.sort((a, b) => CHARS[b].rareza - CHARS[a].rareza || byName(a, b));
+  else if (st.sort === 'rarezaAsc') out.sort((a, b) => CHARS[resolve(a)].rareza - CHARS[resolve(b)].rareza || byName(a, b));
+  else if (st.sort === 'rarezaDesc') out.sort((a, b) => CHARS[resolve(b)].rareza - CHARS[resolve(a)].rareza || byName(a, b));
   else if (st.sort === 'statTotalDesc') out.sort((a, b) => baseStatSum(b) - baseStatSum(a) || byName(a, b));
-  else if (st.sort === 'hpDesc') out.sort((a, b) => CHARS[b].base[0] - CHARS[a].base[0] || byName(a, b));
-  else if (st.sort === 'atkDesc') out.sort((a, b) => CHARS[b].base[1] - CHARS[a].base[1] || byName(a, b));
-  else if (st.sort === 'defDesc') out.sort((a, b) => CHARS[b].base[2] - CHARS[a].base[2] || byName(a, b));
-  else if (st.sort === 'spatkDesc') out.sort((a, b) => CHARS[b].base[3] - CHARS[a].base[3] || byName(a, b));
-  else if (st.sort === 'spdefDesc') out.sort((a, b) => CHARS[b].base[4] - CHARS[a].base[4] || byName(a, b));
-  else if (st.sort === 'spdDesc') out.sort((a, b) => CHARS[b].base[5] - CHARS[a].base[5] || byName(a, b));
+  else if (st.sort === 'hpDesc') out.sort((a, b) => CHARS[resolve(b)].base[0] - CHARS[resolve(a)].base[0] || byName(a, b));
+  else if (st.sort === 'atkDesc') out.sort((a, b) => CHARS[resolve(b)].base[1] - CHARS[resolve(a)].base[1] || byName(a, b));
+  else if (st.sort === 'defDesc') out.sort((a, b) => CHARS[resolve(b)].base[2] - CHARS[resolve(a)].base[2] || byName(a, b));
+  else if (st.sort === 'spatkDesc') out.sort((a, b) => CHARS[resolve(b)].base[3] - CHARS[resolve(a)].base[3] || byName(a, b));
+  else if (st.sort === 'spdefDesc') out.sort((a, b) => CHARS[resolve(b)].base[4] - CHARS[resolve(a)].base[4] || byName(a, b));
+  else if (st.sort === 'spdDesc') out.sort((a, b) => CHARS[resolve(b)].base[5] - CHARS[resolve(a)].base[5] || byName(a, b));
   return out;
 }
 
@@ -2603,11 +2631,12 @@ function showInventoryModal(opts = {}) {
   invViewState = { q: '', type: '', rarity: 0 };
 
   const renderModalContent = () => {
-    let ids = filterSortChars(allUnlocked, invViewState);
+    let ids = filterSortChars(allUnlocked, invViewState, id => luffyFormAt(id, startLvlOf(id)));
     const cap = maxStartLvlCap();
 
     const cardsHTML = ids.map(id => {
-      const c = CHARS[id];
+      const displayId = luffyFormAt(id, startLvlOf(id));
+      const c = CHARS[displayId];
       const inTeam = currentTeam.includes(id);
       const startLvl = startLvlOf(id);
       const cost = logPoseUpgradeCost(startLvl);
@@ -2617,7 +2646,7 @@ function showInventoryModal(opts = {}) {
       return `
         <div class="dex-card sel-card ${inTeam ? 'picked' : ''}" data-id="${id}" style="position:relative;background:var(--paper);border:2px solid var(--ink);padding:8px 6px;text-align:center;cursor:pointer;">
           ${inTeam ? '<div class="veteran-tag" style="background:var(--green);font-size:7px;">EN EQUIPO</div>' : ''}
-          <div class="emoji">${charIcon(id, 34)}</div>
+          <div class="emoji">${charIcon(displayId, 34)}</div>
           <div style="font-size:8.5px;margin:3px 0;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</div>
           <div class="char-lvl" style="font-size:7.5px;">Nv. ${startLvl} · ${'⭐'.repeat(c.rareza)}</div>
           <div class="type-badges" style="margin:3px 0;justify-content:center;">${typeBadges(c.types)}</div>
@@ -2703,7 +2732,7 @@ function showInventoryModal(opts = {}) {
           `<div style="font-size:8.5px;line-height:1.5;color:#333;text-align:left;padding:4px;">
             Los <b>Log Poses 🧭</b> son brujulas de navegación de Grand Line que obtienes al derrotar enemigos durante tu travesía en el modo Historia.<br><br>
             • <b>¿Para qué sirven?</b> Se consumen para entrenar y <b>subir de nivel base permanente</b> a tus nakamas desde este inventario.<br>
-            • <b>Recompensas en combate:</b> Obtienes de 1 a 3 Log Poses por enemigo vencido (y más en combates de jefes).<br>
+            • <b>Recompensas en combate:</b> En East Blue, cada pirata da 3, cada marine 4 y cada jefe 7 Log Poses. Se multiplica por el número de saga (×2 en Alabasta, ×3 en Skypiea…).<br>
             • <b>Coste incremental:</b> Cuanto mayor sea el nivel de un nakama, más Log Poses necesitarás para subirlo al siguiente nivel (hasta el límite de tu saga actual).
           </div>`
         );
@@ -2924,7 +2953,8 @@ function screenStarter(sagaIdx, islandIdx = 0) {
     for (let i = 0; i < maxSlots; i++) {
       const id = picked[i];
       if (id && CHARS[id]) {
-        const c = CHARS[id];
+        const displayId = luffyFormAt(id, startLvlOf(id));
+        const c = CHARS[displayId];
         const startLvl = startLvlOf(id);
         const cost = logPoseUpgradeCost(startLvl);
         const isMax = startLvl >= cap;
@@ -2933,7 +2963,7 @@ function screenStarter(sagaIdx, islandIdx = 0) {
         slotsHTML += `
           <div class="starter-slot-card occupied" data-slot="${i}">
             <div class="starter-slot-badge">HUECO ${i + 1}</div>
-            <div style="margin-top:14px;" class="emoji">${charIcon(id, 40)}</div>
+            <div style="margin-top:14px;" class="emoji">${charIcon(displayId, 40)}</div>
             <div style="font-size:10px;font-weight:bold;margin:3px 0;">${c.name}</div>
             <div class="char-lvl" style="font-size:8px;">Nv. ${startLvl} · ${'⭐'.repeat(c.rareza)}</div>
             <div class="type-badges" style="margin:3px 0;justify-content:center;">${typeBadges(c.types)}</div>
@@ -3240,6 +3270,7 @@ function startRun(sagaIdx, starterIds, islandIdx = 0) {
     nuzCaught: {}, // isla -> ya reclutado
   };
   starterIds.forEach(registerRecruit);
+  run.team.filter(f => baseFormOf(f.id) === 'luffy').forEach(f => registerDex(f.id));
   saveRun();
   screenMap();
 }
@@ -3864,7 +3895,7 @@ function enterNode(r, i) {
         if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
         enemies.push(makeChar(id, lvl, true));
       }
-      startBattle(enemies, { wild: false, reward: rnd(120, 260) * (run.islandIdx + 1) });
+      startBattle(enemies, { wild: false, marine: true });
       break;
     }
     case 'boss': {
@@ -4194,6 +4225,7 @@ function addToTeam(f, done) {
     if (newLvl > oldLvl) {
       existing.lvl = newLvl;
       existing.xp = f.xp || 0;
+      existing.id = luffyFormAt(existing.id, existing.lvl);
       const c = CHARS[existing.id];
       if (c) {
         existing.maxhp = hpAt(c.base[0], existing.lvl);
@@ -5159,7 +5191,7 @@ function getUltimateMove(f) {
   const c = CHARS[f.id] || CHARS[base];
   if (!c) return MOVES.punetazo;
 
-  if (isP(f,'luffy')) return f.lvl >= 38 ? MOVES.kingkonggun : f.lvl >= 20 ? MOVES.jetgatling : MOVES.gatlinggoma;
+  if (isP(f,'luffy')) return MOVES[CHARS[luffyFormAt(f.id,f.lvl)].ultimate] || (f.lvl >= 20 ? MOVES.jetgatling : MOVES.gatlinggoma);
   if (c.ultimate && MOVES[c.ultimate]) return MOVES[c.ultimate];
   if (c.learnset && c.learnset.length >= 3) {
     const highMove = c.learnset[c.learnset.length - 1][1];
@@ -5890,9 +5922,7 @@ function afterRound() {
     }
     // Recompensa de Log Poses al derrotar enemigos en historia
     if (run && !b.tower) {
-      const sagaIdx = run.saga || 0;
-      const isBossEnemy = !!charData(defeated).boss || b.opts.boss;
-      const logPosesWon = isBossEnemy ? (sagaIdx + 3) : (sagaIdx + 1);
+      const logPosesWon = enemyLogPoseReward(defeated, b.opts, run.saga || 0);
       meta.logPoses = (meta.logPoses || 0) + logPosesWon;
       saveMeta();
       log(`🧭 ¡Consigues ${logPosesWon} Log Pose! (Total: ${meta.logPoses})`);
@@ -6057,6 +6087,15 @@ function tryFlee() {
   }
 }
 
+function enemyLogPoseReward(enemy, opts, sagaIdx) {
+  const kind = opts.boss || CHARS[enemy.id]?.boss ? 'boss' : opts.marine ? 'marine' : 'pirate';
+  return {pirate:3,marine:4,boss:7}[kind] * (sagaIdx + 1);
+}
+function encounterBerries(opts, sagaIdx, islandIdx) {
+  const base = opts.marine ? rnd(240,420) : rnd(80,160);
+  return Math.floor(base * (islandIdx + 1) * (1 + sagaIdx * .25));
+}
+
 function endBattle(victory, fled, recruited) {
   if (battle && battle.tower) { battle = null; return endTowerBattle(victory); }
   const opts = battle ? battle.opts : {};
@@ -6073,8 +6112,8 @@ function endBattle(victory, fled, recruited) {
   if (victory && opts.reward) {
     run.berries += opts.reward;
     notes.push(`+${berriesHTML(opts.reward)}`);
-  } else if (victory && opts.wild && !recruited) {
-    const b = rnd(40, 110) * (run.islandIdx + 1);
+  } else if (victory && (opts.wild || opts.marine) && !recruited) {
+    const b = encounterBerries(opts, run.saga || 0, run.islandIdx);
     run.berries += b;
     notes.push(`+${berriesHTML(b)}`);
   }

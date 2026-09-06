@@ -82,3 +82,6 @@ html[data-theme="dark"] :is(.sea-caption,.sea-belt) { color:#93c4d266; }
 .island-info h3 { font:700 10px/1.7 'Press Start 2P',monospace; color:var(--sea); }
 .island-info .island-boss { padding:8px 4px; font-size:14px; border-bottom:1px solid #95aeae50; }
 .island-info .island-boss strong { font-size:13px; }
+
+/* Keep the return route available while scrolling a long saga chart. */
+#islands-back { position:sticky; top:max(8px,env(safe-area-inset-top)); z-index:100; min-height:44px; box-shadow:0 3px 8px #0004; }
