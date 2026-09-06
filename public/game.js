@@ -5286,12 +5286,14 @@ function fighterCardHTML(f, side, idx, active) {
     </div>` : '';
 
   return `<div class="fcard ${f.hp <= 0 ? 'ko' : ''} ${f === active ? 'active' : ''} ${isUltReady ? 'ult-ready' : ''}" id="fc-${side}-${idx}">
-    <div class="fcard-title">${c.name} ${rarityTag} ${fusionTag} Nv${f.lvl} <span class="fcard-tags">${tagIcons(f)}</span><span class="fcard-st">${stIcons(f)}</span></div>
+    <div class="fcard-title">${c.name} ${rarityTag} ${fusionTag} Nv${f.lvl} <span class="fcard-tags">${tagIcons(f)}</span><span class="fcard-st">${stIcons(f)}</span>
+      ${side === 'p' ? xpBarHTML(f) : ''}
+    </div>
     <div class="fcard-hp">
       <div class="hp-bar"><i class="${hpBarClass(f)}" style="width:${clamp(f.hp / f.maxhp * 100, 0, 100)}%"></i></div>
       <div class="hp-nums">${f.hp}/${f.maxhp}</div>
     </div>
-    <div class="fcard-meters">${side === 'p' ? xpBarHTML(f) : ''}${ultBarHTML}</div>
+    <div class="fcard-meters">${ultBarHTML}</div>
     <div class="fcard-stats-mini" style="font-size:7.5px;color:#eee;text-align:center;margin:2px 0;background:rgba(0,0,0,0.3);padding:2px 4px;border-radius:3px;">
       ⚔️ ATQ ${f.atk} · 🛡️ DEF ${f.def} · ⚡ VEL ${f.spd}
     </div>

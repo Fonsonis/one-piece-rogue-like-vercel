@@ -37,6 +37,11 @@ div:has(> #chk-music-toggle) { flex-direction:column; align-items:stretch!import
 #app .battle-layout .fcard.ult-ready .fcard-title {
   box-shadow:inset 0 0 0 2px var(--gold);
 }
+#app .battle-layout .fcard-title .xp-progress { margin:4px 4px 0; }
+#app .battle-layout .fcard-title .xp-caption { font:8px/1.3 system-ui,sans-serif; }
+#app .battle-layout .fcard-meters { min-height:28px; padding:3px 5px 6px; }
+#app .battle-layout .ult-bar-wrap { height:16px; margin-top:0; }
+#app .battle-layout .ult-bar-text { font:8px/16px system-ui,sans-serif; }
 #app:has(.battle-layout) { max-width:1600px; width:100%; }
 .battle-layout .side-head { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px; padding:4px; font-size:10px; }
 .battle-layout .side-head .trainer { font-size:18px; margin:0; }
