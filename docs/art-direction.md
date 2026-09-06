@@ -1,6 +1,6 @@
 # Dirección visual · Egghead
 
-Interfaz de superficies marfil, formas redondeadas, bordes finos, controles coral y azul marino suave. Inspiración en la arquitectura futurista de Egghead, evitando neones, brillos eléctricos y pergaminos envejecidos. Se conservan la estructura del juego, las animaciones pixel art y Luffy Run.
+Interfaz con dos paletas en Ajustes: marfil claro o azul marino oscuro, con controles coral y azul suave. Se recupera la tipografía pixel Press Start 2P y los botones de esquinas casi rectas, con borde inferior marcado. Inspiración en la arquitectura futurista de Egghead, evitando neones, brillos eléctricos y pergaminos envejecidos. Se conservan la estructura del juego, las animaciones pixel art y Luffy Run.
 
 ## Escenarios
 
@@ -21,3 +21,5 @@ Altura de referencia: 128 unidades visibles para humano estándar, ×0,70 para C
 La barra EXP es fina (3 px), tiene etiqueta y semántica de progreso accesible, y se muestra en equipo, ficha en partida y cartas de combate. Las cartas enemigas reservan el mismo espacio para mantener los sprites alineados.
 
 Revisión en navegador local a 390 × 844 y 1200 × 900: menú, portadas, mapas, combate Buggy y comparación de humanoides, pequeños y gigantes. Se corrigieron rutas de imágenes y controles superiores que se solapaban con contenido. El juego sigue siendo una distribución estática compatible con Vercel.
+
+El selector de columnas permite elegir dos o tres tarjetas en móvil (inventario y selección de nakamas), sin perder filtros ni selección. Ambas preferencias se conservan en el JSON local y se restauran al importar. La tienda organiza el entrenamiento en listas desplegables por saga, conservando el buscador y las mejoras individuales.

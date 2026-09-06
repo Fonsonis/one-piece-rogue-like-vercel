@@ -1,6 +1,7 @@
-<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Revisión Egghead · pruebas locales</title><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/runner/runner.css"><link rel="stylesheet" href="/art/theme.css"><link rel="stylesheet" href="/art/sprite-sizes.css"></head><body><div class="qa-toolbar" style="padding:12px;display:flex;gap:8px;flex-wrap:wrap;background:#fffcf3"><button class="btn" id="qa-home">Menú</button><button class="btn" id="qa-sprites">Escalas</button><button class="btn" id="qa-buggy">Buggy contra Buggy</button><button class="btn" id="qa-map">Mapa y EXP</button></div><div id="app"></div><script src="/data.js"></script><script src="/save-storage.js"></script><script src="/game.js"></script><script src="/art/visuals.js"></script><script>
-meta.settings={showEventConfirm:true,customSounds:false};
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Revisión Egghead · pruebas locales</title><link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/runner/runner.css"><link rel="stylesheet" href="/art/theme.css"><link rel="stylesheet" href="/art/sprite-sizes.css"><link rel="stylesheet" href="/art/preferences.css"></head><body><div class="qa-toolbar" style="padding:12px;display:flex;gap:8px;flex-wrap:wrap;background:#fffcf3"><button class="btn" id="qa-preferences">Datos de prueba · Nv30</button><button class="btn" id="qa-home">Menú</button><button class="btn" id="qa-sprites">Escalas</button><button class="btn" id="qa-buggy">Buggy contra Buggy</button><button class="btn" id="qa-map">Mapa y EXP</button></div><div id="app"></div><script src="/data.js"></script><script src="/save-storage.js"></script><script src="/game.js"></script><script src="/art/visuals.js"></script><script>
+
 const qaStop=()=>{if(battle){clearTimeout(battle.timer);battle.over=true;}autoMode=false;clearTimeout(autoTimer);};
+document.querySelector('#qa-preferences').onclick=()=>{qaStop();run=null;meta.roster=['luffy','zoro','nami','buggy','chopper','sanji','newgate','kaido','bigmom','oars','kuma','naruto'];meta.dex=[...meta.roster];meta.recruited=[...meta.roster];meta.fame=2500;meta.accXp=xpForAccLevel(30);meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{1:true,2:true,3:true}]));screenHome();};
 document.querySelector('#qa-home').onclick=()=>{qaStop();screenHome();};
 document.querySelector('#qa-sprites').onclick=()=>{
  qaStop();
@@ -8,7 +9,7 @@ document.querySelector('#qa-sprites').onclick=()=>{
  render(`<h2>Escala humana · pequeños · grandes · gigantes</h2><div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px">${ids.map((id,i)=>{const f=makeChar(id,20);f.xp=xpForLevel(20)/2;return fighterCardHTML(f,'p',i,f)}).join('')}</div>`);
 };
 document.querySelector('#qa-buggy').onclick=()=>{
- qaStop();run={mode:'story',saga:0,islandIdx:0,diff:1,team:[makeChar('buggy',5)],items:{},berries:0};
+ qaStop();run={mode:'classic',saga:0,islandIdx:0,diff:1,team:[makeChar('buggy',5)],items:{},berries:0};
  run.team[0].moves=['cuchillas','cortedoble'];
  const e=makeChar('buggy',5);e.moves=['cuchillas','cortedoble'];
  startBattle([e],{wild:true});
@@ -16,7 +17,7 @@ document.querySelector('#qa-buggy').onclick=()=>{
  gameOver=()=>render('<div class="panel"><h2>Combate terminado: derrota</h2></div>');
 };
 document.querySelector('#qa-map').onclick=()=>{
- qaStop();run={mode:'story',saga:0,islandIdx:0,diff:1,team:[makeChar('luffy',5),makeChar('zoro',5)],items:{},berries:300,map:genMap(SAGAS[0].islands[0]),pos:null,badges:[],nuzCaught:{},sagaRerollUsed:false};
+ qaStop();run={mode:'classic',saga:0,islandIdx:0,diff:1,team:[makeChar('luffy',5),makeChar('zoro',5)],items:{},berries:300,map:genMap(SAGAS[0].islands[0]),pos:null,badges:[],nuzCaught:{},sagaRerollUsed:false};
  run.team[0].xp=75;screenMap();
 };
 </script></body></html>

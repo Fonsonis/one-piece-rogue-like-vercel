@@ -334,7 +334,7 @@ const META_DEFAULTS = () => ({
   logPoses: 0,
   starPity: 0,
   charUpgrades: {},
-  settings: { showEventConfirm: true, customSounds: false },
+  settings: { showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 },
 });
 let meta = META_DEFAULTS();
 function loadMeta() {
@@ -349,7 +349,7 @@ function loadMeta() {
   if (!meta.roster.includes('luffy')) {
     meta.roster.push('luffy');
   }
-  meta.settings = Object.assign({ showEventConfirm: true, customSounds: false }, meta.settings || {});
+  meta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 }, meta.settings || {});
   if (!meta.totalIslands) {
     const totalWins = Object.values(meta.wins || {}).reduce((a, b) => a + b, 0) +
       Object.values(meta.nuzWins || {}).reduce((a, b) => a + b, 0);
@@ -426,7 +426,7 @@ function importSaveFile(file) {
       const data = GameSaveStorage.parse(reader.result);
       validateGameSave(data);
       const nextMeta = Object.assign(META_DEFAULTS(), data.meta);
-      nextMeta.settings = Object.assign({ showEventConfirm: true, customSounds: false }, nextMeta.settings);
+      nextMeta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 }, nextMeta.settings);
       if (!nextMeta.roster.includes('luffy')) nextMeta.roster.push('luffy');
       const nextRun = data.run || null;
       if (nextRun) {
@@ -824,6 +824,7 @@ function cycleTopbarAuto() {
 
 // ---------- Render raíz ----------
 function render(html) {
+  applyDisplayPreferences();
   app.innerHTML = html;
   const btn = $('#btn-mute');
   if (btn) btn.onclick = toggleMute;
@@ -885,6 +886,31 @@ function topbar(showBerries = false, showAuto = showBerries) {
   </div>`;
 }
 
+function applyDisplayPreferences() {
+  document.documentElement?.setAttribute('data-theme', meta.settings?.theme === 'dark' ? 'dark' : 'light');
+  document.documentElement?.setAttribute('data-mobile-columns', meta.settings?.mobileColumns === 2 ? '2' : '3');
+}
+function setDisplayPreference(key, value) {
+  meta.settings ||= {};
+  if (key === 'theme') meta.settings.theme = value === 'dark' ? 'dark' : 'light';
+  else if (key === 'mobileColumns') meta.settings.mobileColumns = Number(value) === 2 ? 2 : 3;
+  else return;
+  applyDisplayPreferences();
+  saveMeta();
+}
+function mobileColumnsControl() {
+  return `<label class="mobile-columns-control">Columnas en móvil
+    <select data-mobile-columns-control aria-label="Columnas de nakamas en móvil">
+      <option value="2" ${meta.settings?.mobileColumns === 2 ? 'selected' : ''}>2 columnas</option>
+      <option value="3" ${meta.settings?.mobileColumns !== 2 ? 'selected' : ''}>3 columnas</option>
+    </select></label>`;
+}
+document.addEventListener('change', event => {
+  if (!event.target.matches?.('[data-mobile-columns-control]')) return;
+  setDisplayPreference('mobileColumns', event.target.value);
+  document.querySelectorAll('[data-mobile-columns-control]').forEach(select => { select.value = String(meta.settings.mobileColumns); });
+});
+
 function showSettingsModal() {
   meta.settings = meta.settings || { showEventConfirm: true, customSounds: false };
 
@@ -901,6 +927,12 @@ function showSettingsModal() {
   ov.innerHTML = `
     <div class="modal" style="max-width:440px;width:90%;">
       <h2 style="margin-top:0;color:var(--sea);font-size:14px;border-bottom:2px solid var(--gold);padding-bottom:6px;">⚙️ AJUSTES DE JUEGO</h2>
+      <div class="display-settings">
+        <label for="setting-theme">Aspecto del juego</label>
+        <select id="setting-theme"><option value="light" ${meta.settings.theme !== 'dark' ? 'selected' : ''}>Claro · Egghead</option><option value="dark" ${meta.settings.theme === 'dark' ? 'selected' : ''}>Oscuro · Egghead</option></select>
+        ${mobileColumnsControl()}
+        <p>El aspecto y las columnas se guardan en este dispositivo.</p>
+      </div>
       <div style="display:flex;flex-direction:column;gap:12px;margin:16px 0;">
         <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.05);padding:10px;border-radius:6px;border:1px solid #ccc;">
           <div style="flex:1;padding-right:10px;">
@@ -938,6 +970,8 @@ function showSettingsModal() {
     </div>
   `;
   document.body.appendChild(ov);
+
+  ov.querySelector('#setting-theme').onchange = e => setDisplayPreference('theme', e.target.value);
 
   ov.querySelector('#chk-music-toggle').onclick = () => {
     toggleMute();
@@ -1777,6 +1811,7 @@ function startLogPoseGacha(activeSagas) {
 function screenHome() {
   playMusic('menu');
   const accLvl = accountLevel();
+  const runnerUnlocked = accLvl >= 30;
   const towerUnlocked = accLvl >= 20;
   const challengeUnlocked = accLvl >= 50;
   const { totalCompleted: completedAch, totalAchievements: totalAchCount, hasUnclaimedAch } = getAchievementsInfo();
@@ -1800,7 +1835,7 @@ function screenHome() {
         <div class="mode-btn">${challengeUnlocked ? 'ENTRAR' : '🔒 NV. CUENTA 50'}</div>
       </div>
     </div>
-    <button class="runner-menu-button" id="btn-runner"><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>Salta, golpea y supera tu récord</small></span></button>
+    <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? 'Doble salto · 25 fama cada 1.000 m' : '🔒 Se desbloquea al nivel 30 de cuenta'}</small></span></button>
     <div class="home-main-buttons">
       <button class="btn blue small" id="btn-dex">
         <span>📖 Dex</span>
@@ -1849,6 +1884,7 @@ function screenHome() {
   if (towerUnlocked) $('#mode-tower').onclick = () => screenTowerIntro();
   if (challengeUnlocked) $('#mode-challenge').onclick = () => screenChallenges();
   $('#btn-runner').onclick = async () => {
+    if (accountLevel() < 30) return toast('🔒 Luffy Run se desbloquea al nivel 30 de cuenta.');
     const btn = $('#btn-runner');
     btn.disabled = true;
     try {
@@ -1856,6 +1892,7 @@ function screenHome() {
       playMusic('combat');
       await openRunner({
         best: meta.runnerBest || 0,
+        onFame: amount => gainFame(amount),
         onScore: score => {
           if (score > (meta.runnerBest || 0)) { meta.runnerBest = score; saveMeta(); }
         },
@@ -2499,6 +2536,7 @@ function renderCharGrid(el, ids, st, cardFn, bindFn) {
       <span>Página ${st.page + 1}/${pages} · ${ids.length} personajes</span>
       <button class="btn small gray" id="gp-next" ${st.page >= pages - 1 ? 'disabled' : ''}>▶</button>
     </div>
+    ${mobileColumnsControl()}
     <div class="grid9" id="grid9">
       ${slice.map(cardFn).join('') || '<div class="grid-empty">Sin resultados con estos filtros.</div>'}
     </div>
@@ -2591,6 +2629,7 @@ function showInventoryModal(opts = {}) {
           ${[1, 2, 3, 4, 5].map(r => `<option value="${r}" ${+invViewState.rarity === r ? 'selected' : ''}>${'⭐'.repeat(r)}</option>`).join('')}
         </select>
       </div>
+      ${mobileColumnsControl()}
       <div id="inv-cards-grid" style="max-height:360px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:8px;padding:4px;border:1px solid #ccc;background:rgba(0,0,0,0.05);">
         ${cardsHTML || '<div style="grid-column:1/-1;text-align:center;font-size:9px;color:#888;padding:20px;">Sin nakamas que coincidan.</div>'}
       </div>
@@ -2807,7 +2846,7 @@ function screenStarter(sagaIdx) {
     <div class="subtitle" style="font-size:14px;">Aventura en ${saga.name}</div>
     <div class="panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
-        <h2 style="margin:0;">🏴‍☠️ Configuración de la Banda (${picked.length}/${maxSlots})</h2>
+        <h2 id="starter-team-heading" style="margin:0;">🏴‍☠️ Configuración de la Banda (${picked.length}/${maxSlots})</h2>
         <div id="starter-logpose-info" style="font-size:9.5px;font-weight:bold;color:var(--gold);background:var(--ink);padding:4px 8px;border-radius:4px;border:1px solid var(--gold);cursor:pointer;" title="Toca para saber más sobre los Log Poses">
           🧭 Log Poses: ${meta.logPoses || 0} ℹ️
         </div>
@@ -2952,6 +2991,8 @@ function screenStarter(sagaIdx) {
   };
 
   const update = () => {
+    const heading = $('#starter-team-heading');
+    if (heading) heading.textContent = `🏴‍☠️ Configuración de la Banda (${picked.filter(Boolean).length}/${maxSlots})`;
     const slotsContainer = $('#starter-slots-container');
     if (slotsContainer) slotsContainer.innerHTML = renderSlotsGrid();
     const presetBarCont = document.querySelector('.preset-bar');
@@ -6227,6 +6268,15 @@ const UPG_STATS = [
 let shipBuyLock = 0;
 let shipSearchQ = '';
 let shipExpanded = {};
+let shipSagaExpanded = {};
+function groupUpgradeRoster(ids) {
+  const groups = [...SAGAS.map(s => ({id:s.id,name:s.name})), {id:'crossover',name:'CROSSOVER'}, {id:'other',name:'OTROS'}];
+  const known = new Set(groups.map(g => g.id));
+  return groups.map(g => ({...g,ids:ids.filter(id => {
+    const saga = CHARS[id]?.saga;
+    return (known.has(saga) ? saga : 'other') === g.id;
+  })})).filter(g => g.ids.length);
+}
 
 function upgCost(lvl) { return (Math.floor(lvl / 2) + 1) * 30; }
 
@@ -6315,7 +6365,7 @@ function screenShip() {
     <div class="panel">
       <h2>🏪 Tienda</h2>
       <p style="font-size:9px;line-height:1.9;">Gasta ⭐ Fama en mejoras permanentes.
-      La Fama se gana con emblemas (+20), sagas (+100 / +150 en Nuzlocke), pisos de la Torre (+5)
+      La Fama se gana con emblemas (+20), sagas (+100 / +150 en Nuzlocke), pisos de la Torre (+5), Luffy Run (+25 cada 1.000 m)
       e incluso derrotas honrosas — y cada punto también da PX de cuenta.</p>
       <div style="text-align:center;font-size:12px;margin:12px 0;color:var(--accent);">
         ⭐ ${meta.fame} Fama · 👤 Cuenta Nv${accLvl} (${meta.accXp || 0}/${accountNextAt()} PX)
@@ -6395,7 +6445,7 @@ function screenShip() {
     const container = $('#ship-roster-list');
     if (!container) return;
 
-    container.innerHTML = filteredRoster.length ? filteredRoster.map(id => {
+    const cardHTML = id => {
       const c = CHARS[id];
       const u = meta.upgrades[id] || {};
       const isExpanded = !!shipExpanded[id];
@@ -6439,7 +6489,16 @@ function screenShip() {
           </div>
         ` : ''}
       </div>`;
-    }).join('') : '<p style="text-align:center;font-size:9px;color:#888;padding:12px;">No se han encontrado veteranos con ese nombre.</p>';
+    };
+    const groups = groupUpgradeRoster(filteredRoster);
+    container.innerHTML = groups.length ? groups.map((group, index) => `
+      <details class="ship-saga" data-upgrade-saga="${group.id}" ${(q || shipSagaExpanded[group.id] === true || (shipSagaExpanded[group.id] === undefined && index === 0)) ? 'open' : ''}>
+        <summary><span>${group.name}</span><span>${group.ids.length} ${group.ids.length === 1 ? 'nakama' : 'nakamas'}</span></summary>
+        <div class="ship-saga-list">${group.ids.map(cardHTML).join('')}</div>
+      </details>`).join('') : '<p>No se han encontrado veteranos con ese nombre.</p>';
+    container.querySelectorAll('[data-upgrade-saga]').forEach(section => {
+      section.ontoggle = () => { shipSagaExpanded[section.dataset.upgradeSaga] = section.open; };
+    });
 
     container.querySelectorAll('[data-toggle-ship]').forEach(hdr => {
       hdr.onclick = () => {

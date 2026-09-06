@@ -25,16 +25,17 @@ async function assets() {
   return assetsPromise;
 }
 
-export async function openRunner({onExit,onScore,best=0}={}) {
+export async function openRunner({onExit,onScore,onFame,best=0}={}) {
   if(document.querySelector('.runner-root'))return;
   const root=document.createElement('section');root.className='runner-root';root.setAttribute('aria-label','Minijuego Luffy Run');
   root.innerHTML=`
     <header class="runner-header"><div><h1>LUFFY RUN</h1><p>¡Corre, salta y abre camino!</p></div><div class="runner-header-actions"><button class="runner-small" data-pause disabled aria-label="Pausar partida">Ⅱ Pausa</button><button class="runner-small" data-exit>✕ Menú</button></div></header>
-    <div class="runner-hud"><div class="runner-stat"><span>PUNTOS</span><strong data-score>0</strong></div><div class="runner-stat"><span>RÉCORD</span><strong data-best>${Number(best)||0}</strong></div><div class="runner-stat"><span>GOLPEADOS</span><strong data-kills>0</strong></div><div class="runner-stat speed"><span>VELOCIDAD</span><strong data-speed>×1.0</strong></div></div>
-    <div class="runner-stage"><canvas aria-label="Zona de juego. Toca para saltar, también en el aire." tabindex="0"></canvas><div class="runner-status" data-callout></div>
+    <div class="runner-hud"><div class="runner-stat"><span>PUNTOS</span><strong data-score>0</strong></div><div class="runner-stat"><span>RÉCORD</span><strong data-best>${Number(best)||0}</strong></div><div class="runner-stat"><span>METROS</span><strong data-meters>0</strong></div><div class="runner-stat speed"><span>VELOCIDAD</span><strong data-speed>×1.0</strong></div></div>
+    <div class="runner-stage"><canvas aria-label="Zona de juego. Toca para saltar. Máximo dos saltos antes de tocar el suelo." tabindex="0"></canvas><div class="runner-status" data-callout></div>
       <div class="runner-dialog"><div class="runner-dialog-card"><h2 data-title>Luffy Run</h2><p data-description>Preparando las animaciones…</p><button data-primary disabled>Cargando…</button></div></div>
     </div>
-    <div class="runner-controls"><button class="runner-action jump" data-jump>↑ SALTAR<small>Sin recarga · también en el aire</small></button><button class="runner-action punch" data-punch aria-disabled="true">👊 <span data-punch-label>PUÑETAZO</span><small data-cooldown>Gomu Gomu no Pistol</small><span class="cooldown-fill"></span></button></div>
+    <div class="runner-controls"><button class="runner-action jump" data-jump>↑ SALTAR<small data-jumps>Doble salto · 2 disponibles</small></button><button class="runner-action punch" data-punch aria-disabled="true">👊 <span data-punch-label>PUÑETAZO</span><small data-cooldown>Gomu Gomu no Pistol</small><span class="cooldown-fill"></span></button></div>
+    <p class="runner-reward" data-reward>0 / 1.000 m · Próxima recompensa: 25 fama</p>
     <p class="runner-keytip">Toca la pantalla para saltar · Teclado: espacio / ↑ salto · X golpe · P pausa</p>`;
   document.body.appendChild(root);
   const oldOverflow=document.body.style.overflow;document.body.style.overflow='hidden';
@@ -60,9 +61,10 @@ export async function openRunner({onExit,onScore,best=0}={}) {
   const engine=new RunnerEngine({onEvent(type,data){
     if(['jump','punch','hit','over'].includes(type))sound(type);
     if(type==='hit'){hitLabel=.4;calloutTime=1.1;$('[data-callout]').textContent=data.chain?'¡GOLPE EN CADENA! +30':'¡POR LOS AIRES! +30';}
+    if(type==='reward'){onFame?.(data.fame);calloutTime=1.5;$('[data-callout]').textContent=`¡+${data.fame} FAMA!`;}
     if(type==='over'){
       best=Math.max(best,engine.score);onScore?.(engine.score);pause.disabled=true;
-      showDialog('¡Fin de la carrera!',`${engine.score} puntos · ${engine.kills} enemigos por los aires.\nRécord: ${best} puntos.`, 'VOLVER A CORRER',start);
+      showDialog('¡Fin de la carrera!',`${engine.meters} metros · ${engine.score} puntos · ${engine.kills} enemigos.\nFama ganada: ${engine.rewardedMilestones * RULES.famePerReward}. Récord: ${best} puntos.`, 'VOLVER A CORRER',start);
     }
   }});
   function showDialog(title,description,label,action) {
@@ -155,7 +157,10 @@ export async function openRunner({onExit,onScore,best=0}={}) {
     }else accumulator=0;
     paint();
     if(now-lastHud>70){
-      lastHud=now;$('[data-score]').textContent=engine.score;$('[data-best]').textContent=Math.max(best,engine.score);$('[data-kills]').textContent=engine.kills;$('[data-speed]').textContent='×'+(engine.speed/RULES.startSpeed).toFixed(1);
+      lastHud=now;$('[data-score]').textContent=engine.score;$('[data-best]').textContent=Math.max(best,engine.score);$('[data-meters]').textContent=engine.meters;
+      $('[data-jumps]').textContent=`Doble salto · ${RULES.maxJumps-engine.jumpsUsed} disponibles`;
+      $('[data-jump]').setAttribute('aria-disabled',String(engine.status!=='running'||engine.jumpsUsed>=RULES.maxJumps));
+      $('[data-reward]').textContent=`${engine.meters % RULES.metersPerReward} / 1.000 m · Próxima recompensa: 25 fama · Ganada: ${engine.rewardedMilestones * RULES.famePerReward}`;$('[data-speed]').textContent='×'+(engine.speed/RULES.startSpeed).toFixed(1);
       const waiting=engine.cooldown>0;
       $('[data-punch]').setAttribute('aria-disabled',String(waiting||engine.status!=='running'));
       $('[data-punch-label]').textContent=waiting?'RECARGANDO':'PUÑETAZO';
@@ -166,7 +171,7 @@ export async function openRunner({onExit,onScore,best=0}={}) {
   }
   raf=requestAnimationFrame(loop);
   async function load(){
-    try{loaded=await assets();if(closed)return;showDialog('¡A correr, capitán!','Toca para saltar tantas veces como quieras. Usa el puñetazo para mandar a los enemigos por los aires. ¡Cada vez irá más rápido!','EMPEZAR',start);}
+    try{loaded=await assets();if(closed)return;showDialog('¡A correr, capitán!','Puedes hacer dos saltos seguidos. Toca el suelo para recuperarlos. Cada 1.000 metros de esta carrera ganas 25 fama. Usa el puñetazo para mandar a los enemigos por los aires. ¡Cada vez irá más rápido!','EMPEZAR',start);}
     catch{if(!closed)showDialog('No han cargado los gráficos','Comprueba la conexión e inténtalo otra vez.','REINTENTAR',load);}
   }
   await load();
