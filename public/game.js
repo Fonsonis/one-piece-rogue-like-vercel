@@ -3,6 +3,7 @@
 
 const $ = sel => document.querySelector(sel);
 const app = $('#app');
+let worldNavigator = null, worldShipLocation = null, worldSelection = null;
 const rnd = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -887,6 +888,9 @@ function cycleTopbarAuto() {
 
 // ---------- Render raíz ----------
 function render(html) {
+  worldNavigator?.destroy();
+  worldNavigator = null;
+  worldSelection = null;
   applyDisplayPreferences();
   app.innerHTML = html;
   const btn = $('#btn-mute');
@@ -2380,8 +2384,12 @@ function screenSagas(focusSaga, previousScroll) {
 
     <div class="world-nav"><label for="world-jump">SAGAS</label><select id="world-jump" aria-label="Explorar una saga">${SAGAS.map((s,i) => `<option value="${i}" ${i === (focusSaga || 0) ? 'selected' : ''}>${sagaUnlocked(i) ? '' : '🔒 '}${s.name}</option>`).join('')}</select><button class="btn small gray" id="world-to-start">↓ INICIO</button></div>
     </div>
+    <div class="world-ocean-frame">
+    <div class="world-sea" aria-hidden="true"></div>
     <div class="world-map" id="world-map" tabindex="0" role="region" aria-label="Carta de Grand Line. Avanza hacia arriba desde East Blue.">
-      <div class="world-chart"><p class="world-end">↑ EL VIAJE CONTINÚA</p>${SAGAS.map((_,i) => worldSagaHTML(i)).reverse().join('')}<p class="world-start">↑ Sigue el Log Pose hacia arriba<br>Explora también las islas y sagas bloqueadas.</p></div>
+      <div class="world-chart"><svg class="world-route" aria-hidden="true" preserveAspectRatio="none"><path/></svg><div class="world-ship" role="img" aria-label="Going Merry"><span class="world-ship-wake"></span><img src="/art/world/ship-north.webp" alt="" width="90" height="90"></div><p class="world-end">↑ EL VIAJE CONTINÚA</p>${SAGAS.map((_,i) => worldSagaHTML(i)).reverse().join('')}<p class="world-start">↑ Sigue el Log Pose hacia arriba<br>Explora también las islas y sagas bloqueadas.</p></div>
+    </div>
+    <section class="world-inspector" id="world-island-panel" aria-label="Destino seleccionado" hidden></section>
     </div>
   `);
 
@@ -2799,28 +2807,23 @@ function worldSagaHTML(sagaIdx) {
   const wins = meta.sagaDiffWins?.[saga.id] || {};
   const entry = worldIslandState(sagaIdx, 0);
   const crossing = saga.id === 'eastblue'
-    ? '<div class="world-redline"><strong>RED LINE · REVERSE MOUNTAIN</strong><span>↑ Entrada a Grand Line · Paradise</span></div>'
+    ? '<div class="world-redline" data-world-crossing><strong>RED LINE · REVERSE MOUNTAIN</strong><span>↑ Entrada a Grand Line · Paradise</span></div>'
     : saga.id === 'gyojin'
-      ? '<div class="world-redline"><strong>RED LINE · NUEVO MUNDO ↑</strong><span>La ruta pasa bajo el continente, por la Isla Gyojin</span></div>' : '';
+      ? '<div class="world-redline" data-world-crossing><strong>RED LINE · NUEVO MUNDO ↑</strong><span>La ruta pasa bajo el continente, por la Isla Gyojin</span></div>' : '';
   return `${crossing}<section class="world-saga" id="world-saga-${sagaIdx}" data-world-saga="${sagaIdx}" style="--saga-color:${saga.color}">
     <div class="world-islands">${saga.islands.map((island, i) => {
       const {active, available} = worldIslandState(sagaIdx, i);
-      const state = active ? `Continuar · mapa ${(run.mapIdx || 0) + 1}/${islandMapCount(island)}` : !available ? 'Bloqueada · consulta ⓘ' : done.includes(i) ? 'Completada · explorar' : 'Preparar equipo';
-      return `<div class="world-stop ${i % 2 ? 'starboard' : 'port'} ${done.includes(i) ? 'is-complete' : ''} ${active ? 'is-current' : ''}" id="world-island-${sagaIdx}-${i}">
-        <svg class="world-trail" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M 50 100 C 50 70, 18 75, 18 50 S 50 30, 50 0"/></svg>
+      const state = active ? `Continuar · mapa ${(run.mapIdx || 0) + 1}/${islandMapCount(island)}` : !available ? 'Bloqueada · consulta ⓘ' : done.includes(i) ? 'Completada · explorar' : 'Explorar destino';
+      return `<div class="world-stop ${i % 2 ? 'starboard' : 'port'} ${done.includes(i) ? 'is-complete' : ''} ${active ? 'is-current' : ''}" id="world-island-${sagaIdx}-${i}" data-location-key="${saga.id}-${i}">
         <div class="world-island-card">
-        <button class="island-select" data-world-island="${i}" data-world-saga="${sagaIdx}" ${available ? '' : 'disabled'} aria-label="${island.name}. ${state}">
+        <button class="island-select" data-world-island="${i}" data-world-saga="${sagaIdx}" aria-controls="world-island-panel" aria-expanded="false" aria-label="${island.name}. ${state}">
           <span class="island-land" aria-hidden="true">
-            <svg viewBox="0 0 140 100"><ellipse class="island-water" cx="70" cy="72" rx="66" ry="24"/>
-              <path class="island-sand" d="M12 69 Q17 49 39 48 Q46 25 67 38 Q92 25 105 49 Q126 51 130 69 Q125 88 94 90 L43 90 Q12 84 12 69Z"/>
-              <path class="island-grass" d="M23 65 Q27 49 47 51 Q53 33 69 43 Q89 33 99 54 Q119 56 120 69 Q107 81 76 80 L45 80 Q26 78 23 65Z"/>
-              ${i%3===1 ? '<path fill="#779091" stroke="#476c71" stroke-width="2" d="M36 64 60 24 77 49 89 33 112 69Z"/><path fill="#f6eed3" d="M49 42 60 24 71 41 61 36Z"/>' : i%3===2 ? '<path fill="#ecd9ad" stroke="#806d4b" stroke-width="2" d="M45 67V37H57V45H65V37H78V45H85V37H98V67Z"/><path fill="#4c6870" d="M66 67V54Q72 45 79 54V67"/>' : '<path fill="none" stroke="#876241" stroke-width="6" d="M69 70Q64 47 72 28"/><path fill="#326e55" d="M71 31Q42 15 37 39Q57 30 70 35Q81 9 101 26Q85 26 74 35Q102 32 102 52Q86 39 72 37Q54 48 47 53Q44 33 71 31"/>'}
-            </svg>
+            <img src="/art/world/${saga.id}-${i}.webp" alt="" width="320" height="240" loading="lazy" decoding="async">
           </span>
 
-          <span class="island-label"><b>${island.name}</b><span>${islandMapCount(island)} mapas · ${island.boss.length} ${island.boss.length === 1 ? 'jefe' : 'jefes'}</span><small>${state}</small></span>
+          <span class="island-label"><b>${island.location?.place || island.name}</b><span class="island-zone">${island.location?.zone || saga.name}</span><span>${islandMapCount(island)} mapas · ${island.boss.length} ${island.boss.length === 1 ? 'jefe' : 'jefes'}</span><small>${state}</small></span>
         </button>
-        <button class="island-marker" data-island-info="${i}" data-world-saga="${sagaIdx}" aria-label="Información de ${island.name}${available ? '' : ', bloqueada'}" aria-haspopup="dialog">${available ? 'ⓘ' : '🔒'}</button>
+        <button class="island-marker" data-island-info="${i}" data-world-saga="${sagaIdx}" aria-label="Información de ${island.name}${available ? '' : ', bloqueada'}" aria-controls="world-island-panel">${available ? 'ⓘ' : '🔒'}</button>
         </div>
       </div>`;
     }).reverse().join('')}</div>
@@ -2838,11 +2841,14 @@ function worldSagaHTML(sagaIdx) {
   </section>`;
 }
 
+function worldStopTop(chart,stop) {
+  return stop.getBoundingClientRect ? chart.scrollTop + stop.getBoundingClientRect().top - chart.getBoundingClientRect().top : stop.offsetTop;
+}
 function scrollWorldStart(chart) {
   $('#world-jump').value = '0';
   // On short phones, keep the first island in view rather than only its saga footer.
   const first = $('#world-island-0-0');
-  chart.scrollTop = Math.min(chart.scrollHeight - chart.clientHeight, first.offsetTop - 16);
+  chart.scrollTop = Math.min(chart.scrollHeight - chart.clientHeight, worldStopTop(chart,first) - 16);
 }
 
 function bindWorldMapNavigation(focusSaga, previousScroll) {
@@ -2852,27 +2858,91 @@ function bindWorldMapNavigation(focusSaga, previousScroll) {
     const current = run && run.saga === focusSaga && !run.islandComplete && run.mode === storyMode && (run.diff || 1) === selectedDiff;
     const index = current ? run.islandIdx : SAGAS[focusSaga].islands.findIndex((_, i) => worldIslandState(focusSaga, i).available && !completedIslands(focusSaga).includes(i));
     const target = $(`#world-island-${focusSaga}-${Math.max(0, index)}`);
-    chart.scrollTop = target.offsetTop - chart.clientHeight / 2 + target.offsetHeight / 2;
+    chart.scrollTop = worldStopTop(chart,target) - chart.clientHeight / 2 + target.offsetHeight / 2;
   } else scrollWorldStart(chart);
   $('#world-to-start').onclick = () => scrollWorldStart(chart);
   $('#world-jump').onchange = e => {
     const target = $(`#world-island-${e.target.value}-0`);
-    chart.scrollTop = target.offsetTop - 16;
+    chart.scrollTop = worldStopTop(chart,target) - 16;
   };
+  worldNavigator = globalThis.WorldVoyage?.mount(chart, {
+    initialId:worldShipLocation || (run && !run.islandComplete ? `${SAGAS[run.saga]?.id}-${run.islandIdx}` : null),
+    onTravel:() => updateWorldArrival(true),
+    onArrival:id => { worldShipLocation=id; updateWorldArrival(false); }
+  });
+  chart.parentElement && (chart.parentElement.onkeydown = e => {
+    if(e.key === 'Escape' && worldSelection){e.preventDefault();closeWorldIsland();}
+  });
   document.querySelectorAll('[data-island-info]').forEach(button => {
-    button.onclick = () => showIslandInfo(+button.dataset.worldSaga, +button.dataset.islandInfo, button);
+    button.onclick = () => selectWorldIsland(+button.dataset.worldSaga, +button.dataset.islandInfo, button);
   });
   document.querySelectorAll('[data-world-island]').forEach(button => {
-    button.onclick = () => {
-      const sagaIdx = +button.dataset.worldSaga, index = +button.dataset.worldIsland;
-      const state = worldIslandState(sagaIdx, index);
-      if (state.active) { screenMap(); return; }
-      if (!state.available) return;
-      const choose = () => screenStarter(sagaIdx, index);
-      if (run) modalConfirm('🧭 ¿Preparar otra expedición?', 'Al zarpar sustituirás el viaje en curso. Los reclutas de una isla sin completar aún no son permanentes.', choose);
-      else choose();
-    };
+    button.onclick = () => selectWorldIsland(+button.dataset.worldSaga, +button.dataset.worldIsland, button);
   });
+}
+
+// Reading a destination never starts or replaces an expedition.
+function worldIslandCompletion(sagaIdx,index,mode,diff) {
+  const key=islandProgressKey(sagaIdx,mode,diff),progress=meta.islandProgress || {};
+  if(Object.hasOwn(progress,key))return progress[key].includes(index);
+  const saga=SAGAS[sagaIdx].id;
+  if(Object.keys(progress).some(k=>k.startsWith(`${saga}:`)&&k.endsWith(`:${diff}`)))return false;
+  // Legacy saga victories unlocked islands but did not record a mode per difficulty.
+  return meta.sagaDiffWins?.[saga]?.[diff] ? 'legacy' : false;
+}
+function worldIslandPanelHTML(sagaIdx,index) {
+  const saga=SAGAS[sagaIdx],island=saga.islands[index],location=island.location;
+  const state=worldIslandState(sagaIdx,index);
+  const progress=['classic','nuzlocke'].map(mode => `<div class="world-mode-progress"><strong>${mode==='classic'?'Clásico':'Nuzlocke'}</strong><div>${DIFFICULTIES.map(d=>{
+    const result=worldIslandCompletion(sagaIdx,index,mode,d.id),won=result===true;
+    const status=won?'superada':result==='legacy'?'guardado antiguo: modo no registrado':'pendiente';
+    return `<span class="${won?'won':''}" title="${d.name}: ${status}" aria-label="${d.name}: ${status}">${d.emoji} ${won?'✓':result==='legacy'?'?':'—'}</span>`;
+  }).join('')}</div></div>`).join('');
+  return `<header><div><h2>${location?.place || island.name}</h2><p>${location?.zone || saga.name} · ${location?.kind || 'Destino'}</p></div><button class="btn gray small" id="world-close" aria-label="Cerrar destino">✕</button></header>
+    <div class="world-inspector-body">
+    <div class="world-completions" aria-label="Dificultades completadas por modo">${progress}</div>
+    <p>${islandMapCount(island)} mapas · Enemigos Nv. ${island.lvl[0]}–${island.lvl[1]}</p>
+    <details><summary>Jefes y datos del destino</summary><p>${location?.description || ''}</p><p>${island.boss.map((id,k)=>`${CHARS[id].name} · Nv. ${island.bossLvl[k]}`).join('<br>')}</p><p>${saga.name} · ${storyMode==='classic'?'Clásico':'Nuzlocke'} · ${DIFFICULTIES.find(d=>d.id===selectedDiff)?.name}</p></details>
+    ${state.reason?`<p class="world-lock">🔒 ${state.reason}</p>`:''}</div>
+    <footer><span id="world-arrival" role="status" aria-live="polite">Destino seleccionado</span><div class="world-panel-actions"><button class="btn small gray" id="world-skip" hidden>SALTAR TRAVESÍA</button><button class="btn small gold" id="world-enter" ${state.available?'':'disabled'}>${state.active?'CONTINUAR':'ENTRAR'}</button></div></footer>`;
+}
+function selectWorldIsland(sagaIdx,index,trigger) {
+  const panel=$('#world-island-panel');if(!panel)return;
+  if(worldSelection?.trigger?.setAttribute)worldSelection.trigger.setAttribute('aria-expanded','false');
+  worldSelection={sagaIdx,index,trigger};
+  panel.innerHTML=worldIslandPanelHTML(sagaIdx,index);panel.hidden=false;
+  trigger?.setAttribute?.('aria-expanded','true');
+  document.querySelectorAll('.world-stop.is-selected').forEach(el=>el.classList.remove('is-selected'));
+  $(`#world-island-${sagaIdx}-${index}`)?.classList?.add('is-selected');
+  $('#world-close').onclick=closeWorldIsland;
+  $('#world-skip').onclick=()=>worldNavigator?.finish();
+  $('#world-enter').onclick=enterWorldIsland;
+  const started=worldNavigator?.travelTo(`${SAGAS[sagaIdx].id}-${index}`);
+  if(!started)updateWorldArrival(false);
+  $('#world-close').focus?.({preventScroll:true});
+}
+function updateWorldArrival(sailing) {
+  if(!worldSelection)return;
+  const state=worldIslandState(worldSelection.sagaIdx,worldSelection.index);
+  $('#world-enter').disabled=sailing || !state.available;
+  $('#world-skip').hidden=!sailing;
+  $('#world-arrival').textContent=sailing?'Navegando…':state.available?'¡Destino alcanzado!':'Destino bloqueado';
+}
+function closeWorldIsland() {
+  const selection=worldSelection;worldSelection=null;
+  $('#world-island-panel').hidden=true;
+  selection?.trigger?.setAttribute?.('aria-expanded','false');
+  document.querySelectorAll('.world-stop.is-selected').forEach(el=>el.classList.remove('is-selected'));
+  if(selection?.trigger?.isConnected)selection.trigger.focus({preventScroll:true});
+}
+function enterWorldIsland() {
+  if(!worldSelection || worldNavigator?.sailing)return;
+  const {sagaIdx,index}=worldSelection,state=worldIslandState(sagaIdx,index);
+  if(!state.available)return;
+  if(state.active){screenMap();return;}
+  const choose=()=>screenStarter(sagaIdx,index);
+  if(run)modalConfirm('🧭 ¿Preparar otra expedición?', 'Al zarpar sustituirás el viaje en curso. Los reclutas de una isla sin completar aún no son permanentes.', choose);
+  else choose();
 }
 
 function screenIslands(sagaIdx) {

@@ -1,13 +1,15 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {combatHarness} from './balance-harness.mjs';
+import fs from 'node:fs';
 
 function setup() {
  const h=combatHarness(),nodes=new Map();
- const node=s=>{if(!nodes.has(s))nodes.set(s,{scrollTop:0,scrollHeight:16000,clientHeight:500,offsetTop:15400,offsetHeight:195});return nodes.get(s);};
+ const node=s=>{if(!nodes.has(s))nodes.set(s,{scrollTop:0,scrollHeight:16000,clientHeight:500,offsetTop:15400,offsetHeight:195,classList:{add(){},remove(){}}});return nodes.get(s);};
  h.ctx.document.querySelector=node;
  h.ctx.document.querySelectorAll=()=>[];
  h.exec(`let html='';render=s=>html=s;storyMode='classic';selectedDiff=1;run=null;meta.sagaDiffWins={};meta.islandProgress={};`);
+ h.exec(fs.readFileSync('public/art/world-locations.js','utf8'));
  return {h,nodes,node};
 }
 
@@ -59,5 +61,39 @@ test('mode changes preserve chart position and navigation independently rechecks
  h.ctx.document.querySelectorAll=s=>s==='[data-world-island]'?[locked,first]:[];
  h.exec('let chosen=null;screenStarter=(s,i)=>chosen=[s,i];screenSagas();');
  locked.onclick();assert.equal(h.exec('chosen'),null);
- first.onclick();assert.deepEqual(Array.from(h.exec('chosen')),[0,0]);
+ first.onclick();assert.equal(h.exec('chosen'),null,'selecting a destination only opens its panel');
+ nodes.get('#world-enter').onclick();assert.deepEqual(Array.from(h.exec('chosen')),[0,0]);
+});
+
+test('destination panel separates completion by mode and difficulty and keeps entry explicit',()=>{
+ const {h,node}=setup();
+ h.exec("meta.islandProgress={'eastblue:classic:1':[0], 'eastblue:classic:3':[0], 'eastblue:nuzlocke:2':[0]};");
+ const panel=h.exec('worldIslandPanelHTML(0,0)');
+ assert.equal((panel.match(/class="won"/g)||[]).length,3);
+ assert.match(panel,/Isla Yotsuba/);assert.match(panel,/Shells Town/);
+ assert.match(panel,/Clásico/);assert.match(panel,/Nuzlocke/);
+ h.exec('let chosen=null;screenStarter=(s,i)=>chosen=[s,i];selectWorldIsland(0,1);');
+ h.exec('worldNavigator={sailing:true};enterWorldIsland();');assert.equal(h.exec('chosen'),null);
+ h.exec("worldNavigator=null;meta.islandProgress['eastblue:classic:1']=[];enterWorldIsland();");
+ assert.equal(h.exec('chosen'),null,'locks checked again at entry time');
+ h.exec('selectWorldIsland(1,0);');assert.equal(node('#world-enter').disabled,true);
+});
+
+test('explicit entry resumes an active journey and preserves replacement confirmation',()=>{
+ const {h}=setup();
+ h.exec("let resumed=false,chosen=false,confirmAction=null;screenMap=()=>resumed=true;screenStarter=()=>chosen=true;modalConfirm=(title,text,fn)=>confirmAction=fn;run={saga:1,islandIdx:2,mode:'classic',diff:1,mapIdx:2};selectWorldIsland(1,2);");
+ assert.equal(h.exec('resumed'),false);
+ h.exec('enterWorldIsland();');assert.equal(h.exec('resumed'),true);
+ h.exec('selectWorldIsland(0,0);enterWorldIsland();');assert.equal(h.exec('chosen'),false);
+ assert.equal(h.exec('typeof confirmAction'),'function');h.exec('confirmAction();');assert.equal(h.exec('chosen'),true);
+});
+
+test('legacy victories do not claim an unrecorded mode was completed',()=>{
+ const {h}=setup();h.exec('meta.sagaDiffWins={eastblue:{2:true}}');
+ assert.equal(h.exec("worldIslandCompletion(0,0,'classic',2)"),'legacy');
+ assert.equal(h.exec("worldIslandCompletion(0,0,'nuzlocke',2)"),'legacy');
+ assert.match(h.exec('worldIslandPanelHTML(0,0)'),/modo no registrado/);
+ h.exec("meta.islandProgress['eastblue:classic:2']=[0]");
+ assert.equal(h.exec("worldIslandCompletion(0,0,'classic',2)"),true);
+ assert.equal(h.exec("worldIslandCompletion(0,0,'nuzlocke',2)"),false);
 });
