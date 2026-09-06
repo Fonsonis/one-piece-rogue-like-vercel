@@ -456,3 +456,6 @@
 .dex-sprite[data-character="genos"]{--atlas-scale:1.1532;--portrait-scale:0.8354;--atlas-shift:-0.0030;--portrait-shift:0.0022}
 .dex-sprite[data-character="garou"]{--atlas-scale:1.3333;--portrait-scale:0.8354;--atlas-shift:0.0000;--portrait-shift:0.0022}
 .dex-sprite[data-character="tatsumaki"]{--atlas-scale:1.2549;--portrait-scale:0.8354;--atlas-shift:0.0000;--portrait-shift:0.0000}
+.dex-sprite[data-character="luffy3"]{--atlas-scale:1.2673;--portrait-scale:0.8354;--atlas-shift:-0.0033;--portrait-shift:-0.0022}
+.dex-sprite[data-character="luffy4"]{--atlas-scale:1.4092;--portrait-scale:1.0025;--atlas-shift:-0.0037;--portrait-shift:-0.0026}
+.dex-sprite[data-character="luffy5"]{--atlas-scale:1.2190;--portrait-scale:0.8354;--atlas-shift:-0.0032;--portrait-shift:-0.0022}
