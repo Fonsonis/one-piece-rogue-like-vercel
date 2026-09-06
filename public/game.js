@@ -2838,21 +2838,38 @@ function screenIslands(sagaIdx) {
   const saga = SAGAS[sagaIdx];
   const done = completedIslands(sagaIdx);
   const current = run && run.saga === sagaIdx && run.mode === storyMode && (run.diff || 1) === selectedDiff ? run : null;
+  const stops = saga.islands.map((_,i) => ({x:12+76*i/Math.max(1,saga.islands.length-1), y:i%2 ? 28 : 70,
+    mx:i%2 ? 72 : 28, my:85-70*i/Math.max(1,saga.islands.length-1)}));
+  const route = portrait => stops.slice(1).map((p,i) => {
+    const prev=stops[i], x=portrait?'mx':'x', y=portrait?'my':'y';
+    const mid=(prev[y]+p[y])/2;
+    return `<path class="${done.includes(i) ? 'sailed' : ''}" d="M ${prev[x]} ${prev[y]} C ${prev[x]} ${mid}, ${p[x]} ${mid}, ${p[x]} ${p[y]}"/>`;
+  }).join('');
   render(`${topbar(false)}<button class="btn gray small" id="islands-back">← SAGAS</button>
-    <section class="island-atlas" style="--island-scene:url('${saga.img}')">
-      <header><span class="atlas-eyebrow">CARTA DE NAVEGACIÓN</span><h2>${saga.name}</h2>
+    <section class="island-atlas">
+      <header><span class="atlas-eyebrow">CARTA DE NAVEGACIÓN · GRAND LINE</span><h2>${saga.name}</h2>
         <p>${done.length}/${saga.islands.length} islas completadas · ${storyMode === 'nuzlocke' ? 'Nuzlocke' : 'Clásico'} · ${DIFFICULTIES.find(d=>d.id===selectedDiff)?.name || 'Grumete'}</p>
-        <p>Elige una isla, prepara tu banda y supera sus mapas. Un único jefe te espera al final.</p></header>
-      <div class="island-route">${saga.islands.map((island,i)=>{
+      </header>
+      <div class="island-route" style="--island-count:${saga.islands.length}" aria-label="Ruta de islas de ${saga.name}">
+        <span class="sea-caption" aria-hidden="true">GRAND LINE</span><span class="sea-belt" aria-hidden="true">CALM BELT</span>
+        <svg class="island-trail trail-wide" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${route(false)}</svg>
+        <svg class="island-trail trail-tall" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${route(true)}</svg>
+        ${saga.islands.map((island,i)=>{
         const active = current?.islandIdx === i, available = islandAvailable(sagaIdx,i) || active;
-        return `<button class="island-stop ${done.includes(i) ? 'is-complete' : ''} ${active ? 'is-current' : ''}" data-island="${i}" ${available ? '' : 'disabled'}>
-          <span class="island-land">${done.includes(i) ? '🏴‍☠️' : available ? '🏝️' : '🔒'}</span>
-          <span class="island-order">ISLA ${i+1}</span><b>${island.name}</b>
-          <span>${islandMapCount(island)} mapas · 1 jefe final</span>
-          <small>${active ? `Continuar · mapa ${(current.mapIdx || 0)+1}/${islandMapCount(island)}` : done.includes(i) ? 'Completada · volver a explorar' : available ? 'Desbloqueada · preparar equipo' : 'Completa la isla anterior'}</small>
+        const p=stops[i], destination=active || (!current && available && !done.includes(i));
+        const state=active ? `Continuar · mapa ${(current.mapIdx || 0)+1}/${islandMapCount(island)}` : done.includes(i) ? 'Completada · explorar' : available ? 'Preparar equipo' : 'Completa la isla anterior';
+        return `<button class="island-stop ${done.includes(i) ? 'is-complete' : ''} ${destination ? 'is-current' : ''}" style="--x:${p.x}%;--y:${p.y}%;--mx:${p.mx}%;--my:${p.my}%" data-island="${i}" ${available ? '' : 'disabled'} aria-label="Isla ${i+1}: ${island.name}. ${islandMapCount(island)} mapas y un jefe final. ${state}">
+          <span class="island-land" aria-hidden="true">
+            <svg viewBox="0 0 140 100"><ellipse class="island-water" cx="70" cy="72" rx="66" ry="24"/>
+              <path class="island-sand" d="M12 69 Q17 49 39 48 Q46 25 67 38 Q92 25 105 49 Q126 51 130 69 Q125 88 94 90 L43 90 Q12 84 12 69Z"/>
+              <path class="island-grass" d="M23 65 Q27 49 47 51 Q53 33 69 43 Q89 33 99 54 Q119 56 120 69 Q107 81 76 80 L45 80 Q26 78 23 65Z"/>
+              ${i%3===1 ? '<path fill="#779091" stroke="#476c71" stroke-width="2" d="M36 64 60 24 77 49 89 33 112 69Z"/><path fill="#f6eed3" d="M49 42 60 24 71 41 61 36Z"/>' : i%3===2 ? '<path fill="#ecd9ad" stroke="#806d4b" stroke-width="2" d="M45 67V37H57V45H65V37H78V45H85V37H98V67Z"/><path fill="#4c6870" d="M66 67V54Q72 45 79 54V67"/>' : '<path fill="none" stroke="#876241" stroke-width="6" d="M69 70Q64 47 72 28"/><path fill="#326e55" d="M71 31Q42 15 37 39Q57 30 70 35Q81 9 101 26Q85 26 74 35Q102 32 102 52Q86 39 72 37Q54 48 47 53Q44 33 71 31"/>'}
+            </svg><span class="island-marker">${done.includes(i) ? '⚑' : available ? i+1 : '🔒'}</span>
+          </span>
+          <span class="island-label"><b>${island.name}</b><span>${islandMapCount(island)} mapas · 1 jefe</span><small>${state}</small></span>
         </button>`;
       }).join('')}</div>
-      <p class="atlas-note">Los nakamas de la expedición se quedan contigo al completar la isla.</p>
+      <p class="atlas-note">Sigue el Log Pose y elige una isla para zarpar.<br>Los reclutas se quedan contigo al completar la isla.</p>
     </section>`);
   $('#islands-back').onclick = screenSagas;
   document.querySelectorAll('[data-island]').forEach(button => {
