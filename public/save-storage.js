@@ -11,14 +11,19 @@
     for (const key of ['dex', 'recruited', 'roster', 'defeated', 'relics']) {
       if (data.meta[key] !== undefined && (!Array.isArray(data.meta[key]) || data.meta[key].some(id => typeof id !== 'string'))) throw new Error('Progreso inválido.');
     }
-    for (const key of ['wins', 'nuzWins', 'upgrades', 'global', 'stats', 'settings', 'sagaClears', 'sagaDiffWins', 'teamPresets', 'charUpgrades']) {
+    for (const key of ['wins', 'nuzWins', 'upgrades', 'global', 'stats', 'settings', 'sagaClears', 'sagaDiffWins', 'teamPresets', 'charUpgrades', 'islandProgress']) {
       if (data.meta[key] !== undefined && !record(data.meta[key])) throw new Error('Progreso inválido.');
+    }
+    for (const islands of Object.values(data.meta.islandProgress || {})) {
+      if (!Array.isArray(islands) || islands.some(i=>!Number.isInteger(i) || i<0)) throw new Error('Progreso de islas inválido.');
     }
     for (const key of ['fame', 'accXp', 'towerRecord', 'runnerBest', 'logPoses', 'starPity', 'soloWins', 'totalIslands']) {
       if (data.meta[key] !== undefined && (!Number.isFinite(data.meta[key]) || data.meta[key] < 0)) throw new Error('Progreso inválido.');
     }
     if (data.run !== null && data.run !== undefined) {
       const r = data.run;
+      if (r?.mapIdx !== undefined && (!Number.isInteger(r.mapIdx) || r.mapIdx<0 || r.mapIdx>4)) throw new Error('Mapa de isla inválido.');
+      if (r?.campaignVersion !== undefined && r.campaignVersion !== 1) throw new Error('Campaña incompatible.');
       if (!record(r) || !Number.isInteger(r.saga) || !Number.isInteger(r.islandIdx) ||
           !['classic', 'nuzlocke'].includes(r.mode) || !Array.isArray(r.team) || !record(r.items) ||
           !Array.isArray(r.badges) || !Number.isFinite(r.berries) || !record(r.map) ||

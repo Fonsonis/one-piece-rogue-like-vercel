@@ -1,0 +1,66 @@
+.toast { top:max(12px,env(safe-area-inset-top)); bottom:auto!important; width:max-content; max-width:min(760px,calc(100vw - 24px)); padding:14px 22px; text-align:center; font:600 14px/1.5 system-ui,sans-serif; border-radius:8px; z-index:10000; }
+/* Center the guard pose on its shadow; attack poses can extend beyond the card. */
+.battle-layout .battle-cols,.battle-layout .battle-side,.battle-layout .fcard.active,.battle-layout .fcard-sprite { overflow:visible; }
+.battle-layout .fcard-sprite { z-index:4; pointer-events:none; }
+.battle-layout .fcard.active .fcard-sprite .sprite,.battle-layout .fcard.active .fcard-sprite .sprite.flip { --sprite-size:clamp(140px,36vw,320px); left:50%; top:auto; bottom:calc(10px - var(--sprite-size) * .0625); margin-left:calc(var(--sprite-size) * -.5); }
+.battle-layout .fcard-sprite .platform { bottom:5px; left:20%; width:60%; }
+.market-cartels .poster { position:relative; width:100px; padding:10px 6px; color:#4d321d; background:radial-gradient(ellipse at 30% 15%,#fff1c9,#e4c998 75%,#b99964); border:2px solid #795b34; border-radius:2px; box-shadow:inset 0 0 16px #956d4166,2px 5px 8px #0003; }
+.market-cartels .poster-face { background:transparent; border:1px solid #795b3480; color:#4d321d; min-height:138px; display:flex; align-items:center; justify-content:space-around; flex-direction:column; }
+.market-cartels .poster-face strong { font:900 14px/1.1 Georgia,serif; letter-spacing:1px; white-space:nowrap; }
+.market-cartels .poster-face span { font:700 9px/1.3 Georgia,serif; }
+.market-cartels .poster-face .poster-silhouette { font:900 68px/1 Georgia,serif; opacity:.65; }
+.market-cartels .poster-stars,.market-reveal .mr-stars { color:#e5b527!important; text-shadow:0 1px 0 #684410,0 -1px 0 #fff0a1; }
+.market-cartels .poster-stars { font:700 13px/1.5 Georgia,serif; letter-spacing:1px; }
+.market-cartels .poster:disabled { opacity:.82; }
+@media(max-width:700px) {
+  .toast { padding:10px 14px; font-size:12px; }
+}
+.island-atlas { margin:14px 0; overflow:hidden; border:2px solid #8a9e8e; border-radius:14px; color:#254650; background:#e9e1c9; box-shadow:0 8px 28px #173c4330; }
+.island-atlas header { padding:16px 12px 12px; text-align:center; background:linear-gradient(100deg,#d9ca9e,#fff7dd,#d9ca9e); border-bottom:3px double #9f9068; }
+.island-atlas h2 { font:800 clamp(20px,4vw,30px)/1.3 Georgia,serif; margin:5px 0; }
+.atlas-eyebrow { font:700 9px/1.4 system-ui,sans-serif; letter-spacing:3px; color:#786437; }
+.island-atlas header p { font:12px/1.5 system-ui,sans-serif; margin:5px 0 0; }
+.island-route { position:relative; height:480px; isolation:isolate; background:#89bfc3 url('grand-line-chart.svg') center/cover; }
+.island-trail { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
+.island-trail path { fill:none; stroke:#476f78; stroke-width:2; stroke-dasharray:5 7; vector-effect:non-scaling-stroke; }
+.island-trail path.sailed { stroke:#b68a34; stroke-width:3; stroke-dasharray:none; }
+.trail-tall { display:none; }
+.sea-caption { position:absolute; left:50%; top:10%; transform:translateX(-50%) rotate(-6deg); font:italic 700 clamp(22px,4vw,42px) Georgia,serif; letter-spacing:10px; color:#285e6a55; white-space:nowrap; pointer-events:none; }
+.sea-belt { position:absolute; bottom:5%; left:40%; font:10px Georgia,serif; letter-spacing:6px; color:#38697299; }
+.island-stop { position:absolute; top:var(--y); left:var(--x); transform:translate(-50%,-50%); width:140px; padding:0; background:none; color:#24454e; border:0; cursor:pointer; text-align:center; z-index:2; box-shadow:none; font-family:system-ui,sans-serif; }
+.island-land { display:block; position:relative; width:110px; height:79px; margin:auto; transition:filter .15s; }
+.island-land svg { display:block; width:100%; height:100%; filter:drop-shadow(0 5px 2px #28596744); overflow:visible; }
+.island-water { fill:#c2e5db90; stroke:#e0eee180; stroke-width:2; }
+.island-sand { fill:#e6cc88; stroke:#9e8c54; stroke-width:1.5; }
+.island-grass { fill:#659b69; stroke:#427b62; stroke-width:1; }
+.island-marker { position:absolute; top:1px; right:9px; display:grid; place-items:center; width:23px; height:23px; border-radius:50%; background:#f9ebc0; border:1px solid #8e7546; color:#735b2d; font:700 12px system-ui,sans-serif; box-shadow:0 2px 4px #214a5140; }
+.island-label { display:block; margin:0 auto; padding:5px 4px; width:100%; border:1px solid #8e9c8580; border-radius:5px; background:#fff4dcd9; box-shadow:0 3px 6px #315b6322; }
+.island-label b { display:block; font:700 14px/1.2 Georgia,serif; }
+.island-label > span { display:block; font:10px/1.5 system-ui,sans-serif; margin-top:3px; }
+.island-label small { display:block; font:600 9px/1.5 system-ui,sans-serif; }
+.island-stop:disabled { cursor:default; }
+.island-stop:disabled .island-land { filter:grayscale(.75); opacity:.7; }
+.island-stop:disabled .island-label { background:#dce4d9c9; color:#56706e; }
+.island-stop.is-complete .island-marker { background:#346e59; color:#fff3bc; }
+.island-stop.is-current .island-water { stroke:#fff0aa; stroke-width:4; }
+.island-stop.is-current .island-label { border:2px solid #ad8335; background:#fff1c9; }
+.island-stop:not(:disabled):hover .island-land { filter:drop-shadow(0 0 8px #fff3c4); }
+.island-stop:focus-visible { outline:3px solid #9c641f; outline-offset:5px; border-radius:8px; }
+.atlas-note { margin:0; padding:12px; border-top:3px double #9f9068; background:#eee3c5; text-align:center; font:12px/1.6 system-ui,sans-serif; }
+@media(max-width:900px) {
+  .island-route { height:max(520px,calc(var(--island-count) * 85px)); background-size:auto 100%; }
+  .island-stop { top:var(--my); left:var(--mx); width:136px; }
+  .trail-wide { display:none; }.trail-tall { display:block; }
+  .sea-caption { top:46%; left:50%; transform:translate(-50%,-50%) rotate(-80deg); font-size:30px; letter-spacing:8px; }
+  .sea-belt { left:5%; bottom:45%; writing-mode:vertical-rl; }
+}
+@media(max-width:700px) {
+  #app:has(.island-atlas) > .topbar .logo { display:none; }
+  .island-atlas header { padding:10px 8px; }
+  .atlas-eyebrow { font-size:8px; letter-spacing:2px; }
+  .atlas-note { font-size:11px; padding:8px; }
+}
+@media(max-width:360px) {
+  .island-stop { width:118px; }.island-label b { font-size:12px; }
+  .island-land { width:100px; height:72px; }
+}
