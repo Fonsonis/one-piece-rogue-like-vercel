@@ -4362,6 +4362,24 @@ function renderSpecialCatalog(lvl) {
   });
 }
 
+function revealSpecialRecruit(ov, prizeId, lvl) {
+  let completed = false;
+  const complete = () => {
+    if (completed || !ov.isConnected) return;
+    completed = true;
+    ov.remove();
+    specialJoin(prizeId, lvl);
+  };
+  try {
+    if (typeof MarketReveal !== 'undefined') {
+      MarketReveal.show({host:ov, name:CHARS[prizeId].name, rarity:CHARS[prizeId].rareza,
+        portraitHTML:charIcon(prizeId, 140), onComplete:complete});
+      return;
+    }
+  } catch (_) { /* A cosmetic failure must not prevent recruitment. */ }
+  setTimeout(complete, 1400);
+}
+
 function renderSpecialGacha(lvl) {
   meta.starPity = meta.starPity || 0;
   // pesos: 1⭐ -> 41.5%, 2⭐ -> 30%, 3⭐ -> 21%, 4⭐ -> 7%, 5⭐ (legendarios) -> 0.5%
@@ -4383,7 +4401,7 @@ function renderSpecialGacha(lvl) {
 
   let current = 0;
   const ov = document.createElement('div');
-  ov.className = 'overlay';
+  ov.className = 'overlay market-cartels';
   ov.innerHTML = `<div class="modal">
     <h2>🎰 Los 5 carteles de SE BUSCA</h2>
     <p style="font-size:8px;text-align:center;margin-bottom:6px;">Destapa los carteles en orden. ¡En uno de ellos está tu recluta!</p>
@@ -4392,16 +4410,17 @@ function renderSpecialGacha(lvl) {
     </div>
     <div class="poster-row">
       ${[0, 1, 2, 3, 4].map(i => `
-        <div class="poster" data-p="${i}">
+        <button type="button" class="poster" data-p="${i}" aria-label="Destapar cartel de ${i + 1} estrellas" disabled>
           <div class="poster-stars">${'⭐'.repeat(i + 1)}</div>
           <div class="poster-face" id="pf-${i}">📜<br><span>SE BUSCA</span></div>
-        </div>`).join('')}
+        </button>`).join('')}
     </div>
   </div>`;
   document.body.appendChild(ov);
   const update = () => {
     ov.querySelectorAll('.poster').forEach((el, i) => {
       el.classList.toggle('next', i === current);
+      el.disabled = i !== current;
       el.onclick = i === current ? () => flip(i) : null;
     });
   };
@@ -4413,16 +4432,18 @@ function renderSpecialGacha(lvl) {
       face.innerHTML = `${charIcon(prizeId, 28)}<br><span>${c.name}</span>`;
       el.classList.add('hit'); el.classList.remove('next');
       registerDex(prizeId);
-      ov.querySelectorAll('.poster').forEach(p => { p.onclick = null; });
-      setTimeout(() => { ov.remove(); specialJoin(prizeId, lvl); }, 1400);
+      ov.querySelectorAll('.poster').forEach(p => { p.onclick = null; p.disabled = true; });
+      revealSpecialRecruit(ov, prizeId, lvl);
     } else {
       face.innerHTML = `💨<br><span>VACÍO</span>`;
       el.classList.add('empty');
       current++;
       update();
+      ov.querySelector(`[data-p="${current}"]`)?.focus({preventScroll:true});
     }
   };
   update();
+  ov.querySelector('[data-p="0"]')?.focus({preventScroll:true});
 }
 
 // Tabla de probabilidades (drop rates) del gacha de carteles SE BUSCA:

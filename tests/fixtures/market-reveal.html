@@ -1,0 +1,9 @@
+<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Revisión local · Mercado clandestino</title><link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/art/theme.css"><link rel="stylesheet" href="/art/sprite-sizes.css"><link rel="stylesheet" href="/art/preferences.css"><link rel="stylesheet" href="/art/market-reveal.css"></head><body><main class="panel"><h1>Revelaciones de mercado</h1><p>Prueba visual aislada, sin guardados, compras ni progreso.</p><div id="tiers" class="actions"></div><button class="btn" id="dark-preview">Tema oscuro</button><p id="result" role="status">Sin reclutamientos de prueba.</p></main><script src="/data.js"></script><script src="/art/market-reveal.js"></script><script>
+let claims=0;
+document.querySelector('#dark-preview').onclick=()=>{document.documentElement.dataset.theme='dark';};
+for(let rarity=1;rarity<=5;rarity++){
+ const button=document.createElement('button');button.className='btn';button.textContent=rarity+' estrellas';
+ button.onclick=()=>{document.querySelector('.market-reveal-host')?.remove();const [id,c]=Object.entries(CHARS).find(([id,c])=>c.rareza===rarity);const host=document.createElement('div');host.className='overlay';document.body.appendChild(host);
+ MarketReveal.show({host,name:c.name,rarity:c.rareza,portraitHTML:`<span class="dex-sprite" data-character="${id}" style="--sprite-size:140px;--sprite-portrait:url('/art/portraits/${id}.png');--sprite-atlas:url('/art/characters/${id}.png')"></span>`,onComplete:()=>{claims++;document.querySelector('#result').textContent=`${c.name} confirmado. Reclutamientos de prueba: ${claims}.`;host.remove();}});};document.querySelector('#tiers').appendChild(button);
+}
+</script></body></html>
