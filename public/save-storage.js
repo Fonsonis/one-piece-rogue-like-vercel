@@ -22,6 +22,7 @@
     }
     if (data.run !== null && data.run !== undefined) {
       const r = data.run;
+      if (r?.startingTeam !== undefined && (!Array.isArray(r.startingTeam) || r.startingTeam.length < 1 || r.startingTeam.length > 6 || r.startingTeam.some(id => typeof id !== 'string'))) throw new Error('Equipo inicial inválido.');
       if (r?.mapIdx !== undefined && (!Number.isInteger(r.mapIdx) || r.mapIdx<0 || r.mapIdx>4)) throw new Error('Mapa de isla inválido.');
       if (r?.campaignVersion !== undefined && r.campaignVersion !== 1) throw new Error('Campaña incompatible.');
       if (!record(r) || !Number.isInteger(r.saga) || !Number.isInteger(r.islandIdx) ||

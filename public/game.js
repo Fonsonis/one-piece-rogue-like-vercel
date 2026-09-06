@@ -476,6 +476,7 @@ function importSaveFile(file) {
       if (!nextMeta.roster.includes('luffy')) nextMeta.roster.push('luffy');
       const nextRun = data.run || null;
       if (nextRun) {
+        ensureStartingTeam(nextRun);
         if (nextRun.mode === 'nuzlocke') nextRun.team = nextRun.team.filter(f => f.hp > 0);
         nextRun.team.forEach(migrateFighter);
       }
@@ -511,6 +512,7 @@ function validateGameSave(data) {
     if (!saga || !['classic','nuzlocke'].includes(mode) || !['1','2','3','4','5'].includes(diff) || islands.some(i=>i>=saga.islands.length)) throw new Error('Progreso de islas incompatible.');
   }
   if (!r) return;
+  if (r.startingTeam?.some(id => !CHARS[id] || baseFormOf(id) !== id)) throw new Error('Equipo inicial incompatible.');
   if (!SAGAS[r.saga]?.islands[r.islandIdx] || r.team.some(f => !CHARS[f.id] || f.moves.some(id => !MOVES[id]))) throw new Error('Viaje incompatible.');
   if (r.mapIdx !== undefined && r.mapIdx >= islandMapCount(SAGAS[r.saga].islands[r.islandIdx])) throw new Error('Mapa de isla incompatible.');
   if (r.map.rows.some(row => row.some(node => !NODE_TYPES[node.type]))) throw new Error('Mapa incompatible.');
@@ -557,6 +559,7 @@ function gainFame(n) {
 // ---------- Estado de la partida ----------
 let run = null; // partida actual (historia)
 function saveRun() {
+  ensureStartingTeam(run);
   if (run && run.mode === 'nuzlocke' && run.team) {
     run.team = run.team.filter(f => f && f.hp > 0);
   }
@@ -571,6 +574,7 @@ function loadRun() {
   try {
     if (loadedSave?.run) run = JSON.parse(JSON.stringify(loadedSave.run));
   } catch (e) { }
+  ensureStartingTeam(run);
   if (run && run.mode === 'nuzlocke' && run.team) {
     run.team = run.team.filter(f => f && f.hp > 0);
   }
@@ -3230,6 +3234,37 @@ function upgradeCharLvl(id) {
   return true;
 }
 
+// Preserve the embarkation selection even when Nuzlocke removes fallen fighters.
+function ensureStartingTeam(journey) {
+  if (!journey || journey.startingTeam !== undefined) return;
+  const ids = (journey.team || []).filter(f => f && CHARS[f.id]).map(f => baseFormOf(f.id)).slice(0,6);
+  if (ids.length) journey.startingTeam = ids;
+}
+function islandRetrySpec(journey) {
+  ensureStartingTeam(journey);
+  if (!journey?.startingTeam?.length || !SAGAS[journey.saga]?.islands[journey.islandIdx]) return null;
+  return {saga:journey.saga, islandIdx:journey.islandIdx, mode:journey.mode,
+    diff:journey.diff || 1, starterIds:[...journey.startingTeam]};
+}
+function retryIsland(attempt) {
+  if (!attempt) return;
+  autoMode = false;
+  clearTimeout(autoTimer); autoTimer = null;
+  if (battle) { battle.over = true; clearTimeout(battle.timer); battle = null; }
+  storyMode = attempt.mode; selectedDiff = attempt.diff;
+  startRun(attempt.saga, attempt.starterIds, attempt.islandIdx);
+}
+function confirmRestartIsland() {
+  const journey = run, attempt = islandRetrySpec(journey);
+  if (!attempt) return;
+  const wasAuto = autoMode;
+  autoMode = false; clearTimeout(autoTimer); autoTimer = null;
+  modalConfirm('🔄 ¿Reiniciar isla?',
+    'Volverás al mapa 1 con el equipo que elegiste al zarpar, sus niveles base actuales y las provisiones iniciales.<br>Se perderán los reclutas y las mejoras temporales de este intento. El progreso permanente se conserva.',
+    () => { if (run === journey) retryIsland(attempt); },
+    () => { if (run === journey) { autoMode = wasAuto; screenMap(2); } });
+}
+
 function startRun(sagaIdx, starterIds, islandIdx = 0) {
   const saga = SAGAS[sagaIdx];
   if (!saga?.islands[islandIdx] || !islandAvailable(sagaIdx,islandIdx)) return;
@@ -3260,6 +3295,7 @@ function startRun(sagaIdx, starterIds, islandIdx = 0) {
   run = {
     saga: sagaIdx, mode: storyMode, diff: selectedDiff || 1,
     islandIdx, mapIdx:0, campaignVersion:1, islandComplete:false,
+    startingTeam: starterIds.map(baseFormOf),
     team: starterIds.map(id => applyUpgrades(makeChar(id, startLvlOf(id)))),
     items,
     berries,
@@ -3391,7 +3427,7 @@ function screenMap(activePageIdx = 0) {
             `}
             <div style="display:flex;gap:8px;margin-top:14px;">
               <button class="btn red small" id="btn-abandon" style="flex:1;">ABANDONAR</button>
-              <button class="btn gray small" id="btn-home" style="flex:1;">MENÚ PRINCIPAL</button>
+              <button class="btn gray small" id="btn-restart-island" style="flex:1;">🔄 REINICIAR ISLA</button>
             </div>
           </div>
         </div>
@@ -3583,7 +3619,7 @@ function screenMap(activePageIdx = 0) {
   document.querySelectorAll('.item-row').forEach(el => {
     el.onclick = () => useItemFromMap(el.dataset.item);
   });
-  $('#btn-home').onclick = screenHome;
+  $('#btn-restart-island').onclick = confirmRestartIsland;
   $('#btn-abandon').onclick = () => {
     modalConfirm('🏳️ ¿Abandonar el viaje?',
       'Se perderá todo el progreso de esta aventura.<br>La Fama, los veteranos y la Dex se conservan.',
@@ -4445,6 +4481,8 @@ const sagaPoolByRareza = (sagaId, r) => {
 const basePirateIds = () => sagaBasePirateIds(SAGAS[run.saga].id);
 // Cartel de rareza r en la saga actual
 const poolByRareza = r => sagaPoolByRareza(SAGAS[run.saga].id, r);
+const specialMapMultiplier = () => (run?.mapIdx || 0) + 1;
+const specialGachaPrice = () => 300 * specialMapMultiplier();
 const hirePrice = c => c.rareza * c.rareza * 250; // precio elevado por elegir a dedo
 
 function specialBlockedReason() {
@@ -4470,7 +4508,7 @@ function specialJoin(id, lvl) {
 function doSpecialPirate(island) {
   meta.starPity = meta.starPity || 0;
   const lvl = island.lvl[1] + 2;
-  const gachaPrice = 300 * (run.islandIdx + 1);
+  const gachaPrice = specialGachaPrice();
   const blocked = specialBlockedReason();
   const ov = document.createElement('div');
   ov.className = 'overlay';
@@ -4480,6 +4518,7 @@ function doSpecialPirate(island) {
     <b>🎯 Elegir:</b> cualquier pirata del catálogo (hasta 4⭐), pagando su caché completo.<br>
     <b>🎰 Carteles:</b> 5 carteles de SE BUSCA boca abajo. Destápalos en orden:
     el 1º es el más probable (recluta de 1⭐)... y el 5º, el premio gordo (5⭐).</p>
+    <p class="special-map-price" style="font-size:8px;text-align:center;line-height:1.8;">Mapa ${specialMapMultiplier()} · Carteles ×${specialMapMultiplier()}. Vuelven a ×1 al empezar otra isla. El catálogo depende solo de las estrellas.</p>
     ${cartelesBadgeHTML()}
     <div style="font-size:9.5px;text-align:center;margin-top:6px;margin-bottom:6px;color:#f39c12;background:rgba(243,156,18,0.12);padding:6px 10px;border-radius:6px;border:1px solid rgba(243,156,18,0.4);display:flex;align-items:center;justify-content:center;gap:6px;">
       <span>⭐ Estrellas acumuladas (Pity): <b>${meta.starPity || 0} / 1000</b></span>
@@ -6417,6 +6456,7 @@ function gameOver() {
   if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
   playMusic('dead');
   battle = null;
+  const retry = islandRetrySpec(run);
   const wasNuz = run && run.mode === 'nuzlocke';
   const consuelo = run ? run.badges.length * 10 : 0;
   if (consuelo) gainFame(consuelo);
@@ -6428,10 +6468,17 @@ function gameOver() {
       <p style="margin:14px 0;">Toda tu banda ha sido derrotada.<br>
       ${wasNuz ? 'Las reglas Nuzlocke no perdonan...' : 'El mar es implacable, pero siempre puedes volver a zarpar.'}
       ${consuelo ? `<br><br>Tu hazaña no se olvida: +${consuelo} ⭐ Fama` : ''}</p>
-      <button class="btn red" id="btn-fin">VOLVER AL PUERTO</button>
+      <div class="actions" style="flex-wrap:wrap;justify-content:center;">
+        ${retry ? '<button class="btn green" id="btn-retry-island">🔄 VOLVER A INTENTAR</button>' : ''}
+        <button class="btn red" id="btn-fin">VOLVER AL PUERTO</button>
+      </div>
     </div>
   `);
   $('#btn-fin').onclick = screenHome;
+  if (retry) {
+    let used = false;
+    $('#btn-retry-island').onclick = () => { if (!used) { used = true; retryIsland(retry); } };
+  }
 }
 
 // ============ TORRE MARINE ============
