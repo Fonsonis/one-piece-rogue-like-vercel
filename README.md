@@ -32,6 +32,8 @@ El combate mantiene un activo por bando y muestra la tripulación sobre los cont
 
 Las fichas de combate y del equipo dan más espacio a los sprites. Los activos aparecen enfrentados, uno al lado del otro también en móvil, con vida, Ultimate y EXP encima y estadísticas debajo. Los logros se filtran mediante un desplegable y muestran la recompensa debajo del texto; el control de música también queda debajo de su descripción.
 
+Cada bando indica los personajes en pie sobre el total inicial del encuentro (por ejemplo, `3/4 en pie`). El denominador se conserva también cuando Nuzlocke elimina a un aliado. Bajo las fichas compactas aparecen la tripulación, los mensajes y tres filas de controles: objetos; bandas, velocidad y sinergias; huir o rendirse cuando esté disponible. Sin objetos se muestra un aviso en su fila. Las animaciones conservan las cuatro poses, con límites ajustados al atlas y sin desplazamientos ni giros adicionales para dar más tamaño al sprite. Si se actualizan los atlas, regenera primero los límites de movimiento y después ejecuta `node scripts/compact-sprite-bounds.mjs`.
+
 ## Guardado en el dispositivo
 
 - **💾**: sobrescribe un único documento JSON en el almacenamiento local del navegador, bajo la clave `oplike_save`. No descarga archivos ni envía datos a un servidor.

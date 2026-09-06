@@ -5033,6 +5033,7 @@ function startBattle(enemies, opts) {
     timer: null,
     round: 1,
     switchUsed: false,
+    teamTotals: {p: team.length, e: enemies.length},
   };
   enemies.forEach(e => registerDex(e.id));
   // reinicia pasivas y estados por-combate
@@ -5127,16 +5128,29 @@ function showBattleCrew() {
 
 function controlsHTML() {
   const b = battle;
-  let html = '';
+  let html = '<div class="battle-control-row battle-items" aria-label="Objetos">';
+  let hasItems = false;
   for (const id of ['carne', 'carnereal', 'bocadillo', 'sake']) {
-    if (b.items[id] > 0) html += `<button class="btn small blue" data-ctl="item" data-arg="${id}" title="${ITEMS[id].name}">${ITEMS[id].emoji} ×${b.items[id]}</button>`;
+    if (b.items[id] > 0) {
+      hasItems = true;
+      html += `<button class="btn small blue" data-ctl="item" data-arg="${id}" title="${ITEMS[id].name}">${ITEMS[id].emoji} ×${b.items[id]}</button>`;
+    }
   }
+  if (!hasItems) html += '<span class="battle-no-items">Sin objetos de combate</span>';
+  html += '</div><div class="battle-control-row battle-tools" aria-label="Controles del combate">';
   html += `<button class="btn small gray battle-crew-button" data-ctl="crew">👥 BANDAS</button>`;
   html += `<button class="btn small gray" data-ctl="speed" title="Atajo: barra espaciadora">⏩ VELOCIDAD x${b.speed}</button>`;
   html += `<button class="btn small gray" data-ctl="info">🧩 SINERGIAS Y TIPOS</button>`;
+  html += '</div><div class="battle-control-row battle-exit" aria-label="Salir del combate">';
   if (b.opts.wild && !b.tower) html += `<button class="btn small red" data-ctl="run">🏃 HUIR</button>`;
   if (b.tower) html += `<button class="btn small red" data-ctl="quit">🏳️ RENDIRSE</button>`;
-  return html;
+  return html + '</div>';
+}
+
+function battleTeamCount(side) {
+  const team = side === 'p' ? battle.pTeam : battle.eTeam;
+  const total = battle.teamTotals?.[side] ?? team.length;
+  return `${team.filter(f => f.hp > 0).length}/${total} en pie`;
 }
 
 function switchBattleFighter(index) {
@@ -5185,12 +5199,14 @@ function renderBattle(logLines) {
         <div class="battle-cols" style="--scene:url('${b.tower ? '/art/scenes/marineford.webp' : (SAGAS[run?.saga || 0]?.img || '/art/scenes/eastblue.webp')}')">
           <div class="battle-side" id="side-p">
             <div class="side-head"><div class="trainer">🏴‍☠️</div>TU BANDA
+              <div class="battle-team-count" id="count-p">${battleTeamCount('p')}</div>
               <div class="syn-chips" id="syn-p">${synChipsHTML(b.pTeam)}</div>
             </div>
             ${b.pTeam.map((f, i) => fighterCardHTML(f, 'p', i, b.curP)).join('')}
           </div>
           <div class="battle-side" id="side-e">
             <div class="side-head"><div class="trainer">${eHead}</div>${b.opts.wild ? 'SALVAJE' : 'ENEMIGO'}
+              <div class="battle-team-count" id="count-e">${battleTeamCount('e')}</div>
               <div class="syn-chips" id="syn-e">${synChipsHTML(b.eTeam)}</div>
             </div>
             ${b.eTeam.map((f, i) => fighterCardHTML(f, 'e', i, b.curE)).join('')}
@@ -5265,6 +5281,10 @@ function keepActiveFightersVisible() {
 
 function refreshHPCards() {
   if (!battle) return;
+  for (const side of ['p', 'e']) {
+    const count = $(`#count-${side}`);
+    if (count) count.textContent = battleTeamCount(side);
+  }
   [['p', battle.pTeam, battle.curP], ['e', battle.eTeam, battle.curE]].forEach(([side, team, active]) => {
     team.forEach((f, i) => {
       const card = $(`#fc-${side}-${i}`);
@@ -5728,10 +5748,12 @@ function afterRound() {
   const ne = activeE(), np = activeP();
   if (!ne && np) {
     b.over = true;
+    refreshHPCards();
     return setTimeout(() => endBattle(true), 1300 / b.speed);
   }
   if (!np) {
     b.over = true;
+    refreshHPCards();
     return setTimeout(() => b.tower ? towerGameOver() : gameOver(), 1300 / b.speed);
   }
   if (deadE && ne !== b.curE) { registerDex(ne.id); log(`¡${charName(ne)} entra en combate!`); }
