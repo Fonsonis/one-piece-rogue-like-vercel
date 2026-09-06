@@ -11,7 +11,7 @@ function harness(reduced=false){
  const host={isConnected:true,innerHTML:'',classList:{add:c=>classes.add(c)},querySelector:s=>s==='.market-reveal'?panel:s==='.mr-continue'?button:status};
  const context=vm.createContext({window:{matchMedia:()=>({matches:reduced,addEventListener:(k,f)=>{changes=f;},removeEventListener:()=>{changes=null;}})},document:{body:{}},Math:Object.assign(Object.create(Math),{random(){throw Error('Presentation consumed gameplay RNG');}}),MutationObserver:class{constructor(f){observerCallback=f;}observe(){}disconnect(){disconnected=true;}},setTimeout:f=>{const id=clock.size+1;clock.set(id,f);return id;},clearTimeout:id=>clock.delete(id)});
  vm.runInContext(readFileSync('public/art/market-reveal.js','utf8'),context);
- const show=rarity=>vm.runInContext('MarketReveal.show',context)({host,name:'Luffy <&>',rarity,portraitHTML:'<img alt="" src="luffy.png">',onComplete:()=>{claims++;}});
+ const show=(rarity,rewardText)=>vm.runInContext('MarketReveal.show',context)({host,name:'Luffy <&>',rarity,rewardText,portraitHTML:'<img alt="" src="luffy.png">',onComplete:()=>{claims++;}});
  return {show,host,button,status,panelClasses,listeners,clock,get claims(){return claims;},get disconnected(){return disconnected;},tick:()=>{for(const f of [...clock.values()])f();},remove:()=>{host.isConnected=false;observerCallback();},reduce:()=>changes({matches:true})};
 }
 
@@ -44,7 +44,14 @@ test('removing or cancelling a reveal releases timers and cannot award a ghost r
 });
 
 
-test('all five market stops in every saga preserve rolls, pity and exactly one recruitment',()=>{
+test('the reveal displays the Log Pose reward when ready, including reduced motion',()=>{
+ for(const reduced of [false,true]){
+  const h=harness(reduced);h.show(3,'+3 Log Poses');h.tick();
+  assert.match(h.status.textContent,/\+3 Log Poses/);
+ }
+});
+
+test('all five market stops in every saga preserve rolls, pity and award actual stars once',()=>{
  const rolls=[.1,.5,.8,.97,.999];
  for(let saga=0;saga<11;saga++)for(let stop=0;stop<5;stop++){
   const h=combatHarness();let draws=0,shown;const joined=[];
@@ -54,14 +61,21 @@ test('all five market stops in every saga preserve rolls, pity and exactly one r
   h.ctx.document.createElement=()=>host;h.ctx.document.body={appendChild(){}};
   h.ctx.Math.random=()=>++draws===1?rolls[stop]:.123;
   h.ctx.MarketReveal={show:args=>{shown=args;}};h.ctx.specialJoin=(id,lvl)=>joined.push({id,lvl});
-  h.exec(`run={saga:${saga},berries:1234};meta.starPity=0;renderSpecialGacha(20);`);
+  const saved=[];h.ctx.saveMeta=()=>saved.push(h.exec('meta.logPoses'));
+  h.exec(`run={saga:${saga},berries:1234};meta.starPity=0;meta.logPoses=10;renderSpecialGacha(20);`);
   assert.equal(draws,2);assert.equal(h.exec('run.berries'),1234);
   for(let i=0;i<=stop;i++){
-   assert.deepEqual(cards.map(c=>c.disabled),cards.map((_,index)=>index!==i));cards[i].onclick();
+   assert.equal(h.exec('meta.logPoses'),10);
+   assert.deepEqual(cards.map(c=>c.disabled),cards.map((_,index)=>index!==i));
+   const click=cards[i].onclick;click();click();
   }
   assert.equal(draws,2);assert.ok(cards.every(c=>c.disabled));assert.equal(joined.length,0);
+  assert.equal(h.exec('meta.logPoses'),10+shown.rarity);
+  assert.equal(saved.at(-1),10+shown.rarity);
+  assert.match(shown.rewardText,new RegExp(`^\\+${shown.rarity} Log Pose`));
   shown.onComplete();shown.onComplete();assert.equal(joined.length,1);assert.equal(joined[0].lvl,20);
   const rarity=h.exec(`CHARS[${JSON.stringify(joined[0].id)}].rareza`);
+  assert.equal(h.exec('meta.logPoses'),10+rarity);
   assert.equal(shown.rarity,rarity);assert.equal(h.exec('meta.starPity'),stop===4||rarity===5?0:stop+1);
  }
 });

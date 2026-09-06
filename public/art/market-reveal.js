@@ -10,7 +10,7 @@ const MarketReveal = (() => {
   ].map(Object.freeze);
   const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const rarityOf = value => Math.max(1,Math.min(5,Math.floor(Number(value)||1)));
-  function show({host,name,rarity,portraitHTML,onComplete}) {
+  function show({host,name,rarity,portraitHTML,rewardText='',onComplete}) {
     const stars=rarityOf(rarity), tier=tiers[stars-1];
     const media=window.matchMedia('(prefers-reduced-motion: reduce)');
     host.classList.add('market-reveal-host');
@@ -36,7 +36,7 @@ const MarketReveal = (() => {
     const skip=()=>{
       if(ended||ready)return;
       ready=true;clearTimeout(timer);panel.classList.add('mr-ready');
-      status.textContent=`${name} · ${stars} ${stars===1?'estrella':'estrellas'}`;
+      status.textContent=`${name} · ${stars} ${stars===1?'estrella':'estrellas'}${rewardText ? ` · ${rewardText}` : ''}`;
       button.textContent='CONTINUAR';
     };
     const cancel=()=>{if(ended)return;ended=true;cleanup();};

@@ -4562,10 +4562,12 @@ function revealSpecialRecruit(ov, prizeId, lvl) {
   try {
     if (typeof MarketReveal !== 'undefined') {
       MarketReveal.show({host:ov, name:CHARS[prizeId].name, rarity:CHARS[prizeId].rareza,
+        rewardText:`+${CHARS[prizeId].rareza} Log Pose${CHARS[prizeId].rareza === 1 ? '' : 's'}`,
         portraitHTML:charIcon(prizeId, 140), onComplete:complete});
       return;
     }
   } catch (_) { /* A cosmetic failure must not prevent recruitment. */ }
+  toast(`🧭 +${CHARS[prizeId].rareza} Log Poses del cartel premiado`);
   setTimeout(complete, 1400);
 }
 
@@ -4588,12 +4590,12 @@ function renderSpecialGacha(lvl) {
   }
   saveMeta();
 
-  let current = 0;
+  let current = 0, resolved = false;
   const ov = document.createElement('div');
   ov.className = 'overlay market-cartels';
   ov.innerHTML = `<div class="modal">
     <h2>🎰 Los 5 carteles de SE BUSCA</h2>
-    <p style="font-size:8px;text-align:center;margin-bottom:6px;">Destapa los carteles en orden. ¡En uno de ellos está tu recluta!</p>
+    <p style="font-size:8px;text-align:center;margin-bottom:6px;">Destapa los carteles en orden. ¡En uno de ellos está tu recluta! El cartel premiado también da 1 Log Pose por cada estrella del personaje obtenido.</p>
     <div style="font-size:9px;text-align:center;margin-bottom:10px;color:#f39c12;">
       ⭐ Estrellas acumuladas (Pity): <b>${meta.starPity} / 1000</b>
     </div>
@@ -4614,10 +4616,14 @@ function renderSpecialGacha(lvl) {
     });
   };
   const flip = i => {
+    if (resolved || !ov.isConnected || i !== current) return;
     const face = ov.querySelector(`#pf-${i}`);
     const el = ov.querySelector(`[data-p="${i}"]`);
     if (i === stopIdx) {
+      resolved = true;
       const c = CHARS[prizeId];
+      meta.logPoses = (meta.logPoses || 0) + c.rareza;
+      saveMeta();
       face.innerHTML = `${charIcon(prizeId, 28)}<br><span>${c.name}</span>`;
       el.classList.add('hit'); el.classList.remove('next');
       registerDex(prizeId);
