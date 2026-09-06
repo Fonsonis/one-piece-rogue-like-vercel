@@ -1508,12 +1508,11 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
       <p style="font-size:8px;text-align:center;margin-bottom:8px;color:#666;">
         Completa desafíos en tus aventuras para ganar ⭐ Fama adicional.
       </p>
-      <div class="tabs" style="margin-bottom:10px;flex-wrap:wrap;gap:4px;">
-        <div class="tab ${currentAchCategory === 'all' ? 'active' : ''}" id="ach-cat-all" style="font-size:8px;padding:4px 6px;">TODOS</div>
-        <div class="tab ${currentAchCategory === 'prog' ? 'active' : ''}" id="ach-cat-prog" style="font-size:8px;padding:4px 6px;">🔄 PROGRESIVOS (${PROGRESSIVE_ACHIEVEMENTS.length})</div>
-        <div class="tab ${currentAchCategory === 'sagas' ? 'active' : ''}" id="ach-cat-sagas" style="font-size:8px;padding:4px 6px;">📜 SAGAS (${visibleStaticList.filter(a => a.id.startsWith('saga_diff_')).length})</div>
-        <div class="tab ${currentAchCategory === 'desafios' ? 'active' : ''}" id="ach-cat-desafios" style="font-size:8px;padding:4px 6px;">🎯 DESAFÍOS (${visibleStaticList.filter(a => !a.id.startsWith('saga_diff_')).length})</div>
-      </div>
+      <label class="achievement-filter" for="ach-category">Tipo de logro
+        <select id="ach-category">
+          ${[['all', 'Todos'], ['prog', `🔄 Progresivos (${PROGRESSIVE_ACHIEVEMENTS.length})`], ['sagas', `📜 Sagas (${visibleStaticList.filter(a => a.id.startsWith('saga_diff_')).length})`], ['desafios', `🎯 Desafíos (${visibleStaticList.filter(a => !a.id.startsWith('saga_diff_')).length})`]].map(([value, label]) => `<option value="${value}" ${currentAchCategory === value ? 'selected' : ''}>${label}</option>`).join('')}
+        </select>
+      </label>
       <div class="achieve-list-container" style="max-height:340px;overflow-y:auto;">
         ${html}
       </div>
@@ -1555,14 +1554,11 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
 
   const bindEvents = () => {
     const cont = ov.querySelector('.achieve-list-container');
-    ['all', 'prog', 'sagas', 'desafios'].forEach(cat => {
-      const tabEl = ov.querySelector(`#ach-cat-${cat}`);
-      if (tabEl) tabEl.onclick = () => {
-        currentAchCategory = cat;
+    ov.querySelector('#ach-category').onchange = event => {
+        currentAchCategory = event.target.value;
         ov.querySelector('.modal').innerHTML = renderModalContent();
         bindEvents();
-      };
-    });
+    };
 
     ov.querySelectorAll('[data-claim]').forEach(btn => {
       btn.onclick = () => {
@@ -4653,7 +4649,8 @@ function healScaleNow() {
   return battle ? clamp(1 - 0.20 * Math.max(0, (battle.round || 1) - CLIMAX_ROUND), 0, 1) : 1;
 }
 
-const activeP = () => battle.pTeam.find(f => f.hp > 0);
+const activeP = () => battle.pTeam.includes(battle.curP) && battle.curP.hp > 0
+  ? battle.curP : battle.pTeam.find(f => f.hp > 0);
 const activeE = () => battle.eTeam.find(f => f.hp > 0);
 
 // ---------- Motor de pasivas (compendio) ----------
@@ -5035,6 +5032,7 @@ function startBattle(enemies, opts) {
     tower: !!opts.tower,
     timer: null,
     round: 1,
+    switchUsed: false,
   };
   enemies.forEach(e => registerDex(e.id));
   // reinicia pasivas y estados por-combate
@@ -5141,6 +5139,42 @@ function controlsHTML() {
   return html;
 }
 
+function switchBattleFighter(index) {
+  const b = battle;
+  const next = b?.pTeam[index];
+  if (!b || b.over || b.waiting || b.switchUsed || !next || next.hp <= 0 ||
+      next === b.curP || b.curP?.hp <= 0 || b.curE?.hp <= 0) return false;
+  b.switchUsed = true;
+  const previous = b.curP;
+  b.curP = next;
+  log(`🔄 ${charName(previous)} se retira. ¡Adelante, ${charName(next)}! Relevo utilizado.`);
+  renderBattlePreserveLog();
+  return true;
+}
+
+function reservesHTML() {
+  const b = battle;
+  return `<div class="battle-reserve-heading">🏴‍☠️ TU TRIPULACIÓN <span>${b.switchUsed ? 'Relevo usado · 0/1' : 'Toca una reserva · 1 relevo disponible'}</span></div>
+    <div class="battle-reserve-list">${b.pTeam.map((f, index) => {
+      const active = f === b.curP;
+      const disabled = active || f.hp <= 0 || b.switchUsed || b.over || b.waiting || b.curP?.hp <= 0 || b.curE?.hp <= 0;
+      return `<button class="battle-reserve ${active ? 'is-active' : ''} ${f.hp <= 0 ? 'is-ko' : ''}" data-reserve="${index}" ${disabled ? 'disabled' : ''} aria-label="${active ? 'Activo' : 'Relevar con'} ${charName(f)}, ${f.hp}/${f.maxhp} PS">
+        ${charIcon(f.id, 80)}<b>${charName(f)}</b>
+        <span class="hp-bar"><i class="${hpBarClass(f)}" style="width:${clamp(f.hp / f.maxhp * 100, 0, 100)}%"></i></span>
+        <small>${f.hp}/${f.maxhp} PS · ${f.hp <= 0 ? 'KO' : active ? 'Activo' : 'Reserva'}</small>
+      </button>`;
+    }).join('')}</div>`;
+}
+
+function refreshReserves() {
+  const el = $('#battle-reserves');
+  if (!el) return;
+  el.innerHTML = reservesHTML();
+  el.querySelectorAll('[data-reserve]').forEach(button => {
+    button.onclick = () => switchBattleFighter(Number(button.dataset.reserve));
+  });
+}
+
 function renderBattle(logLines) {
   const b = battle;
   const eHead = b.opts.wild ? '🌊' : b.opts.boss ? '💀' : '⚓';
@@ -5162,12 +5196,14 @@ function renderBattle(logLines) {
             ${b.eTeam.map((f, i) => fighterCardHTML(f, 'e', i, b.curE)).join('')}
           </div>
         </div>
+        <div class="battle-reserves" id="battle-reserves"></div>
         <div class="battle-log" id="battle-log">${logLines.map(l => `<div>${l}</div>`).join('')}</div>
       </div>
       <div class="battle-sidebar" id="battle-controls">${controlsHTML()}</div>
     </div>
   `);
   bindControls();
+  refreshReserves();
   // En combate: las cartas enemigas muestran su ficha; las cartas aliadas activan la Ultimate si está lista
   [['p', b.pTeam], ['e', b.eTeam]].forEach(([side, team]) => {
     team.forEach((f, i) => {
@@ -5258,6 +5294,7 @@ function refreshHPCards() {
   });
   const sp = $('#syn-p'); if (sp) sp.innerHTML = synChipsHTML(battle.pTeam);
   const se = $('#syn-e'); if (se) se.innerHTML = synChipsHTML(battle.eTeam);
+  refreshReserves();
   keepActiveFightersVisible();
 }
 
@@ -5558,10 +5595,13 @@ function runRound() {
     : [[e, p, 'player'], [p, e, 'enemy']];
   let i = 0;
   const step = () => {
-    if (!battle || battle.over) return;
+    if (battle !== b || b.over) return;
     if (battle.waiting) { battle.pendingStep = step; return; }
     if (i < order.length) {
-      const [att, dfd, side] = order[i++];
+      const side = order[i++][2];
+      // Preserve this round's turn order; a manual relay changes its actors, not its number of attacks.
+      const att = side === 'enemy' ? b.curP : b.curE;
+      const dfd = side === 'enemy' ? b.curE : b.curP;
       if (att.hp > 0 && dfd.hp > 0) attackWith(att, dfd, chooseMove(att, dfd), side);
       setTimeout(step, 900 / battle.speed);
     } else {
@@ -5706,7 +5746,8 @@ function afterRound() {
     const hs = Math.round(healScaleNow() * 100);
     log(`⚔️ Clímax: +${pct}% de daño · curaciones al ${hs}%.`);
   }
-  refreshHPCards();
+  if (changed) renderBattlePreserveLog();
+  else refreshHPCards();
   scheduleRound(changed ? 1800 : 1400);
 }
 
@@ -5756,7 +5797,7 @@ function cycleBattleSpeed() {
 document.addEventListener('keydown', e => {
   if (e.code !== 'Space' && e.key !== ' ') return;
   const t = e.target;
-  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  if (t && (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(t.tagName) || t.isContentEditable)) return;
   if (!battle || battle.over) return;
   e.preventDefault(); // evita el scroll de página y "pulsar" el botón enfocado
   cycleBattleSpeed();
