@@ -4049,7 +4049,7 @@ function doMystery(island) {
 }
 
 // ============ ENCUENTRO SALVAJE ============
-function wildRecruitPrice(c) { return c.rareza * 150 * (run.islandIdx + 1); }
+function wildRecruitPrice(c) { return c.rareza * 150; }
 
 function cartelesBadgeHTML() {
   if (!run || !run.items) return '';
