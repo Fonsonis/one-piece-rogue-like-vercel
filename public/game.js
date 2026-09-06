@@ -2345,22 +2345,15 @@ function showSagaInfoModal(sagaIdx = 0) {
 
 let storyMode = 'classic';
 
-function screenSagas() {
+function screenSagas(focusSaga, previousScroll) {
   playMusic('menu');
 
   const curDiffObj = DIFFICULTIES.find(d => d.id === selectedDiff) || DIFFICULTIES[0];
 
   render(`
     ${topbar(false)}
-    <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
-    <div class="panel" style="margin-bottom:10px;">
-      <h2>Historia — El Mundo de One Piece</h2>
-      <p>Elige tu modo, la dificultad y selecciona una saga para zarpar.</p>
-      <div style="margin-top:8px;text-align:right;">
-        <button class="btn small blue" id="btn-saga-probs-all" style="font-size:8px;">📊 PROBABILIDADES DE SAGAS</button>
-      </div>
-    </div>
-
+    <div class="world-controls">
+      <div class="world-title-row"><button class="btn gray small" id="btn-back">← VOLVER</button><h1>HISTORIA · GRAND LINE</h1><button class="btn small blue" id="btn-saga-probs-all" aria-label="Probabilidades de todas las sagas">📊</button></div>
     <div class="diff-picker-bar">
       <div class="tabs" style="margin-bottom:0;flex:1;max-width:320px;">
         <div class="tab ${storyMode === 'classic' ? 'active' : ''}" id="tab-classic">CLÁSICO</div>
@@ -2385,75 +2378,16 @@ function screenSagas() {
       </div>
     </div>
 
-    <div class="saga-list-container">
-      ${SAGAS.map((s, idx) => {
-    const diffWinsMap = (meta.sagaDiffWins && meta.sagaDiffWins[s.id]) || {};
-    const diffWins = Object.keys(diffWinsMap).length;
-    const isSelectedCleared = !!diffWinsMap[selectedDiff];
-    const isSagaUnlocked = sagaUnlocked(idx);
-    const isDiffUnlocked = sagaDiffUnlocked(s.id, selectedDiff);
-    const curDiffName = curDiffObj.name;
-    const prevDiffObj = DIFFICULTIES.find(d => d.id === selectedDiff - 1);
-
-    return `
-        <div class="saga-row ${isSagaUnlocked && isDiffUnlocked ? '' : 'locked'} ${isSelectedCleared ? 'diff-cleared' : ''}" data-saga="${idx}">
-          <div class="saga-art" style="background:${s.img ? `url('${s.img}') center/cover no-repeat` : s.color || '#777'};">
-            <div class="saga-art-overlay">
-              <div class="saga-art-title">${isSagaUnlocked ? '' : '🔒 '}${s.name}</div>
-              <div class="saga-art-sub">${s.sub}</div>
-            </div>
-          </div>
-          <div class="saga-stats">
-            ${!isSagaUnlocked ? `
-              <div class="saga-lock-banner">
-                🔒 SAGA BLOQUEADA<br>
-                <span style="font-weight:normal;font-size:9px;color:#ffeaad;">
-                  Debes completar Dificultad <b>⚔️ Capitán</b> en <b>${SAGAS[idx - 1] ? SAGAS[idx - 1].name : ''}</b>
-                </span>
-              </div>` : `
-              <div class="saga-stats-top">
-                <div class="saga-tag-header">
-                  ${isSelectedCleared
-        ? `<span class="diff-cleared-tag">⭐ ${curDiffName} SUPERADA</span>`
-        : isDiffUnlocked
-          ? `<span class="diff-pending-tag">🎯 ${curDiffName} PENDIENTE</span>`
-          : `<span class="diff-locked-tag">🔒 ${curDiffName} BLOQUEADA</span>`}
-                </div>
-                <div class="saga-stat-line"><span>Victorias Clásico</span> <b>${meta.wins[s.id] || 0}</b></div>
-                <div class="saga-stat-line"><span>Victorias Nuzlocke</span> <b>${meta.nuzWins[s.id] || 0}</b></div>
-                <div class="saga-stat-line"><span>Dificultades Superadas</span> <b>${diffWins}/5 ⭐</b></div>
-                ${!isDiffUnlocked && prevDiffObj ? `
-                  <div class="saga-req-box">
-                    ⚠️ Requisito: Supera esta saga en Dificultad <b>${prevDiffObj.emoji} ${prevDiffObj.name}</b> primero.
-                  </div>
-                ` : ''}
-              </div>
-              <div class="saga-stats-bottom">
-                <div class="saga-diff-badges">
-                  ${DIFFICULTIES.map(d => {
-            const beaten = !!diffWinsMap[d.id];
-            const unlocked = sagaDiffUnlocked(s.id, d.id);
-            return `<span class="saga-diff-badge ${beaten ? 'beaten' : ''} ${!unlocked ? 'locked-badge' : ''}" title="${d.name}: ${beaten ? 'Superada ✓' : unlocked ? 'Disponible' : 'Bloqueada'}">
-                      ${d.emoji}${beaten ? '✓' : !unlocked ? '🔒' : ''}
-                    </span>`;
-          }).join('')}
-                </div>
-                <div class="saga-stats-btn-wrap">
-                  <button class="btn small gray btn-saga-probs" data-saga="${idx}">📊 PROBABILIDADES</button>
-                  <button class="btn small blue btn-saga-info" data-saga-info="${idx}" title="Información de Jefes y Niveles">ℹ️</button>
-                </div>
-              </div>
-            `}
-          </div>
-        </div>
-      `}).join('')}
+    <div class="world-nav"><label for="world-jump">SAGAS</label><select id="world-jump" aria-label="Explorar una saga">${SAGAS.map((s,i) => `<option value="${i}" ${i === (focusSaga || 0) ? 'selected' : ''}>${sagaUnlocked(i) ? '' : '🔒 '}${s.name}</option>`).join('')}</select><button class="btn small gray" id="world-to-start">↓ INICIO</button></div>
     </div>
-    <div class="footer-note">Más sagas en camino. ¡Mientras tanto, prueba la Torre Marine!</div>
+    <div class="world-map" id="world-map" tabindex="0" role="region" aria-label="Carta de Grand Line. Avanza hacia arriba desde East Blue.">
+      <div class="world-chart"><p class="world-end">↑ EL VIAJE CONTINÚA</p>${SAGAS.map((_,i) => worldSagaHTML(i)).reverse().join('')}<p class="world-start">↑ Sigue el Log Pose hacia arriba<br>Explora también las islas y sagas bloqueadas.</p></div>
+    </div>
   `);
 
   $('#btn-back').onclick = () => { screenHome(); };
-  $('#tab-classic').onclick = () => { storyMode = 'classic'; screenSagas(); };
-  $('#tab-nuz').onclick = () => { storyMode = 'nuzlocke'; screenSagas(); };
+  $('#tab-classic').onclick = () => { storyMode = 'classic'; screenSagas(Number($('#world-jump').value), $('#world-map').scrollTop); };
+  $('#tab-nuz').onclick = () => { storyMode = 'nuzlocke'; screenSagas(Number($('#world-jump').value), $('#world-map').scrollTop); };
 
   const diffTrigger = $('#btn-diff-trigger');
   const diffMenu = $('#diff-dropdown-menu');
@@ -2476,7 +2410,7 @@ function screenSagas() {
     item.onclick = e => {
       e.stopPropagation();
       selectedDiff = +item.dataset.diff;
-      screenSagas();
+      screenSagas(Number($('#world-jump').value), $('#world-map').scrollTop);
     };
   });
 
@@ -2487,30 +2421,13 @@ function screenSagas() {
     };
   });
 
-  document.querySelectorAll('.saga-row').forEach(el => {
-    const idx = +el.dataset.saga;
-    const s = SAGAS[idx];
-    el.onclick = () => {
-      if (!sagaUnlocked(idx)) {
-        toast(`🔒 Debes completar Dificultad Capitán en ${SAGAS[idx - 1].name}.`);
-        return;
-      }
-      if (!sagaDiffUnlocked(s.id, selectedDiff)) {
-        const prevD = DIFFICULTIES.find(d => d.id === selectedDiff - 1);
-        const curD = DIFFICULTIES.find(d => d.id === selectedDiff);
-        toast(`🔒 Debes superar ${s.name} en Dificultad ${prevD ? prevD.name : ''} primero.`);
-        return;
-      }
-      screenIslands(idx);
-    };
-  });
-
   document.querySelectorAll('.btn-saga-probs').forEach(btn => {
     btn.onclick = e => {
       e.stopPropagation();
       showSagaProbabilitiesModal(+btn.dataset.saga);
     };
   });
+  bindWorldMapNavigation(focusSaga, previousScroll);
 }
 
 // ============ LISTAS DE PERSONAJES: FILTRO, ORDEN Y CUADRÍCULA 3x3 ============
@@ -2866,33 +2783,33 @@ function genIslandMap(island, mapIdx) {
   if (!finalMap) map.rows[map.rows.length - 1][0].type = 'travel';
   return map;
 }
-function screenIslands(sagaIdx) {
-  playMusic('menu');
+// One chart shared by Historia and every return from an island expedition.
+function worldIslandState(sagaIdx, index) {
   const saga = SAGAS[sagaIdx];
-  const done = completedIslands(sagaIdx);
-  const current = run && run.saga === sagaIdx && run.mode === storyMode && (run.diff || 1) === selectedDiff ? run : null;
-  const stops = saga.islands.map((_,i) => ({x:12+76*i/Math.max(1,saga.islands.length-1), y:i%2 ? 28 : 70,
-    mx:i%2 ? 72 : 28, my:85-70*i/Math.max(1,saga.islands.length-1)}));
-  const route = portrait => stops.slice(1).map((p,i) => {
-    const prev=stops[i], x=portrait?'mx':'x', y=portrait?'my':'y';
-    const mid=(prev[y]+p[y])/2;
-    return `<path class="${done.includes(i) ? 'sailed' : ''}" d="M ${prev[x]} ${prev[y]} C ${prev[x]} ${mid}, ${p[x]} ${mid}, ${p[x]} ${p[y]}"/>`;
-  }).join('');
-  render(`${topbar(false)}<button class="btn gray small" id="islands-back">← SAGAS</button>
-    <section class="island-atlas">
-      <header><span class="atlas-eyebrow">CARTA DE NAVEGACIÓN · GRAND LINE</span><h2>${saga.name}</h2>
-        <p>${done.length}/${saga.islands.length} islas completadas · ${storyMode === 'nuzlocke' ? 'Nuzlocke' : 'Clásico'} · ${DIFFICULTIES.find(d=>d.id===selectedDiff)?.name || 'Grumete'}</p>
-      </header>
-      <div class="island-route" style="--island-count:${saga.islands.length}" aria-label="Ruta de islas de ${saga.name}">
-        <span class="sea-caption" aria-hidden="true">GRAND LINE</span><span class="sea-belt" aria-hidden="true">CALM BELT</span>
-        <svg class="island-trail trail-wide" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${route(false)}</svg>
-        <svg class="island-trail trail-tall" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${route(true)}</svg>
-        ${saga.islands.map((island,i)=>{
-        const active = current?.islandIdx === i, available = islandAvailable(sagaIdx,i) || active;
-        const p=stops[i], destination=active || (!current && available && !done.includes(i));
-        const state=active ? `Continuar · mapa ${(current.mapIdx || 0)+1}/${islandMapCount(island)}` : done.includes(i) ? 'Completada · explorar' : available ? 'Preparar equipo' : 'Completa la isla anterior';
-        return `<div class="island-stop ${done.includes(i) ? 'is-complete' : ''} ${destination ? 'is-current' : ''}" style="--x:${p.x}%;--y:${p.y}%;--mx:${p.mx}%;--my:${p.my}%">
-          <button class="island-select" data-island="${i}" ${available ? '' : 'disabled'} aria-label="Isla ${i+1}: ${island.name}. ${state}">
+  const active = !!(run && !run.islandComplete && run.saga === sagaIdx && run.islandIdx === index && run.mode === storyMode && (run.diff || 1) === selectedDiff);
+  let reason = '';
+  if (!sagaUnlocked(sagaIdx)) reason = `Supera ${SAGAS[sagaIdx - 1].name} en dificultad Capitán.`;
+  else if (!sagaDiffUnlocked(saga.id, selectedDiff)) reason = `Supera esta saga en dificultad ${DIFFICULTIES.find(d => d.id === selectedDiff - 1)?.name}.`;
+  else if (!islandAvailable(sagaIdx, index)) reason = `Completa ${saga.islands[index - 1]?.name} para desbloquear esta isla.`;
+  return {active, available:active || !reason, reason:active ? '' : reason};
+}
+
+function worldSagaHTML(sagaIdx) {
+  const saga = SAGAS[sagaIdx], done = completedIslands(sagaIdx);
+  const wins = meta.sagaDiffWins?.[saga.id] || {};
+  const entry = worldIslandState(sagaIdx, 0);
+  const crossing = saga.id === 'eastblue'
+    ? '<div class="world-redline"><strong>RED LINE · REVERSE MOUNTAIN</strong><span>↑ Entrada a Grand Line · Paradise</span></div>'
+    : saga.id === 'gyojin'
+      ? '<div class="world-redline"><strong>RED LINE · NUEVO MUNDO ↑</strong><span>La ruta pasa bajo el continente, por la Isla Gyojin</span></div>' : '';
+  return `${crossing}<section class="world-saga" id="world-saga-${sagaIdx}" data-world-saga="${sagaIdx}" style="--saga-color:${saga.color}">
+    <div class="world-islands">${saga.islands.map((island, i) => {
+      const {active, available} = worldIslandState(sagaIdx, i);
+      const state = active ? `Continuar · mapa ${(run.mapIdx || 0) + 1}/${islandMapCount(island)}` : !available ? 'Bloqueada · consulta ⓘ' : done.includes(i) ? 'Completada · explorar' : 'Preparar equipo';
+      return `<div class="world-stop ${i % 2 ? 'starboard' : 'port'} ${done.includes(i) ? 'is-complete' : ''} ${active ? 'is-current' : ''}" id="world-island-${sagaIdx}-${i}">
+        <svg class="world-trail" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><path d="M 50 100 C 50 70, 18 75, 18 50 S 50 30, 50 0"/></svg>
+        <div class="world-island-card">
+        <button class="island-select" data-world-island="${i}" data-world-saga="${sagaIdx}" ${available ? '' : 'disabled'} aria-label="${island.name}. ${state}">
           <span class="island-land" aria-hidden="true">
             <svg viewBox="0 0 140 100"><ellipse class="island-water" cx="70" cy="72" rx="66" ry="24"/>
               <path class="island-sand" d="M12 69 Q17 49 39 48 Q46 25 67 38 Q92 25 105 49 Q126 51 130 69 Q125 88 94 90 L43 90 Q12 84 12 69Z"/>
@@ -2900,39 +2817,78 @@ function screenIslands(sagaIdx) {
               ${i%3===1 ? '<path fill="#779091" stroke="#476c71" stroke-width="2" d="M36 64 60 24 77 49 89 33 112 69Z"/><path fill="#f6eed3" d="M49 42 60 24 71 41 61 36Z"/>' : i%3===2 ? '<path fill="#ecd9ad" stroke="#806d4b" stroke-width="2" d="M45 67V37H57V45H65V37H78V45H85V37H98V67Z"/><path fill="#4c6870" d="M66 67V54Q72 45 79 54V67"/>' : '<path fill="none" stroke="#876241" stroke-width="6" d="M69 70Q64 47 72 28"/><path fill="#326e55" d="M71 31Q42 15 37 39Q57 30 70 35Q81 9 101 26Q85 26 74 35Q102 32 102 52Q86 39 72 37Q54 48 47 53Q44 33 71 31"/>'}
             </svg>
           </span>
-          <span class="island-label"><b>${island.name}</b><span>${islandMapCount(island)} mapas · ${island.boss.length} ${island.boss.length===1 ? 'jefe' : 'jefes'}</span><small>${state}</small></span>
-          </button>
-          <button class="island-marker" data-island-info="${i}" aria-label="${available ? 'Información' : 'Isla bloqueada: información'} de ${island.name}" aria-haspopup="dialog">${available ? 'ⓘ' : '🔒'}</button>
-        </div>`;
-      }).join('')}</div>
-      <p class="atlas-note">Sigue el Log Pose y elige una isla para zarpar.<br>Los reclutas se quedan contigo al completar la isla.</p>
-    </section>`);
-  $('#islands-back').onclick = screenSagas;
+
+          <span class="island-label"><b>${island.name}</b><span>${islandMapCount(island)} mapas · ${island.boss.length} ${island.boss.length === 1 ? 'jefe' : 'jefes'}</span><small>${state}</small></span>
+        </button>
+        <button class="island-marker" data-island-info="${i}" data-world-saga="${sagaIdx}" aria-label="Información de ${island.name}${available ? '' : ', bloqueada'}" aria-haspopup="dialog">${available ? 'ⓘ' : '🔒'}</button>
+        </div>
+      </div>`;
+    }).reverse().join('')}</div>
+    <header class="world-saga-heading">
+      <span class="atlas-eyebrow">${sagaIdx === 0 ? 'EAST BLUE · COMIENZA AQUÍ' : sagaIdx <= 5 ? 'GRAND LINE · PARADISE' : sagaIdx === 6 ? 'BAJO LA RED LINE · 10.000 M' : 'GRAND LINE · NUEVO MUNDO'}</span>
+      <h2>${saga.name}</h2>
+      <p>${done.length}/${saga.islands.length} islas completadas ${wins[selectedDiff] ? '· ★ Dificultad superada' : ''}</p>
+      ${entry.reason ? `<p class="world-lock">🔒 ${entry.reason}</p>` : ''}
+      <details class="world-saga-details"><summary>Datos de saga · dificultades e información</summary>
+        <p>Victorias Clásico: ${meta.wins[saga.id] || 0} · Nuzlocke: ${meta.nuzWins[saga.id] || 0}</p>
+        <div class="world-difficulties">${DIFFICULTIES.map(d => `<span>${d.emoji} ${d.name}: ${wins[d.id] ? '✓ Superada' : sagaDiffUnlocked(saga.id, d.id) ? 'Disponible' : '🔒 Bloqueada'}</span>`).join('')}</div>
+        <div class="actions"><button class="btn small gray btn-saga-probs" data-saga="${sagaIdx}">📊 PROBABILIDADES</button><button class="btn small blue" data-saga-info="${sagaIdx}">ⓘ JEFES Y NIVELES</button></div>
+      </details>
+    </header>
+  </section>`;
+}
+
+function scrollWorldStart(chart) {
+  $('#world-jump').value = '0';
+  // On short phones, keep the first island in view rather than only its saga footer.
+  const first = $('#world-island-0-0');
+  chart.scrollTop = Math.min(chart.scrollHeight - chart.clientHeight, first.offsetTop - 16);
+}
+
+function bindWorldMapNavigation(focusSaga, previousScroll) {
+  const chart = $('#world-map');
+  if (previousScroll != null) chart.scrollTop = previousScroll;
+  else if (Number.isInteger(focusSaga)) {
+    const current = run && run.saga === focusSaga && !run.islandComplete && run.mode === storyMode && (run.diff || 1) === selectedDiff;
+    const index = current ? run.islandIdx : SAGAS[focusSaga].islands.findIndex((_, i) => worldIslandState(focusSaga, i).available && !completedIslands(focusSaga).includes(i));
+    const target = $(`#world-island-${focusSaga}-${Math.max(0, index)}`);
+    chart.scrollTop = target.offsetTop - chart.clientHeight / 2 + target.offsetHeight / 2;
+  } else scrollWorldStart(chart);
+  $('#world-to-start').onclick = () => scrollWorldStart(chart);
+  $('#world-jump').onchange = e => {
+    const target = $(`#world-island-${e.target.value}-0`);
+    chart.scrollTop = target.offsetTop - 16;
+  };
   document.querySelectorAll('[data-island-info]').forEach(button => {
-    button.onclick = () => showIslandInfo(sagaIdx, Number(button.dataset.islandInfo), button);
+    button.onclick = () => showIslandInfo(+button.dataset.worldSaga, +button.dataset.islandInfo, button);
   });
-  document.querySelectorAll('[data-island]').forEach(button => {
+  document.querySelectorAll('[data-world-island]').forEach(button => {
     button.onclick = () => {
-      const index = Number(button.dataset.island);
-      if (current?.islandIdx === index) { screenMap(); return; }
-      if (!islandAvailable(sagaIdx,index)) return;
-      const choose = () => screenStarter(sagaIdx,index);
+      const sagaIdx = +button.dataset.worldSaga, index = +button.dataset.worldIsland;
+      const state = worldIslandState(sagaIdx, index);
+      if (state.active) { screenMap(); return; }
+      if (!state.available) return;
+      const choose = () => screenStarter(sagaIdx, index);
       if (run) modalConfirm('🧭 ¿Preparar otra expedición?', 'Al zarpar sustituirás el viaje en curso. Los reclutas de una isla sin completar aún no son permanentes.', choose);
       else choose();
     };
   });
 }
 
+function screenIslands(sagaIdx) {
+  screenSagas(sagaIdx);
+}
+
 function showIslandInfo(sagaIdx, index, trigger) {
   const saga=SAGAS[sagaIdx], island=saga.islands[index];
-  const available=islandAvailable(sagaIdx,index) || (run?.saga===sagaIdx && run.islandIdx===index && run.mode===storyMode && (run.diff||1)===selectedDiff);
+  const {available, reason}=worldIslandState(sagaIdx,index);
   const ov=document.createElement('div');
   ov.className='overlay';
   ov.innerHTML=`<div class="modal island-info" role="dialog" aria-modal="true" aria-label="Información de ${island.name}">
     <h2>${available ? 'ⓘ' : '🔒'} ${island.name}</h2>
     <p>${islandMapCount(island)} mapas · ${island.boss.length} ${island.boss.length===1 ? 'jefe' : 'jefes'} en un único combate final.</p>
     <div class="island-bosses"><h3>Jefes y niveles</h3>${island.boss.map((id,k)=>`<div class="island-boss"><span>${CHARS[id].name}</span><strong>Nv. ${island.bossLvl[k]}</strong></div>`).join('')}</div>
-    <p>${available ? 'Isla disponible. Selecciónala en el mapa para preparar tu banda o continuar tu viaje.' : `Completa ${saga.islands[index-1]?.name || 'la isla anterior'} para desbloquear esta isla.`}</p>
+    <p>${available ? 'Isla disponible. Selecciónala en el mapa para preparar tu banda o continuar tu viaje.' : reason}</p>
     <div class="actions"><button class="btn gray" data-close-island-info>CERRAR</button></div>
   </div>`;
   const close=()=>{ov.remove();if(trigger?.isConnected)trigger.focus();};
@@ -4049,7 +4005,7 @@ function doMystery(island) {
 }
 
 // ============ ENCUENTRO SALVAJE ============
-function wildRecruitPrice(c) { return c.rareza * 150; }
+function wildRecruitPrice(c) { return c.rareza * 150 * ((run?.mapIdx || 0) + 1); }
 
 function cartelesBadgeHTML() {
   if (!run || !run.items) return '';
@@ -6765,7 +6721,10 @@ function screenShip() {
 
   render(`
     ${topbar(false)}
-    <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
+    <div class="shop-sticky-bar">
+      <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
+      <output class="shop-fame" aria-label="Fama disponible" aria-live="polite">⭐ ${meta.fame.toLocaleString('es')} Fama</output>
+    </div>
     <div class="panel">
       <h2>🏪 Tienda</h2>
       <p style="font-size:9px;line-height:1.9;">Gasta ⭐ Fama en mejoras permanentes.

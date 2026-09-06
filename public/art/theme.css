@@ -335,3 +335,13 @@ body { background:linear-gradient(#f5f4eaa6,#edf2eece),url('scenes/egghead-hub.w
 .fcard-meters { min-height:44px; padding:0 8px; }
 .fcard-meters .xp-progress { margin:4px 0 6px; }
 @media(max-width:700px) { .topbar .logo { flex:0 0 100%; width:100%; } }
+
+.shop-sticky-bar {
+  position:sticky; top:max(8px,env(safe-area-inset-top)); z-index:100;
+  display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap;
+  gap:8px; margin-bottom:16px; padding:8px;
+  background:var(--paper); border:1px solid var(--ink); border-radius:4px;
+  box-shadow:var(--shadow);
+}
+.shop-sticky-bar .back-btn { position:static; margin:0; }
+.shop-fame { margin-left:auto; color:var(--gold); font-size:11px; line-height:1.8; overflow-wrap:anywhere; }

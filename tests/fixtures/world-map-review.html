@@ -1,0 +1,14 @@
+<!doctype html><html lang="es"><meta charset="utf-8"><title>Revisión local de Historia</title><style>body{margin:8px;background:#223b47;color:white;font:12px system-ui}button{padding:10px}iframe{display:block;border:1px solid white;max-width:100%}pre{white-space:pre-wrap;position:absolute;left:870px;top:50px;width:350px}</style><div id="controls"><button data-size="320,568">320 × 568</button><button data-size="390,844">390 × 844</button><button data-size="768,1024">768 × 1024</button><button data-size="844,390">844 × 390</button><button id="story">Historia</button><button id="dark">Oscuro</button><button id="progress">Progreso de prueba</button><button id="measure">Medir</button></div><pre id="report"></pre><iframe id="game" title="Juego de prueba" src="/play.html" width="390" height="844"></iframe><script>
+const frame=document.querySelector('iframe'),report=document.querySelector('#report');
+const errors=[];
+frame.onload=()=>{frame.contentWindow.addEventListener('error',e=>errors.push(e.message));frame.contentWindow.eval("saveMeta=()=>{};saveRun=()=>{};playMusic=()=>{};");};
+document.querySelectorAll('[data-size]').forEach(b=>b.onclick=()=>{[frame.width,frame.height]=b.dataset.size.split(',');});
+document.querySelector('#story').onclick=()=>frame.contentWindow.screenSagas();
+document.querySelector('#dark').onclick=()=>frame.contentDocument.documentElement.dataset.theme='dark';
+document.querySelector('#progress').onclick=()=>frame.contentWindow.eval("meta.sagaDiffWins={eastblue:{1:true,2:true,3:true}};meta.islandProgress={'eastblue:classic:1':[0,1]};storyMode='classic';selectedDiff=1;screenSagas();");
+document.querySelector('#measure').onclick=()=>{
+ const d=frame.contentDocument,chart=d.querySelector('#world-map'),bounds=chart?.getBoundingClientRect();
+ const cards=[...d.querySelectorAll('.world-island-card')];
+ report.textContent=JSON.stringify({viewport:[frame.width,frame.height],body:[d.documentElement.scrollWidth,d.documentElement.clientWidth,d.documentElement.scrollHeight,d.documentElement.clientHeight],chart:bounds?{height:bounds.height,top:bounds.top,bottom:bounds.bottom,scrollTop:chart.scrollTop,max:chart.scrollHeight-chart.clientHeight}:null,islands:cards.length,horizontalOverflow:cards.filter(e=>{const r=e.getBoundingClientRect();return r.left<bounds.left||r.right>bounds.right}).map(e=>e.innerText),visible:cards.filter(e=>{const r=e.getBoundingClientRect();return r.top>=bounds.top&&r.bottom<=bounds.bottom}).map(e=>e.innerText),errors},null,2);
+};
+</script></html>

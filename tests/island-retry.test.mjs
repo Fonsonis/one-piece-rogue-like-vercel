@@ -72,19 +72,19 @@ test('initial selection survives JSON roundtrip and legacy migration before KO f
 });
 
 
-test('wild recruitment costs only 150 Berries per star, displaying and charging the same price on later islands',()=>{
+test('wild recruitment scales by map and stars, resets per island, and charges the displayed price',()=>{
  const {h}=setup();
  for(let saga=0;saga<11;saga++)for(let island=0;island<7;island++)for(let map=0;map<5;map++){
   h.exec(`run={saga:${saga},islandIdx:${island},mapIdx:${map}};`);
-  for(let stars=1;stars<=4;stars++)assert.equal(h.exec(`wildRecruitPrice({rareza:${stars}})`),stars*150);
+  for(let stars=1;stars<=4;stars++)assert.equal(h.exec(`wildRecruitPrice({rareza:${stars}})`),stars*150*(map+1));
  }
  const nodes=new Map(),ov={innerHTML:'',remove(){},querySelector(s){if(!nodes.has(s))nodes.set(s,{onclick:null});return nodes.get(s);}};
  h.ctx.document.createElement=()=>ov;h.ctx.document.body={appendChild(){}};
- h.exec(`run={saga:9,islandIdx:6,mapIdx:4,mode:'classic',nuzCaught:{},berries:1000,items:{},team:[makeChar('luffy',5)]};modalInfo=()=>{};wildEncounter(makeChar('zoro',50,true));`);
+ h.exec(`run={saga:9,islandIdx:6,mapIdx:4,mode:'classic',nuzCaught:{},berries:3000,items:{},team:[makeChar('luffy',5)]};modalInfo=()=>{};wildEncounter(makeChar('zoro',50,true));`);
  const payHTML=ov.innerHTML.match(/<button[^>]*id="we-pay"[^>]*>[\s\S]*?<\/button>/)[0];
- assert.match(payHTML,/450/);assert.doesNotMatch(payHTML,/disabled/);
+ assert.match(payHTML,/2250/);assert.doesNotMatch(payHTML,/disabled/);
  nodes.get('#we-pay').onclick();
- assert.equal(h.exec('run.berries'),550);
+ assert.equal(h.exec('run.berries'),750);
  assert.equal(h.exec('run.team.length'),2);assert.equal(h.exec('run.team[1].id'),'zoro');
  h.exec(`wildEncounter(makeChar('shanks',50,true));`);
  assert.doesNotMatch(ov.innerHTML,/id="we-pay"/);
