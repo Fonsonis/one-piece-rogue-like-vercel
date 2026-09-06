@@ -10,14 +10,15 @@ const art = fs.readFileSync('public/art/visuals.js', 'utf8');
 
 function harness(withArt, brokenAnimation = false) {
   let seed = 81372, randomCalls = 0, animations = 0;
+  const animationFrames = [];
   const memory = new Map(), nodes = new Map();
   function node() {
     return {
       isConnected: true, dataset: {}, style: { setProperty() {} },
       setAttribute() {}, appendChild() {}, remove() {},
-      animate() {
+      animate(frames) {
         if (brokenAnimation) throw Error('Unsupported browser animation');
-        animations++;
+        animations++; animationFrames.push(frames);
         return { cancel() {}, finished: Promise.resolve() };
       },
       querySelector() { return node(); }
@@ -50,7 +51,7 @@ function harness(withArt, brokenAnimation = false) {
     scheduleRound = () => {};
   `, ctx);
   if (withArt) vm.runInContext(art, ctx);
-  return { ctx, stats: () => ({ randomCalls, animations }) };
+  return { ctx, stats: () => ({ randomCalls, animations, animationFrames }) };
 }
 
 test('art adapter preserves every character’s attacks, ultimates, RNG and persistent state', () => {
@@ -133,4 +134,14 @@ test('complete Dex art coverage has four distinct transparent frames per charact
     assert.ok(!hashes.has(hash),'Duplicate character art: '+id);
     hashes.add(hash);
   }
+});
+
+
+test('atlas poses change in whole cells while movement remains independently animated',()=>{
+ const h=harness(true);
+ vm.runInContext(`run={mode:'classic',team:[makeChar('luffy',35)],items:{},saga:0};startBattle([makeChar('zoro',35)],{wild:true});attackWith(battle.curP,battle.curE,MOVES.punetazo);`,h.ctx);
+ const poses=h.stats().animationFrames.filter(frames=>frames.some(f=>'backgroundPosition' in f));
+ assert.ok(poses.length>0);
+ for(const frames of poses)for(const frame of frames){assert.equal(frame.easing,'steps(1,end)');assert.equal('transform' in frame,false);}
+ assert.ok(h.stats().animationFrames.some(frames=>frames.some(f=>'transform' in f)&&frames.every(f=>!('backgroundPosition' in f))));
 });

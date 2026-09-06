@@ -1,4 +1,4 @@
-export const RULES = Object.freeze({gravity:1850,jumpVelocity:-660,punchCooldown:2.4,punchDuration:0.32,startSpeed:285,maxSpeed:650});
+export const RULES = Object.freeze({maxJumps:2,metersPerReward:1000,famePerReward:25,gravity:1850,jumpVelocity:-660,punchCooldown:2.4,punchDuration:0.32,startSpeed:285,maxSpeed:650});
 const overlaps=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
 export class RunnerEngine {
   constructor({width=900,height=540,random=Math.random,onEvent=()=>{}}={}) {
@@ -7,6 +7,7 @@ export class RunnerEngine {
   reset() {
     this.ground=this.height-82;
     this.player={x:Math.min(150,this.width*.21),y:this.ground-90,w:52,h:90,vy:0};
+    this.jumpsUsed=0;this.rewardedMilestones=0;
     this.status='ready';this.time=0;this.distance=0;this.scroll=0;this.score=0;this.kills=0;
     this.speed=RULES.startSpeed;this.spawnIn=1.55;this.cooldown=0;this.punchLeft=0;
     this.enemies=[];this.particles=[];this.nextId=1;this.shake=0;this.hitStop=0;
@@ -16,11 +17,13 @@ export class RunnerEngine {
     this.player.x=Math.min(150,width*.21);this.player.y+=this.ground-oldGround;
     for(const e of this.enemies)e.y+=this.ground-oldGround;
   }
+  get meters(){return Math.floor(this.distance/14);}
   start(){this.reset();this.status='running';this.onEvent('start');}
   pause(){if(this.status==='running'){this.status='paused';this.onEvent('pause');}}
   resume(){if(this.status==='paused'){this.status='running';this.onEvent('resume');}}
   jump() {
-    if(this.status!=='running')return false;
+    if(this.status!=='running'||this.jumpsUsed>=RULES.maxJumps)return false;
+    this.jumpsUsed++;
     this.player.vy=RULES.jumpVelocity;
     this.burst(this.player.x+24,this.player.y+this.player.h,7,'#f8edba',-60);
     this.onEvent('jump');return true;
@@ -63,10 +66,16 @@ export class RunnerEngine {
     this.time+=dt;this.speed=Math.min(RULES.maxSpeed,RULES.startSpeed+this.time*4.5);
     const travel=this.speed*Math.min(1,this.width/700)*dt;
     this.distance+=this.speed*dt;this.scroll+=travel;this.score=Math.floor(this.distance/14)+this.kills*30;
+    const milestones=Math.floor(this.meters/RULES.metersPerReward);
+    if(milestones>this.rewardedMilestones){
+      const fame=(milestones-this.rewardedMilestones)*RULES.famePerReward;
+      this.rewardedMilestones=milestones;
+      this.onEvent('reward',{fame,totalFame:milestones*RULES.famePerReward,meters:this.meters});
+    }
     this.cooldown=Math.max(0,this.cooldown-dt);this.punchLeft=Math.max(0,this.punchLeft-dt);
     this.shake=Math.max(0,this.shake-dt*35);
     const p=this.player;p.vy+=RULES.gravity*dt;p.y+=p.vy*dt;
-    if(p.y+p.h>=this.ground){p.y=this.ground-p.h;p.vy=0;}
+    if(p.y+p.h>=this.ground){p.y=this.ground-p.h;p.vy=0;this.jumpsUsed=0;}
     if(p.y<20){p.y=20;p.vy=Math.max(0,p.vy);}
     this.spawnIn-=dt;if(this.spawnIn<=0)this.spawn();
     const punch=this.punchBox();

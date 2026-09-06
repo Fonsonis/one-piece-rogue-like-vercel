@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import vm from 'node:vm';
+import {RunnerEngine} from '../public/runner/engine.mjs';
 
 function harness(memory = new Map(), blocked = false) {
   const messages = [], nodes = new Map();
@@ -110,4 +111,41 @@ test('save during combat asks to finish rather than claiming to persist an incom
   h.run('run=sampleRun();manualSave();battle={};run.berries=9;manualSave();');
   assert.equal(harness(h.memory).run('run.berries'),300);
   assert.match(h.messages.at(-1),/Termina el combate/);
+});
+
+
+test('theme and mobile columns persist in the JSON and survive reload and import',()=>{
+ const h=harness();
+ h.run("setDisplayPreference('theme','dark');setDisplayPreference('mobileColumns',2);");
+ const restored=harness(h.memory);
+ assert.equal(restored.run('meta.settings.theme'),'dark');
+ assert.equal(restored.run('meta.settings.mobileColumns'),2);
+ const json=JSON.parse(h.memory.get('oplike_save'));
+ assert.equal(json.meta.settings.theme,'dark');
+ h.run("setDisplayPreference('theme','invalid');setDisplayPreference('mobileColumns',7);");
+ assert.equal(h.run('meta.settings.theme'),'light');assert.equal(h.run('meta.settings.mobileColumns'),3);
+ h.run(`importSaveFile({text:${JSON.stringify(JSON.stringify(json))}});`);
+ assert.equal(h.run('meta.settings.theme'),'dark');assert.equal(h.run('meta.settings.mobileColumns'),2);
+});
+
+test('upgrade saga groups cover every owned character once and in saga order',()=>{
+ const h=harness();
+ const groups=JSON.parse(h.run('JSON.stringify(groupUpgradeRoster(Object.keys(CHARS)))'));
+ const ids=groups.flatMap(g=>g.ids);
+ assert.equal(ids.length,457);assert.equal(new Set(ids).size,457);
+ assert.equal(groups[0].id,'eastblue');assert.equal(groups.at(-1).id,'crossover');
+ assert.deepEqual(JSON.parse(h.run('JSON.stringify(groupUpgradeRoster([]))')),[]);
+});
+
+
+test('runner milestone fame is saved immediately and survives leaving and reloading',()=>{
+ const h=harness();
+ const g=new RunnerEngine({onEvent:(type,data)=>{if(type==='reward')h.run(`gainFame(${data.fame})`);}});
+ g.start();g.spawnIn=999;g.distance=14000;g.update(1/120);
+ assert.equal(harness(h.memory).run('meta.fame'),25);
+ assert.equal(harness(h.memory).run('meta.accXp'),25);
+ g.pause();g.update(1);g.resume();g.update(1/120);g.status='over';g.update(1);
+ assert.equal(harness(h.memory).run('meta.fame'),25);
+ g.start();g.spawnIn=999;g.distance=14000;g.update(1/120);
+ assert.equal(harness(h.memory).run('meta.fame'),50);
 });

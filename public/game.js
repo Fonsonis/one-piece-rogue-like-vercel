@@ -334,7 +334,7 @@ const META_DEFAULTS = () => ({
   logPoses: 0,
   starPity: 0,
   charUpgrades: {},
-  settings: { showEventConfirm: true, customSounds: false },
+  settings: { showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 },
 });
 let meta = META_DEFAULTS();
 function loadMeta() {
@@ -349,7 +349,7 @@ function loadMeta() {
   if (!meta.roster.includes('luffy')) {
     meta.roster.push('luffy');
   }
-  meta.settings = Object.assign({ showEventConfirm: true, customSounds: false }, meta.settings || {});
+  meta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 }, meta.settings || {});
   if (!meta.totalIslands) {
     const totalWins = Object.values(meta.wins || {}).reduce((a, b) => a + b, 0) +
       Object.values(meta.nuzWins || {}).reduce((a, b) => a + b, 0);
@@ -426,7 +426,7 @@ function importSaveFile(file) {
       const data = GameSaveStorage.parse(reader.result);
       validateGameSave(data);
       const nextMeta = Object.assign(META_DEFAULTS(), data.meta);
-      nextMeta.settings = Object.assign({ showEventConfirm: true, customSounds: false }, nextMeta.settings);
+      nextMeta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 }, nextMeta.settings);
       if (!nextMeta.roster.includes('luffy')) nextMeta.roster.push('luffy');
       const nextRun = data.run || null;
       if (nextRun) {
@@ -524,6 +524,16 @@ function loadRun() {
   if (run && run.team) run.team.forEach(migrateFighter);
 }
 function migrateFighter(f) {
+  const current = CHARS[f.id];
+  if (current && (f.moveRulesVersion || 0) < 2) {
+    // El aprendizaje es automático: actualizar únicamente las fichas corregidas.
+    // Conserva niveles, PS, EXP, fusiones, mejoras y todo el resto del JSON.
+    if (current.generated || ['buggy','gin','coby','coby2'].includes(f.id)) {
+      f.moves = current.learnset.filter(([level]) => level <= f.lvl).map(([,move]) => move).slice(-2);
+      if (!f.moves.length) f.moves = [current.learnset[0][1]];
+    }
+    f.moveRulesVersion = 2;
+  }
   if (f.spatk == null && CHARS[f.id]) {
     f.spatk = statAt(CHARS[f.id].base[3], f.lvl) + (f.atkBonus || 0);
     f.spdef = statAt(CHARS[f.id].base[4], f.lvl) + (f.defBonus || 0);
@@ -539,6 +549,13 @@ loadRun();
 function statAt(base, lvl) { return Math.floor(base * (1 + 0.085 * (lvl - 1))); }
 function hpAt(base, lvl) { return Math.floor(base * (1 + 0.11 * (lvl - 1))) + lvl; }
 function xpForLevel(lvl) { return Math.floor(lvl * lvl * 6); }
+
+function xpBarHTML(f) {
+  const maxed = f.lvl >= 99, goal = xpForLevel(f.lvl);
+  const value = maxed ? goal : clamp(Number(f.xp) || 0, 0, goal);
+  const label = maxed ? 'Nivel máximo' : `EXP ${value}/${goal} · siguiente nivel ${f.lvl + 1}`;
+  return `<div class="xp-progress" data-level="${f.lvl}" title="${label}"><span class="xp-caption">${maxed ? 'NV. MÁX.' : 'EXP · NV. ' + f.lvl}</span><div class="xp-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${goal}" aria-valuenow="${value}"><i style="width:${value / goal * 100}%"></i></div></div>`;
+}
 
 function makeChar(id, lvl, isEnemy = false) {
   const c = CHARS[id];
@@ -559,7 +576,7 @@ function makeChar(id, lvl, isEnemy = false) {
     spdef: Math.floor(statAt(c.base[4], lvl) * diffMult),
     spd: Math.floor(statAt(c.base[5], lvl) * diffMult),
     atkBonus: 0, defBonus: 0, spatkBonus: 0, spdefBonus: 0,
-    xp: 0, moves, ultCharge: 0,
+    xp: 0, moves, ultCharge: 0, moveRulesVersion: 2,
   };
 }
 // Aplica las mejoras permanentes del Barco (solo a personajes del jugador)
@@ -626,8 +643,8 @@ function gainXP(f, amount, log) {
       f.spatk = statAt(nc.base[3], f.lvl) + (f.spatkBonus || 0);
       f.spdef = statAt(nc.base[4], f.lvl) + (f.spdefBonus || 0);
       f.spd = statAt(nc.base[5], f.lvl) + (f.spdBonus || 0);
-      const nm = nc.learnset.filter(([l]) => l <= f.lvl).map(([, m]) => m).slice(-4);
-      for (const m of nm) if (!f.moves.includes(m)) { f.moves.push(m); if (f.moves.length > 4) f.moves.shift(); }
+      const nm = nc.learnset.filter(([l]) => l <= f.lvl).map(([, m]) => m).slice(-2);
+      for (const m of nm) if (!f.moves.includes(m)) { f.moves.push(m); if (f.moves.length > 2) f.moves.shift(); }
       registerDex(to);
     }
   }
@@ -807,6 +824,7 @@ function cycleTopbarAuto() {
 
 // ---------- Render raíz ----------
 function render(html) {
+  applyDisplayPreferences();
   app.innerHTML = html;
   const btn = $('#btn-mute');
   if (btn) btn.onclick = toggleMute;
@@ -868,6 +886,31 @@ function topbar(showBerries = false, showAuto = showBerries) {
   </div>`;
 }
 
+function applyDisplayPreferences() {
+  document.documentElement?.setAttribute('data-theme', meta.settings?.theme === 'dark' ? 'dark' : 'light');
+  document.documentElement?.setAttribute('data-mobile-columns', meta.settings?.mobileColumns === 2 ? '2' : '3');
+}
+function setDisplayPreference(key, value) {
+  meta.settings ||= {};
+  if (key === 'theme') meta.settings.theme = value === 'dark' ? 'dark' : 'light';
+  else if (key === 'mobileColumns') meta.settings.mobileColumns = Number(value) === 2 ? 2 : 3;
+  else return;
+  applyDisplayPreferences();
+  saveMeta();
+}
+function mobileColumnsControl() {
+  return `<label class="mobile-columns-control">Columnas en móvil
+    <select data-mobile-columns-control aria-label="Columnas de nakamas en móvil">
+      <option value="2" ${meta.settings?.mobileColumns === 2 ? 'selected' : ''}>2 columnas</option>
+      <option value="3" ${meta.settings?.mobileColumns !== 2 ? 'selected' : ''}>3 columnas</option>
+    </select></label>`;
+}
+document.addEventListener('change', event => {
+  if (!event.target.matches?.('[data-mobile-columns-control]')) return;
+  setDisplayPreference('mobileColumns', event.target.value);
+  document.querySelectorAll('[data-mobile-columns-control]').forEach(select => { select.value = String(meta.settings.mobileColumns); });
+});
+
 function showSettingsModal() {
   meta.settings = meta.settings || { showEventConfirm: true, customSounds: false };
 
@@ -884,6 +927,12 @@ function showSettingsModal() {
   ov.innerHTML = `
     <div class="modal" style="max-width:440px;width:90%;">
       <h2 style="margin-top:0;color:var(--sea);font-size:14px;border-bottom:2px solid var(--gold);padding-bottom:6px;">⚙️ AJUSTES DE JUEGO</h2>
+      <div class="display-settings">
+        <label for="setting-theme">Aspecto del juego</label>
+        <select id="setting-theme"><option value="light" ${meta.settings.theme !== 'dark' ? 'selected' : ''}>Claro · Egghead</option><option value="dark" ${meta.settings.theme === 'dark' ? 'selected' : ''}>Oscuro · Egghead</option></select>
+        ${mobileColumnsControl()}
+        <p>El aspecto y las columnas se guardan en este dispositivo.</p>
+      </div>
       <div style="display:flex;flex-direction:column;gap:12px;margin:16px 0;">
         <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.05);padding:10px;border-radius:6px;border:1px solid #ccc;">
           <div style="flex:1;padding-right:10px;">
@@ -921,6 +970,8 @@ function showSettingsModal() {
     </div>
   `;
   document.body.appendChild(ov);
+
+  ov.querySelector('#setting-theme').onchange = e => setDisplayPreference('theme', e.target.value);
 
   ov.querySelector('#chk-music-toggle').onclick = () => {
     toggleMute();
@@ -1760,12 +1811,13 @@ function startLogPoseGacha(activeSagas) {
 function screenHome() {
   playMusic('menu');
   const accLvl = accountLevel();
+  const runnerUnlocked = accLvl >= 30;
   const towerUnlocked = accLvl >= 20;
   const challengeUnlocked = accLvl >= 50;
   const { totalCompleted: completedAch, totalAchievements: totalAchCount, hasUnclaimedAch } = getAchievementsInfo();
   render(`
     ${topbar(false)}
-    <div class="subtitle">AVENTURA ROGUELIKE | v1.1</div>
+    <div class="subtitle">AVENTURA ROGUELIKE · EGGHEAD EDITION</div>
     <div class="modes">
       <div class="mode-card" id="mode-story">
         <div class="mode-art story"></div>
@@ -1783,7 +1835,7 @@ function screenHome() {
         <div class="mode-btn">${challengeUnlocked ? 'ENTRAR' : '🔒 NV. CUENTA 50'}</div>
       </div>
     </div>
-    <button class="runner-menu-button" id="btn-runner"><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>Salta, golpea y supera tu récord</small></span></button>
+    <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? 'Doble salto · 25 fama cada 1.000 m' : '🔒 Se desbloquea al nivel 30 de cuenta'}</small></span></button>
     <div class="home-main-buttons">
       <button class="btn blue small" id="btn-dex">
         <span>📖 Dex</span>
@@ -1811,10 +1863,10 @@ function screenHome() {
       <button class="btn gray small" id="btn-guide" style="padding:6px 14px;font-size:9px;">📊 Tipos y Sinergias</button>
     </div>
     <div style="text-align:center;margin-top:14px;display:flex;flex-direction:column;gap:6px;align-items:center;">
-      <div style="color:#fff;text-shadow:1px 1px 0 #000;font-size:9.5px;">
+      <div class="home-account-status">
         🏴‍☠️ Pirata · Nivel ${accountLevel()} (${meta.accXp || 0}/${accountNextAt()} PX)
       </div>
-      <div id="local-save-status" role="status" style="color:white;font-size:9px;text-shadow:1px 1px #000">${saveStatusText()}</div>
+      <div id="local-save-status" role="status" class="home-save-status">${saveStatusText()}</div>
       ${meta.towerRecord ? `<div style="color:var(--gold);text-shadow:1px 1px 2px #000;font-size:9.5px;font-weight:bold;">🗼 Récord Torre Marine: ${meta.towerRecord} Pisos</div>` : ''}
 
     </div>
@@ -1832,6 +1884,7 @@ function screenHome() {
   if (towerUnlocked) $('#mode-tower').onclick = () => screenTowerIntro();
   if (challengeUnlocked) $('#mode-challenge').onclick = () => screenChallenges();
   $('#btn-runner').onclick = async () => {
+    if (accountLevel() < 30) return toast('🔒 Luffy Run se desbloquea al nivel 30 de cuenta.');
     const btn = $('#btn-runner');
     btn.disabled = true;
     try {
@@ -1839,6 +1892,7 @@ function screenHome() {
       playMusic('combat');
       await openRunner({
         best: meta.runnerBest || 0,
+        onFame: amount => gainFame(amount),
         onScore: score => {
           if (score > (meta.runnerBest || 0)) { meta.runnerBest = score; saveMeta(); }
         },
@@ -2281,12 +2335,10 @@ function screenSagas() {
     return `
         <div class="saga-row ${isSagaUnlocked && isDiffUnlocked ? '' : 'locked'} ${isSelectedCleared ? 'diff-cleared' : ''}" data-saga="${idx}">
           <div class="saga-art" style="background:${s.img ? `url('${s.img}') center/cover no-repeat` : s.color || '#777'};">
-            ${isSagaUnlocked ? '' : `
-              <div class="saga-art-overlay">
-                <div class="saga-art-title">🔒 ${s.name}</div>
-                <div class="saga-art-sub">${s.sub}</div>
-              </div>
-            `}
+            <div class="saga-art-overlay">
+              <div class="saga-art-title">${isSagaUnlocked ? '' : '🔒 '}${s.name}</div>
+              <div class="saga-art-sub">${s.sub}</div>
+            </div>
           </div>
           <div class="saga-stats">
             ${!isSagaUnlocked ? `
@@ -2484,6 +2536,7 @@ function renderCharGrid(el, ids, st, cardFn, bindFn) {
       <span>Página ${st.page + 1}/${pages} · ${ids.length} personajes</span>
       <button class="btn small gray" id="gp-next" ${st.page >= pages - 1 ? 'disabled' : ''}>▶</button>
     </div>
+    ${mobileColumnsControl()}
     <div class="grid9" id="grid9">
       ${slice.map(cardFn).join('') || '<div class="grid-empty">Sin resultados con estos filtros.</div>'}
     </div>
@@ -2576,6 +2629,7 @@ function showInventoryModal(opts = {}) {
           ${[1, 2, 3, 4, 5].map(r => `<option value="${r}" ${+invViewState.rarity === r ? 'selected' : ''}>${'⭐'.repeat(r)}</option>`).join('')}
         </select>
       </div>
+      ${mobileColumnsControl()}
       <div id="inv-cards-grid" style="max-height:360px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:8px;padding:4px;border:1px solid #ccc;background:rgba(0,0,0,0.05);">
         ${cardsHTML || '<div style="grid-column:1/-1;text-align:center;font-size:9px;color:#888;padding:20px;">Sin nakamas que coincidan.</div>'}
       </div>
@@ -2792,7 +2846,7 @@ function screenStarter(sagaIdx) {
     <div class="subtitle" style="font-size:14px;">Aventura en ${saga.name}</div>
     <div class="panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
-        <h2 style="margin:0;">🏴‍☠️ Configuración de la Banda (${picked.length}/${maxSlots})</h2>
+        <h2 id="starter-team-heading" style="margin:0;">🏴‍☠️ Configuración de la Banda (${picked.length}/${maxSlots})</h2>
         <div id="starter-logpose-info" style="font-size:9.5px;font-weight:bold;color:var(--gold);background:var(--ink);padding:4px 8px;border-radius:4px;border:1px solid var(--gold);cursor:pointer;" title="Toca para saber más sobre los Log Poses">
           🧭 Log Poses: ${meta.logPoses || 0} ℹ️
         </div>
@@ -2937,6 +2991,8 @@ function screenStarter(sagaIdx) {
   };
 
   const update = () => {
+    const heading = $('#starter-team-heading');
+    if (heading) heading.textContent = `🏴‍☠️ Configuración de la Banda (${picked.filter(Boolean).length}/${maxSlots})`;
     const slotsContainer = $('#starter-slots-container');
     if (slotsContainer) slotsContainer.innerHTML = renderSlotsGrid();
     const presetBarCont = document.querySelector('.preset-bar');
@@ -3048,26 +3104,26 @@ function screenMap(activePageIdx = 0) {
   const island = saga.islands[run.islandIdx];
   const reach = reachableNodes();
   const rows = run.map.rows;
-  const H = Math.max(650, rows.length * 90);
 
-  let nodesHTML = '', edgesHTML = '';
+  let nodesHTML = '', edgesHTML = '', landscapeEdgesHTML = '';
   const posOf = (r, i) => {
     const row = rows[r];
     const x = (i + 1) / (row.length + 1) * 100;
-    const y = 92 - (r / (rows.length - 1)) * 82;
+    const y = 100 - (r / Math.max(1, rows.length - 1)) * 100;
     return [x, y];
   };
   for (const e of run.map.edges) {
     const [x1, y1] = posOf(e[0], e[1]);
     const [x2, y2] = posOf(e[2], e[3]);
     edgesHTML += `<line x1="${x1}%" y1="${y1}%" x2="${x2}%" y2="${y2}%" stroke="#2b2b2b" stroke-width="2" stroke-dasharray="4 5" opacity="0.5"/>`;
+    landscapeEdgesHTML += `<line x1="${100-y1}%" y1="${x1}%" x2="${100-y2}%" y2="${x2}%"/>`;
   }
   rows.forEach((row, r) => row.forEach((n, i) => {
     const [x, y] = posOf(r, i);
     const isReach = reach.some(([rr, ii]) => rr === r && ii === i);
     const isCur = run.pos && run.pos[0] === r && run.pos[1] === i;
-    nodesHTML += `<div class="map-node ${n.done ? 'done' : ''} ${isReach ? 'reachable' : ''} ${isCur ? 'current' : ''}"
-      style="left:${x}%;top:${y}%" data-r="${r}" data-i="${i}" title="${NODE_TYPES[n.type].label}">${NODE_TYPES[n.type].emoji}</div>`;
+    nodesHTML += `<button type="button" class="map-node ${n.done ? 'done' : ''} ${isReach ? 'reachable' : ''} ${isCur ? 'current' : ''}"
+      style="--map-x:${x}%;--map-y:${y}%;--map-forward:${100-y}%" data-r="${r}" data-i="${i}" title="${NODE_TYPES[n.type].label}" aria-label="${NODE_TYPES[n.type].label}, etapa ${r+1}${isCur ? ", posición actual" : ''}" ${isReach ? '' : 'disabled'}>${NODE_TYPES[n.type].emoji}</button>`;
   }));
 
   const canReroll = run.islandIdx === 0 && run.pos === null && !run.sagaRerollUsed;
@@ -3078,14 +3134,17 @@ function screenMap(activePageIdx = 0) {
       <div class="map-carousel" id="island-carousel">
         <!-- PÁGINA 1: MAPA (ANCHO Y ALTO COMPLETO) -->
         <div class="carousel-page" id="page-map">
-          <div class="map-board" style="min-height: max(calc(100vh - 170px), ${H}px); flex: 1;">
-            <div class="map-title">📍 SAGA: <b>${saga.name}</b> · Isla ${run.islandIdx + 1}/${saga.islands.length}: <b>${island.name}</b> (${run.mode === 'nuzlocke' ? 'NUZLOCKE' : 'CLÁSICO'})</div>
-            <svg class="map-svg">${edgesHTML}</svg>
-            ${nodesHTML}
-            <div style="position:absolute;top:42px;left:10px;z-index:20;">
-              <button class="btn gold small" id="btn-map-reroll" ${canReroll ? '' : 'disabled'} style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
-                Reroll x${canReroll ? 1 : 0}
+          <div class="map-board" style="--scene:url('${SAGAS[run.saga]?.img}');--map-rows:${rows.length}">
+            <div class="map-heading"><div class="map-title">📍 SAGA: <b>${saga.name}</b> · Isla ${run.islandIdx + 1}/${saga.islands.length}: <b>${island.name}</b> (${run.mode === 'nuzlocke' ? 'NUZLOCKE' : 'CLÁSICO'})</div>
+            <div class="map-tools">
+              <button class="btn gold small" id="btn-map-reroll" aria-label="Regenerar mapa" title="Regenerar mapa una vez por saga" ${canReroll ? '' : 'disabled'} style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
+                ↻ ${canReroll ? 1 : 0}
               </button>
+            </div></div>
+            <div class="map-route">
+              <svg class="map-svg map-portrait" aria-hidden="true">${edgesHTML}</svg>
+              <svg class="map-svg map-landscape" aria-hidden="true">${landscapeEdgesHTML}</svg>
+              ${nodesHTML}
             </div>
           </div>
         </div>
@@ -3105,7 +3164,7 @@ function screenMap(activePageIdx = 0) {
                     <span class="emoji">${charIcon(f.id, 36)}</span>
                     <div class="info">${idx + 1}. <b>${charName(f)}</b> ${rarityTag}${fusionTag}<br>Nv${f.lvl}
                       ${typeBadges(fighterTypes(f))}
-                      <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>
+                      <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>${xpBarHTML(f)}
                     </div>
                     ${run.team.length > 1 ? `<span class="btn-dismiss-slot" data-dismiss-idx="${idx}" title="Expulsar de la banda" style="color:#e74c3c;font-size:11px;cursor:pointer;padding:2px 4px;margin-left:auto;opacity:0.75;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.75">🗑️</span>` : ''}
                   </div>`;
@@ -3159,9 +3218,9 @@ function screenMap(activePageIdx = 0) {
 
       <!-- BOTONES DE NAVEGACIÓN INFERIORES -->
       <div class="map-nav-tabs">
-        <div class="tab active" id="tab-page-map" data-page="0">📍 MAPA</div>
-        <div class="tab" id="tab-page-team" data-page="1">👥 EQUIPO (${run.team.length})</div>
-        <div class="tab" id="tab-page-bag" data-page="2">🎒 MOCHILA</div>
+        <button type="button" class="tab active" id="tab-page-map" data-page="0">📍 MAPA</button>
+        <button type="button" class="tab" id="tab-page-team" data-page="1">👥 EQUIPO (${run.team.length})</button>
+        <button type="button" class="tab" id="tab-page-bag" data-page="2">🎒 MOCHILA</button>
       </div>
     </div>
   `);
@@ -3256,7 +3315,7 @@ function screenMap(activePageIdx = 0) {
         <span class="emoji">${charIcon(f.id, 36)}</span>
         <div class="info">${idx + 1}. <b>${charName(f)}</b> ${rarityTag}${fusionTag}<br>Nv${f.lvl}
           ${typeBadges(fighterTypes(f))}
-          <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>
+          <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>${xpBarHTML(f)}
         </div>
         ${run.team.length > 1 ? `<span class="btn-dismiss-slot" data-dismiss-idx="${idx}" title="Expulsar de la banda" style="color:#e74c3c;font-size:11px;cursor:pointer;padding:2px 4px;margin-left:auto;opacity:0.75;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.75">🗑️</span>` : ''}
       </div>`;
@@ -3435,6 +3494,7 @@ function useItemFromMap(id) {
               <div class="info">
                 <b>${charName(f)}</b> <small>(Nv.${f.lvl})</small><br>
                 ${typeBadges(fTypes)}
+    ${isLive ? xpBarHTML(f) : ''}
               </div>
               <div style="font-size:16px;">${isSel ? '✅' : '⚪'}</div>
             </div>`;
@@ -4053,7 +4113,6 @@ function showCharModal(fOrId) {
   const f = isLive ? migrateFighter(fOrId) : applyUpgrades(makeChar(fOrId, startLvlOf(fOrId)));
   const c = CHARS[f.id];
   const lore = (typeof LORE !== 'undefined' && LORE) ? (LORE[f.id] || LORE[baseFormOf(f.id)] || {}) : {};
-  const spVal = lore.sp ? statAt(lore.sp, f.lvl) : null;
   const pInfo = passiveInfo(f);
   const ultMv = getUltimateMove(f);
 
@@ -4063,7 +4122,6 @@ function showCharModal(fOrId) {
     ['DEF', f.def, 20, f.defBonus || 0],
     ['E.ATQ', f.spatk, 20, f.spatkBonus || 0],
     ['E.DEF', f.spdef, 20, f.spdefBonus || 0],
-    ...(spVal !== null ? [['SP', spVal, 20, 0]] : []),
     ['VEL', f.spd, 20, f.spdBonus || 0],
   ];
   const fTypes = fighterTypes(f);
@@ -4084,13 +4142,14 @@ function showCharModal(fOrId) {
   ov.innerHTML = `<div class="modal char-sheet">
     <h2><span style="font-size:26px;vertical-align:middle;">${charIcon(f.id, 34)}</span> ${c.name}${rarityTag}${fusionTag} <small>Nv.${f.lvl}</small></h2>
     <div class="char-sheet-hero" style="text-align:center;padding:12px;margin:8px 0 12px;background:radial-gradient(ellipse at center, rgba(232, 200, 50, 0.22) 0%, rgba(0,0,0,0.35) 75%);border:2px solid var(--gold);border-radius:8px;position:relative;">
-      <div class="char-sheet-sprite" style="display:inline-block;filter:drop-shadow(3px 5px 8px rgba(0,0,0,0.6));">
+      <div class="char-sheet-sprite" data-character="${f.id}" style="display:inline-block;filter:drop-shadow(3px 5px 8px rgba(0,0,0,0.6));">
         ${charIcon(f.id, 90)}
       </div>
       <div class="platform" style="width:120px;height:24px;margin:-10px auto 0;background:radial-gradient(ellipse at center, #7ec850 0%, #4aa557 70%, transparent 72%);border-radius:50%;box-shadow:inset 0 0 0 2px rgba(217, 131, 46, 0.35);"></div>
       <div style="margin-top:6px;font-size:9px;color:var(--gold);"><b>Rareza:</b> ${'⭐'.repeat(c.rareza || 1)} (${c.rareza || 1} Estrellas)</div>
     </div>
     ${typeBadges(fTypes)}
+    ${isLive ? xpBarHTML(f) : ''}
     ${f.stars ? `<div class="sheet-line" style="color:var(--gold);background:rgba(255,215,0,0.1);padding:4px 8px;border-radius:4px;"><b>⭐ Fusión ${f.stars} Estrellas</b> — +${f.stars * 5}% a todas las características en esta partida</div>` : ''}
     ${isLive ? `<div class="sheet-line" style="color:var(--gold);font-weight:bold;">📍 Características reales en combate (Nivel, Fusiones y Barco)</div>` : `<div class="sheet-line" style="color:var(--gold);font-weight:bold;">📍 Nivel base e incentivos del barco actuales${hasUpgrades ? ' (incluye mejoras del barco)' : ''}</div>`}
     ${!isLive ? `
@@ -4139,7 +4198,7 @@ function showCharModal(fOrId) {
     ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>Al nivel ${c.evo.lvl} se convierte en ${CHARS[c.evo.to] ? CHARS[c.evo.to].name : c.evo.to}.</p></div>` : ''}
     <p class="sheet-desc">${c.desc}</p>
     <div class="actions" style="flex-direction:column;gap:6px;">
-      ${isLive && run && run.team && run.team.includes(f) ? `<button class="btn red small" id="sheet-dismiss-btn" style="width:100%;">🗑️ EXPULSAR DE LA BANDA</button>` : ''}
+      ${isLive && (!battle || battle.over) && run && run.team && run.team.includes(f) ? `<button class="btn red small" id="sheet-dismiss-btn" style="width:100%;">🗑️ EXPULSAR DE LA BANDA</button>` : ''}
       <button class="btn gray" id="sheet-close" style="width:100%;">CERRAR</button>
     </div>
   </div>`;
@@ -4147,7 +4206,7 @@ function showCharModal(fOrId) {
   const dismissBtn = ov.querySelector('#sheet-dismiss-btn');
   if (dismissBtn) {
     dismissBtn.onclick = () => {
-      if (!run || !run.team) return;
+      if (!run || !run.team || (battle && !battle.over)) return;
       if (run.team.length <= 1) {
         toast('⚠️ Debes mantener al menos 1 nakama en tu banda.');
         return;
@@ -4306,6 +4365,24 @@ function renderSpecialCatalog(lvl) {
   });
 }
 
+function revealSpecialRecruit(ov, prizeId, lvl) {
+  let completed = false;
+  const complete = () => {
+    if (completed || !ov.isConnected) return;
+    completed = true;
+    ov.remove();
+    specialJoin(prizeId, lvl);
+  };
+  try {
+    if (typeof MarketReveal !== 'undefined') {
+      MarketReveal.show({host:ov, name:CHARS[prizeId].name, rarity:CHARS[prizeId].rareza,
+        portraitHTML:charIcon(prizeId, 140), onComplete:complete});
+      return;
+    }
+  } catch (_) { /* A cosmetic failure must not prevent recruitment. */ }
+  setTimeout(complete, 1400);
+}
+
 function renderSpecialGacha(lvl) {
   meta.starPity = meta.starPity || 0;
   // pesos: 1⭐ -> 41.5%, 2⭐ -> 30%, 3⭐ -> 21%, 4⭐ -> 7%, 5⭐ (legendarios) -> 0.5%
@@ -4327,7 +4404,7 @@ function renderSpecialGacha(lvl) {
 
   let current = 0;
   const ov = document.createElement('div');
-  ov.className = 'overlay';
+  ov.className = 'overlay market-cartels';
   ov.innerHTML = `<div class="modal">
     <h2>🎰 Los 5 carteles de SE BUSCA</h2>
     <p style="font-size:8px;text-align:center;margin-bottom:6px;">Destapa los carteles en orden. ¡En uno de ellos está tu recluta!</p>
@@ -4336,16 +4413,17 @@ function renderSpecialGacha(lvl) {
     </div>
     <div class="poster-row">
       ${[0, 1, 2, 3, 4].map(i => `
-        <div class="poster" data-p="${i}">
+        <button type="button" class="poster" data-p="${i}" aria-label="Destapar cartel de ${i + 1} estrellas" disabled>
           <div class="poster-stars">${'⭐'.repeat(i + 1)}</div>
           <div class="poster-face" id="pf-${i}">📜<br><span>SE BUSCA</span></div>
-        </div>`).join('')}
+        </button>`).join('')}
     </div>
   </div>`;
   document.body.appendChild(ov);
   const update = () => {
     ov.querySelectorAll('.poster').forEach((el, i) => {
       el.classList.toggle('next', i === current);
+      el.disabled = i !== current;
       el.onclick = i === current ? () => flip(i) : null;
     });
   };
@@ -4357,16 +4435,18 @@ function renderSpecialGacha(lvl) {
       face.innerHTML = `${charIcon(prizeId, 28)}<br><span>${c.name}</span>`;
       el.classList.add('hit'); el.classList.remove('next');
       registerDex(prizeId);
-      ov.querySelectorAll('.poster').forEach(p => { p.onclick = null; });
-      setTimeout(() => { ov.remove(); specialJoin(prizeId, lvl); }, 1400);
+      ov.querySelectorAll('.poster').forEach(p => { p.onclick = null; p.disabled = true; });
+      revealSpecialRecruit(ov, prizeId, lvl);
     } else {
       face.innerHTML = `💨<br><span>VACÍO</span>`;
       el.classList.add('empty');
       current++;
       update();
+      ov.querySelector(`[data-p="${current}"]`)?.focus({preventScroll:true});
     }
   };
   update();
+  ov.querySelector('[data-p="0"]')?.focus({preventScroll:true});
 }
 
 // Tabla de probabilidades (drop rates) del gacha de carteles SE BUSCA:
@@ -4577,182 +4657,108 @@ const activeP = () => battle.pTeam.find(f => f.hp > 0);
 const activeE = () => battle.eTeam.find(f => f.hp > 0);
 
 // ---------- Motor de pasivas (compendio) ----------
-const isP = (f, id) => baseFormOf(f.id) === id;
+const isP = (f, id) => f.id === id || baseFormOf(f.id) === id;
 const teamOf = f => (battle && battle.pTeam.includes(f)) ? battle.pTeam : (battle ? battle.eTeam : []);
 
-// Compendio de pasivas para personajes de 4 y 5 estrellas (One Piece y Crossover)
-const STAR_45_PASSIVES = {
-  luffy2: { name: 'Gear Second', desc: 'Aumenta el ataque y la velocidad en combate por el bombeo de sangre.' },
-  zoro2: { name: 'Estilo de 3 Espadas', desc: 'Aumenta la probabilidad de golpe crítico conforme disminuyen sus PS.' },
-  nami2: { name: 'Clima-Tact Avanzado', desc: 'Aumenta la evasión de todo el equipo un 10%.' },
-  arlong: { name: 'Orgullo Gyojin', desc: 'Aumenta el daño de los ataques Físicos y de Agua.' },
-  crocodile: { name: 'Cuerpo de Arena', desc: 'Reduce el daño recibido de ataques que no sean de Agua.' },
-  enel: { name: 'Mantra Divino', desc: 'Aumenta el daño de Rayo y esquiva el primer impacto recibido.' },
-  lucci: { name: 'Garra de Depredador', desc: 'Aumenta el daño de ataques Físicos un 15%.' },
-  moria: { name: 'Robo de Sombras', desc: 'Drena un 3% de los PS del rival cada ronda.' },
-  jinbe: { name: 'Karate Gyojin', desc: 'Aumenta la defensa y el daño de Agua un 15%.' },
-  hancock: { name: 'Mero Mero Mellow', desc: 'Los ataques pueden petrificar y ralentizar al rival.' },
-  magellan: { name: 'Veneno Corrosivo', desc: 'Aumenta el daño de movimientos de Veneno un 25%.' },
-  sengoku: { name: 'Gran Buda', desc: 'Aumenta la DEF y la ESP_DEF un 20%.' },
-  newgate: { name: 'Terremoto de Barbablanca', desc: '+25% de ATQ al estar por debajo del 50% de PS.' },
-  roger: { name: 'Voluntad del Rey Pirata', desc: 'Aumenta el daño de todo el equipo un 20%.' },
-  shanks: { name: 'Haki del Conquistador', desc: 'Debilita el ATQ del enemigo un 15%.' },
-  teach: { name: 'Vórtice Oscuro', desc: '+25% de daño contra usuarios de Fruta del Diablo.' },
-  garp: { name: 'Puño de Hierro', desc: 'Ignora un 30% de la defensa enemiga.' },
-  akainu: { name: 'Magma Hirviente', desc: 'Aumenta el daño de ataques de Fuego un 20%.' },
-  kizaru: { name: 'Velocidad Destello', desc: 'Aumenta la velocidad un 30%.' },
-  aokiji: { name: 'Era de Hielo', desc: 'Ralentiza al enemigo al asestar un golpe.' },
-  dragon: { name: 'Viento del Destino', desc: 'Aumenta la evasión de la banda un 15%.' },
-  mihawk: { name: 'Ojo de Halcón', desc: '+15% de probabilidad de golpe crítico.' },
-  oden: { name: 'Espadachín de Wano', desc: '+10% de crítico y +20% de daño crítico.' },
-  doflamingo: { name: 'Titiritero', desc: 'Aumenta el daño de ataques especiales un 15%.' },
-  katakuri: { name: 'Futuro Inalterable', desc: 'Esquiva los 2 primeros ataques del combate.' },
-  bigmom: { name: 'Soul Pocus', desc: 'Drena un 4% de los PS máximos del rival cada ronda.' },
-  kaido: { name: 'Piel de Dragón', desc: 'Reduce el daño recibido un 15% y aumenta la defensa.' },
-  yamato: { name: 'Espejo Divino', desc: 'Aumenta la defensa y el ataque un 15%.' },
-  king: { name: 'Llama Lunaria', desc: 'Aumenta la resistencia a los ataques recibidos.' },
-  queen: { name: 'Virus de Plaga', desc: 'Aumenta el daño de veneno un 20%.' },
-  kid: { name: 'Magnetismo', desc: 'Aumenta el daño de ataques Físicos un 15%.' },
-  law: { name: 'Room Cirujano', desc: 'Aumenta el daño especial un 15%.' },
-  sabo: { name: 'Garra del Dragón', desc: 'Aumenta el daño de ataques de Fuego un 15%.' },
-  cavendish: { name: 'Hakuba', desc: '+25% de velocidad al bajar del 50% de PS.' },
-  kyros: { name: 'Gladiador Invicto', desc: 'Aumenta el ATQ físico un 15%.' },
-  fujitora: { name: 'Gravedad Pesada', desc: 'Reduce la velocidad del enemigo un 20%.' },
-  ryokugyu: { name: 'Regeneración Forestal', desc: 'Recupera un 5% de PS al final de cada ronda.' },
-  garling: { name: 'Juicio Celestial', desc: 'Aumenta el daño físico un 20%.' },
-  saturn: { name: 'Regeneración Abisal', desc: 'Recupera un 5% de PS al final de cada ronda.' },
-  mars: { name: 'Vuelo Bestial', desc: 'Aumenta la velocidad un 20%.' },
-  warcury: { name: 'Piel de Incondicional', desc: 'Aumenta la defensa un 25%.' },
-  nusjuro: { name: 'Corte Gélido', desc: 'Aumenta el daño de Corte e Hielo un 20%.' },
-  jupeter: { name: 'Devorador Terrestre', desc: 'Aumenta los PS máximos y la defensa.' },
-  im: { name: 'Sombra del Trono', desc: 'Aumenta el daño de Oscuridad y Haki un 25%.' },
-  xebec: { name: 'Furia Salvaje', desc: 'Aumenta el ataque un 25%.' },
-
-  // Crossover 4⭐ / 5⭐
-  naruto: { name: 'Modo Senjutsu', desc: 'Aumenta el daño de Viento y la velocidad un 15%.' },
-  sasuke: { name: 'Sharingan', desc: '+15% de crítico y aumenta el daño de Rayo.' },
-  kakashi: { name: 'Ninja Copia', desc: 'Aumenta la evasión y la velocidad un 15%.' },
-  itadori: { name: 'Puño Divergente', desc: 'Aumenta el daño de ataques físicos un 15%.' },
-  yuta: { name: 'Energía Maldita (Rika)', desc: 'Aumenta el ataque especial un 15%.' },
-  gojo: { name: 'Infinito', desc: 'Esquiva el primer ataque recibido en combate.' },
-  tanjiro: { name: 'Danza del Dios del Fuego', desc: 'Aumenta el daño de Fuego y Agua un 15%.' },
-  zenitsu: { name: 'Respiración del Rayo', desc: '+30% de velocidad y +15% de crítico.' },
-  inosuke: { name: 'Asalto de la Bestia', desc: 'Aumenta el ataque físico un 15%.' },
-  nezuko: { name: 'Sangre Ardiente', desc: 'Aumenta el daño de Fuego y la resistencia.' },
-  goku: { name: 'Super Saiyan', desc: '+20% de ATQ al bajar del 70% de PS.' },
-  vegeta: { name: 'Orgullo Saiyan', desc: '+15% de ATQ y +10% de probabilidad de crítico.' },
-  gohan: { name: 'Ira Desatada', desc: '+20% de ATQ al recibir daño en combate.' },
-  genos: { name: 'Incineración', desc: 'Aumenta el daño de Fuego y Rayo un 20%.' },
-  garou: { name: 'Cazador de Héroes', desc: '+15% de ATQ y +10% de evasión.' },
-  tatsumaki: { name: 'Telequinesis', desc: 'Aumenta el daño de ataques especiales un 20%.' },
-  orochimaru: { name: 'Sustitución de Serpiente', desc: 'Recupera un 5% de PS al final de cada ronda.' },
-  madara: { name: 'Susanoo Definitivo', desc: 'Aumenta la defensa y la defensa especial un 25%.' },
-  sukuna: { name: 'Corte Desmantelar', desc: 'Aumenta el daño de movimientos de Corte un 20%.' },
-  kibutsuji: { name: 'Biokinesis Demoniaca', desc: 'Recupera un 5% de PS al final de cada ronda.' },
-  gokuui: { name: 'Doctrina del Egoísta', desc: '+25% de evasión y +20% de velocidad.' },
-  jiren: { name: 'Fuerza Absoluta', desc: '+25% de ataque y defensa.' },
-  cell: { name: 'Células Perfectas', desc: 'Recupera un 5% de PS al final de cada ronda.' },
-  frieza: { name: 'Emperador del Universo', desc: '+20% de daño contra objetivos con poca salud.' },
-  zenosama: { name: 'Borrado Divino', desc: 'Aumenta el daño general un 25%.' },
-  saitama: { name: 'Entrenamiento Serio', desc: '+35% al daño de ataques Físicos.' },
+// Una única ficha por pasiva: los modificadores de esta tabla se consumen en el motor.
+// Las capacidades sin regla jugable no se anuncian como efectos activos.
+const PASSIVES = {
+  luffy: { name:'Espíritu de Goma', desc:'+15% de ataque con menos del 50% de PS. Inmune al Rayo.' },
+  zoro: { name:'Camino del Ashura', desc:'Hasta +25 puntos de crítico según los PS perdidos.' },
+  nami: { name:'Lectura Meteorológica', desc:'+10 puntos de evasión a los aliados vivos.' },
+  usopp: { name:'Disparo Preparado', desc:'+30% de velocidad en la primera ronda.', openingSpeed:1.3 },
+  sanji: { name:'Tenacidad del Cocinero', desc:'Reduce un 15% todo el daño de ataques recibido.' },
+  chopper: { name:'Médico de la Banda', desc:'Recupera un 3% de sus PS por ronda; el Clímax reduce la curación.', regen:.03 },
+  robin: { name:'Ojos en Todas Partes', desc:'+10 puntos de probabilidad de crítico.', critical:.10 },
+  franky: { name:'Armadura Frontal', desc:'Los ataques recibidos no pueden ser críticos.' },
+  brook: { name:'Segunda Vida', desc:'Revive una vez por viaje con el 20% de PS. No revive aliados en Nuzlocke.' },
+  buggy: { name:'Bara Bara no Mi', desc:'Inmune a ataques de Corte. Las bombas y los golpes sí le afectan.' },
+  marco: { name:'Llamas del Fénix', desc:'Cura al aliado activo un 6% de sus PS por ronda; el Clímax reduce la curación.' },
+  arlong: { name:'Orgullo Gyojin', desc:'+15% de daño físico y de Agua.', physical:1.15, types:{Agua:1.15} },
+  crocodile: { name:'Cuerpo de Arena', desc:'Reduce un 15% el daño recibido, excepto Agua.', dryReduction:.85 },
+  enel: { name:'Mantra', desc:'+15% de daño de Rayo. Esquiva el primer ataque del combate.', types:{Rayo:1.15}, dodge:1 },
+  lucci: { name:'Depredador', desc:'+15% de daño físico.', physical:1.15 },
+  moria: { name:'Robo de Sombras', desc:'Drena un 3% de los PS del rival activo por ronda. El Clímax reduce la curación.', drain:.03 },
+  jinbe: { name:'Karate Gyojin', desc:'+15% de defensa y de daño de Agua.', defense:1.15, types:{Agua:1.15} },
+  hancock: { name:'Petrificación Parcial', desc:'Al golpear reduce la velocidad rival un 15% durante la siguiente ronda.', slow:true },
+  magellan: { name:'Veneno Corrosivo', desc:'+25% de daño de Veneno.', types:{Veneno:1.25} },
+  sengoku: { name:'Gran Buda', desc:'+20% de defensa física y especial.', defense:1.20 },
+  newgate: { name:'El Hombre más Fuerte', desc:'+25% de ataque con menos del 50% de PS.' },
+  roger: { name:'Voluntad del Rey Pirata', desc:'+20% de daño de ataques de los aliados vivos.' },
+  shanks: { name:'Haki del Conquistador', desc:'Reduce un 15% el ataque del bando rival mientras viva.' },
+  teach: { name:'Vórtice Oscuro', desc:'+25% de daño contra usuarios de Fruta.' },
+  garp: { name:'Puño de Hierro', desc:'Los ataques físicos ignoran un 30% de la defensa rival.' },
+  akainu: { name:'Magma Hirviente', desc:'+20% de daño de Fuego.' },
+  kizaru: { name:'Velocidad Destello', desc:'+30% de velocidad.', speed:1.30 },
+  aokiji: { name:'Era de Hielo', desc:'Al golpear reduce la velocidad rival un 15% durante la siguiente ronda.', slow:true },
+  dragon: { name:'Viento del Destino', desc:'+15 puntos de evasión a los aliados vivos. Interpretación para el juego.' },
+  mihawk: { name:'Ojo de Halcón', desc:'+15 puntos de probabilidad de crítico.' },
+  oden: { name:'Espadachín de Wano', desc:'+10 puntos de crítico y +0,20 al multiplicador de daño crítico.' },
+  smoker: { name:'Cuerpo de Humo', desc:'+20 puntos de evasión.' },
+  doflamingo: { name:'Titiritero', desc:'+15% de daño especial.', special:1.15 },
+  katakuri: { name:'Futuro Inalterable', desc:'Esquiva los dos primeros ataques del combate.', dodge:2 },
+  bigmom: { name:'Soul Pocus', desc:'Drena un 4% de los PS del rival activo por ronda. El Clímax reduce la curación.', drain:.04 },
+  kaido: { name:'Piel de Dragón', desc:'+20% de defensa y -15% de daño recibido de ataques.' },
+  yamato: { name:'Espejo Divino', desc:'+15% de ataque y defensa.', attack:1.15, defense:1.15 },
+  king: { name:'Llama Lunaria', desc:'Reduce un 15% el daño recibido de ataques.', reduction:.85 },
+  queen: { name:'Virus de Plaga', desc:'+20% de daño de Veneno.', types:{Veneno:1.20} },
+  kid: { name:'Magnetismo', desc:'+15% de daño físico.', physical:1.15 },
+  law: { name:'Room Cirujano', desc:'+15% de daño especial.', special:1.15 },
+  sabo: { name:'Garra del Dragón', desc:'+15% de daño de Fuego.', types:{Fuego:1.15} },
+  cavendish: { name:'Hakuba', desc:'+25% de velocidad con menos del 50% de PS.', lowSpeed:1.25 },
+  kyros: { name:'Gladiador Invicto', desc:'+15% de daño físico.', physical:1.15 },
+  fujitora: { name:'Gravedad Pesada', desc:'Reduce un 20% la velocidad del rival activo.', foeSpeed:.80 },
+  ryokugyu: { name:'Regeneración Forestal', desc:'Cura al aliado activo un 5% de PS por ronda; el Clímax reduce la curación.' },
+  garling: { name:'Juicio Celestial', desc:'+20% de daño físico.', physical:1.20 },
+  saturn: { name:'Regeneración Abisal', desc:'Recupera un 5% de sus PS por ronda; el Clímax reduce la curación.', regen:.05 },
+  mars: { name:'Vuelo Bestial', desc:'+20% de velocidad.', speed:1.20 },
+  warcury: { name:'Coraza Bestial', desc:'+25% de defensa física y especial.', defense:1.25 },
+  nusjuro: { name:'Corte Gélido', desc:'+20% de daño de Corte e Hielo.', types:{Corte:1.20,Hielo:1.20} },
+  jupeter: { name:'Devorador Terrestre', desc:'+20% de defensa física y especial.', defense:1.20 },
+  im: { name:'Sombra del Trono', desc:'+25% de daño de Oscuridad y Haki. Interpretación para el juego.', types:{Oscuridad:1.25,Haki:1.25} },
+  xebec: { name:'Furia Salvaje', desc:'+25% de ataque.', attack:1.25 },
+  naruto: { name:'Modo Senjutsu', desc:'+15% de daño de Viento y de velocidad.', types:{Viento:1.15}, speed:1.15 },
+  sasuke: { name:'Sharingan', desc:'+15 puntos de crítico y +15% de daño de Rayo.', critical:.15, types:{Rayo:1.15} },
+  kakashi: { name:'Ninja Copia', desc:'+15 puntos de evasión y +15% de velocidad.', evasion:.15, speed:1.15 },
+  itadori: { name:'Puño Divergente', desc:'+15% de daño físico.', physical:1.15 },
+  yuta: { name:'Energía Maldita', desc:'+15% de daño especial.', special:1.15 },
+  gojo: { name:'Infinito', desc:'Esquiva el primer ataque del combate.', dodge:1 },
+  tanjiro: { name:'Danza del Dios del Fuego', desc:'+15% de daño de Fuego y Agua.', types:{Fuego:1.15,Agua:1.15} },
+  zenitsu: { name:'Respiración del Rayo', desc:'+30% de velocidad y +15 puntos de crítico.', speed:1.30, critical:.15 },
+  inosuke: { name:'Asalto de la Bestia', desc:'+15% de daño físico.', physical:1.15 },
+  nezuko: { name:'Sangre Ardiente', desc:'+15% de daño de Fuego y -10% de daño recibido.', types:{Fuego:1.15}, reduction:.9 },
+  goku: { name:'Super Saiyan', desc:'+20% de ataque con menos del 70% de PS.', lowAttack:1.20, threshold:.70 },
+  vegeta: { name:'Orgullo Saiyan', desc:'+15% de ataque y +10 puntos de crítico.', attack:1.15, critical:.10 },
+  gohan: { name:'Ira Desatada', desc:'+20% de ataque tras recibir un golpe en combate.', hitAttack:1.20 },
+  genos: { name:'Incineración', desc:'+20% de daño de Fuego y Rayo.', types:{Fuego:1.20,Rayo:1.20} },
+  garou: { name:'Cazador de Héroes', desc:'+15% de ataque y +10 puntos de evasión.', attack:1.15, evasion:.10 },
+  tatsumaki: { name:'Telequinesis', desc:'+20% de daño especial.', special:1.20 },
+  orochimaru: { name:'Sustitución de Serpiente', desc:'Recupera un 5% de sus PS por ronda; el Clímax reduce la curación.', regen:.05 },
+  madara: { name:'Susanoo Definitivo', desc:'+25% de defensa física y especial.', defense:1.25 },
+  sukuna: { name:'Corte Desmantelar', desc:'+20% de daño de Corte.' },
+  kibutsuji: { name:'Biokinesis Demoniaca', desc:'Cura al aliado activo un 5% de PS por ronda; el Clímax reduce la curación.' },
+  gokuui: { name:'Doctrina del Egoísta', desc:'+25 puntos de evasión y +20% de velocidad.', evasion:.25, speed:1.20 },
+  jiren: { name:'Fuerza Absoluta', desc:'+25% de ataque y defensa.', attack:1.25, defense:1.25 },
+  cell: { name:'Células Perfectas', desc:'Recupera un 5% de sus PS por ronda; el Clímax reduce la curación.', regen:.05 },
+  frieza: { name:'Emperador del Universo', desc:'+20% de daño contra rivales con menos del 50% de PS.' },
+  zenosama: { name:'Borrado Divino', desc:'+25% de daño de ataques.' },
+  saitama: { name:'Entrenamiento Serio', desc:'+35% de daño físico y +0,50 al multiplicador de daño crítico.' },
 };
-
-// Estado en tiempo real de cada pasiva implementada
-const PASSIVE_IMPL = {
-  luffy2: f => ({ active: f.hp > 0 }),
-  zoro2: f => ({ active: f.hp > 0 && f.hp < f.maxhp, extra: `+${Math.round(25 * (1 - f.hp / Math.max(1, f.maxhp)))}% crít` }),
-  nami2: f => ({ active: f.hp > 0 }),
-  marco: f => ({ active: f.hp > 0 }),
-  katakuri: f => ({ active: (f.dodgeLeft || 0) > 0, extra: `${f.dodgeLeft || 0} esquivas` }),
-  roger: f => ({ active: f.hp > 0 }),
-  newgate: f => ({ active: f.hp > 0 && f.hp < f.maxhp * 0.5 }),
-  kaido: f => ({ active: f.hp > 0 }),
-  bigmom: f => ({ active: f.hp > 0 }),
-  shanks: f => ({ active: f.hp > 0 }),
-  teach: f => ({ active: f.hp > 0 }),
-  mihawk: f => ({ active: f.hp > 0 }),
-  akainu: f => ({ active: f.hp > 0 }),
-  kizaru: f => ({ active: f.hp > 0 }),
-  aokiji: f => ({ active: f.hp > 0 }),
-  garp: f => ({ active: f.hp > 0 }),
-  dragon: f => ({ active: f.hp > 0 }),
-  oden: f => ({ active: f.hp > 0 }),
-  smoker: f => ({ active: f.hp > 0 }),
-  sengoku: f => ({ active: f.hp > 0 }),
-  fujitora: f => ({ active: f.hp > 0 }),
-  ryokugyu: f => ({ active: f.hp > 0 }),
-  garling: f => ({ active: f.hp > 0 }),
-  saturn: f => ({ active: f.hp > 0 }),
-  mars: f => ({ active: f.hp > 0 }),
-  warcury: f => ({ active: f.hp > 0 }),
-  nusjuro: f => ({ active: f.hp > 0 }),
-  jupeter: f => ({ active: f.hp > 0 }),
-  im: f => ({ active: f.hp > 0 }),
-  xebec: f => ({ active: f.hp > 0 }),
-  naruto: f => ({ active: f.hp > 0 }),
-  sasuke: f => ({ active: f.hp > 0 }),
-  kakashi: f => ({ active: f.hp > 0 }),
-  itadori: f => ({ active: f.hp > 0 }),
-  yuta: f => ({ active: f.hp > 0 }),
-  gojo: f => ({ active: (f.dodgeLeft || 0) > 0, extra: `${f.dodgeLeft || 0} esquiva` }),
-  tanjiro: f => ({ active: f.hp > 0 }),
-  zenitsu: f => ({ active: f.hp > 0 }),
-  inosuke: f => ({ active: f.hp > 0 }),
-  nezuko: f => ({ active: f.hp > 0 }),
-  goku: f => ({ active: f.hp > 0 && f.hp < f.maxhp * 0.7 }),
-  gokuui: f => ({ active: f.hp > 0 }),
-  vegeta: f => ({ active: f.hp > 0 }),
-  gohan: f => ({ active: f.hp > 0 }),
-  genos: f => ({ active: f.hp > 0 }),
-  garou: f => ({ active: f.hp > 0 }),
-  tatsumaki: f => ({ active: f.hp > 0 }),
-  orochimaru: f => ({ active: f.hp > 0 }),
-  madara: f => ({ active: f.hp > 0 }),
-  sukuna: f => ({ active: f.hp > 0 }),
-  kibutsuji: f => ({ active: f.hp > 0 }),
-  cell: f => ({ active: f.hp > 0 }),
-  frieza: f => ({ active: f.hp > 0 }),
-  zenosama: f => ({ active: f.hp > 0 }),
-  saitama: f => ({ active: f.hp > 0 }),
-  jiren: f => ({ active: f.hp > 0 }),
-  arlong: f => ({ active: f.hp > 0 }),
-  crocodile: f => ({ active: f.hp > 0 }),
-  enel: f => ({ active: f.hp > 0 }),
-  lucci: f => ({ active: f.hp > 0 }),
-  moria: f => ({ active: f.hp > 0 }),
-  jinbe: f => ({ active: f.hp > 0 }),
-  hancock: f => ({ active: f.hp > 0 }),
-  magellan: f => ({ active: f.hp > 0 }),
-  doflamingo: f => ({ active: f.hp > 0 }),
-  yamato: f => ({ active: f.hp > 0 }),
-  king: f => ({ active: f.hp > 0 }),
-  queen: f => ({ active: f.hp > 0 }),
-  kid: f => ({ active: f.hp > 0 }),
-  law: f => ({ active: f.hp > 0 }),
-  sabo: f => ({ active: f.hp > 0 }),
-  cavendish: f => ({ active: f.hp > 0 && f.hp < f.maxhp * 0.5 }),
-  kyros: f => ({ active: f.hp > 0 }),
-};
-
+const passiveRule = f => PASSIVES[f.id] || PASSIVES[baseFormOf(f.id)] || {};
 function passiveInfo(f) {
-  const c = charData(f);
-  if (!c || c.rareza < 4) return null; // Únicamente los personajes de 4 y 5 estrellas tienen pasiva
-
-  const base = baseFormOf(f.id);
-  const lore = (typeof LORE !== 'undefined' && LORE) ? (LORE[f.id] || LORE[base]) : null;
-  let pData = (lore && lore.pasiva) ? lore.pasiva : (STAR_45_PASSIVES[f.id] || STAR_45_PASSIVES[base]);
-  if (!pData) {
-    pData = { name: 'Voluntad Indomable', desc: 'Aumenta las capacidades de combate de este personaje destacado.' };
+  const rule = passiveRule(f);
+  if (!rule.name) return null;
+  let active = f.hp > 0;
+  let extra = '';
+  if (rule.dodge) {
+    const inCombat = battle && !battle.over && [...battle.pTeam,...battle.eTeam].includes(f);
+    const left = inCombat ? (f.dodgeLeft || 0) : rule.dodge;
+    active = active && left > 0; extra = ` (${left} esquivas)`;
   }
-
-  const impl = PASSIVE_IMPL[f.id] || PASSIVE_IMPL[base];
-  let active = f.hp > 0, extra = '';
-  if (impl) {
-    const st = impl(f);
-    active = st.active;
-    extra = st.extra ? ` (${st.extra})` : '';
-  }
-  return { label: pData.name + extra, active, desc: pData.desc, implemented: true };
+  if (rule.lowAttack) active = active && f.hp < f.maxhp * rule.threshold;
+  if (rule.lowSpeed || isP(f,'newgate')) active = active && f.hp < f.maxhp * .5;
+  if (rule.hitAttack) active = active && !!f.st?.receivedHit;
+  return {label:rule.name + extra, desc:rule.desc, active, implemented:true};
 }
 
 // ---------- Sinergias de equipo (rediseño) ----------
@@ -4825,7 +4831,7 @@ const SYNERGIES = {
   },
   Nakama: {
     name: 'Espíritu de Tripulación',
-    d1: '+10% a todas las estadísticas si ningún miembro comparte tipo primario',
+    d1: '+10% al ataque, defensas y velocidad si ningún miembro comparte tipo primario',
     d2: 'Un aliado que caiga a 0 PS sobrevive con 1 PS una vez por viaje'
   },
 };
@@ -4854,9 +4860,9 @@ function synChipsHTML(team) {
 }
 
 // ---------- Tags de naturaleza ----------
-const hasFruta = f => charData(f).types.includes('Fruta');
+const hasFruta = f => fighterTypes(f).includes('Fruta');
 // HAKI: tipo propio o concedido por la sinergia Haki del equipo (nivel I+)
-const hasHaki = f => charData(f).types.includes('Haki') ||
+const hasHaki = f => fighterTypes(f).includes('Haki') || (f.moves || []).some(id => MOVES[id]?.type === 'Haki') ||
   (battle && synergyTier(teamOf(f), 'Haki') >= 1);
 // Nakama I: +10% a todas las estadísticas si ningún miembro comparte tipo primario
 function nakamaStatMult(team) {
@@ -4921,7 +4927,7 @@ function showTypeChartModal(team) {
       <div class="sheet-section" style="margin-top:10px;">
         <b>🍈👁️ Tags de Naturaleza</b>
         <p><b>FRUTA</b>: usuario de Fruta del Diablo · <b>HAKI</b>: capaz de imbuir Haki.<br><br>
-        ⚖️ <b>Regla núcleo:</b> si el atacante NO tiene HAKI y el defensor tiene el tag FRUTA,
+        ⚖️ <b>Regla de equilibrio del juego (simplificación de la serie):</b> si el atacante NO tiene HAKI y el defensor tiene el tag FRUTA,
         el daño se reduce un <b>50%</b>. Si el atacante tiene HAKI (propio o por la sinergia Haki Ⅰ+),
         esta reducción se anula por completo.</p>
       </div>
@@ -4935,7 +4941,7 @@ function showTypeChartModal(team) {
         <b>⚔️ Clímax de combate</b>
         <p>A partir de la ronda ${CLIMAX_ROUND} el daño de ambos bandos aumenta un <b>+10% acumulativo
         por ronda</b> y todas las curaciones (movimientos de apoyo y pasivas) pierden un <b>20% de eficacia
-        por ronda</b> hasta anularse. Ningún combate puede durar para siempre.</p>
+        por ronda</b> hasta anularse. Desde la ronda 30 ambos activos sufren desgaste creciente, incluso si esquivan. Si ambos bandos caen a la vez, pierdes el combate.</p>
       </div>
     </div>
     <div class="actions" style="background:var(--paper);padding:10px 18px;margin-left:-18px;margin-right:-18px;border-top:2px solid var(--ink);box-shadow:0 -4px 12px rgba(0,0,0,0.18);z-index:20;display:flex;gap:10px;justify-content:center;flex-shrink:0;">
@@ -4989,26 +4995,15 @@ function getUltimateMove(f) {
   const c = CHARS[f.id] || CHARS[base];
   if (!c) return MOVES.punetazo;
 
+  if (isP(f,'luffy')) return f.lvl >= 38 ? MOVES.kingkonggun : f.lvl >= 20 ? MOVES.jetgatling : MOVES.gatlinggoma;
+  if (c.ultimate && MOVES[c.ultimate]) return MOVES[c.ultimate];
   if (c.learnset && c.learnset.length >= 3) {
     const highMove = c.learnset[c.learnset.length - 1][1];
     if (MOVES[highMove]) return MOVES[highMove];
   }
 
-  const lore = (typeof LORE !== 'undefined' && LORE) ? (LORE[f.id] || LORE[base]) : null;
-  if (lore && lore.ulti && lore.ulti.name) {
-    for (const [k, m] of Object.entries(MOVES)) {
-      if (m.name.toLowerCase() === lore.ulti.name.toLowerCase()) return m;
-    }
-  }
-
-  const t1 = c.types[0];
-  const typeUltis = {
-    Golpe: 'kingkonggun', Corte: 'santoryuogi', Disparo: 'kabuto', Fuego: 'daienkai',
-    Agua: 'karatepez', Rayo: 'yasakani', Hielo: 'iceage', Tierra: 'terremoto',
-    Viento: 'vientolibre', Veneno: 'virusmomia', Oscuridad: 'blackhole', Haki: 'galaxyimpact', Fruta: 'gammaknife'
-  };
-  const ultKey = typeUltis[t1] || 'kingkonggun';
-  return MOVES[ultKey] || MOVES.punetazo;
+  const ownMoves = c.learnset.map(([,id]) => MOVES[id]).filter(m => m && m.power > 0);
+  return ownMoves.sort((a,b) => b.power * b.acc - a.power * a.acc)[0] || MOVES.punetazo;
 }
 
 function useUltimate(f) {
@@ -5045,7 +5040,7 @@ function startBattle(enemies, opts) {
   // reinicia pasivas y estados por-combate
   [...battle.pTeam, ...battle.eTeam].forEach(f => {
     migrateFighter(f);
-    if (isP(f, 'katakuri')) f.dodgeLeft = 2;
+    f.dodgeLeft = passiveRule(f).dodge || 0;
     f.st = {}; // estados: burn (quemadura), poison (veneno), slow (ralentizado), gust (viento a favor)
   });
   battle.firstHit = { p: true, e: true }; // para Rayo Ⅱ: primer ataque crítico garantizado
@@ -5097,16 +5092,39 @@ function fighterCardHTML(f, side, idx, active) {
       <div class="hp-bar"><i class="${hpBarClass(f)}" style="width:${clamp(f.hp / f.maxhp * 100, 0, 100)}%"></i></div>
       <div class="hp-nums">${f.hp}/${f.maxhp}</div>
     </div>
-    ${ultBarHTML}
+    <div class="fcard-meters">${side === 'p' ? xpBarHTML(f) : ''}${ultBarHTML}</div>
     <div class="fcard-stats-mini" style="font-size:7.5px;color:#eee;text-align:center;margin:2px 0;background:rgba(0,0,0,0.3);padding:2px 4px;border-radius:3px;">
       ⚔️ ATQ ${f.atk} · 🛡️ DEF ${f.def} · ⚡ VEL ${f.spd}
     </div>
-    <div class="fcard-sprite">
+    <div class="fcard-sprite" data-character="${f.id}">
       <span class="sprite ${side === 'e' ? 'flip' : ''}">${charIcon(f.id, 64)}</span>
       <div class="platform"></div>
     </div>
     ${ps ? `<div class="fcard-passive ${ps.active ? 'on' : ''}" title="${ps.desc}">✨ ${ps.label}</div>` : ''}
   </div>`;
+}
+
+function showBattleCrew() {
+  const b = battle;
+  if (!b || b.over) return;
+  const wasWaiting = b.waiting;
+  pauseBattle();
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal battle-crew-modal"><h2>👥 Bandas en combate</h2>
+    ${[['Tu banda',b.pTeam,b.curP],['Enemigos',b.eTeam,b.curE]].map(([label,team,active],side)=>`
+      <h3>${label}</h3>${team.map((f,index)=>`<button class="battle-crew-row" data-crew-side="${side}" data-crew-index="${index}">
+        ${charIcon(f.id,36)}<span><b>${charName(f)}</b> · Nv${f.lvl}<small>${f.hp}/${f.maxhp} PS · ${f.hp <= 0 ? 'Fuera de combate' : f === active ? 'Activo' : 'En reserva'}</small></span><span>ℹ️</span>
+      </button>`).join('')}`).join('')}
+    <div class="actions"><button class="btn green" data-close-crew>VOLVER AL COMBATE</button></div></div>`;
+  document.body.appendChild(ov);
+  let closed = false;
+  const close = () => { if (closed) return; closed = true; ov.remove(); if (battle === b && !b.over && !wasWaiting) resumeBattle(); };
+  ov.querySelector('[data-close-crew]').onclick = close;
+  ov.querySelectorAll('[data-crew-index]').forEach(button => {
+    button.onclick = () => showCharModal((button.dataset.crewSide === '0' ? b.pTeam : b.eTeam)[Number(button.dataset.crewIndex)]);
+  });
+  ov.onclick = event => { if (event.target === ov) close(); };
 }
 
 function controlsHTML() {
@@ -5115,6 +5133,7 @@ function controlsHTML() {
   for (const id of ['carne', 'carnereal', 'bocadillo', 'sake']) {
     if (b.items[id] > 0) html += `<button class="btn small blue" data-ctl="item" data-arg="${id}" title="${ITEMS[id].name}">${ITEMS[id].emoji} ×${b.items[id]}</button>`;
   }
+  html += `<button class="btn small gray battle-crew-button" data-ctl="crew">👥 BANDAS</button>`;
   html += `<button class="btn small gray" data-ctl="speed" title="Atajo: barra espaciadora">⏩ VELOCIDAD x${b.speed}</button>`;
   html += `<button class="btn small gray" data-ctl="info">🧩 SINERGIAS Y TIPOS</button>`;
   if (b.opts.wild && !b.tower) html += `<button class="btn small red" data-ctl="run">🏃 HUIR</button>`;
@@ -5129,7 +5148,7 @@ function renderBattle(logLines) {
     ${topbar(!b.tower)}
     <div class="battle-layout">
       <div class="battle-main">
-        <div class="battle-cols">
+        <div class="battle-cols" style="--scene:url('${b.tower ? '/art/scenes/marineford.webp' : (SAGAS[run?.saga || 0]?.img || '/art/scenes/eastblue.webp')}')">
           <div class="battle-side" id="side-p">
             <div class="side-head"><div class="trainer">🏴‍☠️</div>TU BANDA
               <div class="syn-chips" id="syn-p">${synChipsHTML(b.pTeam)}</div>
@@ -5174,6 +5193,7 @@ function renderBattle(logLines) {
       }
     });
   });
+  keepActiveFightersVisible();
 }
 
 function renderBattlePreserveLog() {
@@ -5196,6 +5216,17 @@ function log(msg) {
   while (el.children.length > 5) el.removeChild(el.firstChild);
 }
 
+function keepActiveFightersVisible() {
+  for (const id of ['side-p','side-e']) {
+    const side = document.getElementById(id);
+    const active = side?.querySelector('.fcard.active');
+    if (!active?.getBoundingClientRect || side.scrollHeight <= side.clientHeight) continue;
+    const cardBox = active.getBoundingClientRect(), sideBox = side.getBoundingClientRect();
+    if (cardBox.top < sideBox.top) side.scrollTop += cardBox.top - sideBox.top - 8;
+    else if (cardBox.bottom > sideBox.bottom) side.scrollTop += cardBox.bottom - sideBox.bottom + 8;
+  }
+}
+
 function refreshHPCards() {
   if (!battle) return;
   [['p', battle.pTeam, battle.curP], ['e', battle.eTeam, battle.curE]].forEach(([side, team, active]) => {
@@ -5213,10 +5244,12 @@ function refreshHPCards() {
       card.classList.toggle('ult-ready', isUltReady);
       const ultBar = card.querySelector('.ult-bar');
       if (ultBar) ultBar.style.width = clamp(f.ultCharge || 0, 0, 100) + '%';
+      const xpEl = card.querySelector('.xp-progress');
+      if (xpEl) xpEl.outerHTML = xpBarHTML(f);
       const stEl = card.querySelector('.fcard-st');
       if (stEl) stEl.textContent = stIcons(f);
       const pEl = card.querySelector('.fcard-passive');
-      if (pEl) {
+      if (pEl && passiveInfo(f)) {
         const ps = passiveInfo(f);
         pEl.textContent = `✨ ${ps.label}`;
         pEl.classList.toggle('on', ps.active);
@@ -5225,28 +5258,33 @@ function refreshHPCards() {
   });
   const sp = $('#syn-p'); if (sp) sp.innerHTML = synChipsHTML(battle.pTeam);
   const se = $('#syn-e'); if (se) se.innerHTML = synChipsHTML(battle.eTeam);
+  keepActiveFightersVisible();
 }
 
 // Elige automáticamente el mejor movimiento según potencia, precisión, tipos y categoría
 function chooseMove(att, dfd) {
-  let best = null, bestScore = -1;
+  let best = null, bestScore = 0;
   for (const m of att.moves) {
     const mv = MOVES[m];
+    if (!mv) continue;
     if (mv.power === 0) {
-      // no malgasta el turno curando si el Clímax de combate ya anula las curaciones
-      if (mv.effect === 'heal40' && att.hp < att.maxhp * 0.45 && healScaleNow() > 0) return mv;
+      if (mv.effect === 'heal40' && att.hp < att.maxhp * .45 && healScaleNow() > 0 &&
+          (battle?.round || 1) >= (att.st?.supportReady || 0)) return mv;
+      if (['atkup','defup'].includes(mv.effect) && !att.st?.[mv.effect] && (battle?.round || 1) === 1) return mv;
       continue;
     }
-    const stat = isPhysType(mv.type) ? att.atk : att.spatk;
-    const score = mv.power * mv.acc * typeMult(mv.type, charData(dfd).types) * stat;
+    // Mismo cálculo que el ataque real, sin consumir números aleatorios.
+    const score = calcDamage(att, dfd, mv, false, 0.925).dmg * mv.acc;
     if (score > bestScore) { bestScore = score; best = mv; }
   }
-  return best || MOVES[att.moves[0]] || MOVES.punetazo;
+  // Un espadachín puede recurrir a un golpe básico contra Bara Bara.
+  // También rescata partidas antiguas con dos ataques inmunes o de apoyo.
+  return best || (isP(att,'sanji') ? MOVES.patada : MOVES.punetazo);
 }
 
 // ---------- Críticos y evasión ----------
 function critChanceFor(att) {
-  let c = BASE_CRIT;
+  let c = BASE_CRIT + (passiveRule(att).critical || 0);
   // Pasiva Zoro: crítico creciente con el PS faltante
   if (isP(att, 'zoro')) c += 0.25 * (1 - att.hp / Math.max(1, att.maxhp));
   if (isP(att, 'mihawk')) c += 0.15;
@@ -5256,7 +5294,7 @@ function critChanceFor(att) {
   const tD = synergyTier(team, 'Disparo');
   if (tD) c += tD === 2 ? 0.20 : 0.10;
   if (synergyTier(team, 'Haki') === 2) c += 0.10;
-  return c;
+  return Math.min(.75, c);
 }
 function critDmgFor(att) {
   let m = BASE_CRIT_DMG;
@@ -5267,26 +5305,33 @@ function critDmgFor(att) {
   return m;
 }
 function evaChanceFor(dfd) {
-  let e = BASE_EVA;
+  let e = BASE_EVA + (passiveRule(dfd).evasion || 0);
   // Pasiva Nami: +10% de evasión de equipo
   if (teamOf(dfd).some(x => x.hp > 0 && isP(x, 'nami'))) e += 0.10;
   if (teamOf(dfd).some(x => x.hp > 0 && isP(x, 'dragon'))) e += 0.15;
   if (isP(dfd, 'smoker')) e += 0.20;
-  if (isP(dfd, 'gojo') && (dfd.dodgeLeft || 0) > 0) e = 1.0; // Gojo esquiva 1er golpe
   const tV = synergyTier(teamOf(dfd), 'Viento');
   if (tV) e += tV === 2 ? 0.18 : 0.08;
-  return e;
+  return Math.min(.60, e);
 }
 
-function calcDamage(att, dfd, mv, crit) {
+function calcDamage(att, dfd, mv, crit, variance) {
   const phys = isPhysType(mv.type);
-  let eff = typeMult(mv.type, charData(dfd).types);
+  let eff = typeMult(mv.type, fighterTypes(dfd));
   // Pasiva Buggy: inmune al daño de espadas
   if (isP(dfd, 'buggy') && mv.type === 'Corte') eff = 0;
+  if (isP(dfd, 'luffy') && mv.type === 'Rayo') eff = 0;
   const atkTeam = teamOf(att), defTeam = teamOf(dfd);
   // Categoría: físico usa ATQ vs DEF; especial usa ESP_ATQ vs ESP_DEF
   let atkStat = (phys ? att.atk : att.spatk) * nakamaStatMult(atkTeam);
   let defStat = (phys ? dfd.def : dfd.spdef) * nakamaStatMult(defTeam);
+  const ar = passiveRule(att), dr = passiveRule(dfd);
+  atkStat *= ar.attack || 1;
+  defStat *= dr.defense || 1;
+  if (ar.lowAttack && att.hp < att.maxhp * ar.threshold) atkStat *= ar.lowAttack;
+  if (ar.hitAttack && att.st?.receivedHit) atkStat *= ar.hitAttack;
+  if (att.st?.atkup) atkStat *= 1.20;
+  if (dfd.st?.defup) defStat *= 1.20;
   // Pasiva Luffy: +15% ATQ por debajo del 50% de PS
   if (isP(att, 'luffy') && att.hp < att.maxhp * 0.5) atkStat *= 1.15;
   if (isP(att, 'newgate') && att.hp < att.maxhp * 0.5) atkStat *= 1.25;
@@ -5311,8 +5356,12 @@ function calcDamage(att, dfd, mv, crit) {
   if (mv.type === 'Oscuridad' && hasFruta(dfd)) eff *= 1.35;
 
   const base = ((2 * att.lvl / 5 + 2) * mv.power * atkStat / Math.max(1, defStat)) / 50 + 2;
-  const r = 0.85 + Math.random() * 0.15;
+  const r = variance ?? (0.85 + Math.random() * 0.15);
   let dmg = base * eff * r;
+  dmg *= (phys ? ar.physical : ar.special) || 1;
+  dmg *= ar.types?.[mv.type] || 1;
+  dmg *= dr.reduction || 1;
+  if (dr.dryReduction && mv.type !== 'Agua') dmg *= dr.dryReduction;
   if (crit) dmg *= critDmgFor(att);
   // Sinergias de daño del atacante
   const tGolpe = synergyTier(atkTeam, 'Golpe');
@@ -5333,7 +5382,7 @@ function calcDamage(att, dfd, mv, crit) {
   if (isP(dfd, 'kaido')) dmg *= 0.85;
   if (isP(att, 'teach') && hasFruta(dfd)) dmg *= 1.25;
   if (isP(att, 'akainu') && mv.type === 'Fuego') dmg *= 1.20;
-  if (isP(att, 'saitama')) dmg *= 1.35;
+  if (isP(att, 'saitama') && phys) dmg *= 1.35;
   if (isP(att, 'sukuna') && mv.type === 'Corte') dmg *= 1.20;
   if (isP(att, 'zenosama')) dmg *= 1.25;
   // Pasiva Sanji: reduce el daño recibido un 15%
@@ -5374,8 +5423,11 @@ function attackWith(att, dfd, mv, targetSide) {
   if (!mv) return; // guardia: sin movimiento válido, se salta el ataque
   const attName = charName(att);
   if (mv.power === 0 && mv.effect) {
+    att.st ||= {};
     if (mv.effect === 'heal40') {
-      const heal = Math.floor(40 * healScaleNow());
+      if ((battle.round || 1) < (att.st.supportReady || 0)) return;
+      att.st.supportReady = (battle.round || 1) + 3;
+      const heal = Math.min(att.maxhp - att.hp, Math.floor(40 * healScaleNow()));
       if (heal > 0) {
         att.hp = Math.min(att.maxhp, att.hp + heal);
         log(`${attName} usa ${mv.name} y recupera ${heal} PS.`);
@@ -5383,13 +5435,17 @@ function attackWith(att, dfd, mv, targetSide) {
         log(`${attName} usa ${mv.name}... ¡pero el Clímax de combate anula la curación! ⚔️`);
       }
     }
+    if (['atkup','defup'].includes(mv.effect)) {
+      att.st[mv.effect] = true;
+      log(`${attName} usa ${mv.name}: +20% de ${mv.effect === 'atkup' ? 'ataque' : 'defensa'} hasta el final del combate (no acumulable).`);
+    }
     refreshHPCards();
     return;
   }
   // Pasiva Katakuri: esquiva los 2 primeros ataques del combate
-  if (isP(dfd, 'katakuri') && (dfd.dodgeLeft || 0) > 0) {
+  if ((dfd.dodgeLeft || 0) > 0) {
     dfd.dodgeLeft--;
-    log(`${charName(dfd)} esquiva el ataque. ✨ (Futuro Inalterable)`);
+    log(`${charName(dfd)} esquiva el ataque. ✨ (${passiveRule(dfd).name})`);
     refreshHPCards();
     return;
   }
@@ -5424,14 +5480,12 @@ function attackWith(att, dfd, mv, targetSide) {
     return;
   }
   dfd.hp = Math.max(0, dfd.hp - dmg);
+  dfd.st ||= {};
+  if (dmg > 0) dfd.st.receivedHit = true;
+  if (passiveRule(att).slow) dfd.st.slow = 2;
   // Recarga de Ultimate al golpear al enemigo (para personajes de nivel base >= 20)
   if (att && att.lvl >= 20 && b.pTeam.includes(att)) {
     att.ultCharge = Math.min(100, (att.ultCharge || 0) + 34);
-  }
-  if (dfd.hp === 0 && battle && battle.eTeam && battle.eTeam.includes(dfd)) {
-    meta.stats = meta.stats || { kills: 0, items: 0 };
-    meta.stats.kills = (meta.stats.kills || 0) + 1;
-    saveMeta();
   }
   let txt = `${attName} usa <b>${mv.name}</b>. `;
   if (crit) txt += '¡Golpe crítico! ';
@@ -5472,6 +5526,20 @@ function scheduleRound(delay) {
   battle.timer = setTimeout(runRound, (delay == null ? 1200 : delay) / battle.speed);
 }
 
+function effectiveSpeed(f) {
+  const rule = passiveRule(f);
+  let speed = f.spd * nakamaStatMult(teamOf(f)) * (rule.speed || 1);
+  const tier = synergyTier(teamOf(f), 'Rayo');
+  if (tier) speed *= tier === 2 ? 1.40 : 1.20;
+  if (f.st?.slow) speed *= .85;
+  if (f.st?.gust) speed *= 1.20;
+  if (rule.lowSpeed && f.hp < f.maxhp * .5) speed *= rule.lowSpeed;
+  if (rule.openingSpeed && battle.round === 1) speed *= rule.openingSpeed;
+  const foe = battle.pTeam.includes(f) ? battle.curE : battle.curP;
+  if (foe?.hp > 0) speed *= passiveRule(foe).foeSpeed || 1;
+  return speed;
+}
+
 function runRound() {
   const b = battle;
   if (!b || b.over || b.waiting) return;
@@ -5484,18 +5552,7 @@ function runRound() {
     useUltimate(p);
   }
 
-  // Velocidad efectiva: Rayo (+20/+40%), Nakama Ⅰ, ralentización de Hielo,
-  // racha de Viento Ⅱ y pasiva Usopp (siempre ataca primero)
-  const spdOf = f => {
-    let s = f.spd * nakamaStatMult(teamOf(f));
-    const tR = synergyTier(teamOf(f), 'Rayo');
-    if (tR) s *= tR === 2 ? 1.40 : 1.20;
-    if (f.st && f.st.slow) s *= 0.85;
-    if (f.st && f.st.gust) s *= 1.20;
-    if (isP(f, 'usopp')) s += 1000;
-    return s;
-  };
-  const pSpd = spdOf(p), eSpd = spdOf(e);
+  const pSpd = effectiveSpeed(p), eSpd = effectiveSpeed(e);
   const order = pSpd >= eSpd
     ? [[p, e, 'enemy'], [e, p, 'player']]
     : [[e, p, 'player'], [p, e, 'enemy']];
@@ -5534,6 +5591,32 @@ function afterRound() {
     if (f.st.slow && --f.st.slow <= 0) delete f.st.slow;
     if (f.st.gust && --f.st.gust <= 0) delete f.st.gust;
   }
+  // Resolución simultánea: nadie revive por drenaje ni ataca tras caer.
+  const actors = [b.curP, b.curE];
+  const hpDelta = actors.map((act, i) => {
+    if (!act || act.hp <= 0) return 0;
+    const team = teamOf(act), foe = actors[1-i];
+    if (!foe || foe.hp <= 0) return 0;
+    const drain = Math.min(foe.hp, Math.floor(foe.maxhp * (passiveRule(act).drain || 0)));
+    let heal = passiveRule(act).regen || 0;
+    if (team.some(x => x.hp > 0 && isP(x,'marco'))) heal += .06;
+    if (team.some(x => x.hp > 0 && isP(x,'kibutsuji'))) heal += .05;
+    if (team.some(x => x.hp > 0 && isP(x,'ryokugyu'))) heal += .05;
+    const water = synergyTier(team,'Agua');
+    if (water) heal += water === 2 ? .08 : .04;
+    const blocked = synergyTier(teamOf(foe),'Oscuridad') === 2;
+    return {drain, heal:blocked ? 0 : Math.floor((heal * act.maxhp + drain) * healScaleNow())};
+  });
+  actors.forEach((act,i) => {
+    if (!act || act.hp <= 0) return;
+    act.hp = Math.max(0, Math.min(act.maxhp, act.hp + (hpDelta[i].heal || 0)) - (hpDelta[1-i].drain || 0));
+    // Límite independiente de precisión, inmunidades y azar: desgaste de ambos activos.
+    if (b.round >= 30 && act.hp > 0) {
+      const fatigue = Math.max(1, Math.ceil(act.maxhp * Math.min(.5, .05 * (b.round - 29))));
+      act.hp = Math.max(0, act.hp - fatigue);
+      log(`⚔️ Desgaste: ${charName(act)} pierde ${fatigue} PS.`);
+    }
+  });
   const checkRevive = f => {
     if (!f || f.hp > 0) return;
     const isPlayer = b.pTeam.includes(f) || (run && run.team && run.team.includes(f));
@@ -5544,7 +5627,8 @@ function afterRound() {
       log(`✨ ¡Segunda Vida! ${charName(f)} se niega a morir. ¡Yohohoho!`);
       return;
     }
-    if (synergyTier(teamOf(f), 'Nakama') === 2) {
+    const guardTeam = teamOf(f).map(ally => ally === f ? {...ally, hp:1} : ally);
+    if (synergyTier(guardTeam, 'Nakama') === 2) {
       const used = isPlayer
         ? (b.tower ? tower && tower.nakamaGuardUsed : run && run.nakamaGuardUsed)
         : b.eGuardUsed;
@@ -5556,27 +5640,32 @@ function afterRound() {
       }
     }
   };
-  checkRevive(b.curP); checkRevive(b.curE);
+  [...b.pTeam, ...b.eTeam].forEach(checkRevive);
   const deadE = b.curE.hp <= 0, deadP = b.curP.hp <= 0;
   let changed = false;
 
-  if (deadE) {
-    log(`¡${charName(b.curE)} cae derrotado!`);
+  b.rewarded ||= new Set();
+  for (const defeated of b.eTeam.filter(f => f.hp <= 0 && !b.rewarded.has(f))) {
+    b.rewarded.add(defeated);
+    meta.stats ||= {kills:0,items:0};
+    meta.stats.kills = (meta.stats.kills || 0) + 1;
+    saveMeta();
+    log(`¡${charName(defeated)} cae derrotado!`);
     // registro de vencidos en historia (habilita comprarlos en el mercado clandestino)
-    if (run && !b.tower && !meta.defeated.includes(b.curE.id)) {
-      meta.defeated.push(b.curE.id);
+    if (run && !b.tower && !meta.defeated.includes(defeated.id)) {
+      meta.defeated.push(defeated.id);
       saveMeta();
     }
     // Recompensa de Log Poses al derrotar enemigos en historia
     if (run && !b.tower) {
       const sagaIdx = run.saga || 0;
-      const isBossEnemy = !!charData(b.curE).boss || b.opts.boss;
+      const isBossEnemy = !!charData(defeated).boss || b.opts.boss;
       const logPosesWon = isBossEnemy ? (sagaIdx + 3) : (sagaIdx + 1);
       meta.logPoses = (meta.logPoses || 0) + logPosesWon;
       saveMeta();
       log(`🧭 ¡Consigues ${logPosesWon} Log Pose! (Total: ${meta.logPoses})`);
     }
-    const xp = Math.floor(b.curE.lvl * 14 * (charData(b.curE).boss ? 1.6 : 1) * (b.opts.xpMult || 1));
+    const xp = Math.floor(defeated.lvl * 14 * (charData(defeated).boss ? 1.6 : 1) * (b.opts.xpMult || 1));
     log(`¡Toda la banda gana ${xp} EXP!`);
     b.pTeam.forEach(f => { if (f.hp > 0) gainXP(f, xp, log); });
     changed = true;
@@ -5597,7 +5686,7 @@ function afterRound() {
   }
 
   const ne = activeE(), np = activeP();
-  if (!ne) {
+  if (!ne && np) {
     b.over = true;
     return setTimeout(() => endBattle(true), 1300 / b.speed);
   }
@@ -5608,28 +5697,6 @@ function afterRound() {
   if (deadE && ne !== b.curE) { registerDex(ne.id); log(`¡${charName(ne)} entra en combate!`); }
   if (deadP && np !== b.curP) log(`¡Adelante, ${charName(np)}!`);
   b.curE = ne; b.curP = np;
-  // Pasiva Marco, Kibutsuji, Ryokugyu + Sinergia Agua: curan al luchador activo cada ronda.
-  // Oscuridad Ⅱ del rival (Vórtice) anula estas curaciones pasivas.
-  [[b.pTeam, np], [b.eTeam, ne]].forEach(([team, act]) => {
-    if (act.hp <= 0 || act.hp >= act.maxhp) return;
-    const foe = team === b.pTeam ? b.eTeam : b.pTeam;
-    const foeAct = team === b.pTeam ? ne : np;
-    if (synergyTier(foe, 'Oscuridad') === 2) return;
-    let heal = 0;
-    if (team.some(x => x.hp > 0 && isP(x, 'marco'))) heal += 0.06;
-    if (team.some(x => x.hp > 0 && isP(x, 'kibutsuji'))) heal += 0.05;
-    if (team.some(x => x.hp > 0 && isP(x, 'ryokugyu'))) heal += 0.05;
-    const tA = synergyTier(team, 'Agua');
-    if (tA) heal += tA === 2 ? 0.08 : 0.04;
-    heal *= healScaleNow(); // el Clímax de combate también apaga las curaciones pasivas
-    if (heal > 0) act.hp = Math.min(act.maxhp, act.hp + Math.max(1, Math.floor(act.maxhp * heal)));
-    // Big Mom Soul Pocus: drena PS del activo rival
-    if (team.some(x => x.hp > 0 && isP(x, 'bigmom')) && foeAct && foeAct.hp > 0) {
-      const drain = Math.max(1, Math.floor(foeAct.maxhp * 0.04));
-      foeAct.hp = Math.max(0, foeAct.hp - drain);
-      act.hp = Math.min(act.maxhp, act.hp + drain);
-    }
-  });
   // Avance de ronda y aviso del Clímax de combate
   b.round = (b.round || 1) + 1;
   if (b.round === CLIMAX_ROUND + 1) {
@@ -5650,6 +5717,7 @@ function bindControls() {
       const b = battle;
       if (!b || b.over) return;
       const kind = btn.dataset.ctl, arg = btn.dataset.arg;
+      if (kind === 'crew') { showBattleCrew(); return; }
       if (kind === 'speed') {
         cycleBattleSpeed();
         return;
@@ -6262,6 +6330,15 @@ const UPG_STATS = [
 let shipBuyLock = 0;
 let shipSearchQ = '';
 let shipExpanded = {};
+let shipSagaExpanded = {};
+function groupUpgradeRoster(ids) {
+  const groups = [...SAGAS.map(s => ({id:s.id,name:s.name})), {id:'crossover',name:'CROSSOVER'}, {id:'other',name:'OTROS'}];
+  const known = new Set(groups.map(g => g.id));
+  return groups.map(g => ({...g,ids:ids.filter(id => {
+    const saga = CHARS[id]?.saga;
+    return (known.has(saga) ? saga : 'other') === g.id;
+  })})).filter(g => g.ids.length);
+}
 
 function upgCost(lvl) { return (Math.floor(lvl / 2) + 1) * 30; }
 
@@ -6350,7 +6427,7 @@ function screenShip() {
     <div class="panel">
       <h2>🏪 Tienda</h2>
       <p style="font-size:9px;line-height:1.9;">Gasta ⭐ Fama en mejoras permanentes.
-      La Fama se gana con emblemas (+20), sagas (+100 / +150 en Nuzlocke), pisos de la Torre (+5)
+      La Fama se gana con emblemas (+20), sagas (+100 / +150 en Nuzlocke), pisos de la Torre (+5), Luffy Run (+25 cada 1.000 m)
       e incluso derrotas honrosas — y cada punto también da PX de cuenta.</p>
       <div style="text-align:center;font-size:12px;margin:12px 0;color:var(--accent);">
         ⭐ ${meta.fame} Fama · 👤 Cuenta Nv${accLvl} (${meta.accXp || 0}/${accountNextAt()} PX)
@@ -6430,7 +6507,7 @@ function screenShip() {
     const container = $('#ship-roster-list');
     if (!container) return;
 
-    container.innerHTML = filteredRoster.length ? filteredRoster.map(id => {
+    const cardHTML = id => {
       const c = CHARS[id];
       const u = meta.upgrades[id] || {};
       const isExpanded = !!shipExpanded[id];
@@ -6474,7 +6551,16 @@ function screenShip() {
           </div>
         ` : ''}
       </div>`;
-    }).join('') : '<p style="text-align:center;font-size:9px;color:#888;padding:12px;">No se han encontrado veteranos con ese nombre.</p>';
+    };
+    const groups = groupUpgradeRoster(filteredRoster);
+    container.innerHTML = groups.length ? groups.map((group, index) => `
+      <details class="ship-saga" data-upgrade-saga="${group.id}" ${(q || shipSagaExpanded[group.id] === true || (shipSagaExpanded[group.id] === undefined && index === 0)) ? 'open' : ''}>
+        <summary><span>${group.name}</span><span>${group.ids.length} ${group.ids.length === 1 ? 'nakama' : 'nakamas'}</span></summary>
+        <div class="ship-saga-list">${group.ids.map(cardHTML).join('')}</div>
+      </details>`).join('') : '<p>No se han encontrado veteranos con ese nombre.</p>';
+    container.querySelectorAll('[data-upgrade-saga]').forEach(section => {
+      section.ontoggle = () => { shipSagaExpanded[section.dataset.upgradeSaga] = section.open; };
+    });
 
     container.querySelectorAll('[data-toggle-ship]').forEach(hdr => {
       hdr.onclick = () => {
