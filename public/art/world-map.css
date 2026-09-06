@@ -14,30 +14,27 @@ body:has(.world-map) { height:100dvh; min-height:0; overflow:hidden; }
 .world-controls .diff-dropdown-menu { max-height:min(420px,60dvh); overflow:auto; max-width:calc(100vw - 24px); }
 .world-nav { font-size:8px; }
 .world-nav select { flex:1; min-width:0; height:40px; border:1px solid var(--line); border-radius:3px; background:var(--paper); color:var(--ink); font:10px 'Press Start 2P',monospace; padding:6px; }
-.world-map { position:relative; flex:1; min-height:0; overflow:auto; overscroll-behavior:contain; overflow-anchor:none; border:1px solid var(--line); border-radius:4px; background:#bad8d5; scrollbar-color:#628f94 #d2e7df; }
+.world-map { position:relative; height:100%; min-height:0; overflow:auto; overscroll-behavior:contain; overflow-anchor:none; border:1px solid var(--line); border-radius:4px; background:transparent; scrollbar-color:#628f94 #d2e7df; }
 .world-map:focus-visible { outline:3px solid var(--accent); outline-offset:-3px; }
-.world-chart { position:relative; max-width:880px; margin:auto; isolation:isolate; background:repeating-linear-gradient(0deg,transparent 0 79px,#507b8010 80px),repeating-linear-gradient(90deg,transparent 0 79px,#507b8010 80px),linear-gradient(90deg,#6b9fa922,transparent 25% 75%,#6b9fa922),url('grand-line-chart.svg') center top/880px auto repeat-y; }
-.world-start,.world-end { position:relative; margin:0; padding:22px 12px; text-align:center; color:#315a61; font-size:9px; line-height:2; }
-.world-saga { border-bottom:1px solid #527f7b55; background:linear-gradient(90deg,color-mix(in srgb,var(--saga-color) 12%,transparent),transparent 38% 62%,color-mix(in srgb,var(--saga-color) 12%,transparent)); }
-.world-saga-heading { position:relative; margin:auto; padding:18px 12px; max-width:540px; text-align:center; color:#294c53; }
+.world-chart { position:relative; max-width:880px; margin:auto; isolation:isolate; padding-bottom:120px; }
+.world-start,.world-end { position:relative; margin:0; padding:22px 12px; text-align:center; color:#fff7db; text-shadow:0 2px 0 #16516d; font-size:9px; line-height:2; }
+.world-saga { position:relative; border-bottom:1px solid #ffffff44; }
+.world-saga-heading { position:relative; margin:auto; padding:18px 12px; max-width:540px; text-align:center; color:#183e52; }
 .world-saga-heading:before { content:''; display:block; width:54px; height:4px; background:var(--saga-color); border:1px solid #476c7155; margin:0 auto 12px; }
 .world-saga-heading h2 { font-size:clamp(12px,2vw,18px); margin:10px 0; line-height:1.8; color:inherit; }
 .world-saga-heading p { font:12px/1.6 system-ui,sans-serif; margin:6px 0; }
 .world-saga-heading .atlas-eyebrow { font-size:7px; line-height:1.8; }
 .world-saga-heading .world-lock { color:#744b34; }
-.world-saga-details { border:1px solid #567f7c66; border-radius:3px; background:#faf5e3de; margin-top:12px; font:12px/1.6 system-ui,sans-serif; color:#294c53; }
+.world-saga-details { border:1px solid #567f7c66; border-radius:3px; background:#faf5e3de; margin-top:12px; font:12px/1.6 system-ui,sans-serif; color:#183e52; }
 .world-saga-details summary { padding:12px 8px; min-height:44px; cursor:pointer; }
 .world-saga-details .actions { padding:8px; flex-wrap:wrap; }
 .world-saga-details .btn { min-height:44px; font-size:8px; }
 .world-difficulties { display:flex; flex-wrap:wrap; justify-content:center; gap:6px 12px; padding:6px; }
-.world-stop { position:relative; height:200px; max-width:600px; margin:auto; }
-.world-trail { position:absolute; inset:0; width:100%; height:100%; fill:none; stroke:#527b81; stroke-width:1; stroke-dasharray:3 4; opacity:.65; }
-.world-stop.starboard .world-trail { transform:scaleX(-1); }
-.world-stop.is-complete .world-trail { stroke:#34745b; opacity:1; }
-.world-island-card { position:absolute; width:166px; top:50%; left:25%; transform:translate(-50%,-50%); }
+.world-stop { position:relative; height:270px; max-width:600px; margin:auto; }
+.world-island-card { position:absolute; width:190px; top:50%; left:25%; transform:translate(-50%,-50%); }
 .world-stop.starboard .world-island-card { left:75%; }
 .world-island-card .island-select { position:relative; }
-.world-island-card .island-land { display:block; margin:auto; width:116px; height:83px; }
+.world-island-card .island-land { display:block; margin:auto; width:170px; height:128px; }
 .world-island-card .island-marker { right:8px; top:0; min-width:44px; min-height:44px; z-index:2; border-radius:3px; }
 .world-island-card .island-label { display:grid; gap:5px; padding:9px 6px; color:#28494e; background:#fcf5df; border-radius:3px; }
 .world-island-card .island-label b { font-size:9px; line-height:1.8; overflow-wrap:anywhere; }
@@ -46,24 +43,25 @@ body:has(.world-map) { height:100dvh; min-height:0; overflow:hidden; }
 .world-island-card .island-select:disabled .island-land { filter:saturate(.45); }
 .world-stop.is-current .island-label { outline:3px solid #d38944; }
 .world-stop.is-complete .island-label { border-color:#43846c; }
-.world-redline { position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; min-height:160px; padding:24px 14px; text-align:center; color:#fff1cf; border-block:5px solid #eab18a; background:repeating-linear-gradient(103deg,#7d4238 0 12px,#a35b48 14px 38px,#b57656 40px 50px); box-shadow:0 7px 0 #ffffff55,0 -7px 0 #ffffff55; }
-.world-redline:before { content:'↑'; position:absolute; inset:0; width:60px; margin:auto; display:grid; place-items:center; background:#86b8b0; border-inline:4px solid #dbd8a9; color:#305e69; font:40px system-ui; }
-.world-redline strong,.world-redline span { position:relative; background:#563b32ed; padding:7px; border-radius:2px; }
-.world-redline strong { font-size:10px; line-height:1.8; }
+/* Illustrated continent; the boat follows the central sea passage. */
+.world-redline { position:relative; isolation:isolate; display:flex; flex-direction:column; align-items:center; justify-content:space-between; gap:18px; height:clamp(190px,35vw,300px); margin-block:20px; padding:12px; text-align:center; color:#fff6df; }
+.world-redline:before { content:''; position:absolute; inset:0; z-index:-1; background:url('world/redline.webp') center/cover no-repeat; mask-image:linear-gradient(transparent,#000 12% 88%,transparent); }
+.world-redline strong,.world-redline span { background:#713f30ed; border:1px solid #ffce97; padding:8px 10px; border-radius:3px; max-width:95%; }
+.world-redline strong { font-size:9px; line-height:1.8; }
 .world-redline span { font:12px/1.5 system-ui,sans-serif; }
-html[data-theme="dark"] .world-map { background:#172e37; }
-html[data-theme="dark"] .world-chart { background-blend-mode:normal,normal,normal,multiply; background-color:#536f78; }
+html[data-theme="dark"] .world-sea { filter:brightness(.55) saturate(.8); }
+html[data-theme="dark"] .world-saga-heading { background:#243c46ee; }
 html[data-theme="dark"] .world-saga-heading,html[data-theme="dark"] .world-start,html[data-theme="dark"] .world-end { color:#dfebda; }
 html[data-theme="dark"] .world-saga-heading .world-lock { color:#f2c995; }
 html[data-theme="dark"] .world-saga-details,html[data-theme="dark"] .world-island-card .island-label { background:#243c46; color:#f3ead2; }
-html[data-theme="dark"] .world-trail { stroke:#b7d1c2; }
+
 @media(max-width:600px) {
   .world-controls .diff-picker-bar { display:flex; flex-direction:row; flex-wrap:nowrap; }
   .world-controls .diff-dropdown-container { flex:1; min-width:0; }
   .world-controls .diff-dropdown-trigger { width:100%; padding:6px; font-size:7px; line-height:1.6; }
   .world-controls .diff-dropdown-menu { right:0; left:auto; width:300px; }
-  .world-stop { height:195px; }
-  .world-island-card { width:144px; left:27%; }
+  .world-stop { height:250px; }
+  .world-island-card { width:150px; left:27%; }
   .world-stop.starboard .world-island-card { left:73%; }
   .world-island-card .island-label b { font-size:8px; }
   .world-title-row .btn,.world-nav .btn { font-size:8px; padding:7px; }
@@ -75,8 +73,69 @@ html[data-theme="dark"] .world-trail { stroke:#b7d1c2; }
   .world-controls .tab { font-size:7px; }
   .world-title-row h1 { font-size:7px; }
 }
-@media(max-height:540px) and (orientation:landscape) {
+@media(min-width:700px) and (max-height:540px) and (orientation:landscape) {
   .world-controls { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
   .world-controls .world-title-row { grid-column:1/-1; }
   .world-controls .diff-picker-bar { margin:0; }
+}
+
+/* The animated layer is only viewport-sized, independent of the 57-stop chart. */
+.world-ocean-frame { position:relative; flex:1; min-height:0; overflow:hidden; isolation:isolate; border:2px solid #284858; border-radius:3px; background:#168ac8; }
+.world-sea { position:absolute; z-index:-1; inset:-32px; pointer-events:none; background:#168ac8 url('world/ocean.webp') center var(--sea-offset,0px)/480px 480px repeat; animation:world-sea-drift 12s ease-in-out infinite alternate; will-change:transform; }
+.world-sea:after { content:''; position:absolute; inset:-24px; background:url('world/ocean.webp') 150px calc(var(--sea-offset,0px) + 80px)/660px 660px repeat; opacity:.22; mix-blend-mode:screen; animation:world-sea-foam 9s ease-in-out infinite alternate; }
+.world-island-card .island-land img { display:block; width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 4px 1px #074c6933); }
+.world-stop.is-selected .island-label { border-color:#9b501d; outline:3px solid #ffe59c; }
+.world-island-card .island-zone { font-weight:700; }
+.world-island-card .island-marker { top:65px; right:-4px; background:var(--paper); color:var(--ink); border:2px solid #284858; }
+.world-route { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:-1; }
+.world-route path { fill:none; stroke:#fff0b2; stroke-width:3; stroke-dasharray:6 10; vector-effect:non-scaling-stroke; }
+.world-ship { position:absolute; left:0; top:0; width:0; height:0; pointer-events:none; z-index:5; will-change:transform; }
+.world-ship img { position:absolute; width:78px; height:78px; max-width:none; left:-39px; bottom:-9px; object-fit:contain; animation:world-ship-bob 2.8s ease-in-out infinite; filter:drop-shadow(0 3px 1px #074c6944); }
+.world-ship-wake { position:absolute; left:-18px; top:-6px; width:36px; height:65px; transform-origin:50% 6px; transform:rotate(var(--wake-angle,180deg)); opacity:0; transition:opacity .25s; }
+.world-ship-wake:before,.world-ship-wake:after { content:''; position:absolute; inset:0; border:3px solid #f4ffffbb; border-top:0; border-radius:0 0 50% 50%; animation:world-wake 1.2s ease-out infinite; }
+.world-ship-wake:after { animation-delay:-.6s; }
+.world-ship.is-sailing .world-ship-wake { opacity:1; }
+.world-inspector[hidden] { display:none; }
+.world-inspector { position:absolute; z-index:10; left:50%; bottom:8px; transform:translateX(-50%); width:calc(100% - 16px); max-width:520px; max-height:min(330px,65%); display:flex; flex-direction:column; overflow:hidden; border:2px solid #284858; border-bottom:4px solid #284858; border-radius:3px; background:var(--paper); color:var(--ink); box-shadow:0 4px 12px #163b5655; }
+.world-inspector header { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:8px 10px; border-bottom:1px solid var(--line); flex:none; }
+.world-inspector h2 { font:10px/1.8 'Press Start 2P',monospace; margin:0; overflow-wrap:anywhere; }
+.world-inspector p { font:12px/1.45 system-ui,sans-serif; margin:4px 0; }
+.world-inspector .btn { min-height:40px; border-radius:3px; font-size:8px; padding:8px; }
+.world-inspector-body { padding:6px 10px; overflow:auto; overscroll-behavior:contain; min-height:0; font:12px/1.5 system-ui,sans-serif; }
+.world-inspector summary { cursor:pointer; padding-block:7px; }
+.world-mode-progress { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-block:4px; }
+.world-mode-progress > div { display:flex; gap:3px; }
+.world-mode-progress span { display:inline-block; padding:3px 5px; border:1px solid var(--line); background:var(--paper-dark); font:11px/1.4 system-ui,sans-serif; }
+.world-mode-progress .won { background:#d7efc8; border-color:#418451; color:#245730; }
+.world-inspector footer { padding:6px 10px; border-top:1px solid var(--line); display:flex; gap:6px; align-items:center; justify-content:space-between; flex:none; font:11px/1.4 system-ui,sans-serif; }
+.world-panel-actions { display:flex; gap:5px; }
+.world-panel-actions [hidden] { display:none; }
+@keyframes world-sea-drift { from { transform:translate(-12px,-8px); } to { transform:translate(16px,12px); } }
+@keyframes world-sea-foam { from { transform:translate(10px,-6px); opacity:.14; } to { transform:translate(-12px,10px); opacity:.28; } }
+@keyframes world-ship-bob { 0%,100% { transform:translateY(0) rotate(-2deg); } 50% { transform:translateY(-3px) rotate(2deg); } }
+@keyframes world-wake { from { opacity:.9; transform:scale(.6,.4); } to { opacity:0; transform:translateY(12px) scale(1.3,1); } }
+@media(max-width:600px) {
+ .world-island-card .island-land { width:150px; height:112px; }
+ .world-inspector h2 { font-size:9px; }
+ .world-inspector .btn { font-size:7px; }
+}
+@media(max-width:360px) {
+ .world-island-card .island-land { width:132px; height:99px; }
+ .world-inspector footer { flex-wrap:wrap; }
+ .world-panel-actions { margin-left:auto; }
+ .world-mode-progress span { padding:3px; }
+}
+@media(prefers-reduced-motion:reduce) {
+ .world-sea,.world-sea:after,.world-ship img,.world-ship-wake:before,.world-ship-wake:after { animation:none!important; }
+ .world-ship-wake { transition:none; }
+}
+
+.world-saga-heading { background:#fff4dfee; border:2px solid #284858; border-radius:3px; margin-block:16px; }
+@media(max-width:600px) { .world-inspector { max-height:min(330px,60%); } }
+@media(min-width:700px) and (max-height:540px) and (orientation:landscape) {
+ .world-ocean-frame:has(.world-inspector:not([hidden])) .world-map { width:50%; }
+ .world-inspector { left:auto; right:8px; width:calc(50% - 16px); top:8px; bottom:8px; max-height:none; transform:none; }
+ .world-inspector header { padding:4px 8px; }
+ .world-inspector h2 { font-size:8px; }
+ .world-inspector footer { padding:4px 8px; }
 }
