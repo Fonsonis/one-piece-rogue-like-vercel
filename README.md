@@ -34,6 +34,18 @@ Las fichas de combate y del equipo dan más espacio a los sprites. Los activos a
 
 Cada bando indica los personajes en pie sobre el total inicial del encuentro (por ejemplo, `3/4 en pie`). El denominador se conserva también cuando Nuzlocke elimina a un aliado. Bajo las fichas compactas aparecen la tripulación, los mensajes y tres filas de controles: objetos; bandas, velocidad y sinergias; huir o rendirse cuando esté disponible. Sin objetos se muestra un aviso en su fila. Las animaciones conservan las cuatro poses, con límites ajustados al atlas y sin desplazamientos ni giros adicionales para dar más tamaño al sprite. Si se actualizan los atlas, regenera primero los límites de movimiento y después ejecuta `node scripts/compact-sprite-bounds.mjs`.
 
+## Islas y expediciones
+
+Al elegir saga aparece su mapa de islas antes de preparar el equipo. Cada isla tiene entre 3 y 5 mapas de nodos (`min(5, max(3, 2 + número de jefes definidos))`), con combates y eventos. Los mapas intermedios terminan en una salida; solo el último contiene el encuentro de jefe. Los niveles, estadísticas y curvas de enemigos existentes se conservan.
+
+La banda mantiene PS, objetos y progreso entre mapas. **Los reclutas de la expedición solo se desbloquean permanentemente al completar la isla**, si siguen en la banda. Una derrota o un abandono previo no los añade a la plantilla. Los carteles comprados en el puerto con Log Poses conservan su desbloqueo directo.
+
+Vencer al jefe desbloquea la siguiente isla y permite preparar otro equipo. El progreso de islas se guarda por saga, modo y dificultad; las sagas ya conquistadas conservan sus islas disponibles. Un viaje antiguo continúa en su mapa guardado, tratado como último mapa de la isla, sin regenerarlo.
+
+Las sinergias se activan con 2 miembros vivos del mismo tag (nivel I) y 3 o más (nivel II). Con 6/6, sus bonus numéricos se multiplican por 1,4: un 25 % pasa al 35 %. Las inmunidades y protecciones garantizadas no se duplican.
+
+Huir requiere confirmación y pausa el combate mientras se decide. Los sprites de combate se centran sobre la sombra y pueden sobresalir de sus fichas; las notificaciones aparecen en horizontal arriba. Los carteles del evento especial usan papel envejecido y estrellas doradas.
+
 ## Guardado en el dispositivo
 
 - **💾**: sobrescribe un único documento JSON en el almacenamiento local del navegador, bajo la clave `oplike_save`. No descarga archivos ni envía datos a un servidor.
