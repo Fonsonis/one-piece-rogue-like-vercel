@@ -6,21 +6,32 @@
 <script>
 const select=document.querySelector('#review-char'),slider=document.querySelector('#review-frame');
 select.innerHTML=Object.entries(CHARS).map(([id,c])=>`<option value="${id}">${c.name}</option>`).join('');select.value='law';
-const spec=id=>UltimateArtProfiles.resolve(id,CHARS[id],getUltimateMove({id,lvl:100}),baseFormOf(id));
-function stopReview(){UltimateFX.cancelAll();document.querySelectorAll('.overlay').forEach(x=>x.remove());if(battle){clearTimeout(battle.timer);battle.over=true;}autoMode=false;}
+const levelFor=id=>({luffy:19,luffy2:20,luffy3:35,luffy4:70,luffy5:100})[id]||100;
+const spec=id=>UltimateArtProfiles.resolve(id,CHARS[id],MOVES[CHARS[id].ultimate]||getUltimateMove({id,lvl:levelFor(id)}),baseFormOf(id));
+function stopReview(){document.querySelector('.review-controls').style.display='';document.querySelector('.review-dock')?.remove();UltimateFX.cancelAll();document.querySelectorAll('.overlay').forEach(x=>x.remove());if(battle){clearTimeout(battle.timer);battle.over=true;}autoMode=false;}
 function stageHTML(id){return `<div class="review-stage" data-review-id="${id}"><div class="one dex-sprite" data-character="${id}" style="--sprite-atlas:url('/art/characters/${id}.png');--sprite-portrait:url('/art/portraits/${id}.png')"></div><div class="two dex-sprite" data-character="kaido" style="--sprite-atlas:url('/art/characters/kaido.png');--sprite-portrait:url('/art/portraits/kaido.png')"></div><canvas></canvas><div class="review-heading">${CHARS[id].name} · ${spec(id).technique}</div></div>`;}
-function drawReview(){document.querySelectorAll('[data-review-id]').forEach(stage=>{const c=stage.querySelector('canvas'),r=stage.getBoundingClientRect();c.width=r.width;c.height=r.height;UltimateFX.drawFrame(c.getContext('2d'),spec(stage.dataset.reviewId),slider.value/100,{width:c.width,height:c.height});});}
+async function drawReview(){document.querySelectorAll('[data-review-id]').forEach(async stage=>{const [sprite,enemy]=await Promise.all([UltimateFX.loadSprite(stage.dataset.reviewId),UltimateFX.loadSprite('kaido')]);if(!stage.isConnected)return;const c=stage.querySelector('canvas'),r=stage.getBoundingClientRect();c.width=r.width;c.height=r.height;stage.querySelectorAll('.dex-sprite').forEach(x=>x.style.visibility='hidden');const size=Math.min(c.height*.93,c.width*.42);UltimateFX.drawFrame(c.getContext('2d'),spec(stage.dataset.reviewId),slider.value/100,{width:c.width,height:c.height,sprite,actor:{x:c.width*.23,y:c.height*.95,size},defender:{image:enemy,x:c.width*.8,y:c.height*.95,size}});});}
 function single(){stopReview();render(stageHTML(select.value));drawReview();document.querySelector('#review-info').textContent=spec(select.value).family+' · '+spec(select.value).motif;}
 select.onchange=single;slider.oninput=drawReview;
-document.querySelector('#review-play').onclick=()=>{single();const source=document.querySelector('.review-stage');UltimateFX.play({profile:spec(select.value),source,preview:true});source.querySelector('canvas').style.visibility='hidden';};
-document.querySelector('#review-sheet').onclick=()=>{stopReview();showCharModal({id:select.value,...makeChar(select.value,100)});};
-document.querySelector('#review-battle').onclick=()=>{stopReview();run={mode:'classic',saga:0,islandIdx:0,diff:1,team:[makeChar(select.value,100),makeChar('zoro',50)],items:{carne:3},berries:1000};startBattle([makeChar('kaido',100)],{wild:true});pauseBattle();};
+document.querySelector('#review-play').onclick=()=>{single();const source=document.querySelector('.review-stage');source.querySelectorAll('.dex-sprite').forEach(x=>x.style.visibility='');UltimateFX.play({profile:spec(select.value),source,preview:true});source.querySelector('canvas').style.visibility='hidden';};
+document.querySelector('#review-sheet').onclick=()=>{stopReview();showCharModal({id:select.value,...makeChar(select.value,levelFor(select.value))});};
+document.querySelector('#review-battle').onclick=()=>{stopReview();run={mode:'classic',saga:0,islandIdx:0,diff:1,team:[makeChar(select.value,levelFor(select.value)),makeChar('zoro',50)],items:{carne:3},berries:1000};startBattle([makeChar('kaido',100)],{wild:true});pauseBattle();document.querySelector('.review-controls').style.display='none';
+ const dock=document.createElement('div');dock.className='review-dock';dock.style='position:fixed;bottom:0;right:0;z-index:999;display:flex;gap:4px';
+ dock.innerHTML='<button class="btn small" id="qa-ultimate">Ultimate real</button><button class="btn small" id="qa-study">Estudio</button>';document.body.appendChild(dock);
+ dock.querySelector('#qa-ultimate').onclick=()=>{if(battle&&!battle.over){battle.curP.ultCharge=100;useUltimate(battle.curP);}};
+ dock.querySelector('#qa-study').onclick=single;
+};
 document.querySelector('#review-fire').onclick=()=>{if(battle&&!battle.over){battle.curP.ultCharge=100;useUltimate(battle.curP);}};
 document.querySelector('#review-gallery').onclick=()=>{stopReview();render('<div class="review-grid">'+['zoro2','law','kuma','aokiji','teach','marco','doflamingo','sanji','kaido','katakuri','robin','hancock'].map(stageHTML).join('')+'</div>');drawReview();};
-document.querySelector('#review-benchmark').onclick=()=>{
+document.querySelector('#review-benchmark').onclick=async()=>{
  stopReview();render(stageHTML(select.value));const c=document.querySelector('canvas');c.width=585;c.height=240;const ctx=c.getContext('2d'),all=Object.keys(CHARS).map(spec),times=[];
- for(const p of all){const start=performance.now();for(const t of [.12,.3,.58,.84])UltimateFX.drawFrame(ctx,p,t,{width:c.width,height:c.height});times.push((performance.now()-start)/4);}
+ for(const p of all){const sprite=await UltimateFX.loadSprite(p.id);const start=performance.now();for(const t of [.12,.3,.58,.84])UltimateFX.drawFrame(ctx,p,t,{width:c.width,height:c.height,sprite});times.push((performance.now()-start)/4);}
  times.sort((a,b)=>a-b);document.querySelector('#review-info').textContent=JSON.stringify({characters:all.length,frames:all.length*4,p95ms:+times[Math.floor(times.length*.95)].toFixed(2),worstMs:+times.at(-1).toFixed(2)});drawReview();
 };
 addEventListener('resize',drawReview);single();
+if(new URLSearchParams(location.search).has('device')){
+ stopReview();const dimensions=new URLSearchParams(location.search).get('device').split(',').map(Number);
+ document.body.innerHTML='<iframe title="Juego móvil" src="/review" style="display:block;border:0;margin:0 auto;width:'+dimensions[0]+'px;height:'+dimensions[1]+'px"></iframe>';
+}
+
 </script></body></html>

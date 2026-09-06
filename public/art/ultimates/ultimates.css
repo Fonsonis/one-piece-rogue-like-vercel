@@ -1,6 +1,6 @@
-/* Effects occupy only the visible sprite stage. Controls and layout never move. */
+/* The scene may cross fighter cells, bounded by the viewport. No layout or input changes. */
 .ultimate-scene { position:fixed; overflow:hidden; pointer-events:none!important; z-index:900; contain:strict; isolation:isolate; }
-.ultimate-scene canvas { position:absolute; inset:0; display:block; width:100%; height:100%; }
+.ultimate-scene canvas { position:absolute; inset:0; display:block; width:100%; height:100%; image-rendering:pixelated; }
 .ultimate-technique { position:absolute; top:3px; left:5%; width:90%; box-sizing:border-box; padding:6px 10px; color:#fff4dc; background:linear-gradient(105deg,transparent,#152032ed 13%,#152032ed 87%,transparent); border-block:1px solid var(--ultimate-color); text-align:center; text-shadow:1px 2px #000; }
 .ultimate-technique span { display:block; color:var(--ultimate-color); font:600 10px/1.3 system-ui,sans-serif; }
 .ultimate-technique strong { display:block; font:700 clamp(7px,1.6vw,11px)/1.6 'Press Start 2P',monospace; overflow-wrap:anywhere; }

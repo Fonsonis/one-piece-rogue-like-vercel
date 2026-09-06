@@ -87,6 +87,8 @@
 
   function presentAttack(attacker, defender, move, oldHP, oldSelfHP, oldTeamHP, ultimate) {
     if (!move) return;
+    // The ultimate renderer owns both sprites; avoid simultaneous basic poses/bursts.
+    if (ultimate && globalThis.UltimateFX?.handlesSprites) return;
     const source = cardFor(attacker);
     const target = cardFor(defender);
     const speed = Math.max(1, Number(battle?.speed) || 1);

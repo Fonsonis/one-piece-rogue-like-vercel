@@ -3,8 +3,10 @@
   'use strict';
   const originalUltimate=useUltimate,originalSheet=showCharModal;
   const safe=fn=>{try{return fn();}catch{return null;}};
-  function profileFor(f) {
-    return UltimateArtProfiles.resolve(f.id,CHARS[f.id],getUltimateMove(f),baseFormOf(f.id));
+  function profileFor(f,preview=false) {
+    const form=preview&&baseFormOf(f.id)==='luffy'?{...f,lvl:(CHARS[f.id].evo?.lvl||101)-1}:f;
+    const move=getUltimateMove(form);
+    return UltimateArtProfiles.resolve(f.id,CHARS[f.id],move,baseFormOf(f.id));
   }
   function stageFor(b,f) {
     const side=b.pTeam.includes(f)?'p':'e',team=side==='p'?b.pTeam:b.eTeam;
@@ -33,7 +35,7 @@
       const f={id,lvl:typeof fOrId==='object'?fOrId.lvl:startLvlOf(fOrId)};
       const button=document.createElement('button');button.type='button';button.className='ultimate-preview-button';
       button.textContent='✦ Ver ultimate';button.setAttribute('aria-label',`Ver ultimate de ${CHARS[id].name}`);
-      button.onclick=()=>safe(()=>UltimateFX.play({profile:profileFor(f),source:stage,owner:hero,preview:true}));
+      button.onclick=()=>safe(()=>UltimateFX.play({profile:profileFor(f,true),source:stage,owner:hero,preview:true}));
       hero.appendChild(button);
     });
     return result;

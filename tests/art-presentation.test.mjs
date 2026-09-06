@@ -145,3 +145,16 @@ test('atlas poses change in whole cells while movement remains independently ani
  for(const frames of poses)for(const frame of frames){assert.equal(frame.easing,'steps(1,end)');assert.equal('transform' in frame,false);}
  assert.ok(h.stats().animationFrames.some(frames=>frames.some(f=>'transform' in f)&&frames.every(f=>!('backgroundPosition' in f))));
 });
+
+test('sprite ultimates own the choreography while normal attacks retain their animation', () => {
+  const h = harness(true);
+  h.ctx.UltimateFX = {handlesSprites:true};
+  vm.runInContext(`
+    run={mode:'classic',saga:0,team:[makeChar('sanji',35)],items:{}};
+    startBattle([makeChar('kaido',100,true)],{wild:true});
+    run.team[0].ultCharge=100;useUltimate(run.team[0]);
+  `, h.ctx);
+  assert.equal(h.stats().animations,0,'No simultaneous basic motion or detached burst');
+  vm.runInContext(`attackWith(run.team[0],battle.curE,MOVES.punetazo);`,h.ctx);
+  assert.ok(h.stats().animations>0,'Ordinary attacks still animate');
+});

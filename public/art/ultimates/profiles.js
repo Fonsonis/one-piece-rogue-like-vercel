@@ -170,11 +170,25 @@
   group('jango','portal','hypnosis',{color:'#dfb3e4'});
   const typeFamily={Golpe:'impact',Corte:'slash',Disparo:'shot',Fuego:'flame',Rayo:'lightning',Hielo:'ice',Agua:'water',Tierra:'quake',Viento:'wind',Veneno:'poison',Oscuridad:'dark',Haki:'impact',Fruta:'impact'};
   const hash = text => {let h=2166136261;for(const ch of text){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return h>>>0;};
+  function spriteMotion(family,motif) {
+    if(motif==='kick')return 'kick';
+    if(family==='rubber')return ({gatling:'barrage',jet:'jet',giant:'heavy',kong:'bound'})[motif]||'barrage';
+    if(family==='sun')return 'dawn';
+    if(family==='slash')return 'sword';
+    if(['shot','laser'].includes(family))return 'ranged';
+    if(['room','portal'].includes(family))return 'blink';
+    if(family==='phoenix'||['wings','harpy','butterfly'].includes(motif))return 'flight';
+    if(['beast','electricBeast'].includes(family))return 'pounce';
+    if(['quake','metal','dragon'].includes(family)||['giant','buddha','serious'].includes(motif))return 'heavy';
+    if(['impact','mochi','water'].includes(family))return 'strike';
+    return 'cast';
+  }
   function resolve(id, character, move, baseId=id) {
     const rule=overrides[id] || overrides[baseId];
     const family=rule?.family || typeFamily[move?.type] || typeFamily[character?.types?.[0]] || 'impact';
     const seed=hash(id+':'+(move?.name||'')), palette=styles[family];
     return Object.freeze({id,family,motif:rule?.motif || 'technique',
+      motion:spriteMotion(family,rule?.motif),
       color:rule?.color||palette[0],accent:rule?.accent||palette[1],
       count:rule?.count||3+seed%4,seed,angle:(seed%41-20)*Math.PI/180,
       name:character?.name||id,technique:move?.name||'Definitiva',

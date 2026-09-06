@@ -1,30 +1,31 @@
-# Animaciones de ultimates
+# Ultimates con el sprite del personaje
 
-Capa de presentación para los 460 personajes actuales. Cada entrada tiene una dirección visual explícita y una variación determinista de trayectoria, partículas y ritmo; 41 familias comparten material y formas para mantener una descarga pequeña. Son efectos Canvas en tiempo real, no 460 vídeos ni nuevos atlas. Los personajes con técnicas genéricas conservan el nombre y las reglas de su técnica del juego; la imagen se inspira en su arma, fruta o estilo de lucha. Las escenas son interpretaciones estilizadas, no reproducciones plano por plano del anime.
+Presentación para los 460 personajes: retrato con fondo y nombre de la técnica, seguido de una coreografía del atlas real. El corte, fuego, arma o puño son los dibujados en el PNG de ese personaje. El renderizador ya no construye puños, haces, aros ni partículas geométricas superpuestas.
 
-## Aspecto y uso
+## Animación
 
-- Entrada breve con el retrato existente y el nombre real de la técnica.
-- Preparación, proyección, impacto y disipación. Si el ataque falla, no se reproduce el remate de impacto ni la petrificación.
-- Motivos específicos: tres espadas/Ashura, ROOM y Gamma Knife, huella de Kuma, cristales de Ice Age, oscuridad de Teach, alas de Marco, hilos de Doflamingo, patada ígnea de Sanji, magma, mochi, fantasmas, música, barreras, raíces, etc. Las cinco formas de Luffy tienen efectos distintos que usan sus atlas actuales.
-- Botón **Ver ultimate** en las fichas, junto a **Ver ataque**, sin consumir carga ni ejecutar daño.
-- La animación no pausa la partida. Respeta la velocidad y el movimiento reducido del sistema; no mueve la cámara ni hace destellos a pantalla completa.
+Se reutilizan las cuatro poses existentes (guardia, preparación, ataque y recuperación). No se han dibujado 460 atlas nuevos. La secuencia añade desplazamiento, impulso, recuperación y, según el estilo, repeticiones o estelas de las propias poses. Todas las muestras de textura permanecen dentro de una sola celda y se pintan sin suavizado.
 
-## Integración aislada
+Los perfiles seleccionan una coreografía por arma/fruta: espadazo, patada elevada, disparo con retroceso, salto, vuelo, desplazamiento de Law, golpe pesado o canalización. Las cinco formas de Luffy tienen secuencias distintas: ráfaga, Jet, golpe de Gear 3, rebote de Gear 4 y salto elástico de Gear 5. En Luffy base, Gear 2 y Gear 5 se alarga sólo una franja horizontal del antebrazo del fotograma de ataque; torso y puño conservan sus píxeles. Gear 3 y Gear 4 usan directamente sus puños grandes dibujados.
 
-Sólo se añaden cuatro referencias a `public/play.html`. Todo el código de producción nuevo vive en `public/art/ultimates/`: `profiles.js`, `effects.js`, `integration.js` y `ultimates.css`. No se cambia `data.js`, `game.js`, `visuals.js`, ningún PNG ni las reglas de las transformaciones. El adaptador se carga después de `visuals.js` y encadena la llamada original una sola vez. El otro trabajo de Luffy puede seguir cambiando datos y sprites.
+La ficha mantiene **Ver ultimate** junto a **Ver ataque**. Su previsualización muestra la técnica de la forma representada, incluso si el nivel comprado desbloquearía otro Gear. En combate se usa siempre la técnica que ha ejecutado el motor. La reacción del enemigo usa su pose de daño sólo si pierde PS.
 
-El efecto sólo se dibuja en la unión visible de los escenarios de los luchadores; no ocupa los controles. Usa `pointer-events:none`, un máximo de dos escenas, 40 actualizaciones por segundo, resolución acotada y cancelación al desconectar el escenario, cambiar de combate, ocultar la pestaña o agotar el tiempo de vida. En fichas, la escena se queda dentro de la superposición correspondiente. No usa el generador aleatorio del juego, almacenamiento ni red salvo para leer el retrato local ya existente.
+## Integración
+
+`integration.js` captura el resultado y llama al motor una sola vez. `visuals.js` cede las ultimates al nuevo renderizador para no duplicar el movimiento básico ni los destellos; los ataques normales conservan su presentación. No se modifican datos de combate, daño, estados, carga, reglas de evolución ni guardados.
+
+El atlas se carga antes de ocultar el sprite original. Durante la escena se dibuja su sustituto con la orientación del bando. Al terminar, fallar, cerrar una ficha o cambiar de pantalla se restaura la visibilidad original. Se contabilizan las escenas que comparten un sprite para evitar restauraciones prematuras. La caché conserva como máximo 32 atlas; las imágenes sólo se solicitan desde los recursos locales del juego.
+
+La escena puede salir de las celdas: calcula el espacio de ambos sprites, añade margen y lo limita al viewport. El escalado es uniforme y los controles conservan sus posiciones y clics (`pointer-events:none`). Hasta dos escenas simultáneas, 40 actualizaciones/s y lienzo máximo de 1600×900. Respeta la velocidad de combate, movimiento reducido (pose estática), ocultación de pestaña y cancelación. No usa el RNG del juego, almacenamiento ni servicios externos.
 
 ## Verificación
 
-`node --test tests/ultimate-effects.test.mjs tests/art-presentation.test.mjs`
+`npm test` y `npm run lint`.
 
-- Todos los perfiles se dibujan sin valores inválidos en 260×80, 350×180 y 1200×350, ambos sentidos y cuatro momentos de la secuencia.
-- Comparación del motor con y sin efectos para todos los personajes: mismos PS, estados, carga y llamadas al generador aleatorio. También se comprueba el fallo del renderizador.
-- Límites de escenas, limpieza de lienzos/temporizadores, ataques bloqueados, fallos, movimiento reducido y abandono de pantalla.
-- El adaptador de sprites existente conserva 2254 escenarios idénticos.
-- Navegador: combate real y ficha, 390×844 y 320×568; escena visible acotada en 844×390. El tamaño móvil se prueba en un iframe aislado, sin modificar el navegador compartido.
-- Medición local de 1840 fotogramas a 585×240: p95 de las llamadas de dibujo 0,05 ms y peor media por personaje 0,68 ms. Es una medición del ordenador de desarrollo; no certifica el rendimiento de todos los móviles ni mide el tiempo final de GPU.
+- Cobertura de los 460 perfiles en ambos sentidos, cuatro momentos y tres tamaños de lienzo.
+- Equivalencia del motor con y sin ultimates visuales, incluidos fallos del renderizador.
+- Muestreo dentro de una única celda, ausencia de efectos geométricos y coreografías distintas para los cinco Gears.
+- Restauración de sprites, cancelación antes y después de cargar, límites de escenas, temporizadores, movimiento reducido y Canvas no disponible.
+- Los ataques normales siguen animándose; las ultimates no disparan simultáneamente la presentación anterior.
 
-Las páginas `tests/fixtures/ultimate-review.html` y `ultimate-device-review.html` son herramientas locales, fuera de `public` y del despliegue. Permiten seleccionar cualquier personaje, mover el fotograma, comparar doce escenas, reproducir, abrir una ficha real, lanzar un combate y medir el renderizado. El catálogo de dirección visual está en `ultimate-catalog.json`.
+`tests/fixtures/ultimate-review.html` es una herramienta local, fuera del despliegue: selector de personaje, fotograma fijo, galería, ficha, combate y medición de dibujo. `?device=320,568` abre un iframe de prueba aislado; también admite 390×844 y 844×390. El catálogo de formas y coreografías está en `ultimate-catalog.json`.
