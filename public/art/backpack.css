@@ -64,3 +64,6 @@ html[data-theme="dark"] .bag-continuation { background:repeating-linear-gradient
   .backpack-combat .bag-part { font-size:9px; }
   #app .battle-lower-panels .battle-log { font-size:11px; }
 }
+
+.backpacks { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
+@media(max-width:700px) { .backpacks { grid-template-columns:minmax(0,1fr); } }

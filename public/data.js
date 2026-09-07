@@ -669,6 +669,8 @@ const ITEMS = {
   carnereal:    { slotSize: 2, stackLimit: 1, name: 'Carne Real',         emoji: '🍗', desc: 'Restaura 80 PS.', price: 250, kind: 'heal', val: 80 },
   bocadillo:    { slotSize: 3, stackLimit: 1, name: 'Plato de Sanji',     emoji: '🍱', desc: 'Restaura todos los PS.', price: 500, kind: 'heal', val: 9999 },
   sake:         { slotSize: 4, stackLimit: 1, name: 'Sake de Binks',      emoji: '🍶', desc: 'Revive a un nakama con la mitad de PS.', price: 400, kind: 'revive', val: 0.5 },
+  bebida_ataque: { slotSize: 2, stackLimit: 1, name: 'Bebida de Ataque', emoji: '🥤', desc: '+25% de ataque físico y especial al nakama activo hasta el final del combate. No se acumula.', price: 200, kind: 'battleBoost', stat: 'atk', val: 0.25 },
+  bebida_defensa: { slotSize: 2, stackLimit: 1, name: 'Bebida de Defensa', emoji: '🧃', desc: '+25% de defensa física y especial al nakama activo hasta el final del combate. No se acumula.', price: 200, kind: 'battleBoost', stat: 'def', val: 0.25 },
   cartel:       { slotSize: 1, stackLimit: 10, name: 'Cartel de Recluta',  emoji: '📜', desc: 'Al tentar la suerte, rompe 1 cadena garantizada.', price: 150, kind: 'ball', val: 1 },
   carteldorado: { slotSize: 1, stackLimit: 10, name: 'Cartel Dorado',      emoji: '🏅', desc: 'Al tentar la suerte, rompe 2 cadenas garantizadas.', price: 350, kind: 'ball', val: 2 },
   cartelbuster: { slotSize: 1, stackLimit: 10, name: 'Buster Call',        emoji: '📯', desc: 'Rompe las 3 cadenas: reclutamiento garantizado.', price: 800, kind: 'ball', val: 3.5 },
