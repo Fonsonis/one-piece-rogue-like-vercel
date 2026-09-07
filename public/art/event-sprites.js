@@ -4,14 +4,17 @@
     ['🍖'],['🍗'],['🍱','🍽️','🥪'],['🍶'],['📜','📃'],['🏅'],
     ['📯'],['🥤'],['🛡️','🛡'],['🍈','🍇'],['🎁','🧰'],['⛺','🏕️'],
     ['⚔️','⚔'],['🏴‍☠️'],['💀','☠️'],['🏪','🛒'],['❓','❔','🎲'],['🌟','🎰'],
-    ['🧭','🎯','📍'],['⛵','🚢','🛳️','⚓'],['🎒','📦'],['💰','🪙'],['⭐','🏆','✨','🌠'],['🔒','🔐'],
+    ['🧭','🎯','📍'],['⛵','🚢','🛳️','⚓'],['🎒','📦'],['💰','🪙'],['🏆','✨','🌠'],['🔒','🔐'],
     ['🔥'],['❄️','🧊'],['☣️','🧪','🐍'],['💨','🌪️','🐌'],['🌊','💧','♨️'],['⚡'],
     ['🌑','🌌'],['👊','💪','🥊'],['🔫','💥'],['🗡️'],['❤️','💚','💖','💕','💗','♥️','💊'],['🌀','🌈']
   ];
   const labels = ['Carne','Carne real','Comida','Sake','Cartel','Cartel dorado','Buster Call','Proteína','Defensa','Fruta del Diablo','Tesoro','Campamento','Combate','Pirata','Jefe','Tienda','Misterio','Pirata especial','Log Pose','Viaje','Mochila','Berries','Estrella','Bloqueado','Fuego','Hielo','Veneno','Viento','Agua','Rayo','Oscuridad','Golpe','Disparo','Corte','Curación','Portal'];
-  const uiGroups = [['💾'],['⚙️','⚙'],['ℹ️','ⓘ'],['🔎','🔍'],['📂','📁'],['🗑️'],['👥','👤','🤝'],['🌍','🌎','🌏','🌐'],['🧢'],['🗼','🏰'],['📋','📖','📚'],['📊','📈'],['⛓️','🔗'],['⛓️‍💥'],['🕸️'],['🥋','👴'],['🧑‍🌾'],['🏝️','🏝','🏖️'],['★'],['➕'],['✅','✔️'],['❌','🚫','⛔'],['🔄','🔁'],['⬆️','🔼'],['🎲'],['⚠️','🚨','❗'],['⏳','⏱️','⏰'],['💔'],['🩹','🏥'],['👑'],['🎵','🎶'],['🔊','🔉'],['🔇'],['🏃','🏃‍♂️','👟'],['🎮','🕹️'],['🦴']];
+  const uiGroups = [['💾'],['⚙️','⚙'],['ℹ️','ⓘ'],['🔎','🔍'],['📂','📁'],['🗑️'],['👥','👤','🤝'],['🌍','🌎','🌏','🌐'],['🧢'],['🗼','🏰'],['📋','📖','📚'],['📊','📈'],['⛓️','🔗'],['⛓️‍💥'],['🕸️'],['🥋','👴'],['🧑‍🌾'],['🏝️','🏝','🏖️'],[],['➕'],['✅','✔️'],['❌','🚫','⛔'],['🔄','🔁'],['⬆️','🔼'],['🎲'],['⚠️','🚨','❗'],['⏳','⏱️','⏰'],['💔'],['🩹','🏥'],['👑'],['🎵','🎶'],['🔊','🔉'],['🔇'],['🏃','🏃‍♂️','👟'],['🎮','🕹️'],['🦴']];
   labels.push('Guardar','Ajustes','Información','Buscar','Equipo guardado','Eliminar','Tripulación','Mundo','Marine','Torre','Registro','Estadísticas','Cadena','Cadena rota','Trampa','Entrenamiento','Aldeano','Isla','Estrella','Añadir','Confirmado','Cancelar','Cambiar','Mejorar','Azar','Aviso','Tiempo','Derrota','Curar','Corona','Música','Sonido','Silencio','Correr','Juego','Huesos');
+  // Keep the original star glyphs for character rarity, fusion and their labels.
   const icons = new Map([...groups,...uiGroups].flatMap((list,index) => list.map(symbol => [symbol,index])));
+  const difficultyIcons = new Set(DIFFICULTIES.map(d => d.emoji));
+  const difficultyContext = '.diff-dropdown-trigger,.diff-dropdown-item,.world-difficulties,.world-mode-progress,.native-difficulty';
   const pattern = new RegExp([...icons.keys()].sort((a,b)=>b.length-a.length).map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),'gu');
   function paint(root) {
     if (!root || root.closest?.('script,style,textarea,select,.event-sprite,.dex-sprite')) return;
@@ -22,7 +25,8 @@
     for(const text of nodes) {
       if(text.parentElement?.closest('script,style,textarea,select,.event-sprite,.dex-sprite')) continue;
       const value=text.textContent; pattern.lastIndex=0;
-      const matches=[...value.matchAll(pattern)]; if(!matches.length)continue;
+      const nativeDifficulty = text.parentElement?.closest(difficultyContext);
+      const matches=[...value.matchAll(pattern)].filter(match => !nativeDifficulty || !difficultyIcons.has(match[0])); if(!matches.length)continue;
       const fragment=document.createDocumentFragment();let offset=0;
       for(const match of matches){
         fragment.append(value.slice(offset,match.index));
