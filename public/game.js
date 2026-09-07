@@ -3770,7 +3770,7 @@ function useItemFromMap(id) {
               <div class="info">
                 <b>${charName(f)}</b> <small>(Nv.${f.lvl})</small><br>
                 ${typeBadges(fTypes)}
-    ${isLive ? xpBarHTML(f) : ''}
+                ${xpBarHTML(f)}
               </div>
               <div style="font-size:16px;">${isSel ? '✅' : '⚪'}</div>
             </div>`;
@@ -6205,6 +6205,11 @@ function encounterBerries(opts, sagaIdx, islandIdx) {
   return Math.floor(base * (islandIdx + 1) * (1 + sagaIdx * .25));
 }
 
+function bossFameReward(diff = 1) {
+  const difficulty = DIFFICULTIES.find(d => d.id === diff) || DIFFICULTIES[0];
+  return Math.round(40 * difficulty.mult);
+}
+
 function endBattle(victory, fled, recruited) {
   if (battle && battle.tower) { battle = null; return endTowerBattle(victory); }
   const opts = battle ? battle.opts : {};
@@ -6245,7 +6250,9 @@ function endBattle(victory, fled, recruited) {
     if (newVets.length > 0) {
       toast(`🎉 ¡${newVets.map(id => CHARS[id] ? CHARS[id].name : id).join(', ')} desbloqueado/s para tu plantilla permanente!`);
     }
-    gainFame(20);
+    const bossFame = bossFameReward(run.diff);
+    gainFame(bossFame);
+    toast(`🏅 Jefe derrotado: +${bossFame} ⭐ Fama`);
     const saga = SAGAS[run.saga];
     // Al vencer al jefe de la isla (en modo Clásico), toda la banda (incluyendo caídos) se recupera al 100% de PS
     run.team.forEach(f => { f.hp = f.maxhp; });
@@ -6263,7 +6270,7 @@ function endBattle(victory, fled, recruited) {
     if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
     clearRun();
     modalInfo('🏅 ¡Emblema conseguido!',
-      `<div class="reward-list">¡Has completado ${saga.islands[islandIdx].name}!<br>+20 ⭐ Fama<br><br>Desbloqueada: <b>${saga.islands[islandIdx+1].name}</b> 🧭<br>Elige la siguiente isla y prepara tu equipo.${newVets.length ? `<br><br><small>🏅 Nakamas permanentes:<br>${newVets.map(id => `${charIcon(id, 16)} ${CHARS[id].name}`).join(' · ')}</small>` : ''
+      `<div class="reward-list">¡Has completado ${saga.islands[islandIdx].name}!<br>+${bossFame} ⭐ Fama<br><br>Desbloqueada: <b>${saga.islands[islandIdx+1].name}</b> 🧭<br>Elige la siguiente isla y prepara tu equipo.${newVets.length ? `<br><br><small>🏅 Nakamas permanentes:<br>${newVets.map(id => `${charIcon(id, 16)} ${CHARS[id].name}`).join(' · ')}</small>` : ''
       }</div>`,
       () => screenIslands(sagaIdx));
     return;
@@ -6290,7 +6297,7 @@ function offerCrossoverPath(newVets) {
   ov.innerHTML = `<div class="modal">
     <h2>🏅 ¡Último emblema conseguido!</h2>
     <p style="font-size:9px;text-align:center;line-height:1.9;margin-bottom:10px;">
-      Has vencido al último capitán de la saga. +20 ⭐ Fama<br>
+      Has vencido al último capitán de la saga. +${bossFameReward(run.diff)} ⭐ Fama<br>
       ${newVets && newVets.length ? `<small>🏅 Veteranos desbloqueados: ${newVets.map(id => CHARS[id].name).join(' · ')}</small><br>` : ''}
       <br>Pero al recoger el emblema en Dificultad Rey Pirata, el aire vibra... Un <b>camino alternativo</b> 🌀
       aparece donde antes no había salida.<br><br>
@@ -6753,7 +6760,7 @@ function groupUpgradeRoster(ids) {
   })})).filter(g => g.ids.length);
 }
 
-function upgCost(lvl) { return (Math.floor(lvl / 2) + 1) * 30; }
+function upgCost(lvl) { return 30 + lvl * 10; }
 
 function charTotalUpgSpent(id) {
   const u = meta.upgrades[id] || {};
