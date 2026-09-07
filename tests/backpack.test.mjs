@@ -26,6 +26,13 @@ test('nine slots pack ten posters together; large food occupies its full footpri
   assert.equal(h.exec('addBackpackItem(run,"sake")'),true);
   const html = h.exec('backpackHTML(run)');
   assert.equal((html.match(/class="bag-cell /g)||[]).length,9);
+  assert.equal((html.match(/class="bag-icon"/g)||[]).length,5);
+  const pieces = id => [...html.matchAll(new RegExp(`<button[^>]*data-bag-item="${id}"[^>]*>[\\s\\S]*?</button>`, 'g'))].map(m=>m[0]);
+  assert.equal(pieces('carnereal').length,1);
+  assert.match(pieces('carnereal')[0],/grid-column:span 2/);
+  assert.equal((pieces('carnereal').join('').match(/bag-occupied/g)||[]).length,2);
+  assert.equal((pieces('sake').join('').match(/bag-occupied/g)||[]).length,4);
+  assert.equal((pieces('sake').join('').match(/class="bag-icon"/g)||[]).length,1);
   assert.match(html,/×10/);
   assert.match(html,/×2/);
 });

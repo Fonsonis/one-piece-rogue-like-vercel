@@ -13,9 +13,16 @@
 .bag-icon { display:block; font-size:30px; line-height:1; }
 .bag-quantity { position:absolute; right:4px; top:3px; font:800 12px/1 system-ui,sans-serif; }
 .bag-item-name { font:700 11px/1.2 system-ui,sans-serif; text-align:center; overflow-wrap:anywhere; }
-.bag-continuation { background:repeating-linear-gradient(135deg,#d7c5a4,#d7c5a4 7px,#ded0b5 7px,#ded0b5 14px); border-style:dashed; }
+.bag-piece.bag-continuation { background:repeating-linear-gradient(135deg,#d7c5a4,#d7c5a4 7px,#ded0b5 7px,#ded0b5 14px); border-style:dashed; }
 .bag-continuation .bag-icon { opacity:.55; font-size:24px; }
 .bag-part { font:700 11px/1.2 system-ui,sans-serif; }
+.bag-piece { position:relative; min-width:0; padding:0; border:1px solid #baa17b; border-radius:4px; color:#31464c; background:#eddfbf; }
+.bag-piece-cells { display:grid; grid-template-columns:repeat(var(--bag-piece-columns),minmax(0,1fr)); }
+.bag-piece .bag-cell { background:transparent; border:0; border-radius:0; padding:0; }
+.bag-piece .bag-cell + .bag-cell { border-left:1px dashed #927a5866; }
+.bag-piece > .bag-icon,.bag-piece > .bag-link { position:absolute; left:50%; top:45%; transform:translate(-50%,-50%); }
+.bag-piece > .bag-item-name { position:absolute; left:3px; right:3px; bottom:4px; }
+.bag-piece > .bag-link { font:22px/1 system-ui,sans-serif; opacity:.65; }
 .bag-help,.bag-pending p,.bag-item-modal p { font:12px/1.6 system-ui,sans-serif; }
 .bag-pending { border:1px solid var(--gold); padding:10px; margin-top:12px; border-radius:5px; }
 .bag-pending > b { font-size:10px; }
@@ -24,6 +31,13 @@
 .bag-pending-item button { min-height:36px; font-size:8px; padding:6px; background:var(--paper-dark); color:var(--ink); border:1px solid #9f8057; border-radius:3px; }
 .bag-pending-item button:disabled { opacity:.45; }
 .bag-item-modal .actions { flex-wrap:wrap; }
+.bag-auto-settings { display:grid; gap:8px; margin:16px 0; padding:12px; border:1px solid #9f8057; border-radius:5px; min-width:0; }
+.bag-auto-settings legend { font-size:9px; line-height:1.5; padding:0 5px; }
+.bag-auto-settings label,.bag-auto-settings > span { font:600 12px/1.5 system-ui,sans-serif; }
+.bag-auto-settings label:has(input) { display:flex; align-items:center; gap:8px; min-height:32px; }
+.bag-auto-settings input { width:18px; height:18px; flex:none; accent-color:#b68a40; }
+.bag-auto-settings select { width:100%; min-height:38px; font:12px/1.5 system-ui,sans-serif; padding:6px; }
+.bag-auto-settings p { font:12px/1.5 system-ui,sans-serif; margin:0; opacity:.8; }
 #app .battle-lower-panels { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; flex:none; min-height:220px; margin:8px 0; }
 .battle-log-panel,#battle-backpack { min-width:0; background:var(--paper); border:1px solid #79939c; border-radius:6px; padding:10px; }
 .battle-log-panel { display:flex; flex-direction:column; }

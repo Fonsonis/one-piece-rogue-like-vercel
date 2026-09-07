@@ -106,7 +106,6 @@ let autoMode = false;
 let autoTimer = null;
 let autoSettings = {
   speed: 'x2', // 'x1' (normal, mitad) o 'x2' (rápida, actual)
-  healThreshold: 50, // 0 = desactivo, 25, 50, 75, 99
   nodePriority: 'random', // 'random', 'item', 'battle', 'rest'
   wildAction: 'fight', // 'fight', 'recruit', 'chains'
   shopItems: [
@@ -136,52 +135,61 @@ function scheduleAutoStep(fn, ms = 700) {
   }, ms * mult);
 }
 
-function runAutoItems() {
-  if (!autoMode || !autoSettings.healThreshold) return;
+function autoBackpackSettings() {
+  const saved = meta.settings?.autoBackpack || {};
+  return {
+    enabled: saved.enabled === true,
+    threshold: [25,50,75,99].includes(saved.threshold) ? saved.threshold : 50,
+    where: ['map','combat','both'].includes(saved.where) ? saved.where : 'both',
+    items: {carne:saved.items?.carne !== false, carnereal:saved.items?.carnereal !== false,
+      bocadillo:saved.items?.bocadillo === true, sake:saved.items?.sake === true}
+  };
+}
+function setAutoBackpackSettings(change) {
+  const current = autoBackpackSettings();
+  meta.settings ||= {};
+  meta.settings.autoBackpack = {...current,...change,items:{...current.items,...change.items}};
+  saveMeta();
+}
+function runAutoItems(refresh = true) {
+  const config = autoBackpackSettings();
+  if (!config.enabled) return false;
   const isCombat = typeof battle !== 'undefined' && battle && !battle.over;
-  const targetRun = isCombat ? { items: battle.items, team: battle.pTeam } : run;
-  if (!targetRun || !targetRun.items || !targetRun.team) return;
-  const isNuz = typeof run !== 'undefined' && run && run.mode === 'nuzlocke';
-  const thresh = autoSettings.healThreshold;
-
-  if (!isNuz && (targetRun.items.sake || 0) > 0) {
-    const dead = targetRun.team.find(f => f.hp <= 0);
-    if (dead) {
-      targetRun.items.sake--;
-      dead.hp = Math.floor(dead.maxhp * 0.5);
-      const msg = `🤖 Auto: ${charName(dead)} revivido con Sake 🍶`;
-      if (isCombat) log(msg); else toast(msg);
+  if (isCombat && battle.waiting) return false;
+  if ((isCombat && config.where === 'map') || (!isCombat && config.where === 'combat')) return false;
+  const owner = isCombat && battle.tower ? tower : run;
+  const team = isCombat ? battle.pTeam : owner?.team;
+  if (!owner?.items || !team) return false;
+  const isNuz = !(isCombat && battle.tower) && owner.mode === 'nuzlocke';
+  let changed = false, revived = null;
+  const consume = (id, fighter) => {
+    owner.items[id]--;
+    changed = true;
+    const message = `🎒 Auto: ${ITEMS[id].name} para ${charName(fighter)}.`;
+    if (isCombat) log(message); else toast(message);
+  };
+  if (config.items.sake && !isNuz && (owner.items.sake || 0) > 0) {
+    revived = team.find(f => f.hp <= 0);
+    if (revived) {
+      revived.hp = Math.max(1,Math.floor(revived.maxhp * ITEMS.sake.val));
+      consume('sake',revived);
     }
   }
-  for (const f of targetRun.team) {
-    if (f.hp > 0) {
-      const pct = (f.hp / f.maxhp) * 100;
-      if (pct <= thresh) {
-        if ((targetRun.items.carnereal || 0) > 0 && f.hp < f.maxhp * 0.5) {
-          targetRun.items.carnereal--;
-          f.hp = f.maxhp;
-          const msg = `🤖 Auto: Carne Real usada en ${charName(f)} 🥩`;
-          if (isCombat) log(msg); else toast(msg);
-        } else if ((targetRun.items.carne || 0) > 0) {
-          targetRun.items.carne--;
-          f.hp = Math.min(f.maxhp, f.hp + 40);
-          const msg = `🤖 Auto: Carne usada en ${charName(f)} 🍖`;
-          if (isCombat) log(msg); else toast(msg);
-        } else if ((targetRun.items.bocadillo || 0) > 0) {
-          targetRun.items.bocadillo--;
-          f.hp = Math.min(f.maxhp, f.hp + 25);
-          const msg = `🤖 Auto: Bocadillo usado en ${charName(f)} 🥪`;
-          if (isCombat) log(msg); else toast(msg);
-        }
-      }
-    }
+  for (const fighter of team) {
+    if (fighter === revived || fighter.hp <= 0 || fighter.hp >= fighter.maxhp ||
+        (config.threshold !== 99 && fighter.hp / fighter.maxhp * 100 > config.threshold)) continue;
+    const healing = ['carne','carnereal','bocadillo'].filter(id=>config.items[id] && owner.items[id] > 0)
+      .sort((a,b)=>ITEMS[a].val-ITEMS[b].val);
+    const missing = fighter.maxhp-fighter.hp;
+    const id = healing.find(id=>ITEMS[id].val >= missing) || healing.at(-1);
+    if (!id) continue;
+    fighter.hp = Math.min(fighter.maxhp,fighter.hp + ITEMS[id].val);
+    consume(id,fighter);
   }
-  if (isCombat) {
-    refreshHPCards();
-    refreshControls();
-  } else if (typeof saveRun === 'function') {
-    saveRun();
-  }
+  if (!changed) return false;
+  if (owner === run) saveRun();
+  if (isCombat && refresh) { refreshHPCards(); refreshControls(); }
+  return true;
 }
 
 function pickAutoNode(reach) {
@@ -228,11 +236,11 @@ function showAutoSettingsModal() {
         </label>
         <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Usar objetos de curación o Sake cuando el PS baje de:</div>
         <select id="auto-heal-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-          <option value="0" ${autoSettings.healThreshold === 0 ? 'selected' : ''}>❌ Desactivado (no usar objetos)</option>
-          <option value="25" ${autoSettings.healThreshold === 25 ? 'selected' : ''}>❤️ Crítico: Menos del 25% de PS</option>
-          <option value="50" ${autoSettings.healThreshold === 50 ? 'selected' : ''}>🧡 Medio: Menos del 50% de PS</option>
-          <option value="75" ${autoSettings.healThreshold === 75 ? 'selected' : ''}>💛 Leve: Menos del 75% de PS</option>
-          <option value="99" ${autoSettings.healThreshold === 99 ? 'selected' : ''}>💚 Cualquier daño recibido (<100% PS)</option>
+          <option value="0" ${!autoBackpackSettings().enabled ? 'selected' : ''}>❌ Desactivado (no usar objetos)</option>
+          <option value="25" ${autoBackpackSettings().enabled && autoBackpackSettings().threshold === 25 ? 'selected' : ''}>❤️ Crítico: Menos del 25% de PS</option>
+          <option value="50" ${autoBackpackSettings().enabled && autoBackpackSettings().threshold === 50 ? 'selected' : ''}>🧡 Medio: Menos del 50% de PS</option>
+          <option value="75" ${autoBackpackSettings().enabled && autoBackpackSettings().threshold === 75 ? 'selected' : ''}>💛 Leve: Menos del 75% de PS</option>
+          <option value="99" ${autoBackpackSettings().enabled && autoBackpackSettings().threshold === 99 ? 'selected' : ''}>💚 Cualquier daño recibido (<100% PS)</option>
         </select>
       </div>
 
@@ -306,7 +314,8 @@ function showAutoSettingsModal() {
 
   const saveFormSettings = () => {
     autoSettings.speed = ov.querySelector('#auto-speed-sel').value;
-    autoSettings.healThreshold = +ov.querySelector('#auto-heal-sel').value;
+    const threshold = +ov.querySelector('#auto-heal-sel').value;
+    setAutoBackpackSettings({enabled:threshold > 0, ...(threshold ? {threshold} : {})});
     autoSettings.nodePriority = ov.querySelector('#auto-node-sel').value;
     autoSettings.wildAction = ov.querySelector('#auto-wild-sel').value;
     autoSettings.shopItems = [0, 1, 2].map(idx => ({
@@ -1001,7 +1010,7 @@ function showSettingsModal() {
   meta.settings = meta.settings || { showEventConfirm: true, customSounds: false };
 
   const existing = document.querySelector('#settings-modal-overlay');
-  if (existing) existing.remove();
+  if (existing) return;
 
   const ov = document.createElement('div');
   ov.id = 'settings-modal-overlay';
@@ -1009,6 +1018,12 @@ function showSettingsModal() {
 
   const showConfirm = meta.settings.showEventConfirm !== false;
   const customSounds = !!meta.settings.customSounds;
+  const bagAuto = autoBackpackSettings();
+  const settingsBattle = battle && !battle.over ? battle : null;
+  const wasWaiting = settingsBattle?.waiting;
+  const settingsRun = run;
+  const onMap = !!document.getElementById?.('island-carousel');
+  if (settingsBattle) pauseBattle();
 
   ov.innerHTML = `
     <div class="modal" style="max-width:440px;width:90%;">
@@ -1019,6 +1034,18 @@ function showSettingsModal() {
         ${mobileColumnsControl()}
         <p>El aspecto y las columnas se guardan en este dispositivo.</p>
       </div>
+      <fieldset class="bag-auto-settings">
+        <legend>🎒 Uso automático de la mochila</legend>
+        <label><input type="checkbox" id="setting-bag-auto" ${bagAuto.enabled ? 'checked' : ''}> Usar objetos automáticamente</label>
+        <p>Funciona aunque el avance automático esté pausado. Se comprueba al volver al mapa y al inicio de cada ronda.</p>
+        <label for="setting-bag-where">Dónde usar objetos</label>
+        <select id="setting-bag-where"><option value="both" ${bagAuto.where === 'both' ? 'selected' : ''}>Isla y combate</option><option value="map" ${bagAuto.where === 'map' ? 'selected' : ''}>Solo en la isla</option><option value="combat" ${bagAuto.where === 'combat' ? 'selected' : ''}>Solo en combate</option></select>
+        <label for="setting-bag-threshold">Curar con estos PS o menos</label>
+        <select id="setting-bag-threshold">${[25,50,75,99].map(n=>`<option value="${n}" ${bagAuto.threshold === n ? 'selected' : ''}>${n === 99 ? 'Cualquier daño' : n + '% de PS'}</option>`).join('')}</select>
+        <span>Objetos permitidos</span>
+        ${['carne','carnereal','bocadillo','sake'].map(id=>`<label><input type="checkbox" data-setting-bag-item="${id}" ${bagAuto.items[id] ? 'checked' : ''}> ${ITEMS[id].emoji} ${ITEMS[id].name}</label>`).join('')}
+        <p>Prioriza la cura más pequeña que cubra el daño. Máximo un objeto por nakama en cada comprobación. El sake revive a un caído y respeta Nuzlocke. Frutas, mejoras y carteles conservan su uso actual.</p>
+      </fieldset>
       <div style="display:flex;flex-direction:column;gap:12px;margin:16px 0;">
         <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.05);padding:10px;border-radius:6px;border:1px solid #ccc;">
           <div style="flex:1;padding-right:10px;">
@@ -1057,6 +1084,13 @@ function showSettingsModal() {
   `;
   document.body.appendChild(ov);
 
+  ov.querySelector('#setting-bag-auto').onchange = e => setAutoBackpackSettings({enabled:e.target.checked});
+  ov.querySelector('#setting-bag-where').onchange = e => setAutoBackpackSettings({where:e.target.value});
+  ov.querySelector('#setting-bag-threshold').onchange = e => setAutoBackpackSettings({threshold:Number(e.target.value)});
+  ov.querySelectorAll('[data-setting-bag-item]').forEach(input => {
+    input.onchange = e => setAutoBackpackSettings({items:{[input.dataset.settingBagItem]:e.target.checked}});
+  });
+
   ov.querySelector('#setting-theme').onchange = e => setDisplayPreference('theme', e.target.value);
 
   ov.querySelector('#chk-music-toggle').onclick = () => {
@@ -1076,8 +1110,15 @@ function showSettingsModal() {
     }
   };
 
-  ov.querySelector('#btn-save-settings').onclick = () => ov.remove();
-  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true; ov.remove();
+    if (settingsBattle && battle === settingsBattle && !battle.over && !wasWaiting) resumeBattle();
+    else if (!settingsBattle && onMap && run === settingsRun) screenMap(2);
+  };
+  ov.querySelector('#btn-save-settings').onclick = close;
+  ov.onclick = e => { if (e.target === ov) close(); };
 }
 
 function showNodeConfirmModal(r, i) {
@@ -3410,14 +3451,19 @@ function backpackHTML(owner, combat = false) {
   const capacity = backpackCapacity(), used = backpackUsed(owner.items);
   let slot = 0;
   const cells = backpackStacks(owner).map(({id,count,size},stack) => {
-    const item = ITEMS[id];
-    return Array.from({length:size}, (_,part) => {
-      slot++;
-      return `<button type="button" class="bag-cell bag-filled ${part ? 'bag-continuation' : ''}" data-bag-item="${id}" data-bag-count="${count}" data-bag-stack="${stack}" title="${item.name} ×${count} · ${size} casilla${size > 1 ? 's' : ''}" aria-label="${item.name} ×${count}, casilla ${part+1} de ${size}">
-        <span class="bag-slot-number">${slot}</span><span class="bag-icon">${item.emoji}</span>
-        ${part ? `<span class="bag-part">${part+1}/${size}</span>` : `<span class="bag-quantity">×${count}</span><span class="bag-item-name">${item.name}</span>`}
-      </button>`;
-    }).join('');
+    const item = ITEMS[id], pieces = [];
+    let part = 0;
+    while (part < size) {
+      const length = Math.min(size-part,3-slot%3);
+      pieces.push({start:slot,length,part}); slot += length; part += length;
+    }
+    // A footprint can wrap to another row, but only one segment carries the icon.
+    const illustrated = pieces.reduce((best,piece)=>piece.length > best.length ? piece : best,pieces[0]);
+    return pieces.map(piece => `<button type="button" class="bag-piece bag-filled ${piece !== illustrated ? 'bag-continuation' : ''}" style="grid-column:span ${piece.length};--bag-piece-columns:${piece.length}" data-bag-item="${id}" data-bag-count="${count}" data-bag-stack="${stack}" title="${item.name} ×${count} · ${size} casilla${size > 1 ? 's' : ''}" aria-label="${item.name} ×${count}, ocupa ${size} casilla${size > 1 ? 's' : ''}">
+      <span class="bag-piece-cells">${Array.from({length:piece.length},(_,i)=>`<span class="bag-cell bag-occupied"><span class="bag-slot-number">${piece.start+i+1}</span></span>`).join('')}</span>
+      ${piece === illustrated ? `<span class="bag-icon">${item.emoji}</span><span class="bag-quantity">×${count}</span>` : '<span class="bag-link" aria-hidden="true">↳</span>'}
+      <span class="bag-item-name">${item.name}${size > 1 ? ` · ${size} casillas` : ''}</span>
+    </button>`).join('');
   }).join('');
   const empty = Array.from({length:Math.max(0,capacity-used)},(_,i)=>`<div class="bag-cell bag-empty" aria-label="Casilla ${used+i+1} libre"><span class="bag-slot-number">${used+i+1}</span><span>＋</span></div>`).join('');
   const pending = Object.entries(owner.pendingLoot || {}).filter(([id,n])=>ITEMS[id] && n>0).map(([id,n])=>`
@@ -3564,6 +3610,7 @@ function startRun(sagaIdx, starterIds, islandIdx = 0) {
 // ============ PANTALLA: MAPA ============
 function screenMap(activePageIdx = 0) {
   playMusic('menu');
+  runAutoItems(false);
   if (run && run.mode === 'nuzlocke' && run.team) {
     run.team = run.team.filter(f => f && f.hp > 0);
   }
@@ -3881,7 +3928,6 @@ function screenMap(activePageIdx = 0) {
   if (toggleAutoBtn) toggleAutoBtn.onclick = showAutoSettingsModal;
 
   if (autoMode && run) {
-    runAutoItems();
     if (reach.length > 0) {
       const target = pickAutoNode(reach);
       if (target) {
@@ -6096,7 +6142,7 @@ function effectiveSpeed(f) {
 function runRound() {
   const b = battle;
   if (!b || b.over || b.waiting) return;
-  if (autoMode) runAutoItems();
+  runAutoItems();
   const p = b.curP, e = b.curE;
   if (!p || !e || p.hp <= 0 || e.hp <= 0) return afterRound();
 
