@@ -15,18 +15,19 @@ test('nine slots pack ten posters together; large food occupies its full footpri
     assert.equal(h.exec(`backpackUsed({cartel:${qty}})`),slots);
   }
   assert.equal(h.exec('backpackUsed({carne:1,carnereal:1,sake:1})'),7);
-  h.exec('run.items={cartel:11,carne:1,carnereal:1,sake:1}');
-  assert.equal(h.exec('backpackUsed(run.items)'),9);
+  h.exec('run.items={cartel:11,carne:3,carnereal:1,sake:1}');
+  assert.equal(h.exec('backpackUsed(run.items,true)'),9);
+  assert.equal(h.exec('backpackUsed(run.items,false)'),2);
   assert.equal(h.exec('addBackpackItem(run,"carne")'),false);
   assert.equal(h.exec('addBackpackItem(run,"cartel")'),true);
   assert.equal(h.exec('run.items.cartel'),12);
-  assert.equal(h.exec('addBackpackItem(run,"carteldorado")'),false);
+  assert.equal(h.exec('backpackFits(run,"carteldorado")'),true);
   h.exec('run.items.sake--');
-  assert.equal(h.exec('backpackUsed(run.items)'),5);
+  assert.equal(h.exec('backpackUsed(run.items,true)'),5);
   assert.equal(h.exec('addBackpackItem(run,"sake")'),true);
   const html = h.exec('backpackHTML(run)');
-  assert.equal((html.match(/class="bag-cell /g)||[]).length,9);
-  assert.equal((html.match(/class="bag-icon"/g)||[]).length,5);
+  assert.equal((html.match(/class="bag-cell /g)||[]).length,18);
+  assert.equal((html.match(/class="bag-icon"/g)||[]).length,7);
   const pieces = id => [...html.matchAll(new RegExp(`<button[^>]*data-bag-item="${id}"[^>]*>[\\s\\S]*?</button>`, 'g'))].map(m=>m[0]);
   assert.equal(pieces('carnereal').length,1);
   assert.match(pieces('carnereal')[0],/grid-column:span 2/);
@@ -63,7 +64,7 @@ test('full bags save pending loot, stop auto travel, and can collect after space
 test('migration and oversized starting provisions preserve every unit without exceeding capacity', () => {
   const h = setup();
   h.exec('delete run.backpackVersion;run.items={cartel:27,carne:4,sake:3,hierro:1};prepareBackpack(run)');
-  assert.ok(h.exec('backpackUsed(run.items)')<=9);
+  assert.ok(h.exec('[false,true].every(combat=>backpackUsed(run.items,combat)<=9)'));
   for (const [id,count] of [['cartel',27],['carne',4],['sake',3],['hierro',1]]) {
     assert.equal(h.exec(`(run.items.${id}||0)+(run.pendingLoot.${id}||0)`),count);
   }
@@ -72,7 +73,7 @@ test('migration and oversized starting provisions preserve every unit without ex
   assert.equal(h.exec('JSON.stringify(run)'),before);
   h.exec('meta.global.food_sake3=true;startRun(0,["luffy"])');
   assert.equal(h.exec('(run.items.sake||0)+(run.pendingLoot.sake||0)'),3);
-  assert.ok(h.exec('backpackUsed(run.items)')<=9);
+  assert.ok(h.exec('[false,true].every(combat=>backpackUsed(run.items,combat)<=9)'));
 });
 
 test('permanent expansion charges 300, 600, 900 Fama and survives a new run and save roundtrip', () => {

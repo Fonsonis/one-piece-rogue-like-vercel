@@ -104,7 +104,7 @@ try {
 
 let autoMode = false;
 let autoTimer = null;
-const PORT_SHOP_STOCK = ['carne','carnereal','bocadillo','sake','cartel','carteldorado','cartelbuster'];
+const PORT_SHOP_STOCK = ['carne','carnereal','bocadillo','sake','bebida_ataque','bebida_defensa','cartel','carteldorado','cartelbuster'];
 const AUTO_ROUTE_KEYS = ['random','wild','marine','item','mystery','shop','rest','special','boss','crossover','battle'];
 const AUTO_DEFAULTS = () => ({
   speed:'x2', healThreshold:50, nodePriority:'random', wildAction:'fight',
@@ -3432,15 +3432,15 @@ function buyBackpackUpgrade() {
   saveMeta();
   return true;
 }
-function backpackUsed(items) {
+function backpackUsed(items, combat = null) {
   return Object.entries(items || {}).reduce((sum, [id, count]) => {
     const item = ITEMS[id];
-    return sum + (item && count > 0 ? Math.ceil(count / item.stackLimit) * item.slotSize : 0);
+    return sum + (item && count > 0 && (combat === null || isBattleItem(id) === combat) ? Math.ceil(count / item.stackLimit) * item.slotSize : 0);
   }, 0);
 }
 function backpackFits(owner, id, count = 1) {
   return !!ITEMS[id] && Number.isInteger(count) && count > 0 &&
-    backpackUsed({...owner.items, [id]:(owner.items[id] || 0) + count}) <= backpackCapacity();
+    backpackUsed({...owner.items, [id]:(owner.items[id] || 0) + count},isBattleItem(id)) <= backpackCapacity();
 }
 function addBackpackItem(owner, id, count = 1) {
   if (!backpackFits(owner, id, count)) return false;
@@ -3459,7 +3459,7 @@ function receiveBackpackItem(owner, id, count = 1) {
   return stored;
 }
 function prepareBackpack(owner) {
-  if (!owner || (owner.backpackVersion === 1 && backpackUsed(owner.items) <= backpackCapacity())) return;
+  if (!owner || (owner.backpackVersion === 1 && [false,true].every(combat=>backpackUsed(owner.items,combat) <= backpackCapacity()))) return;
   const original = owner.items || {};
   owner.items = {};
   owner.pendingLoot ||= {};
@@ -3473,6 +3473,7 @@ function prepareBackpack(owner) {
   owner.backpackVersion = 1;
 }
 function hasPendingLoot(owner) { return Object.values(owner?.pendingLoot || {}).some(n => n > 0); }
+function isBattleItem(id) { return ['heal','revive','battleBoost'].includes(ITEMS[id]?.kind); }
 function backpackStacks(owner) {
   const stacks = [];
   for (const [id,total] of Object.entries(owner.items || {})) {
@@ -3484,10 +3485,13 @@ function backpackStacks(owner) {
   }
   return stacks;
 }
-function backpackHTML(owner, combat = false) {
-  const capacity = backpackCapacity(), used = backpackUsed(owner.items);
+function backpackHTML(owner, combat = false, category = null) {
+  if (!combat && category === null) return `<div class="backpacks">${backpackHTML(owner,false,false)}${backpackHTML(owner,false,true)}</div>`;
+  const battleBag = combat || category === true;
+  const capacity = backpackCapacity(), used = backpackUsed(owner.items,battleBag);
+  const stacks = backpackStacks(owner).filter(({id}) => isBattleItem(id) === battleBag);
   let slot = 0;
-  const cells = backpackStacks(owner).map(({id,count,size},stack) => {
+  const cells = stacks.map(({id,count,size},stack) => {
     const item = ITEMS[id], pieces = [];
     let part = 0;
     while (part < size) {
@@ -3503,15 +3507,15 @@ function backpackHTML(owner, combat = false) {
     </button>`).join('');
   }).join('');
   const empty = Array.from({length:Math.max(0,capacity-used)},(_,i)=>`<div class="bag-cell bag-empty" aria-label="Casilla ${used+i+1} libre"><span class="bag-slot-number">${used+i+1}</span><span>＋</span></div>`).join('');
-  const pending = Object.entries(owner.pendingLoot || {}).filter(([id,n])=>ITEMS[id] && n>0).map(([id,n])=>`
+  const pending = Object.entries(owner.pendingLoot || {}).filter(([id,n])=>ITEMS[id] && n>0 && (isBattleItem(id) === battleBag)).map(([id,n])=>`
     <div class="bag-pending-item"><span>${ITEMS[id].emoji} ${ITEMS[id].name} ×${n}</span>
       <button type="button" data-bag-collect="${id}" ${backpackFits(owner,id) ? '' : 'disabled'}>GUARDAR 1</button>
       <button type="button" data-bag-leave="${id}">DEJAR ×${n}</button></div>`).join('');
   return `<div class="backpack ${combat ? 'backpack-combat' : ''}">
-    <div class="bag-heading"><strong>🎒 MOCHILA</strong><span aria-label="Espacio ocupado">${used}/${capacity} casillas</span></div>
+    <div class="bag-heading"><strong>🎒 ${battleBag ? 'COMBATE' : 'ISLA'}</strong><span aria-label="Espacio ocupado">${used}/${capacity} casillas</span></div>
     <div class="bag-grid">${cells}${empty}</div>
     ${pending ? `<div class="bag-pending"><b>Pendiente de guardar</b><p>Libera espacio o deja estos objetos para continuar.</p>${pending}</div>` : ''}
-    ${combat ? '' : '<p class="bag-help">Toca un objeto para usarlo o liberar espacio. Carteles: hasta 10 por casilla. Amplía tu mochila en la tienda del puerto.</p>'}
+    ${combat ? '' : `<p class="bag-help">${battleBag ? 'Curas, resurrecciones y bebidas de combate.' : 'Carteles, frutas y mejoras para la isla.'} Las dos mochilas tienen su propio espacio y se amplían juntas.</p>`}
   </div>`;
 }
 function saveBackpack(owner) { if (owner === run) saveRun(); }
@@ -3537,16 +3541,16 @@ function bindBackpack(root, owner, combat, refresh) {
   });
 }
 function showBackpackItem(owner, id, count, combat, refresh) {
-  if (!(owner.items[id] > 0)) return;
+  if (!(owner.items[id] > 0) || (combat && !isBattleItem(id))) return;
   const b = combat ? battle : null;
   if (combat && (!b || b.over || b.waiting)) return;
   if (b) pauseBattle();
   const item = ITEMS[id], ov = document.createElement('div');
   ov.className = 'overlay';
-  const usable = combat ? ['heal','revive'].includes(item.kind) : owner === run && item.kind !== 'ball';
+  const usable = combat ? isBattleItem(id) : owner === run && !['ball','battleBoost'].includes(item.kind);
   ov.innerHTML = `<div class="modal bag-item-modal"><h2>${item.emoji} ${item.name}</h2><p>${item.desc}</p>
     <p>${item.slotSize} casilla${item.slotSize > 1 ? 's' : ''}${item.stackLimit > 1 ? ` · Hasta ${item.stackLimit} por pila` : ' por unidad'}</p>
-    ${!usable ? `<p>${item.kind === 'ball' ? 'Se usa en el evento de las cadenas.' : 'Se usa fuera del combate.'}</p>` : ''}
+    ${!usable ? `<p>${item.kind === 'ball' ? 'Se usa en el evento de las cadenas.' : item.kind === 'battleBoost' ? 'Se usa durante el combate.' : 'Se usa fuera del combate.'}</p>` : ''}
     <div class="actions"><button class="btn green" data-bag-use ${usable ? '' : 'disabled'}>USAR</button>
       <button class="btn red" data-bag-discard>DESCARTAR ${count > 1 ? `PILA ×${count}` : '1'}</button>
       <button class="btn gray" data-bag-close>VOLVER</button></div></div>`;
@@ -3994,6 +3998,7 @@ function showItemTargetModal(item, title, renderRow, onSelect) {
 function useItemFromMap(id) {
   const item = ITEMS[id];
   if (!item || !run || !(run.items[id] > 0) || (battle && !battle.over)) return;
+  if (item.kind === 'battleBoost') return toast('Esta bebida se usa durante el combate.');
 
   if (item.kind === 'ball') {
     return toast(`📜 ${item.name}: Se usa automáticamente al intentar reclutar piratas.`);
@@ -5114,7 +5119,7 @@ function screenShop() {
       <h2>🏪 Tienda del puerto</h2>
 
       <div style="font-size:9.5px;background:rgba(255,215,0,0.12);padding:6px 10px;border-radius:6px;border:1px solid var(--gold);margin-bottom:10px;text-align:center;">
-        <b>🎒 Mochila: ${backpackUsed(run.items)}/${backpackCapacity()} casillas</b><br>${inventorySummary || 'Vacía'}
+        <b>🎒 Isla: ${backpackUsed(run.items,false)}/${backpackCapacity()} · Combate: ${backpackUsed(run.items,true)}/${backpackCapacity()} casillas</b><br>${inventorySummary || 'Vacía'}
       </div>
 
       <h3 style="margin-top:10px;margin-bottom:6px;font-size:11px;color:var(--gold);">🛒 COMPRAR PROVISIONES</h3>
@@ -5610,6 +5615,7 @@ function startBattle(enemies, opts) {
     timer: null,
     round: 1,
     switchUsed: false,
+    itemBuffs: new Map(),
     teamTotals: {p: team.length, e: enemies.length},
   };
   enemies.forEach(e => registerDex(e.id));
@@ -5634,6 +5640,14 @@ function startBattle(enemies, opts) {
   scheduleRound(900);
 }
 
+function battleItemMult(f, stat) {
+  return 1 + ((!battle || battle.over) ? 0 : battle.itemBuffs?.get(f)?.[stat] || 0);
+}
+function combatStatsHTML(f) {
+  return `      <span class="combat-stat">⚔️ ATQ ${Math.floor(f.atk * battleItemMult(f,'atk'))}${battleItemMult(f,'atk') > 1 ? ' ↑' : ''}</span>
+      <span class="combat-stat">🛡️ DEF ${Math.floor(f.def * battleItemMult(f,'def'))}${battleItemMult(f,'def') > 1 ? ' ↑' : ''}</span>
+      <span class="combat-stat">⚡ VEL ${f.spd}</span>`;
+}
 function hpBarClass(f) {
   const p = f.hp / f.maxhp;
   return p < 0.25 ? 'crit' : p < 0.5 ? 'low' : '';
@@ -5675,9 +5689,7 @@ function fighterCardHTML(f, side, idx, active) {
     </div>
     <div class="fcard-meters">${ultBarHTML}</div>
     <div class="fcard-stats-mini" style="font-size:7.5px;color:#eee;text-align:center;margin:2px 0;background:rgba(0,0,0,0.3);padding:2px 4px;border-radius:3px;">
-      <span class="combat-stat">⚔️ ATQ ${f.atk}</span>
-      <span class="combat-stat">🛡️ DEF ${f.def}</span>
-      <span class="combat-stat">⚡ VEL ${f.spd}</span>
+      ${combatStatsHTML(f)}
     </div>
     <div class="fcard-sprite" data-character="${f.id}">
       <span class="sprite ${side === 'e' ? 'flip' : ''}">${charIcon(f.id, 64)}</span>
@@ -5884,6 +5896,8 @@ function refreshHPCards() {
       if (ultBar) ultBar.style.width = clamp(f.ultCharge || 0, 0, 100) + '%';
       const xpEl = card.querySelector('.xp-progress');
       if (xpEl) xpEl.outerHTML = xpBarHTML(f);
+      const statsEl = card.querySelector('.fcard-stats-mini');
+      if (statsEl) statsEl.innerHTML = combatStatsHTML(f);
       const stEl = card.querySelector('.fcard-st');
       if (stEl) stEl.textContent = stIcons(f);
       const pEl = card.querySelector('.fcard-passive');
@@ -5962,8 +5976,8 @@ function calcDamage(att, dfd, mv, crit, variance) {
   if (isP(dfd, 'luffy') && mv.type === 'Rayo') eff = 0;
   const atkTeam = teamOf(att), defTeam = teamOf(dfd);
   // Categoría: físico usa ATQ vs DEF; especial usa ESP_ATQ vs ESP_DEF
-  let atkStat = (phys ? att.atk : att.spatk) * nakamaStatMult(atkTeam);
-  let defStat = (phys ? dfd.def : dfd.spdef) * nakamaStatMult(defTeam);
+  let atkStat = (phys ? att.atk : att.spatk) * nakamaStatMult(atkTeam) * battleItemMult(att,'atk');
+  let defStat = (phys ? dfd.def : dfd.spdef) * nakamaStatMult(defTeam) * battleItemMult(dfd,'def');
   const ar = passiveRule(att), dr = passiveRule(dfd);
   atkStat *= ar.attack || 1;
   defStat *= dr.defense || 1;
@@ -6437,7 +6451,7 @@ function resumeBattle(delay) {
 function useBattleItem(id) {
   const item = ITEMS[id];
   const b = battle;
-  if (!item || !b || b.over || b.waiting || !(b.items[id] > 0)) return;
+  if (!isBattleItem(id) || !b || b.over || b.waiting || !(b.items[id] > 0)) return;
   if (item.kind === 'heal') {
     const f = b.curP;
     if (!f || f.hp <= 0) return toast('No hay un nakama activo consciente.');
@@ -6453,6 +6467,14 @@ function useBattleItem(id) {
     b.items[id]--;
     f.hp = Math.floor(f.maxhp * item.val);
     log(`¡${charName(f)} vuelve a la lucha! 🍶`);
+  } else if (item.kind === 'battleBoost') {
+    const f = b.curP;
+    if (!f || f.hp <= 0) return toast('No hay un nakama activo consciente.');
+    const buffs = b.itemBuffs.get(f) || {};
+    if (buffs[item.stat]) return toast(`${charName(f)} ya tiene esta mejora durante el combate.`);
+    b.items[id]--;
+    b.itemBuffs.set(f,{...buffs,[item.stat]:item.val});
+    log(`${item.emoji} ${charName(f)} usa ${item.name}: +${item.val * 100}% hasta el final del combate.`);
   }
   if (!b.tower) saveRun();
   refreshHPCards();
@@ -7135,8 +7157,8 @@ function screenShip() {
       <h2>🏪 Tienda</h2>
       <p>Mejoras permanentes · Cuenta Nv${accLvl}</p>
       <div class="global-upg-row">
-        <span class="upg-emoji">🎒</span><div class="upg-details"><b class="upg-name">Ampliar mochila</b>
-          <div class="upg-desc">${backpackCapacity()} casillas · ${backpackCapacity() < 60 ? '+3 casillas para todas tus aventuras y combates' : 'Capacidad máxima'}</div>
+        <span class="upg-emoji">🎒</span><div class="upg-details"><b class="upg-name">Ampliar ambas mochilas</b>
+          <div class="upg-desc">${backpackCapacity()} casillas cada una · ${backpackCapacity() < 60 ? '+3 casillas en la mochila de isla y +3 en la de combate' : 'Capacidad máxima'}</div>
           ${backpackCapacity() < 60 ? `<span class="price">⭐${backpackUpgradeCost()} Fama</span>` : ''}</div>
         <div class="upg-action"><button class="btn small green" id="btn-buy-backpack" ${backpackCapacity() >= 60 || meta.fame < backpackUpgradeCost() ? 'disabled' : ''}>${backpackCapacity() >= 60 ? 'MÁXIMO' : 'AMPLIAR +3'}</button></div>
       </div>
@@ -7372,7 +7394,7 @@ function screenShip() {
     shipBuyLock = Date.now();
     if (!buyBackpackUpgrade()) return;
     screenShip();
-    toast(`🎒 Mochila ampliada a ${backpackCapacity()} casillas.`);
+    toast(`🎒 Ambas mochilas ampliadas a ${backpackCapacity()} casillas cada una.`);
   };
   const buySlotBtn = $('#btn-buy-starter-slot');
   if (buySlotBtn) {
