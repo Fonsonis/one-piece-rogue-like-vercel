@@ -2,6 +2,7 @@
 .event-sprite.ui-sprite { background-image:url('ui-atlas.png'); }
 .event-art { text-align:center; font-size:64px; line-height:1; margin:10px auto; }
 .map-node .event-sprite { width:80%; height:80%; min-width:0; }
+.map-node .map-event-icon { display:block; width:90%; height:90%; object-fit:contain; image-rendering:pixelated; pointer-events:none; }
 .world-stop.is-locked { background:#07152199; box-shadow:0 0 32px 20px #07152166; }
 .world-stop.is-locked .island-land img { filter:brightness(0)!important; }
 .world-stop.is-locked .island-label { background:#243442; color:#c8d1d5; border-color:#465363; }

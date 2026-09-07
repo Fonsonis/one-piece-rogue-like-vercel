@@ -817,39 +817,56 @@ let currentTrack = null;
 let bgmAudio = null;
 let isMuted = false;
 try { isMuted = localStorage.getItem('oplike_muted') === 'true'; } catch (e) { }
+let musicFocused = document.hasFocus ? document.hasFocus() : true;
+
+function syncMusicPlayback() {
+  const audio = bgmAudio;
+  if (!audio) return;
+  if (!currentTrack || isMuted || document.hidden || !musicFocused) {
+    audio.pause();
+    return;
+  }
+  if (!audio.paused) return;
+  // Autoplay can be denied until the next user interaction.
+  audio.play()?.then(() => {
+    if (audio !== bgmAudio || !currentTrack || isMuted || document.hidden || !musicFocused) audio.pause();
+  }).catch(() => {});
+}
+
+document.addEventListener('visibilitychange', () => {
+  musicFocused = !document.hidden && (document.hasFocus ? document.hasFocus() : true);
+  syncMusicPlayback();
+});
+globalThis.addEventListener?.('blur', () => { musicFocused = false; syncMusicPlayback(); });
+globalThis.addEventListener?.('focus', () => { musicFocused = true; syncMusicPlayback(); });
+globalThis.addEventListener?.('pagehide', () => { musicFocused = false; syncMusicPlayback(); });
+globalThis.addEventListener?.('pageshow', () => {
+  musicFocused = document.hasFocus ? document.hasFocus() : true;
+  syncMusicPlayback();
+});
+['click', 'keydown', 'touchstart'].forEach(type => document.addEventListener(type, syncMusicPlayback));
 
 function playMusic(track) {
-  if (currentTrack === track) return;
+  if (currentTrack === track) return syncMusicPlayback();
   currentTrack = track;
   if (bgmAudio) {
     bgmAudio.pause();
     bgmAudio.currentTime = 0;
   }
+  bgmAudio = null;
   if (!track) return;
   bgmAudio = new Audio(`soundtracks/${track}.mp3`);
   bgmAudio.loop = true;
   bgmAudio.muted = isMuted;
   bgmAudio.volume = 0.45;
-  const playPromise = bgmAudio.play();
-  if (playPromise !== undefined) {
-    playPromise.catch(() => {
-      const unlock = () => {
-        if (bgmAudio && currentTrack === track) bgmAudio.play().catch(() => { });
-        document.removeEventListener('click', unlock);
-        document.removeEventListener('keydown', unlock);
-        document.removeEventListener('touchstart', unlock);
-      };
-      document.addEventListener('click', unlock);
-      document.addEventListener('keydown', unlock);
-      document.addEventListener('touchstart', unlock);
-    });
-  }
+  syncMusicPlayback();
 }
 
 function toggleMute() {
   isMuted = !isMuted;
   try { localStorage.setItem('oplike_muted', String(isMuted)); } catch (e) { }
   if (bgmAudio) bgmAudio.muted = isMuted;
+  syncMusicPlayback();
   const btn = $('#btn-mute');
   if (btn) btn.textContent = isMuted ? '🔇 MÚSICA' : '🎵 MÚSICA';
   const chkBtn = $('#chk-music-toggle');
@@ -1898,7 +1915,7 @@ function startLogPoseGacha(activeSagas) {
 function screenHome() {
   playMusic('menu');
   const accLvl = accountLevel();
-  const runnerUnlocked = accLvl >= 30;
+  const runnerUnlocked = accLvl >= 1;
   const towerUnlocked = accLvl >= 20;
   const challengeUnlocked = accLvl >= 50;
   const { totalCompleted: completedAch, totalAchievements: totalAchCount, hasUnclaimedAch } = getAchievementsInfo();
@@ -1922,7 +1939,7 @@ function screenHome() {
         <div class="mode-btn">${challengeUnlocked ? 'ENTRAR' : '🔒 NV. CUENTA 50'}</div>
       </div>
     </div>
-    <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? 'Doble salto · 25 fama cada 1.000 m' : '🔒 Se desbloquea al nivel 30 de cuenta'}</small></span></button>
+    <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? 'Doble salto · 25 fama cada 1.000 m' : '🔒 Se desbloquea al nivel 1 de cuenta'}</small></span></button>
     <div class="home-main-buttons">
       <button class="btn blue small" id="btn-dex">
         <span>📖 Dex</span>
@@ -1971,7 +1988,7 @@ function screenHome() {
   if (towerUnlocked) $('#mode-tower').onclick = () => screenTowerIntro();
   if (challengeUnlocked) $('#mode-challenge').onclick = () => screenChallenges();
   $('#btn-runner').onclick = async () => {
-    if (accountLevel() < 30) return toast('🔒 Luffy Run se desbloquea al nivel 30 de cuenta.');
+    if (accountLevel() < 1) return toast('🔒 Luffy Run se desbloquea al nivel 1 de cuenta.');
     const btn = $('#btn-runner');
     btn.disabled = true;
     try {
@@ -3399,7 +3416,7 @@ function screenMap(activePageIdx = 0) {
     const isReach = reach.some(([rr, ii]) => rr === r && ii === i);
     const isCur = run.pos && run.pos[0] === r && run.pos[1] === i;
     nodesHTML += `<button type="button" class="map-node ${n.done ? 'done' : ''} ${isReach ? 'reachable' : ''} ${isCur ? 'current' : ''}"
-      style="--map-x:${x}%;--map-y:${y}%;--map-forward:${100-y}%" data-r="${r}" data-i="${i}" title="${NODE_TYPES[n.type].label}" aria-label="${NODE_TYPES[n.type].label}, etapa ${r+1}${isCur ? ", posición actual" : ''}" ${isReach ? '' : 'disabled'}>${NODE_TYPES[n.type].emoji}</button>`;
+      style="--map-x:${x}%;--map-y:${y}%;--map-forward:${100-y}%" data-r="${r}" data-i="${i}" title="${NODE_TYPES[n.type].label}" aria-label="${NODE_TYPES[n.type].label}, etapa ${r+1}${isCur ? ", posición actual" : ''}" ${isReach ? '' : 'disabled'}>${n.type === 'special' ? '<img class="map-event-icon" src="/art/cross-guild-map.png" alt="" aria-hidden="true" draggable="false">' : NODE_TYPES[n.type].emoji}</button>`;
   }));
 
   const canReroll = (run.mapIdx || 0) === 0 && run.pos === null && !run.sagaRerollUsed;
@@ -5401,7 +5418,9 @@ function fighterCardHTML(f, side, idx, active) {
     </div>
     <div class="fcard-meters">${ultBarHTML}</div>
     <div class="fcard-stats-mini" style="font-size:7.5px;color:#eee;text-align:center;margin:2px 0;background:rgba(0,0,0,0.3);padding:2px 4px;border-radius:3px;">
-      ⚔️ ATQ ${f.atk} · 🛡️ DEF ${f.def} · ⚡ VEL ${f.spd}
+      <span class="combat-stat">⚔️ ATQ ${f.atk}</span>
+      <span class="combat-stat">🛡️ DEF ${f.def}</span>
+      <span class="combat-stat">⚡ VEL ${f.spd}</span>
     </div>
     <div class="fcard-sprite" data-character="${f.id}">
       <span class="sprite ${side === 'e' ? 'flip' : ''}">${charIcon(f.id, 64)}</span>
