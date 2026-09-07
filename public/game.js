@@ -283,7 +283,6 @@ function showAutoSettingsModal() {
               <option value="cartel" ${itemSetting.id === 'cartel' ? 'selected' : ''}>📜 Cartel de Recluta (1 Cadena)</option>
               <option value="carteldorado" ${itemSetting.id === 'carteldorado' ? 'selected' : ''}>🏅 Cartel Dorado (2 Cadenas)</option>
               <option value="cartelbuster" ${itemSetting.id === 'cartelbuster' ? 'selected' : ''}>📯 Buster Call (3 Cadenas)</option>
-              <option value="hierro" ${itemSetting.id === 'hierro' ? 'selected' : ''}>🛡️ Hierro Forjado (Exp)</option>
             </select>
             <span style="font-size:8px;color:#aaa;">Hasta:</span>
             <select id="auto-shop-qty-${idx}" style="width:50px;padding:4px;font-size:8.5px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
@@ -513,6 +512,7 @@ function validateGameSave(data) {
     if (!saga || !['classic','nuzlocke'].includes(mode) || !['1','2','3','4','5'].includes(diff) || islands.some(i=>i>=saga.islands.length)) throw new Error('Progreso de islas incompatible.');
   }
   if (!r) return;
+  if ([...Object.keys(r.items || {}), ...Object.keys(r.pendingLoot || {})].some(id => !Object.hasOwn(ITEMS,id))) throw new Error('Objeto desconocido en la mochila.');
   if (r.startingTeam?.some(id => !CHARS[id] || baseFormOf(id) !== id)) throw new Error('Equipo inicial incompatible.');
   if (!SAGAS[r.saga]?.islands[r.islandIdx] || r.team.some(f => !CHARS[f.id] || f.moves.some(id => !MOVES[id]))) throw new Error('Viaje incompatible.');
   if (r.mapIdx !== undefined && r.mapIdx >= islandMapCount(SAGAS[r.saga].islands[r.islandIdx])) throw new Error('Mapa de isla incompatible.');
@@ -581,6 +581,7 @@ function loadRun() {
   }
   if (run && run.team) run.team.forEach(migrateFighter);
   migrateIslandJourney(run, meta);
+  prepareBackpack(run);
 }
 function migrateFighter(f) {
   const current = CHARS[f.id];
@@ -3341,6 +3342,178 @@ function confirmRestartIsland() {
     () => { if (run === journey) { autoMode = wasAuto; screenMap(2); } });
 }
 
+// Slots are derived from quantities so every consumer (including auto mode and
+// recruitment) immediately frees space without maintaining a second inventory.
+function backpackCapacity() { return 9 + Math.min(17, Math.max(0, meta.global.backpackTier || 0)) * 3; }
+function backpackUpgradeCost() { return 300 * ((meta.global.backpackTier || 0) + 1); }
+function buyBackpackUpgrade() {
+  const cost = backpackUpgradeCost();
+  if (backpackCapacity() >= 60 || meta.fame < cost) return false;
+  meta.fame -= cost;
+  meta.global.backpackTier = (meta.global.backpackTier || 0) + 1;
+  saveMeta();
+  return true;
+}
+function backpackUsed(items) {
+  return Object.entries(items || {}).reduce((sum, [id, count]) => {
+    const item = ITEMS[id];
+    return sum + (item && count > 0 ? Math.ceil(count / item.stackLimit) * item.slotSize : 0);
+  }, 0);
+}
+function backpackFits(owner, id, count = 1) {
+  return !!ITEMS[id] && Number.isInteger(count) && count > 0 &&
+    backpackUsed({...owner.items, [id]:(owner.items[id] || 0) + count}) <= backpackCapacity();
+}
+function addBackpackItem(owner, id, count = 1) {
+  if (!backpackFits(owner, id, count)) return false;
+  owner.items[id] = (owner.items[id] || 0) + count;
+  return true;
+}
+function receiveBackpackItem(owner, id, count = 1) {
+  if (!ITEMS[id] || !Number.isInteger(count) || count < 1) return false;
+  const stored = addBackpackItem(owner, id, count);
+  if (!stored) {
+    owner.pendingLoot ||= {};
+    owner.pendingLoot[id] = (owner.pendingLoot[id] || 0) + count;
+    autoMode = false;
+    clearTimeout(autoTimer); autoTimer = null;
+  }
+  return stored;
+}
+function prepareBackpack(owner) {
+  if (!owner || (owner.backpackVersion === 1 && backpackUsed(owner.items) <= backpackCapacity())) return;
+  const original = owner.items || {};
+  owner.items = {};
+  owner.pendingLoot ||= {};
+  for (const [id,count] of Object.entries(original)) {
+    if (!ITEMS[id]) continue;
+    // Move excess to a saved collection tray; never discard old saves or provisions.
+    let kept = 0;
+    while (kept < count && addBackpackItem(owner,id)) kept++;
+    if (count > kept) owner.pendingLoot[id] = (owner.pendingLoot[id] || 0) + count - kept;
+  }
+  owner.backpackVersion = 1;
+}
+function hasPendingLoot(owner) { return Object.values(owner?.pendingLoot || {}).some(n => n > 0); }
+function backpackStacks(owner) {
+  const stacks = [];
+  for (const [id,total] of Object.entries(owner.items || {})) {
+    const item = ITEMS[id];
+    if (!item) continue;
+    for (let remaining = total; remaining > 0; remaining -= item.stackLimit) {
+      stacks.push({id, count:Math.min(remaining,item.stackLimit), size:item.slotSize});
+    }
+  }
+  return stacks;
+}
+function backpackHTML(owner, combat = false) {
+  const capacity = backpackCapacity(), used = backpackUsed(owner.items);
+  let slot = 0;
+  const cells = backpackStacks(owner).map(({id,count,size},stack) => {
+    const item = ITEMS[id];
+    return Array.from({length:size}, (_,part) => {
+      slot++;
+      return `<button type="button" class="bag-cell bag-filled ${part ? 'bag-continuation' : ''}" data-bag-item="${id}" data-bag-count="${count}" data-bag-stack="${stack}" title="${item.name} ×${count} · ${size} casilla${size > 1 ? 's' : ''}" aria-label="${item.name} ×${count}, casilla ${part+1} de ${size}">
+        <span class="bag-slot-number">${slot}</span><span class="bag-icon">${item.emoji}</span>
+        ${part ? `<span class="bag-part">${part+1}/${size}</span>` : `<span class="bag-quantity">×${count}</span><span class="bag-item-name">${item.name}</span>`}
+      </button>`;
+    }).join('');
+  }).join('');
+  const empty = Array.from({length:Math.max(0,capacity-used)},(_,i)=>`<div class="bag-cell bag-empty" aria-label="Casilla ${used+i+1} libre"><span class="bag-slot-number">${used+i+1}</span><span>＋</span></div>`).join('');
+  const pending = Object.entries(owner.pendingLoot || {}).filter(([id,n])=>ITEMS[id] && n>0).map(([id,n])=>`
+    <div class="bag-pending-item"><span>${ITEMS[id].emoji} ${ITEMS[id].name} ×${n}</span>
+      <button type="button" data-bag-collect="${id}" ${backpackFits(owner,id) ? '' : 'disabled'}>GUARDAR 1</button>
+      <button type="button" data-bag-leave="${id}">DEJAR ×${n}</button></div>`).join('');
+  return `<div class="backpack ${combat ? 'backpack-combat' : ''}">
+    <div class="bag-heading"><strong>🎒 MOCHILA</strong><span aria-label="Espacio ocupado">${used}/${capacity} casillas</span></div>
+    <div class="bag-grid">${cells}${empty}</div>
+    ${pending ? `<div class="bag-pending"><b>Pendiente de guardar</b><p>Libera espacio o deja estos objetos para continuar.</p>${pending}</div>` : ''}
+    ${combat ? '' : '<p class="bag-help">Toca un objeto para usarlo o liberar espacio. Carteles: hasta 10 por casilla. Amplía tu mochila en la tienda del puerto.</p>'}
+  </div>`;
+}
+function saveBackpack(owner) { if (owner === run) saveRun(); }
+function bindBackpack(root, owner, combat, refresh) {
+  root.querySelectorAll('[data-bag-item]').forEach(button => {
+    button.onclick = () => showBackpackItem(owner, button.dataset.bagItem, Number(button.dataset.bagCount), combat, refresh);
+  });
+  root.querySelectorAll('[data-bag-collect]').forEach(button => {
+    button.onclick = () => {
+      const id = button.dataset.bagCollect;
+      if (!(owner.pendingLoot?.[id] > 0) || !addBackpackItem(owner,id)) return;
+      owner.pendingLoot[id]--;
+      saveBackpack(owner); refresh();
+    };
+  });
+  root.querySelectorAll('[data-bag-leave]').forEach(button => {
+    button.onclick = () => {
+      const id = button.dataset.bagLeave;
+      modalConfirm('¿Dejar el objeto?', `Dejarás ${ITEMS[id].name} ×${owner.pendingLoot[id]}.`, () => {
+        delete owner.pendingLoot[id]; saveBackpack(owner); refresh();
+      });
+    };
+  });
+}
+function showBackpackItem(owner, id, count, combat, refresh) {
+  if (!(owner.items[id] > 0)) return;
+  const b = combat ? battle : null;
+  if (combat && (!b || b.over || b.waiting)) return;
+  if (b) pauseBattle();
+  const item = ITEMS[id], ov = document.createElement('div');
+  ov.className = 'overlay';
+  const usable = combat ? ['heal','revive'].includes(item.kind) : owner === run && item.kind !== 'ball';
+  ov.innerHTML = `<div class="modal bag-item-modal"><h2>${item.emoji} ${item.name}</h2><p>${item.desc}</p>
+    <p>${item.slotSize} casilla${item.slotSize > 1 ? 's' : ''}${item.stackLimit > 1 ? ` · Hasta ${item.stackLimit} por pila` : ' por unidad'}</p>
+    ${!usable ? `<p>${item.kind === 'ball' ? 'Se usa en el evento de las cadenas.' : 'Se usa fuera del combate.'}</p>` : ''}
+    <div class="actions"><button class="btn green" data-bag-use ${usable ? '' : 'disabled'}>USAR</button>
+      <button class="btn red" data-bag-discard>DESCARTAR ${count > 1 ? `PILA ×${count}` : '1'}</button>
+      <button class="btn gray" data-bag-close>VOLVER</button></div></div>`;
+  document.body.appendChild(ov);
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true; ov.remove();
+    if (b && battle === b && !b.over) resumeBattle();
+  };
+  ov.querySelector('[data-bag-close]').onclick = close;
+  ov.querySelector('[data-bag-use]').onclick = () => {
+    if (!usable || closed) return;
+    close();
+    if (combat) useBattleItem(id); else useItemFromMap(id);
+  };
+  ov.querySelector('[data-bag-discard]').onclick = () => {
+    if (closed) return;
+    modalConfirm('¿Descartar objeto?', `Descartarás ${item.name} ×${Math.min(count,owner.items[id])}.`, () => {
+      if (closed) return;
+      owner.items[id] = Math.max(0,owner.items[id]-count);
+      saveBackpack(owner); close(); refresh();
+    });
+  };
+  ov.onclick = event => { if (event.target === ov) close(); };
+}
+function refreshBattleBackpack() {
+  const el = $('#battle-backpack');
+  if (!el || !battle) return;
+  const owner = battle.tower ? tower : run;
+  if (!owner) return;
+  el.innerHTML = backpackHTML(owner,true);
+  bindBackpack(el,owner,true,refreshBattleBackpack);
+}
+
+function showTowerBackpack(onContinue) {
+  const owner = tower, ov = document.createElement('div');
+  ov.className = 'overlay';
+  let continued = false;
+  const update = () => {
+    ov.innerHTML = `<div class="modal"><h2>🎒 Prepara tu mochila</h2>${backpackHTML(owner)}<div class="actions"><button class="btn green" data-bag-continue ${hasPendingLoot(owner) ? 'disabled' : ''}>CONTINUAR</button></div></div>`;
+    bindBackpack(ov,owner,false,update);
+    ov.querySelector('[data-bag-continue]').onclick = () => {
+      if (continued || hasPendingLoot(owner) || tower !== owner) return;
+      continued = true; ov.remove(); onContinue();
+    };
+  };
+  update(); document.body.appendChild(ov);
+}
+
 function startRun(sagaIdx, starterIds, islandIdx = 0) {
   const saga = SAGAS[sagaIdx];
   if (!saga?.islands[islandIdx] || !islandAvailable(sagaIdx,islandIdx)) return;
@@ -3381,10 +3554,11 @@ function startRun(sagaIdx, starterIds, islandIdx = 0) {
     sagaRerollUsed: false,
     nuzCaught: {}, // isla -> ya reclutado
   };
+  prepareBackpack(run);
   starterIds.forEach(registerRecruit);
   run.team.filter(f => baseFormOf(f.id) === 'luffy').forEach(f => registerDex(f.id));
   saveRun();
-  screenMap();
+  screenMap(hasPendingLoot(run) ? 2 : 0);
 }
 
 // ============ PANTALLA: MAPA ============
@@ -3473,10 +3647,7 @@ function screenMap(activePageIdx = 0) {
         <!-- PÁGINA 3: MOCHILA Y EMBLEMAS (ANCHO COMPLETO) -->
         <div class="carousel-page" id="page-bag">
           <div class="panel">
-            <h3>🎒 MOCHILA DE OBJETOS</h3>
-            ${Object.entries(run.items).filter(([, n]) => n > 0).map(([id, n]) =>
-              `<div class="item-row" data-item="${id}"><span>${ITEMS[id].emoji}</span> ${ITEMS[id].name} ×${n}</div>`
-            ).join('') || '<div style="font-size:8px;color:#888;">Bolsa vacía</div>'}
+            <div id="map-backpack">${backpackHTML(run)}</div>
             <h3 style="margin-top:14px;">🏅 EMBLEMAS DE LA SAGA</h3>
             <div class="badge-grid">
               ${saga.islands.map((isl, i) =>
@@ -3692,9 +3863,7 @@ function screenMap(activePageIdx = 0) {
   };
 
   bindTeamSlots();
-  document.querySelectorAll('.item-row').forEach(el => {
-    el.onclick = () => useItemFromMap(el.dataset.item);
-  });
+  bindBackpack($('#map-backpack'), run, false, () => screenMap(2));
   $('#btn-restart-island').onclick = confirmRestartIsland;
   $('#btn-abandon').onclick = () => {
     modalConfirm('🏳️ ¿Abandonar el viaje?',
@@ -3757,7 +3926,7 @@ function showItemTargetModal(item, title, renderRow, onSelect) {
 
 function useItemFromMap(id) {
   const item = ITEMS[id];
-  if (!item) return;
+  if (!item || !run || !(run.items[id] > 0) || (battle && !battle.over)) return;
 
   if (item.kind === 'ball') {
     return toast(`📜 ${item.name}: Se usa automáticamente al intentar reclutar piratas.`);
@@ -3842,9 +4011,7 @@ function useItemFromMap(id) {
           trackItemCollected(1);
           trackStat('fruit_use', 1);
           saveRun();
-          if (grantedLog.length) {
-            screenMap(2);
-          }
+          screenMap(2);
         };
       }
 
@@ -3974,6 +4141,7 @@ function pickWildEnemy(pool) {
 
 // ============ ENTRAR EN NODO ============
 function enterNode(r, i) {
+  if (hasPendingLoot(run)) { toast('🎒 Guarda o deja los objetos pendientes antes de continuar.'); screenMap(2); return; }
   const node = run.map.rows[r][i];
   run.pos = [r, i];
   node.done = true;
@@ -4023,10 +4191,10 @@ function enterNode(r, i) {
         const commonLoot = ['carne', 'carne', 'carnereal', 'cartel', 'cartel', 'carteldorado', 'sake', 'bocadillo'];
         id = pick(commonLoot);
       }
-      run.items[id] = (run.items[id] || 0) + 1;
+      const stored = receiveBackpackItem(run,id);
       trackItemCollected(1);
       saveRun();
-      modalInfo('🎁 ¡Objeto encontrado!', `<div class="reward-list">${ITEMS[id].emoji} <b>${ITEMS[id].name}</b><br><small>${ITEMS[id].desc}</small></div>`, screenMap);
+      modalInfo('🎁 ¡Objeto encontrado!', `<div class="reward-list">${ITEMS[id].emoji} <b>${ITEMS[id].name}</b><br><small>${ITEMS[id].desc}</small>${stored ? '' : '<br>🎒 Mochila llena. Elige qué guardar.'}</div>`, () => screenMap(stored ? 0 : 2));
       break;
     }
     case 'mystery': trackStat('mystery_visit', 1); doMystery(island); break;
@@ -4061,8 +4229,8 @@ function doMystery(island) {
     }
     case 'item': {
       const id = pick(['carne', 'cartel', 'carnereal', 'carteldorado']);
-      run.items[id] = (run.items[id] || 0) + 1; saveRun();
-      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS[id].emoji} <b>${ITEMS[id].name}</b></div>`, screenMap);
+      const stored = receiveBackpackItem(run,id); saveRun();
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS[id].emoji} <b>${ITEMS[id].name}</b>${stored ? '' : '<br>🎒 Mochila llena. Elige qué guardar.'}</div>`, () => screenMap(stored ? 0 : 2));
       break;
     }
     case 'battle': {
@@ -4116,10 +4284,10 @@ function doMystery(island) {
       break;
     }
     case 'fruta': {
-      run.items['fruta_diablo'] = (run.items['fruta_diablo'] || 0) + 1;
+      const stored = receiveBackpackItem(run,'fruta_diablo');
       trackItemCollected(1);
       saveRun();
-      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS['fruta_diablo'].emoji} <b>${ITEMS['fruta_diablo'].name}</b> añadida a tu bolsa.</div>`, screenMap);
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS['fruta_diablo'].emoji} <b>${ITEMS['fruta_diablo'].name}</b>${stored ? ' añadida a tu mochila.' : '<br>🎒 Mochila llena. Elige qué guardar.'}</div>`, () => screenMap(stored ? 0 : 2));
       break;
     }
   }
@@ -4833,7 +5001,7 @@ function modalConfirm(title, html, onYes, onNo) {
 // ============ TIENDA ============
 function screenShop() {
   playMusic('menu');
-  const stock = ['carne', 'carnereal', 'bocadillo', 'sake', 'cartel', 'carteldorado', 'cartelbuster', 'hierro'];
+  const stock = ['carne', 'carnereal', 'bocadillo', 'sake', 'cartel', 'carteldorado', 'cartelbuster'];
   const inventorySummary = Object.entries((run && run.items) || {})
     .filter(([, n]) => n > 0)
     .map(([id, n]) => `${ITEMS[id] ? ITEMS[id].emoji : ''} ×${n}`)
@@ -4859,7 +5027,7 @@ function screenShop() {
       <h2>🏪 Tienda del puerto</h2>
 
       <div style="font-size:9.5px;background:rgba(255,215,0,0.12);padding:6px 10px;border-radius:6px;border:1px solid var(--gold);margin-bottom:10px;text-align:center;">
-        <b>🎒 Tu Bolsa:</b> ${inventorySummary || 'Vacía'}
+        <b>🎒 Mochila: ${backpackUsed(run.items)}/${backpackCapacity()} casillas</b><br>${inventorySummary || 'Vacía'}
       </div>
 
       <h3 style="margin-top:10px;margin-bottom:6px;font-size:11px;color:var(--gold);">🛒 COMPRAR PROVISIONES</h3>
@@ -4870,9 +5038,9 @@ function screenShop() {
           <span class="emoji">${it.emoji}</span>
           <div class="info">
             <b>${it.name}</b> <span style="font-size:8.5px;color:var(--gold);font-weight:bold;margin-left:4px;">(Tienes: ${owned})</span> — <span class="price">${berriesHTML(it.price)}</span><br>
-            <small>${it.desc}</small>
+            <small>${it.desc} · ${it.slotSize} casilla${it.slotSize > 1 ? 's' : ''}${it.stackLimit > 1 ? ` / ${it.stackLimit} uds.` : ' / ud.'}</small>
           </div>
-          <button class="btn small ${run.berries >= it.price ? 'green' : 'gray'}" data-buy="${id}" ${run.berries >= it.price ? '' : 'disabled'}>COMPRAR</button>
+          <button class="btn small ${run.berries >= it.price && backpackFits(run,id) ? 'green' : 'gray'}" data-buy="${id}" ${run.berries >= it.price && backpackFits(run,id) ? '' : 'disabled'}>${backpackFits(run,id) ? 'COMPRAR' : 'SIN ESPACIO'}</button>
         </div>`;
   }).join('')}
 
@@ -4887,9 +5055,9 @@ function screenShop() {
   document.querySelectorAll('[data-buy]').forEach(b => {
     b.onclick = () => {
       const id = b.dataset.buy;
-      if (run.berries < ITEMS[id].price) return;
+      if (!stock.includes(id) || run.berries < ITEMS[id].price) return;
+      if (!addBackpackItem(run,id)) { toast('🎒 No hay espacio en la mochila.'); return; }
       run.berries -= ITEMS[id].price;
-      run.items[id] = (run.items[id] || 0) + 1;
       trackItemCollected(1);
       trackStat('shop_buy', 1);
       saveRun();
@@ -5455,16 +5623,7 @@ function showBattleCrew() {
 
 function controlsHTML() {
   const b = battle;
-  let html = '<div class="battle-control-row battle-items" aria-label="Objetos">';
-  let hasItems = false;
-  for (const id of ['carne', 'carnereal', 'bocadillo', 'sake']) {
-    if (b.items[id] > 0) {
-      hasItems = true;
-      html += `<button class="btn small blue" data-ctl="item" data-arg="${id}" title="${ITEMS[id].name}">${ITEMS[id].emoji} ×${b.items[id]}</button>`;
-    }
-  }
-  if (!hasItems) html += '<span class="battle-no-items">Sin objetos de combate</span>';
-  html += '</div><div class="battle-control-row battle-tools" aria-label="Controles del combate">';
+  let html = '<div class="battle-control-row battle-tools" aria-label="Controles del combate">';
   html += `<button class="btn small gray battle-crew-button" data-ctl="crew">👥 BANDAS</button>`;
   html += `<button class="btn small gray" data-ctl="speed" title="Atajo: barra espaciadora">⏩ VELOCIDAD x${b.speed}</button>`;
   html += `<button class="btn small gray" data-ctl="info">🧩 SINERGIAS Y TIPOS</button>`;
@@ -5540,7 +5699,10 @@ function renderBattle(logLines) {
           </div>
         </div>
         <div class="battle-reserves" id="battle-reserves"></div>
-        <div class="battle-log" id="battle-log">${logLines.map(l => `<div>${l}</div>`).join('')}</div>
+        <div class="battle-lower-panels">
+          <section class="battle-log-panel"><h3>REGISTRO</h3><div class="battle-log" id="battle-log">${logLines.map(l => `<div>${l}</div>`).join('')}</div></section>
+          <section id="battle-backpack" aria-label="Mochila de combate"></section>
+        </div>
       </div>
       <div class="battle-sidebar" id="battle-controls">${controlsHTML()}</div>
     </div>
@@ -5572,6 +5734,7 @@ function renderBattle(logLines) {
       }
     });
   });
+  refreshBattleBackpack();
   keepActiveFightersVisible();
 }
 
@@ -5584,15 +5747,18 @@ function renderBattlePreserveLog() {
 function refreshControls() {
   const el = $('#battle-controls');
   if (el) { el.innerHTML = controlsHTML(); bindControls(); }
+  refreshBattleBackpack();
 }
 
 function log(msg) {
   const el = $('#battle-log');
   if (!el) return;
+  const follow = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
   const d = document.createElement('div');
   d.innerHTML = msg;
   el.appendChild(d);
-  while (el.children.length > 5) el.removeChild(el.firstChild);
+  while (el.children.length > 30) el.removeChild(el.firstChild);
+  if (follow) el.scrollTop = el.scrollHeight;
 }
 
 function keepActiveFightersVisible() {
@@ -6177,8 +6343,10 @@ function resumeBattle(delay) {
 function useBattleItem(id) {
   const item = ITEMS[id];
   const b = battle;
+  if (!item || !b || b.over || b.waiting || !(b.items[id] > 0)) return;
   if (item.kind === 'heal') {
     const f = b.curP;
+    if (!f || f.hp <= 0) return toast('No hay un nakama activo consciente.');
     if (f.hp >= f.maxhp) return toast('PS al máximo.');
     b.items[id]--;
     f.hp = Math.min(f.maxhp, f.hp + item.val);
@@ -6192,6 +6360,8 @@ function useBattleItem(id) {
     f.hp = Math.floor(f.maxhp * item.val);
     log(`¡${charName(f)} vuelve a la lucha! 🍶`);
   }
+  if (!b.tower) saveRun();
+  refreshHPCards();
   refreshControls();
 }
 
@@ -6634,7 +6804,8 @@ function screenTowerIntro() {
   startBtn.onclick = () => {
     if (picked.length !== 3) return;
     tower = { floor: startFloor, team: picked.map(id => applyUpgrades(makeChar(id, startLvl))), items: { bocadillo: 3, sake: 1 } };
-    towerNextBattle();
+    prepareBackpack(tower);
+    if (hasPendingLoot(tower)) showTowerBackpack(towerNextBattle); else towerNextBattle();
   };
 }
 
@@ -6662,8 +6833,8 @@ function endTowerBattle(victory) {
     }
   });
   tower.floor++;
-  if (tower.floor % 3 === 0) tower.items.bocadillo = (tower.items.bocadillo || 0) + 1;
-  towerNextBattle();
+  if (tower.floor % 3 === 0) receiveBackpackItem(tower,'bocadillo');
+  if (hasPendingLoot(tower)) showTowerBackpack(towerNextBattle); else towerNextBattle();
 }
 
 function towerGameOver() {
@@ -6873,6 +7044,12 @@ function screenShip() {
     <div class="panel">
       <h2>🏪 Tienda</h2>
       <p>Mejoras permanentes · Cuenta Nv${accLvl}</p>
+      <div class="global-upg-row">
+        <span class="upg-emoji">🎒</span><div class="upg-details"><b class="upg-name">Ampliar mochila</b>
+          <div class="upg-desc">${backpackCapacity()} casillas · ${backpackCapacity() < 60 ? '+3 casillas para todas tus aventuras y combates' : 'Capacidad máxima'}</div>
+          ${backpackCapacity() < 60 ? `<span class="price">⭐${backpackUpgradeCost()} Fama</span>` : ''}</div>
+        <div class="upg-action"><button class="btn small green" id="btn-buy-backpack" ${backpackCapacity() >= 60 || meta.fame < backpackUpgradeCost() ? 'disabled' : ''}>${backpackCapacity() >= 60 ? 'MÁXIMO' : 'AMPLIAR +3'}</button></div>
+      </div>
 
 
       <h2 style="font-size:11px;">👥 Casillas de Nakamas Iniciales</h2>
@@ -7056,6 +7233,14 @@ function screenShip() {
   const searchInput = $('#ship-search-q');
   if (searchInput) searchInput.oninput = e => { shipSearchQ = e.target.value; renderRosterUI(); };
 
+  const backpackBtn = $('#btn-buy-backpack');
+  if (backpackBtn) backpackBtn.onclick = () => {
+    if (Date.now() - shipBuyLock < 300) return;
+    shipBuyLock = Date.now();
+    if (!buyBackpackUpgrade()) return;
+    screenShip();
+    toast(`🎒 Mochila ampliada a ${backpackCapacity()} casillas.`);
+  };
   const buySlotBtn = $('#btn-buy-starter-slot');
   if (buySlotBtn) {
     buySlotBtn.onclick = () => {
