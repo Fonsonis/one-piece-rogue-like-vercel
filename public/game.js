@@ -1190,7 +1190,7 @@ function showNodeConfirmModal(r, i) {
       detailsText = 'Tu banda descansará en el campamento. Todos los nakamas conscientes recuperarán un 50% de sus PS máximos.';
       break;
     case 'special':
-      detailsText = 'Un contacto te ofrece reclutas y carteles de recompensa. Los nuevos nakamas solo serán permanentes al completar la isla.';
+      detailsText = specialPiratePoolHTML();
       break;
     case 'travel':
       detailsText = 'Continúa al siguiente mapa de esta isla con tu banda, objetos y PS actuales. El jefe espera al final del último mapa.';
@@ -4945,17 +4945,10 @@ function specialJoin(id, lvl) {
   });
 }
 
-function doSpecialPirate(island) {
-  meta.starPity = meta.starPity || 0;
-  const lvl = island.lvl[1] + 2;
-  const gachaPrice = specialGachaPrice();
-  const blocked = specialBlockedReason();
+function specialPiratePoolHTML() {
   const pool = basePirateIds().sort((a, b) => CHARS[a].rareza - CHARS[b].rareza || CHARS[a].name.localeCompare(CHARS[b].name));
   const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-  const ov = document.createElement('div');
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal">
-    <h2>🌟 Mercado clandestino</h2>
+  return `
     <p class="special-pool-heading">${esc(SAGAS[run.saga].name)} · ${pool.length} piratas posibles</p>
     <div class="special-pool" role="list" aria-label="Piratas disponibles en este evento">
       ${pool.map(id => {
@@ -4965,7 +4958,19 @@ function doSpecialPirate(island) {
           <b>${seen ? esc(c.name) : '???'}</b><span class="special-pool-stars">${'⭐'.repeat(c.rareza)}</span>
         </div>`;
       }).join('')}
-    </div>
+    </div>`;
+}
+
+function doSpecialPirate(island) {
+  meta.starPity = meta.starPity || 0;
+  const lvl = island.lvl[1] + 2;
+  const gachaPrice = specialGachaPrice();
+  const blocked = specialBlockedReason();
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal">
+    <h2>🌟 Mercado clandestino</h2>
+    ${specialPiratePoolHTML()}
     <p class="special-map-price" style="font-size:8px;text-align:center;line-height:1.8;">Mapa ${specialMapMultiplier()} · Carteles ×${specialMapMultiplier()} · 5⭐ solo en carteles</p>
     ${cartelesBadgeHTML()}
     <div style="font-size:9.5px;text-align:center;margin-top:6px;margin-bottom:6px;color:#f39c12;background:rgba(243,156,18,0.12);padding:6px 10px;border-radius:6px;border:1px solid rgba(243,156,18,0.4);display:flex;align-items:center;justify-content:center;gap:6px;">
