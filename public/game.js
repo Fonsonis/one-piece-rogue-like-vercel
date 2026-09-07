@@ -2670,7 +2670,114 @@ function renderCharGrid(el, ids, st, cardFn, bindFn) {
 // ============ MODAL: INVENTARIO DE NAKAMAS ============
 let invViewState = { q: '', type: '', rarity: 0 };
 
+// Keep the roster position when opening another team slot.
+let nakamaPickerState = { q:'', saga:'', type:'', rarity:0, sort:'name', scope:'all', page:0 };
+function showNakamaPicker(opts) {
+  document.querySelector('#inventory-modal-overlay')?.remove();
+  const previousFocus = document.activeElement;
+  const st = nakamaPickerState;
+  const team = opts.currentTeam || [];
+  const unlocked = [...new Set(['luffy', ...(meta.roster || [])])].filter(id => CHARS[id] && isNakamaUnlocked(id));
+  const display = id => luffyFormAt(id, startLvlOf(id));
+  const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const sagaIds = new Set(unlocked.map(id => CHARS[display(id)].saga));
+  const sagas = SAGAS.filter(s => sagaIds.has(s.id));
+  if (!sagas.some(s => s.id === st.saga)) st.saga = '';
+  const ov = document.createElement('div');
+  ov.id = 'inventory-modal-overlay';
+  ov.className = 'overlay nakama-picker-overlay';
+  ov.innerHTML = `<section class="modal nakama-picker" role="dialog" aria-modal="true" aria-labelledby="nakama-picker-title" aria-describedby="nakama-picker-hint">
+    <header class="nakama-picker-header"><div><small>TU TRIPULACIÓN</small><h2 id="nakama-picker-title">${esc(opts.title || 'Elige un nakama')}</h2></div><button class="btn gray" id="np-close" aria-label="Cerrar selector">✕</button></header>
+    <p id="nakama-picker-hint">Pulsa un retrato para elegirlo. Los nakamas de otro hueco se intercambian.</p>
+    <div class="nakama-picker-filters">
+      <label>Nombre<input id="np-search" type="search" placeholder="Buscar nakama…" value="${esc(st.q)}" autocomplete="off"></label>
+      <label>Saga<select id="np-saga"><option value="">Todas las sagas</option>${sagas.map(s => `<option value="${esc(s.id)}" ${st.saga === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+    </div>
+    <div class="nakama-picker-scopes" role="group" aria-label="Disponibilidad">${[['all','Todos'],['free','Fuera del equipo'],['team','En el equipo']].map(([value,label]) => `<button class="btn gray" data-scope="${value}" aria-pressed="${st.scope === value}">${label}</button>`).join('')}</div>
+    <details class="nakama-picker-more"><summary>Tipo, rareza y orden</summary><div class="nakama-picker-extra">
+      <label>Tipo<select id="np-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t => `<option value="${esc(t)}" ${st.type === t ? 'selected' : ''}>${TYPES[t].emoji} ${esc(t)}</option>`).join('')}</select></label>
+      <label>Rareza<select id="np-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r => `<option value="${r}" ${+st.rarity === r ? 'selected' : ''}>${r} estrellas</option>`).join('')}</select></label>
+      <label>Orden<select id="np-sort">${[['name','Nombre A–Z'],['rarezaDesc','Mayor rareza'],['statTotalDesc','Stats base totales'],['atkDesc','Ataque base'],['spatkDesc','Ataque especial base'],['spdDesc','Velocidad base']].map(([value,label]) => `<option value="${value}" ${st.sort === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+    </div></details>
+    <div class="nakama-picker-summary"><span id="np-count" role="status"></span><button class="btn gray" id="np-reset">Limpiar filtros</button></div>
+    <div class="nakama-picker-roster" id="np-roster"></div>
+    <footer class="nakama-picker-pages"><button class="btn gray" id="np-prev" aria-label="Página anterior">◀</button><span id="np-page" role="status"></span><button class="btn gray" id="np-next" aria-label="Página siguiente">▶</button></footer>
+  </section>`;
+  document.body.appendChild(ov);
+  const find = sel => ov.querySelector(sel);
+  const close = () => { ov.remove(); if (previousFocus?.isConnected) previousFocus.focus(); };
+  const draw = () => {
+    const ids = filterSortChars(unlocked, st, display).filter(id => st.scope === 'all' || (st.scope === 'team' ? team.includes(id) : !team.includes(id)));
+    const pageSize = 12, pages = Math.max(1, Math.ceil(ids.length / pageSize));
+    st.page = clamp(st.page, 0, pages - 1);
+    find('#np-count').textContent = `${ids.length} de ${unlocked.length} nakamas`;
+    find('#np-page').textContent = `Página ${st.page + 1} de ${pages}`;
+    find('#np-prev').disabled = st.page === 0;
+    find('#np-next').disabled = st.page === pages - 1;
+    find('#np-reset').disabled = !st.q && !st.saga && !st.type && !+st.rarity && st.scope === 'all' && st.sort === 'name';
+    find('.nakama-picker-more').classList.toggle('filtered', !!st.type || !!+st.rarity || st.sort !== 'name');
+    ov.querySelectorAll('[data-scope]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.scope === st.scope)));
+    find('#np-roster').innerHTML = ids.slice(st.page * pageSize, (st.page + 1) * pageSize).map(id => {
+      const c = CHARS[display(id)], current = opts.selectedId === id;
+      return `<article class="nakama-picker-card ${team.includes(id) ? 'in-team' : ''}">
+        <button class="nakama-picker-pick" data-id="${esc(id)}" aria-label="Elegir a ${esc(c.name)}${current ? ', en este hueco' : team.includes(id) ? ', en el equipo' : ''}">
+          <span class="nakama-picker-badge">${current ? 'Este hueco' : team.includes(id) ? 'En equipo' : ''}</span>
+          ${charIcon(display(id), 48)}<strong>${esc(c.name)}</strong><span>Nv. ${startLvlOf(id)} · ${c.rareza} ★</span><span class="type-badges">${typeBadges(c.types)}</span>
+        </button><button class="nakama-picker-info" data-info="${esc(id)}" aria-label="Ver ficha de ${esc(c.name)}" title="Ver ficha">ⓘ</button>
+      </article>`;
+    }).join('') || '<p class="nakama-picker-empty">No hay nakamas con estos filtros. Prueba otra saga o pulsa «Limpiar filtros».</p>';
+    find('#np-roster').scrollTop = 0;
+    ov.querySelectorAll('[data-id]').forEach(btn => btn.onclick = () => { close(); opts.onSelect(btn.dataset.id); });
+    ov.querySelectorAll('[data-info]').forEach(btn => btn.onclick = () => {
+      showCharModal(btn.dataset.info);
+      const closeSheet = document.querySelector('#sheet-close');
+      const sheet = closeSheet.closest('.overlay');
+      const returnToPicker = () => { sheet.remove(); btn.focus(); };
+      closeSheet.onclick = returnToPicker;
+      sheet.onclick = e => { if (e.target === sheet) returnToPicker(); };
+      sheet.onkeydown = e => {
+        if (e.key === 'Escape') { e.preventDefault(); returnToPicker(); }
+        if (e.key === 'Tab') {
+          const buttons = [...sheet.querySelectorAll('button:not(:disabled)')];
+          const first = buttons[0], last = buttons[buttons.length - 1];
+          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      };
+      closeSheet.focus();
+    });
+  };
+  find('#np-close').onclick = close;
+  find('#np-search').oninput = e => { st.q = e.target.value; st.page = 0; draw(); };
+  for (const key of ['saga','type','rarity','sort']) find(`#np-${key}`).onchange = e => { st[key] = e.target.value; st.page = 0; draw(); };
+  ov.querySelectorAll('[data-scope]').forEach(btn => btn.onclick = () => { st.scope = btn.dataset.scope; st.page = 0; draw(); });
+  find('#np-reset').onclick = () => {
+    Object.assign(st, {q:'', saga:'', type:'', rarity:0, sort:'name', scope:'all', page:0});
+    find('#np-search').value = '';
+    for (const key of ['saga','type','rarity','sort']) find(`#np-${key}`).value = st[key];
+    draw();
+  };
+  for (const [key, step] of [['prev',-1],['next',1]]) find(`#np-${key}`).onclick = () => {
+    st.page += step; draw();
+    // A disabled paging control must not strand keyboard focus.
+    if (find(`#np-${key}`).disabled) find('.nakama-picker-pick')?.focus();
+  };
+  ov.onclick = e => { if (e.target === ov) close(); };
+  ov.onkeydown = e => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    if (e.key === 'Tab') {
+      const focusable = [...ov.querySelectorAll('button:not(:disabled),input,select,summary')].filter(el => el.getClientRects().length);
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  };
+  draw();
+  find('#np-close').focus();
+}
+
 function showInventoryModal(opts = {}) {
+  if (opts.onSelect) return showNakamaPicker(opts);
   const onSelect = opts.onSelect || null;
   const currentTeam = opts.currentTeam || [];
   const title = opts.title || '🎒 INVENTARIO DE NAKAMAS';
@@ -3208,6 +3315,7 @@ function screenStarter(sagaIdx, islandIdx = 0) {
     showInventoryModal({
       title: `Añadir / Sustituir Nakama (Hueco ${slotIdx + 1})`,
       currentTeam: picked,
+      selectedId: picked[slotIdx],
       onSelect: (newId) => {
         const existingIdx = picked.indexOf(newId);
         if (existingIdx >= 0 && existingIdx !== slotIdx) {

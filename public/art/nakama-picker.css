@@ -1,0 +1,44 @@
+.nakama-picker-overlay { padding:12px; }
+.modal.nakama-picker { width:100%; max-width:780px; max-height:calc(100dvh - 24px); padding:18px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; color:var(--ink); font:14px/1.4 system-ui,sans-serif; }
+.nakama-picker-header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.nakama-picker-header small { color:var(--sea); font-weight:700; letter-spacing:2px; }
+.nakama-picker .nakama-picker-header h2 { margin:4px 0 0; font:700 20px/1.3 system-ui,sans-serif; color:var(--ink); text-align:left; }
+.nakama-picker #nakama-picker-hint { margin:0; font-size:13px; }
+.nakama-picker :is(button,input,select,summary):focus-visible { outline:3px solid var(--accent); outline-offset:2px; }
+.nakama-picker :is(.btn,input,select,summary) { min-height:44px; font:inherit; }
+.nakama-picker :is(input,select) { width:100%; min-width:0; padding:8px; background:var(--paper); color:var(--ink); border:1px solid #879d9c; border-radius:6px; }
+.nakama-picker-filters { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.nakama-picker label { display:flex; flex-direction:column; gap:4px; min-width:0; font-size:13px; font-weight:600; }
+.nakama-picker-scopes { display:flex; gap:6px; flex-wrap:wrap; }
+.nakama-picker-scopes .btn { flex:1; padding:6px 8px; }
+.nakama-picker-scopes [aria-pressed="true"] { background:var(--sea); color:white; border-color:var(--sea); box-shadow:inset 0 0 0 2px var(--paper); }
+html[data-theme="dark"] .nakama-picker-scopes .btn[aria-pressed="true"] { background:var(--sea); color:var(--paper); border-color:var(--sea); }
+.nakama-picker-more summary { cursor:pointer; padding:10px 0; }
+.nakama-picker-more.filtered summary::after { content:' · Filtros activos'; color:var(--sea); font-weight:700; }
+.nakama-picker-extra { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; padding:0 0 8px; }
+.nakama-picker-summary { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:13px; }
+.nakama-picker-summary .btn { padding:6px 10px; }
+.nakama-picker-roster { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; min-height:150px; overflow-y:auto; flex:1 1 auto; padding:4px; border:1px solid #91aaa9; border-radius:8px; background:var(--paper-dark); }
+.nakama-picker-card { position:relative; min-width:0; border:2px solid #91aaa9; border-radius:7px; background:var(--paper); }
+.nakama-picker-card.in-team { border-color:var(--sea); }
+.nakama-picker-pick { display:flex; flex-direction:column; align-items:center; gap:4px; width:100%; height:100%; padding:6px; background:transparent; color:var(--ink); border:0; border-radius:5px; cursor:pointer; font:12px/1.3 system-ui,sans-serif; }
+.nakama-picker-pick:hover { background:var(--paper-dark); }
+.nakama-picker-pick strong { font-size:14px; overflow-wrap:anywhere; }
+.nakama-picker-badge { align-self:flex-start; min-height:24px; padding:0 30px 0 0; font-size:10px; color:var(--sea); font-weight:700; text-align:left; }
+.nakama-picker-pick .type-badges { justify-content:center; flex-wrap:wrap; }
+.nakama-picker-info { position:absolute; top:0; right:0; width:44px; height:44px; border:0; background:transparent; color:var(--sea); font:22px system-ui,sans-serif; cursor:pointer; border-radius:5px; }
+.nakama-picker-pages { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-shrink:0; }
+.nakama-picker-pages .btn { min-width:48px; }
+.nakama-picker-empty { grid-column:1/-1; padding:20px; text-align:center; }
+#inventory-modal-overlay .modal > #np-roster { flex:1 1 auto; }
+@media(max-width:540px) {
+  .modal.nakama-picker { padding:12px; gap:8px; }
+  .nakama-picker .nakama-picker-header h2 { font-size:17px; }
+  .nakama-picker-filters { grid-template-columns:1fr; gap:6px; }
+  .nakama-picker-extra { grid-template-columns:1fr; }
+  .nakama-picker-roster { grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
+  .nakama-picker-pick strong { font-size:12px; }
+  .nakama-picker-pick { padding:4px; }
+  .nakama-picker-scopes .btn { font-size:12px; }
+  .nakama-picker-badge { font-size:9px; }
+}
