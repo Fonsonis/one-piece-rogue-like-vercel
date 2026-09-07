@@ -8,19 +8,41 @@ function setup() {
   return h;
 }
 
-test('nine slots pack ten posters together; large food occupies its full footprint', () => {
+test('all items stack in threes and royal meat follows the requested space boundaries', () => {
+  const h = setup();
+  for (const id of h.exec('Object.keys(ITEMS)')) {
+    h.ctx.itemId = id;
+    assert.equal(h.exec('backpackUsed({[itemId]:3})'),h.exec('ITEMS[itemId].slotSize'),id);
+    assert.equal(h.exec('backpackUsed({[itemId]:4})'),h.exec('ITEMS[itemId].slotSize * 2'),id);
+  }
+  for (const [count,spaces] of [[1,2],[3,2],[4,4],[6,4],[7,6]]) {
+    assert.equal(h.exec(`backpackUsed({carnereal:${count}})`),spaces);
+  }
+  h.exec('run.items={carnereal:6}');
+  assert.deepEqual(Array.from(h.exec('backpackStacks(run).map(s=>s.count)')),[3,3]);
+  h.exec('meta.fame=900;buyBackpackUpgrade()');
+  assert.equal(h.exec('backpackStackLimit()'),4);
+  assert.equal(h.exec('backpackUsed({carnereal:4})'),2);
+  assert.deepEqual(Array.from(h.exec('backpackStacks(run).map(s=>s.count)')),[4,2]);
+  h.exec('buyBackpackUpgrade()');
+  assert.equal(h.exec('backpackStackLimit()'),5);
+  assert.equal(h.exec('backpackUsed({carnereal:5})'),2);
+  assert.equal(h.exec('run.items.carnereal'),6);
+});
+
+test('nine slots pack three identical items together; large food keeps its footprint', () => {
   const h = setup();
   assert.equal(h.exec('backpackCapacity()'),9);
-  for (const [qty,slots] of [[1,1],[10,1],[11,2],[20,2],[21,3]]) {
+  for (const [qty,slots] of [[1,1],[3,1],[4,2],[6,2],[7,3]]) {
     assert.equal(h.exec(`backpackUsed({cartel:${qty}})`),slots);
   }
   assert.equal(h.exec('backpackUsed({carne:1,carnereal:1,sake:1})'),7);
-  h.exec('run.items={cartel:11,carne:3,carnereal:1,sake:1}');
+  h.exec('run.items={cartel:4,carne:9,carnereal:1,sake:1}');
   assert.equal(h.exec('backpackUsed(run.items,true)'),9);
   assert.equal(h.exec('backpackUsed(run.items,false)'),2);
   assert.equal(h.exec('addBackpackItem(run,"carne")'),false);
   assert.equal(h.exec('addBackpackItem(run,"cartel")'),true);
-  assert.equal(h.exec('run.items.cartel'),12);
+  assert.equal(h.exec('run.items.cartel'),5);
   assert.equal(h.exec('backpackFits(run,"carteldorado")'),true);
   h.exec('run.items.sake--');
   assert.equal(h.exec('backpackUsed(run.items,true)'),5);
@@ -34,13 +56,13 @@ test('nine slots pack ten posters together; large food occupies its full footpri
   assert.equal((pieces('carnereal').join('').match(/bag-occupied/g)||[]).length,2);
   assert.equal((pieces('sake').join('').match(/bag-occupied/g)||[]).length,4);
   assert.equal((pieces('sake').join('').match(/class="bag-icon"/g)||[]).length,1);
-  assert.match(html,/×10/);
+  assert.match(html,/×3/);
   assert.match(html,/×2/);
 });
 
 test('full bags save pending loot, stop auto travel, and can collect after space is released', () => {
   const h = setup();
-  h.exec('run.items={carne:9};autoMode=true;receiveBackpackItem(run,"sake");saveRun()');
+  h.exec('run.items={carne:27};autoMode=true;receiveBackpackItem(run,"sake");saveRun()');
   assert.equal(h.exec('autoMode'),false);
   assert.equal(h.exec('run.items.sake || 0'),0);
   assert.equal(h.exec('run.pendingLoot.sake'),1);
@@ -54,7 +76,7 @@ test('full bags save pending loot, stop auto travel, and can collect after space
   h.exec('bindBackpack(bagRoot,run,false,()=>{})');
   button.onclick();
   assert.equal(h.exec('run.pendingLoot.sake'),1);
-  h.exec('run.items.carne-=4');
+  h.exec('run.items.carne-=12');
   button.onclick(); button.onclick();
   assert.equal(h.exec('run.items.sake'),1);
   assert.equal(h.exec('hasPendingLoot(run)'),false);
@@ -63,9 +85,9 @@ test('full bags save pending loot, stop auto travel, and can collect after space
 
 test('migration and oversized starting provisions preserve every unit without exceeding capacity', () => {
   const h = setup();
-  h.exec('delete run.backpackVersion;run.items={cartel:27,carne:4,sake:3,hierro:1};prepareBackpack(run)');
+  h.exec('delete run.backpackVersion;run.items={cartel:90,carne:4,sake:3,hierro:1};prepareBackpack(run)');
   assert.ok(h.exec('[false,true].every(combat=>backpackUsed(run.items,combat)<=9)'));
-  for (const [id,count] of [['cartel',27],['carne',4],['sake',3],['hierro',1]]) {
+  for (const [id,count] of [['cartel',90],['carne',4],['sake',3],['hierro',1]]) {
     assert.equal(h.exec(`(run.items.${id}||0)+(run.pendingLoot.${id}||0)`),count);
   }
   const before = h.exec('JSON.stringify(run)');
@@ -89,9 +111,11 @@ test('permanent expansion charges 300, 600, 900 Fama and survives a new run and 
   assert.equal(h.exec('meta.fame'),0);
   h.exec('startRun(0,["luffy"]);meta=GameSaveStorage.parse(JSON.stringify(GameSaveStorage.payload(meta,run))).meta');
   assert.equal(h.exec('backpackCapacity()'),18);
+  assert.equal(h.exec('backpackStackLimit()'),6);
   h.exec('meta.global.backpackTier=17;meta.fame=99999');
   assert.equal(h.exec('buyBackpackUpgrade()'),false);
   assert.equal(h.exec('meta.fame'),99999);
+  assert.equal(h.exec('backpackStackLimit()'),20);
 });
 
 test('shop hides iron and never charges for a purchase that no longer fits', () => {
@@ -100,12 +124,12 @@ test('shop hides iron and never charges for a purchase that no longer fits', () 
   const buy = {dataset:{buy:'sake'}};
   h.ctx.render = s => {html=s;};
   h.ctx.document.querySelectorAll = selector=>selector==='[data-buy]'?[buy]:[];
-  h.exec('run.items={carne:9};run.berries=10000;screenShop()');
+  h.exec('run.items={carne:27};run.berries=10000;screenShop()');
   assert.doesNotMatch(html,/data-buy="hierro"/);
   assert.match(html,/SIN ESPACIO/);
   buy.onclick();
   assert.equal(h.exec('run.berries'),10000);
-  h.exec('run.items.carne=5');
+  h.exec('run.items.carne=15');
   buy.onclick();
   assert.equal(h.exec('run.berries'),9600);
   assert.equal(h.exec('run.items.sake'),1);
@@ -145,12 +169,12 @@ test('new save fields reject malformed capacity and pending inventory', () => {
 
 test('tower provisions and floor rewards share the capacity limit and wait for overflow resolution', () => {
   const h = setup();
-  h.exec(`tower={floor:2,team:[makeChar('luffy',15)],items:{bocadillo:3,sake:1}};prepareBackpack(tower);`);
+  h.exec(`tower={floor:2,team:[makeChar('luffy',15)],items:{bocadillo:9,sake:1}};prepareBackpack(tower);`);
   assert.equal(h.exec('backpackUsed(tower.items)'),9);
   assert.equal(h.exec('tower.pendingLoot.sake'),1);
   h.exec(`tower.pendingLoot={};let nextFloor=0,organize=0;showTowerBackpack=()=>organize++;towerNextBattle=()=>nextFloor++;endTowerBattle(true);`);
   assert.equal(h.exec('tower.floor'),3);
-  assert.equal(h.exec('tower.items.bocadillo'),3);
+  assert.equal(h.exec('tower.items.bocadillo'),9);
   assert.equal(h.exec('tower.pendingLoot.bocadillo'),1);
   assert.equal(h.exec('nextFloor'),0);
   assert.equal(h.exec('organize'),1);

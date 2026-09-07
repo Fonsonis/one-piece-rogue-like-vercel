@@ -665,18 +665,18 @@ const CHARS = {
 
 // ============ OBJETOS ============
 const ITEMS = {
-  carne:        { slotSize: 1, stackLimit: 1, name: 'Carne',              emoji: '🍖', desc: 'Restaura 30 PS.', price: 100, kind: 'heal', val: 30 },
-  carnereal:    { slotSize: 2, stackLimit: 1, name: 'Carne Real',         emoji: '🍗', desc: 'Restaura 80 PS.', price: 250, kind: 'heal', val: 80 },
-  bocadillo:    { slotSize: 3, stackLimit: 1, name: 'Plato de Sanji',     emoji: '🍱', desc: 'Restaura todos los PS.', price: 500, kind: 'heal', val: 9999 },
-  sake:         { slotSize: 4, stackLimit: 1, name: 'Sake de Binks',      emoji: '🍶', desc: 'Revive a un nakama con la mitad de PS.', price: 400, kind: 'revive', val: 0.5 },
-  bebida_ataque: { slotSize: 2, stackLimit: 1, name: 'Bebida de Ataque', emoji: '🥤', desc: '+25% de ataque físico y especial al nakama activo hasta el final del combate. No se acumula.', price: 200, kind: 'battleBoost', stat: 'atk', val: 0.25 },
-  bebida_defensa: { slotSize: 2, stackLimit: 1, name: 'Bebida de Defensa', emoji: '🧃', desc: '+25% de defensa física y especial al nakama activo hasta el final del combate. No se acumula.', price: 200, kind: 'battleBoost', stat: 'def', val: 0.25 },
-  cartel:       { slotSize: 1, stackLimit: 10, name: 'Cartel de Recluta',  emoji: '📜', desc: 'Al tentar la suerte, rompe 1 cadena garantizada.', price: 150, kind: 'ball', val: 1 },
-  carteldorado: { slotSize: 1, stackLimit: 10, name: 'Cartel Dorado',      emoji: '🏅', desc: 'Al tentar la suerte, rompe 2 cadenas garantizadas.', price: 350, kind: 'ball', val: 2 },
-  cartelbuster: { slotSize: 1, stackLimit: 10, name: 'Buster Call',        emoji: '📯', desc: 'Rompe las 3 cadenas: reclutamiento garantizado.', price: 800, kind: 'ball', val: 3.5 },
-  proteina:     { slotSize: 1, stackLimit: 1, name: 'Proteína de Franky', emoji: '🥤', desc: '+2 ATQ permanente al nakama activo.', price: 600, kind: 'boost', stat: 1 },
-  hierro:       { slotSize: 2, stackLimit: 1, name: 'Placa de Hierro',    emoji: '🛡️', desc: '+2 DEF permanente al nakama activo.', price: 600, kind: 'boost', stat: 2 },
-  fruta_diablo: { slotSize: 2, stackLimit: 1, name: 'Fruta del Diablo',   emoji: '🍈', desc: 'Concede un nuevo Tag/Sinergia elemental a 2 nakamas activos.', price: 1000, kind: 'fruta' },
+  carne:        { slotSize: 1, name: 'Carne',              emoji: '🍖', desc: 'Restaura 30 PS.', price: 100, kind: 'heal', val: 30 },
+  carnereal:    { slotSize: 2, name: 'Carne Real',         emoji: '🍗', desc: 'Restaura 80 PS.', price: 250, kind: 'heal', val: 80 },
+  bocadillo:    { slotSize: 3, name: 'Plato de Sanji',     emoji: '🍱', desc: 'Restaura todos los PS.', price: 500, kind: 'heal', val: 9999 },
+  sake:         { slotSize: 4, name: 'Sake de Binks',      emoji: '🍶', desc: 'Revive a un nakama con la mitad de PS.', price: 400, kind: 'revive', val: 0.5 },
+  bebida_ataque: { slotSize: 2, name: 'Bebida de Ataque', emoji: '🥤', desc: '+25% de ataque físico y especial al nakama activo hasta el final del combate. No se acumula.', price: 200, kind: 'battleBoost', stat: 'atk', val: 0.25 },
+  bebida_defensa: { slotSize: 2, name: 'Bebida de Defensa', emoji: '🧃', desc: '+25% de defensa física y especial al nakama activo hasta el final del combate. No se acumula.', price: 200, kind: 'battleBoost', stat: 'def', val: 0.25 },
+  cartel:       { slotSize: 1, name: 'Cartel de Recluta',  emoji: '📜', desc: 'Al tentar la suerte, rompe 1 cadena garantizada.', price: 150, kind: 'ball', val: 1 },
+  carteldorado: { slotSize: 1, name: 'Cartel Dorado',      emoji: '🏅', desc: 'Al tentar la suerte, rompe 2 cadenas garantizadas.', price: 350, kind: 'ball', val: 2 },
+  cartelbuster: { slotSize: 1, name: 'Buster Call',        emoji: '📯', desc: 'Rompe las 3 cadenas: reclutamiento garantizado.', price: 800, kind: 'ball', val: 3.5 },
+  proteina:     { slotSize: 1, name: 'Proteína de Franky', emoji: '🥤', desc: '+2 ATQ permanente al nakama activo.', price: 600, kind: 'boost', stat: 1 },
+  hierro:       { slotSize: 2, name: 'Placa de Hierro',    emoji: '🛡️', desc: '+2 DEF permanente al nakama activo.', price: 600, kind: 'boost', stat: 2 },
+  fruta_diablo: { slotSize: 2, name: 'Fruta del Diablo',   emoji: '🍈', desc: 'Concede un nuevo Tag/Sinergia elemental a 2 nakamas activos.', price: 1000, kind: 'fruta' },
 };
 
 // ============ SAGAS / ISLAS ============

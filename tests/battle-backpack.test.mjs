@@ -13,7 +13,7 @@ function setup(towerMode=false) {
 
 test('combat bag has its own free space and only displays usable items',()=>{
   const h=setup();
-  h.exec('run.items={cartel:11,fruta_diablo:1,carne:1,bebida_ataque:1,bebida_defensa:1};run.pendingLoot={cartel:1}');
+  h.exec('run.items={cartel:4,fruta_diablo:1,carne:1,bebida_ataque:1,bebida_defensa:1};run.pendingLoot={cartel:1}');
   const html=h.exec('backpackHTML(run,true)');
   assert.doesNotMatch(html,/data-bag-item="(?:cartel|fruta_diablo)"|data-bag-collect="cartel"/);
   for(const id of ['carne','bebida_ataque','bebida_defensa']) assert.ok(html.includes(`data-bag-item="${id}"`));
@@ -69,11 +69,11 @@ test('drinks are sold for 200 Berries and need two free slots; iron stays unavai
   const h=setup();let html='';const button={dataset:{buy:'bebida_defensa'}};
   h.ctx.render=s=>html=s;
   h.ctx.document.querySelectorAll=s=>s==='[data-buy]'?[button]:[];
-  h.exec('battle=null;run.items={carne:8};run.berries=500;screenShop()');
+  h.exec('battle=null;run.items={carne:24};run.berries=500;screenShop()');
   assert.match(html,/data-buy="bebida_ataque"/);assert.match(html,/data-buy="bebida_defensa"/);
   assert.doesNotMatch(html,/data-buy="hierro"/);
   button.onclick();assert.equal(h.exec('run.berries'),500);
-  h.exec('run.items.carne=7');button.onclick();
+  h.exec('run.items.carne=21');button.onclick();
   assert.equal(h.exec('run.berries'),300);assert.equal(h.exec('backpackUsed(run.items)'),9);
   h.exec("useItemFromMap('bebida_defensa')");
   assert.equal(h.exec('run.items.bebida_defensa'),1);
@@ -82,7 +82,7 @@ test('drinks are sold for 200 Berries and need two free slots; iron stays unavai
 
 test('both bags have independent capacity but one permanent upgrade and save migration',()=>{
   const h=setup();
-  h.exec('run.items={cartel:90,carne:9};prepareBackpack(run);meta.fame=300');
+  h.exec('run.items={cartel:27,carne:27};prepareBackpack(run);meta.fame=300');
   assert.equal(h.exec('backpackUsed(run.items,false)'),9);
   assert.equal(h.exec('backpackUsed(run.items,true)'),9);
   assert.equal(h.exec('hasPendingLoot(run)'),false);
@@ -94,9 +94,9 @@ test('both bags have independent capacity but one permanent upgrade and save mig
   assert.equal(h.exec('backpackCapacity()'),12);
   assert.equal(h.exec('meta.fame'),0);
   assert.equal(h.exec('addBackpackItem(run,"bebida_ataque")'),true);
-  assert.equal(h.exec('addBackpackItem(run,"cartel",120)'),true);
+  assert.equal(h.exec('addBackpackItem(run,"cartel",48)'),true);
   h.exec('loadedSave=GameSaveStorage.parse(JSON.stringify(GameSaveStorage.payload(meta,run)));validateGameSave(loadedSave);loadRun()');
   assert.equal(h.exec('backpackUsed(run.items,false)'),12);
-  assert.equal(h.exec('backpackUsed(run.items,true)'),11);
+  assert.equal(h.exec('backpackUsed(run.items,true)'),9);
   assert.equal(h.exec('hasPendingLoot(run)'),false);
 });
