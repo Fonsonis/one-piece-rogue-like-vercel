@@ -1,5 +1,13 @@
 # Ajustes de interfaz, progreso y sprites
 
+## Icono de Cross Guild
+
+`public/art/cross-guild-map.png`, generado con imagegen integrado, sustituye únicamente el icono del nodo `special` en el mapa. Verificado con transparencia alfa real y a 36 × 36 píxeles en navegador.
+
+Prompt: “Create one game map icon for Cross Guild from One Piece, pixel-art pirate faction emblem for a clandestine recruiting market. A front-facing ivory grinning pirate skull with Buggy's unmistakable ROUND RED CLOWN NOSE, dark eye sockets and blue hair tufts, against a compact crossed blade motif evoking Mihawk and a golden hook evoking Crocodile. Cross Guild identity, not Straw Hat pirates: NO straw hat. Strong simple silhouette, dark navy outlines, ivory, red, blue and antique gold palette, crisp deliberate pixel clusters, readable at only 32 to 48 pixels. Single centered isolated emblem, square canvas, 15% margin on every edge. No scenery, no lettering, no title, no border, no watermark. Actual transparent PNG RGBA alpha background: empty space alpha zero, not painted black or a checkerboard. Production sprite icon.”
+
+## Atlas
+
 Los atlas `public/art/event-atlas.png` y `public/art/ui-atlas.png` se generaron con la herramienta integrada imagegen el 7 de septiembre de 2026. Son PNG RGBA, con 36 celdas por atlas (6 × 6). `event-sprites.js` sustituye las representaciones visuales, conservando los textos originales de datos y guardados. Los controles nativos de selección mantienen texto porque no admiten imágenes en sus opciones.
 
 Dirección del prompt: sprites pixel art para un RPG pirata, contorno azul marino, oro, turquesa y crema, celdas iguales, iconos centrados y fondo alfa transparente. Orden de los elementos:
