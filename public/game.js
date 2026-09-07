@@ -1960,7 +1960,7 @@ function screenHome() {
     </div>
     <div style="text-align:center;margin-top:8px;">
       <button class="btn red small" id="btn-logpose-gacha" style="padding:7px 16px;font-size:9.5px;font-weight:bold;width:100%;max-width:280px;box-shadow:0 2px 6px rgba(231,76,60,0.4);">
-        🎰 TIRADA DE CARTELES (🧭 ${meta.logPoses || 0})
+        <img class="carteles-menu-icon" src="/art/cross-guild-map.png" alt="" aria-hidden="true" draggable="false"> CARTELES (🧭 ${meta.logPoses || 0})
       </button>
     </div>
     <div style="text-align:center;margin-top:8px;">
