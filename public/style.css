@@ -480,7 +480,7 @@ button { font-family: inherit; cursor: pointer; }
 }
 .poster .poster-stars { font-size: 7px; margin-bottom: 4px; }
 .poster-face { font-size: 22px; line-height: 1.2; }
-.poster-face span { font-size: 6px; display: block; margin-top: 3px; }
+.poster-face span:not(.event-sprite) { font-size: 6px; display: block; margin-top: 3px; }
 .poster.next { opacity: 1; cursor: pointer; border-color: var(--gold); animation: posterPulse .8s infinite alternate; }
 @keyframes posterPulse { from { transform: scale(1); } to { transform: scale(1.07); } }
 .poster.empty { opacity: .35; filter: grayscale(1); }
