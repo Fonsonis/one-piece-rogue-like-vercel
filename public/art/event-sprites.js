@@ -4,13 +4,14 @@
     ['🍖'],['🍗'],['🍱','🍽️','🥪'],['🍶'],['📜','📃'],['🏅'],
     ['📯'],['🥤'],['🛡️','🛡'],['🍈','🍇'],['🎁','🧰'],['⛺','🏕️'],
     ['⚔️','⚔'],['🏴‍☠️'],['💀','☠️'],['🏪','🛒'],['❓','❔','🎲'],['🌟','🎰'],
-    ['🧭','🎯','📍'],['⛵','🚢','🛳️','⚓'],['🎒','📦'],['💰','🪙'],['⭐','🏆','✨','🌠'],['🔒','🔐'],
+    ['🧭','🎯','📍'],['⛵','🚢','🛳️','⚓'],['🎒','📦'],['💰','🪙'],['🏆','✨','🌠'],['🔒','🔐'],
     ['🔥'],['❄️','🧊'],['☣️','🧪','🐍'],['💨','🌪️','🐌'],['🌊','💧','♨️'],['⚡'],
     ['🌑','🌌'],['👊','💪','🥊'],['🔫','💥'],['🗡️'],['❤️','💚','💖','💕','💗','♥️','💊'],['🌀','🌈']
   ];
   const labels = ['Carne','Carne real','Comida','Sake','Cartel','Cartel dorado','Buster Call','Proteína','Defensa','Fruta del Diablo','Tesoro','Campamento','Combate','Pirata','Jefe','Tienda','Misterio','Pirata especial','Log Pose','Viaje','Mochila','Berries','Estrella','Bloqueado','Fuego','Hielo','Veneno','Viento','Agua','Rayo','Oscuridad','Golpe','Disparo','Corte','Curación','Portal'];
-  const uiGroups = [['💾'],['⚙️','⚙'],['ℹ️','ⓘ'],['🔎','🔍'],['📂','📁'],['🗑️'],['👥','👤','🤝'],['🌍','🌎','🌏','🌐'],['🧢'],['🗼','🏰'],['📋','📖','📚'],['📊','📈'],['⛓️','🔗'],['⛓️‍💥'],['🕸️'],['🥋','👴'],['🧑‍🌾'],['🏝️','🏝','🏖️'],['★'],['➕'],['✅','✔️'],['❌','🚫','⛔'],['🔄','🔁'],['⬆️','🔼'],['🎲'],['⚠️','🚨','❗'],['⏳','⏱️','⏰'],['💔'],['🩹','🏥'],['👑'],['🎵','🎶'],['🔊','🔉'],['🔇'],['🏃','🏃‍♂️','👟'],['🎮','🕹️'],['🦴']];
+  const uiGroups = [['💾'],['⚙️','⚙'],['ℹ️','ⓘ'],['🔎','🔍'],['📂','📁'],['🗑️'],['👥','👤','🤝'],['🌍','🌎','🌏','🌐'],['🧢'],['🗼','🏰'],['📋','📖','📚'],['📊','📈'],['⛓️','🔗'],['⛓️‍💥'],['🕸️'],['🥋','👴'],['🧑‍🌾'],['🏝️','🏝','🏖️'],[],['➕'],['✅','✔️'],['❌','🚫','⛔'],['🔄','🔁'],['⬆️','🔼'],['🎲'],['⚠️','🚨','❗'],['⏳','⏱️','⏰'],['💔'],['🩹','🏥'],['👑'],['🎵','🎶'],['🔊','🔉'],['🔇'],['🏃','🏃‍♂️','👟'],['🎮','🕹️'],['🦴']];
   labels.push('Guardar','Ajustes','Información','Buscar','Equipo guardado','Eliminar','Tripulación','Mundo','Marine','Torre','Registro','Estadísticas','Cadena','Cadena rota','Trampa','Entrenamiento','Aldeano','Isla','Estrella','Añadir','Confirmado','Cancelar','Cambiar','Mejorar','Azar','Aviso','Tiempo','Derrota','Curar','Corona','Música','Sonido','Silencio','Correr','Juego','Huesos');
+  // Keep the original star glyphs for character rarity, fusion and their labels.
   const icons = new Map([...groups,...uiGroups].flatMap((list,index) => list.map(symbol => [symbol,index])));
   const pattern = new RegExp([...icons.keys()].sort((a,b)=>b.length-a.length).map(s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('|'),'gu');
   function paint(root) {
