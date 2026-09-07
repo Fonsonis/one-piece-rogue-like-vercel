@@ -1003,10 +1003,10 @@ function trackKills(qty = 1) {
 
 function berriesHTML(v) { return `฿${v.toLocaleString('es')}`; }
 
-function topbar(showBerries = false, showAuto = showBerries, showSpeed = false) {
+function topbar(showBerries = false, showAuto = showBerries, showSpeed = false, showFlee = false) {
   const autoLabel = !autoMode ? '🤖 PAUSADO' : (autoSettings.speed === 'x1' ? '🤖 AUTO x1' : '🤖 AUTO x2');
   const autoBtnClass = !autoMode ? 'gray' : 'green';
-  const combatSpeed = preferredCombatSpeed();
+  const combatSpeed = battle?.speed ?? preferredCombatSpeed();
   return `<div class="topbar">
     <div class="logo">ONE PIECE <span>ROGUE LIKE</span></div>
     ${showBerries && run ? `<div class="floating-berries"><div class="berries">${berriesHTML(run.berries)}</div></div>` : ''}
@@ -1015,6 +1015,7 @@ function topbar(showBerries = false, showAuto = showBerries, showSpeed = false) 
       <button class="btn small gray" id="btn-settings" title="Ajustes de juego">⚙️ AJUSTES</button>
       ${showSpeed ? `<button class="btn small gray" id="btn-map-speed" title="Velocidad de combate: x1, x2 o x4" aria-label="Velocidad de combate x${combatSpeed}" aria-live="polite">⏩ x${combatSpeed}</button>` : ''}
       <button class="btn small green" id="btn-save" title="Guardar partida en este dispositivo" aria-label="Guardar partida en este dispositivo">💾</button>
+      ${showFlee ? '<button class="btn small red" data-ctl="run">🏃 HUIR</button>' : ''}
     </div>
   </div>`;
 }
@@ -5834,10 +5835,7 @@ function controlsHTML() {
   const b = battle;
   let html = '<div class="battle-control-row battle-tools" aria-label="Controles del combate">';
   html += `<button class="btn small gray battle-crew-button" data-ctl="crew">👥 BANDAS</button>`;
-  html += `<button class="btn small gray" data-ctl="speed" title="Atajo: barra espaciadora">⏩ VELOCIDAD x${b.speed}</button>`;
-  html += `<button class="btn small gray" data-ctl="info">🧩 SINERGIAS Y TIPOS</button>`;
   html += '</div><div class="battle-control-row battle-exit" aria-label="Salir del combate">';
-  if (b.opts.wild && !b.tower) html += `<button class="btn small red" data-ctl="run">🏃 HUIR</button>`;
   if (b.tower) html += `<button class="btn small red" data-ctl="quit">🏳️ RENDIRSE</button>`;
   return html + '</div>';
 }
@@ -5888,7 +5886,7 @@ function renderBattle(logLines) {
   const b = battle;
   const eHead = b.opts.wild ? '🌊' : b.opts.boss ? '💀' : '⚓';
   render(`
-    ${topbar(!b.tower)}
+    ${topbar(!b.tower, !b.tower, true, b.opts.wild && !b.tower)}
     <div class="battle-layout">
       <div class="battle-main">
         <div class="battle-cols" style="--scene:url('${b.tower ? '/art/scenes/marineford.webp' : (SAGAS[run?.saga || 0]?.img || '/art/scenes/eastblue.webp')}')">
