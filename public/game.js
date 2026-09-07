@@ -1542,7 +1542,7 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
     const done = val >= a.goal;
     const claimed = !!meta.claimedAch[a.id];
     const pct = Math.min(100, Math.floor((val / a.goal) * 100));
-    return `<div class="achieve-row ${claimed ? 'done' : ''}">
+    return `<div class="achieve-row ${claimed ? 'done' : ''} ${a.id.startsWith('saga_diff_') ? 'native-difficulty' : ''}">
       <span class="emoji">${a.emoji}</span>
       <div class="info">
         <b>${a.title}</b> — <span style="color:var(--accent);">⭐+${a.fame} Fama</span><br>
@@ -6492,7 +6492,7 @@ function sagaComplete() {
 
   if (isFirstDiffWin) {
     fameWon = Math.round(baseFame * dObj.mult);
-    rewardMessage = `<div style="color:var(--green);font-size:9px;margin-top:6px;">🎉 ¡Primera victoria en Dificultad ${dObj.emoji} ${dObj.name}! Recompensa completa: +${fameWon} ⭐ Fama</div>`;
+    rewardMessage = `<div style="color:var(--green);font-size:9px;margin-top:6px;">🎉 ¡Primera victoria en Dificultad <span class="native-difficulty">${dObj.emoji}</span> ${dObj.name}! Recompensa completa: +${fameWon} ⭐ Fama</div>`;
   } else {
     fameWon = Math.round(baseFame * dObj.mult * 0.2);
     rewardMessage = `<div style="color:var(--accent);font-size:8px;margin-top:6px;">⚠️ Ya habías conquistado esta saga en Dificultad ${dObj.name}. Recompensa reducida: +${fameWon} ⭐ Fama.<br>¡Cambia a otra dificultad para ganar la recompensa completa!</div>`;
@@ -6510,7 +6510,7 @@ function sagaComplete() {
     ${topbar(false)}
     <div class="panel" style="text-align:center;">
       <h2>🏴‍☠️ ¡SAGA CONQUISTADA!</h2>
-      <p style="margin:14px 0;">¡Has derrotado a todos los capitanes del ${saga.name} en Dificultad <b>${dObj.emoji} ${dObj.name}</b>!<br>
+      <p style="margin:14px 0;">¡Has derrotado a todos los capitanes del ${saga.name} en Dificultad <b><span class="native-difficulty">${dObj.emoji}</span> ${dObj.name}</b>!<br>
       Tu banda ya es leyenda en este mar.<br><br>
       <span style="font-size:30px;">${team.map(f => charIcon(f.id, 38)).join(' ')}</span><br><br>
       ${team.map(f => `${charName(f)}${f.stars ? ` ⭐${f.stars}` : ''} Nv${f.lvl}`).join(' · ')}<br><br>
