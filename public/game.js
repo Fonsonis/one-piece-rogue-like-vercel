@@ -2629,7 +2629,6 @@ function showInventoryModal(opts = {}) {
               </button>
             `}
             <div style="display:flex;gap:3px;justify-content:center;">
-              ${onSelect ? `<button class="btn small green btn-pick-inv" data-id="${id}" style="font-size:7px;padding:3px 6px;flex:1;">${inTeam ? 'SELECCIONADO' : 'ELEGIR'}</button>` : ''}
               <button class="btn small gray btn-info-inv" data-id="${id}" style="font-size:7px;padding:3px 6px;">ℹ️ FICHA</button>
             </div>
           </div>
@@ -6772,8 +6771,7 @@ const UPG_STATS = [
 ];
 let shipBuyLock = 0;
 let shipSearchQ = '';
-let shipExpanded = {};
-let shipSagaExpanded = {};
+const shipTraining = { selected: null, saga: '', teamOnly: false, page: 0 };
 function groupUpgradeRoster(ids) {
   const groups = [...SAGAS.map(s => ({id:s.id,name:s.name})), {id:'crossover',name:'CROSSOVER'}, {id:'other',name:'OTROS'}];
   const known = new Set(groups.map(g => g.id));
@@ -6827,6 +6825,7 @@ function showSellStatsConfirmModal(id, spent, refund, onConfirm) {
 
 function screenShip() {
   playMusic('menu');
+  if (!run?.team?.length) shipTraining.teamOnly = false;
   const roster = meta.roster.filter(id => CHARS[id]);
   const accLvl = accountLevel();
   const maxLvl = maxUpgLvl();
@@ -6858,12 +6857,6 @@ function screenShip() {
     }
   });
 
-  const q = (shipSearchQ || '').trim().toLowerCase();
-  const filteredRoster = roster.filter(id => {
-    if (!q) return true;
-    return CHARS[id].name.toLowerCase().includes(q);
-  });
-
   render(`
     ${topbar(false)}
     <div class="shop-sticky-bar">
@@ -6873,6 +6866,19 @@ function screenShip() {
     <div class="panel">
       <h2>🏪 Tienda</h2>
       <p>Mejoras permanentes · Cuenta Nv${accLvl}</p>
+      <section class="ship-training" aria-label="Entrenamiento de nakamas">
+        <h2>Entrena a tu tripulación</h2>
+        <p>Elige un retrato y mejora sus stats.</p>
+        <div class="training-filters">
+          <input id="ship-search-q" aria-label="Buscar nakama" placeholder="Buscar nakama…" value="${(shipSearchQ || '').replace(/"/g, '&quot;')}">
+          <select id="ship-training-saga" aria-label="Filtrar por saga">
+            <option value="">Todas las sagas</option>
+            ${groupUpgradeRoster(roster).map(g => `<option value="${g.id}" ${shipTraining.saga === g.id ? 'selected' : ''}>${g.name}</option>`).join('')}
+          </select>
+          <button class="btn small gray" id="ship-training-team" aria-pressed="${shipTraining.teamOnly}" ${run?.team?.length ? '' : 'disabled'}>Mi equipo</button>
+        </div>
+        <div id="ship-roster-list"></div>
+      </section>
 
 
       <h2 style="font-size:11px;">👥 Casillas de Nakamas Iniciales</h2>
@@ -6932,38 +6938,48 @@ function screenShip() {
       }).join('')}
       </div>
 
-      <h2 style="font-size:11px;margin-top:16px;">⚓ Mi Barco — Entrenamiento de veteranos</h2>
-      <div style="margin:8px 0;">
-        <input id="ship-search-q" placeholder="🔎 Buscar veterano por nombre..." value="${(shipSearchQ || '').replace(/"/g, '&quot;')}" style="width:100%;padding:8px;border:2px solid var(--ink);font-family:inherit;font-size:9px;background:#fff;">
-      </div>
-      <div id="ship-roster-list"></div>
+
     </div>
   `);
 
   const renderRosterUI = () => {
-    const q = (shipSearchQ || '').trim().toLowerCase();
-    const filteredRoster = roster.filter(id => {
-      if (!q) return true;
-      return CHARS[id].name.toLowerCase().includes(q);
-    });
+    const q = (shipSearchQ || '').trim().toLocaleLowerCase('es');
+    const teamIds = new Set((run?.team || []).map(f => baseFormOf(f.id)));
+    const filteredRoster = groupUpgradeRoster(roster)
+      .filter(g => !shipTraining.saga || g.id === shipTraining.saga)
+      .flatMap(g => g.ids)
+      .filter(id => (!shipTraining.teamOnly || teamIds.has(baseFormOf(id))) && CHARS[id].name.toLocaleLowerCase('es').includes(q));
     const container = $('#ship-roster-list');
     if (!container) return;
+    const pageSize = 8;
+    const pages = Math.max(1, Math.ceil(filteredRoster.length / pageSize));
+    shipTraining.page = Math.min(shipTraining.page, pages - 1);
+    if (!filteredRoster.includes(shipTraining.selected)) shipTraining.selected = filteredRoster[0] || null;
+    const visible = filteredRoster.slice(shipTraining.page * pageSize, (shipTraining.page + 1) * pageSize);
+    const fame = document.querySelector('.shop-fame');
+    if (fame) fame.textContent = `⭐ ${meta.fame.toLocaleString('es')} Fama`;
+    document.querySelectorAll('[data-global],#btn-buy-starter-slot,#btn-buy-capitania').forEach(btn => {
+      const item = btn.dataset.global ? GLOBAL_ITEMS[btn.dataset.global] : btn.id === 'btn-buy-starter-slot' ? nextSlot : nextCap;
+      const can = !item.maxed && !(btn.dataset.global && meta.global[btn.dataset.global]) && accLvl >= item.lvl && meta.fame >= item.cost;
+      btn.disabled = !can;
+      btn.classList.toggle('green', can);
+      btn.classList.toggle('gray', !can);
+    });
 
     const cardHTML = id => {
       const c = CHARS[id];
       const u = meta.upgrades[id] || {};
-      const isExpanded = !!shipExpanded[id];
+      const isExpanded = true;
       const totalStats = UPG_STATS.reduce((acc, [st]) => acc + (u[st] || 0), 0);
       const totalSpent = charTotalUpgSpent(id);
       const refund = Math.floor(totalSpent * 0.5);
       return `<div class="ship-card-acc">
-        <div class="ship-card-header" data-toggle-ship="${id}">
+        <div class="ship-card-header">
           <span class="emoji">${charIcon(id, 28)}</span>
           <div style="flex:1;">
             <b>${c.name}</b> ${typeBadges(c.types)}<br>
             <small style="color:#666;font-size:7px;">Stats mejorados: <b>${totalStats}</b> (Límite: Nv${maxLvl})</small>
           </div>
-          <button class="btn small gray">${isExpanded ? '▲ CERRAR' : '▼ MEJORAR'}</button>
         </div>
         ${isExpanded ? `
           <div class="ship-card-body">
@@ -6974,9 +6990,9 @@ function screenShip() {
         const maxed = lvl >= maxLvl;
         const can = !maxed && meta.fame >= cost;
         return `<div class="upg">
-                  <span class="upg-label">${label} ${lvl}/${maxLvl}</span>
+                  <span class="upg-label">${label} ${lvl}/${maxLvl}</span><small class="training-gain">${desc}</small>
                   <button class="btn small ${can ? 'green' : 'gray'}" data-up="${id}" data-stat="${stat}"
-                    title="${desc}" ${can ? '' : 'disabled'}>${maxed ? 'MÁX' : `⭐${cost}`}</button>
+                    aria-label="Mejorar ${label} de ${c.name}: ${desc}, ${cost} Fama" title="${desc}" ${can ? '' : 'disabled'}>${maxed ? 'MÁX' : `⭐${cost}`}</button>
                 </div>`;
       }).join('')}
             </div>
@@ -6994,21 +7010,33 @@ function screenShip() {
         ` : ''}
       </div>`;
     };
-    const groups = groupUpgradeRoster(filteredRoster);
-    container.innerHTML = groups.length ? groups.map((group, index) => `
-      <details class="ship-saga" data-upgrade-saga="${group.id}" ${(q || shipSagaExpanded[group.id] === true || (shipSagaExpanded[group.id] === undefined && index === 0)) ? 'open' : ''}>
-        <summary><span>${group.name}</span><span>${group.ids.length} ${group.ids.length === 1 ? 'nakama' : 'nakamas'}</span></summary>
-        <div class="ship-saga-list">${group.ids.map(cardHTML).join('')}</div>
-      </details>`).join('') : '<p>No se han encontrado veteranos con ese nombre.</p>';
-    container.querySelectorAll('[data-upgrade-saga]').forEach(section => {
-      section.ontoggle = () => { shipSagaExpanded[section.dataset.upgradeSaga] = section.open; };
-    });
-
-    container.querySelectorAll('[data-toggle-ship]').forEach(hdr => {
-      hdr.onclick = () => {
-        const id = hdr.dataset.toggleShip;
-        shipExpanded[id] = !shipExpanded[id];
+    container.innerHTML = `<div class="training-layout">
+      <div class="training-picker">
+        <div class="training-portraits">${visible.map(id => `<button type="button" class="training-portrait" data-train="${id}" aria-pressed="${id === shipTraining.selected}">
+          ${charIcon(id,48)}<span>${CHARS[id].name}</span><small>${'⭐'.repeat(CHARS[id].rareza)}</small>
+        </button>`).join('') || '<p>No hay nakamas con estos filtros.</p>'}</div>
+        <nav class="training-pages" aria-label="Páginas de nakamas">
+          <button class="btn small gray" data-training-page="-1" aria-label="Página anterior" ${shipTraining.page === 0 ? 'disabled' : ''}>←</button>
+          <span aria-live="polite">${shipTraining.page + 1} / ${pages} · ${filteredRoster.length} nakamas</span>
+          <button class="btn small gray" data-training-page="1" aria-label="Página siguiente" ${shipTraining.page >= pages - 1 ? 'disabled' : ''}>→</button>
+        </nav>
+      </div>
+      <div class="training-detail" aria-label="Stats del nakama seleccionado">${shipTraining.selected ? cardHTML(shipTraining.selected) : '<p>Cambia los filtros para elegir un nakama.</p>'}</div>
+    </div>`;
+    container.querySelectorAll('[data-train]').forEach(btn => {
+      btn.onclick = () => {
+        shipTraining.selected = btn.dataset.train;
         renderRosterUI();
+        container.querySelector(`[data-train="${shipTraining.selected}"]`)?.focus({preventScroll:true});
+      };
+    });
+    container.querySelectorAll('[data-training-page]').forEach(btn => {
+      btn.onclick = () => {
+        const direction = btn.dataset.trainingPage;
+        shipTraining.page += Number(direction);
+        renderRosterUI();
+        const next = container.querySelector(`[data-training-page="${direction}"]`);
+        (next?.disabled ? container.querySelector('[data-train]') : next)?.focus({preventScroll:true});
       };
     });
 
@@ -7027,7 +7055,8 @@ function screenShip() {
         u[stat] = lvl + 1;
         saveMeta();
         toast(`✨ ${CHARS[id].name}: ${stat.toUpperCase()} sube a Nv.${u[stat]}`);
-        screenShip();
+        renderRosterUI();
+        container.querySelector(`[data-up="${id}"][data-stat="${stat}"]`)?.focus({preventScroll:true});
       };
     });
 
@@ -7044,7 +7073,7 @@ function screenShip() {
           delete meta.upgrades[id];
           saveMeta();
           toast(`💰 Has recibido ⭐${refund} Fama al vender las mejoras de ${c.name}.`);
-          screenShip();
+          renderRosterUI();
         });
       };
     });
@@ -7054,7 +7083,14 @@ function screenShip() {
 
   $('#btn-back').onclick = screenHome;
   const searchInput = $('#ship-search-q');
-  if (searchInput) searchInput.oninput = e => { shipSearchQ = e.target.value; renderRosterUI(); };
+  if (searchInput) searchInput.oninput = e => { shipSearchQ = e.target.value; shipTraining.page = 0; renderRosterUI(); };
+  $('#ship-training-saga').onchange = e => { shipTraining.saga = e.target.value; shipTraining.page = 0; renderRosterUI(); };
+  $('#ship-training-team').onclick = e => {
+    shipTraining.teamOnly = !shipTraining.teamOnly;
+    shipTraining.page = 0;
+    e.currentTarget.setAttribute('aria-pressed', String(shipTraining.teamOnly));
+    renderRosterUI();
+  };
 
   const buySlotBtn = $('#btn-buy-starter-slot');
   if (buySlotBtn) {
@@ -7104,30 +7140,6 @@ function screenShip() {
     };
   });
 
-  document.querySelectorAll('[data-toggle-ship]').forEach(el => {
-    el.onclick = () => {
-      const id = el.dataset.toggleShip;
-      shipExpanded[id] = !shipExpanded[id];
-      screenShip();
-    };
-  });
-
-  document.querySelectorAll('[data-up]').forEach(btn => {
-    btn.onclick = () => {
-      if (Date.now() - shipBuyLock < 300) return;
-      shipBuyLock = Date.now();
-      const id = btn.dataset.up, stat = btn.dataset.stat;
-      const u = meta.upgrades[id] = meta.upgrades[id] || {};
-      const lvl = u[stat] || 0;
-      const cost = upgCost(lvl);
-      if (lvl >= maxLvl || meta.fame < cost) return;
-      meta.fame -= cost;
-      u[stat] = lvl + 1;
-      saveMeta();
-      toast(`${CHARS[id].name}: ${stat.toUpperCase()} mejorado ⭐`);
-      screenShip();
-    };
-  });
 }
 
 // ============ DEX PIRATA ============
