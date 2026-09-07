@@ -4949,15 +4949,23 @@ function doSpecialPirate(island) {
   const lvl = island.lvl[1] + 2;
   const gachaPrice = specialGachaPrice();
   const blocked = specialBlockedReason();
+  const pool = basePirateIds().sort((a, b) => CHARS[a].rareza - CHARS[b].rareza || CHARS[a].name.localeCompare(CHARS[b].name));
+  const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal">
     <h2>🌟 Mercado clandestino</h2>
-    <p style="font-size:9px;line-height:1.9;text-align:center;">Un contacto de los bajos fondos te ofrece reclutas (Nv${lvl}).<br><br>
-    <b>🎯 Elegir:</b> cualquier pirata del catálogo (hasta 4⭐), pagando su caché completo.<br>
-    <b>🎰 Carteles:</b> 5 carteles de SE BUSCA boca abajo. Destápalos en orden:
-    el 1º es el más probable (recluta de 1⭐)... y el 5º, el premio gordo (5⭐).</p>
-    <p class="special-map-price" style="font-size:8px;text-align:center;line-height:1.8;">Mapa ${specialMapMultiplier()} · Carteles ×${specialMapMultiplier()}. Vuelven a ×1 al empezar otra isla. El catálogo depende solo de las estrellas.</p>
+    <p class="special-pool-heading">${esc(SAGAS[run.saga].name)} · ${pool.length} piratas posibles</p>
+    <div class="special-pool" role="list" aria-label="Piratas disponibles en este evento">
+      ${pool.map(id => {
+        const c = CHARS[id], seen = meta.dex.includes(id);
+        return `<div class="special-pool-card ${seen ? 'seen' : 'unseen'}" role="listitem" aria-label="${seen ? esc(c.name) : 'Pirata sin avistar'}, ${c.rareza} estrellas">
+          <div class="special-pool-portrait" aria-hidden="true">${charIcon(id, 54)}</div>
+          <b>${seen ? esc(c.name) : '???'}</b><span class="special-pool-stars">${'⭐'.repeat(c.rareza)}</span>
+        </div>`;
+      }).join('')}
+    </div>
+    <p class="special-map-price" style="font-size:8px;text-align:center;line-height:1.8;">Mapa ${specialMapMultiplier()} · Carteles ×${specialMapMultiplier()} · 5⭐ solo en carteles</p>
     ${cartelesBadgeHTML()}
     <div style="font-size:9.5px;text-align:center;margin-top:6px;margin-bottom:6px;color:#f39c12;background:rgba(243,156,18,0.12);padding:6px 10px;border-radius:6px;border:1px solid rgba(243,156,18,0.4);display:flex;align-items:center;justify-content:center;gap:6px;">
       <span>⭐ Estrellas acumuladas (Pity): <b>${meta.starPity || 0} / 1000</b></span>
