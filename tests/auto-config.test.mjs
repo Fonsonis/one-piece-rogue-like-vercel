@@ -5,11 +5,11 @@ import {combatHarness} from './balance-harness.mjs';
 test('automatic healing uses the actual object values, chosen items and threshold',()=>{
  const h=combatHarness();
  h.exec(`saveRun=()=>{};autoMode=true;run={mode:'classic',team:[makeChar('luffy',5)],items:{carne:2,carnereal:1,bocadillo:1}};
- const f=run.team[0];f.maxhp=100;f.hp=20;autoSettings.healItems=['carne'];autoSettings.healThreshold=50;runAutoItems();`);
+ const f=run.team[0];f.maxhp=100;f.hp=20;setAutoBackpackSettings({enabled:true,threshold:50,items:{carne:true,carnereal:false,bocadillo:false}});runAutoItems();`);
  assert.equal(h.exec('run.team[0].hp'),50);
  assert.equal(h.exec('run.items.carne'),1);
  assert.equal(h.exec('run.items.carnereal'),1);
- h.exec("autoSettings.healItems=['carne','carnereal','bocadillo'];run.team[0].hp=10;runAutoItems()");
+ h.exec("setAutoBackpackSettings({items:{carnereal:true,bocadillo:true}});run.team[0].hp=10;runAutoItems()");
  assert.equal(h.exec('run.team[0].hp'),100);
  assert.equal(h.exec('run.items.bocadillo'),0);
  h.exec('run.team[0].hp=90;runAutoItems()');
@@ -19,7 +19,7 @@ test('automatic healing uses the actual object values, chosen items and threshol
 test('revival is independent from healing and always respects Nuzlocke',()=>{
  for(const [mode,revive,expected] of [['classic',true,50],['classic',false,0],['nuzlocke',true,0]]){
   const h=combatHarness();h.exec(`saveRun=()=>{};autoMode=true;run={mode:'${mode}',team:[makeChar('luffy',5)],items:{sake:1}};
-  run.team[0].maxhp=100;run.team[0].hp=0;autoSettings.healThreshold=0;autoSettings.revive=${revive};runAutoItems()`);
+  run.team[0].maxhp=100;run.team[0].hp=0;setAutoBackpackSettings({enabled:true,threshold:0,items:{sake:${revive}}});runAutoItems()`);
   assert.equal(h.exec('run.team[0].hp'),expected);
   assert.equal(h.exec('run.items.sake'),expected?0:1);
  }

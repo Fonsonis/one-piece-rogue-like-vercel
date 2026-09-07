@@ -665,16 +665,16 @@ const CHARS = {
 
 // ============ OBJETOS ============
 const ITEMS = {
-  carne:        { name: 'Carne',              emoji: '🍖', desc: 'Restaura 30 PS.', price: 100, kind: 'heal', val: 30 },
-  carnereal:    { name: 'Carne Real',         emoji: '🍗', desc: 'Restaura 80 PS.', price: 250, kind: 'heal', val: 80 },
-  bocadillo:    { name: 'Plato de Sanji',     emoji: '🍱', desc: 'Restaura todos los PS.', price: 500, kind: 'heal', val: 9999 },
-  sake:         { name: 'Sake de Binks',      emoji: '🍶', desc: 'Revive a un nakama con la mitad de PS.', price: 400, kind: 'revive', val: 0.5 },
-  cartel:       { name: 'Cartel de Recluta',  emoji: '📜', desc: 'Al tentar la suerte, rompe 1 cadena garantizada.', price: 150, kind: 'ball', val: 1 },
-  carteldorado: { name: 'Cartel Dorado',      emoji: '🏅', desc: 'Al tentar la suerte, rompe 2 cadenas garantizadas.', price: 350, kind: 'ball', val: 2 },
-  cartelbuster: { name: 'Buster Call',        emoji: '📯', desc: 'Rompe las 3 cadenas: reclutamiento garantizado.', price: 800, kind: 'ball', val: 3.5 },
-  proteina:     { name: 'Proteína de Franky', emoji: '🥤', desc: '+2 ATQ permanente al nakama activo.', price: 600, kind: 'boost', stat: 1 },
-  hierro:       { name: 'Placa de Hierro',    emoji: '🛡️', desc: '+2 DEF permanente al nakama activo.', price: 600, kind: 'boost', stat: 2 },
-  fruta_diablo: { name: 'Fruta del Diablo',   emoji: '🍈', desc: 'Concede un nuevo Tag/Sinergia elemental a 2 nakamas activos.', price: 1000, kind: 'fruta' },
+  carne:        { slotSize: 1, stackLimit: 1, name: 'Carne',              emoji: '🍖', desc: 'Restaura 30 PS.', price: 100, kind: 'heal', val: 30 },
+  carnereal:    { slotSize: 2, stackLimit: 1, name: 'Carne Real',         emoji: '🍗', desc: 'Restaura 80 PS.', price: 250, kind: 'heal', val: 80 },
+  bocadillo:    { slotSize: 3, stackLimit: 1, name: 'Plato de Sanji',     emoji: '🍱', desc: 'Restaura todos los PS.', price: 500, kind: 'heal', val: 9999 },
+  sake:         { slotSize: 4, stackLimit: 1, name: 'Sake de Binks',      emoji: '🍶', desc: 'Revive a un nakama con la mitad de PS.', price: 400, kind: 'revive', val: 0.5 },
+  cartel:       { slotSize: 1, stackLimit: 10, name: 'Cartel de Recluta',  emoji: '📜', desc: 'Al tentar la suerte, rompe 1 cadena garantizada.', price: 150, kind: 'ball', val: 1 },
+  carteldorado: { slotSize: 1, stackLimit: 10, name: 'Cartel Dorado',      emoji: '🏅', desc: 'Al tentar la suerte, rompe 2 cadenas garantizadas.', price: 350, kind: 'ball', val: 2 },
+  cartelbuster: { slotSize: 1, stackLimit: 10, name: 'Buster Call',        emoji: '📯', desc: 'Rompe las 3 cadenas: reclutamiento garantizado.', price: 800, kind: 'ball', val: 3.5 },
+  proteina:     { slotSize: 1, stackLimit: 1, name: 'Proteína de Franky', emoji: '🥤', desc: '+2 ATQ permanente al nakama activo.', price: 600, kind: 'boost', stat: 1 },
+  hierro:       { slotSize: 2, stackLimit: 1, name: 'Placa de Hierro',    emoji: '🛡️', desc: '+2 DEF permanente al nakama activo.', price: 600, kind: 'boost', stat: 2 },
+  fruta_diablo: { slotSize: 2, stackLimit: 1, name: 'Fruta del Diablo',   emoji: '🍈', desc: 'Concede un nuevo Tag/Sinergia elemental a 2 nakamas activos.', price: 1000, kind: 'fruta' },
 };
 
 // ============ SAGAS / ISLAS ============
