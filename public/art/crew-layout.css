@@ -112,6 +112,7 @@ div:has(> #chk-music-toggle) { flex-direction:column; align-items:stretch!import
   .battle-layout .battle-team-count { font-size:11px; }
   .battle-layout .fcard-title { min-height:34px; padding:3px 2px; }
   .battle-layout .fcard-passive { min-height:22px; }
-  .battle-layout .fcard-stats-mini { min-height:24px; display:grid; align-items:center; }
+  #app .battle-layout .fcard-stats-mini { min-height:24px; display:flex; flex-wrap:wrap; align-items:center; align-content:center; justify-content:center; gap:3px 7px; font:10px/1.3 system-ui,sans-serif!important; }
+  .battle-layout .fcard-stats-mini .combat-stat { display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
   .battle-layout .battle-sidebar .btn { min-height:44px; font-size:clamp(7px,1.8vw,10px); }
 }

@@ -5401,7 +5401,9 @@ function fighterCardHTML(f, side, idx, active) {
     </div>
     <div class="fcard-meters">${ultBarHTML}</div>
     <div class="fcard-stats-mini" style="font-size:7.5px;color:#eee;text-align:center;margin:2px 0;background:rgba(0,0,0,0.3);padding:2px 4px;border-radius:3px;">
-      ⚔️ ATQ ${f.atk} · 🛡️ DEF ${f.def} · ⚡ VEL ${f.spd}
+      <span class="combat-stat">⚔️ ATQ ${f.atk}</span>
+      <span class="combat-stat">🛡️ DEF ${f.def}</span>
+      <span class="combat-stat">⚡ VEL ${f.spd}</span>
     </div>
     <div class="fcard-sprite" data-character="${f.id}">
       <span class="sprite ${side === 'e' ? 'flip' : ''}">${charIcon(f.id, 64)}</span>
