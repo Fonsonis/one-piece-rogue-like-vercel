@@ -739,7 +739,7 @@ function unlockRoster(allowBosses = true) {
 // ---------- Generación de mapa ----------
 const NODE_TYPES = {
   wild: { emoji: '🏴‍☠️', label: 'Pirata salvaje' },
-  marine: { emoji: '⚓', label: 'Combate Marine' },
+  marine: { emoji: '🧢', label: 'Combate Marine' },
   item: { emoji: '🎁', label: 'Objeto' },
   mystery: { emoji: '❓', label: 'Misterio' },
   shop: { emoji: '🏪', label: 'Tienda' },
@@ -1146,6 +1146,8 @@ function makeListReorderable(container, itemSelector, onReorder) {
   let touchStartY = 0;
   let touchStartX = 0;
   let isTouchDragging = false;
+  let holdTimer = null;
+  const cancelHold = () => { clearTimeout(holdTimer); holdTimer = null; };
 
   items.forEach((item) => {
     const idx = parseInt(item.dataset.idx !== undefined ? item.dataset.idx : item.dataset.slot);
@@ -1183,12 +1185,19 @@ function makeListReorderable(container, itemSelector, onReorder) {
     };
 
     item.ontouchstart = e => {
+      cancelHold();
+      if (e.touches.length !== 1 || e.target.closest('button')) return;
       const touch = e.touches[0];
       touchStartY = touch.clientY;
       touchStartX = touch.clientX;
       touchStartElement = item;
       draggedIdx = idx;
       isTouchDragging = false;
+      holdTimer = setTimeout(() => {
+        if (!touchStartElement?.isConnected) return;
+        isTouchDragging = true;
+        touchStartElement.classList.add('dragging');
+      }, 350);
     };
 
     item.ontouchmove = e => {
@@ -1198,8 +1207,10 @@ function makeListReorderable(container, itemSelector, onReorder) {
       const dx = touch.clientX - touchStartX;
 
       if (!isTouchDragging && (Math.abs(dy) > 6 || Math.abs(dx) > 6)) {
-        isTouchDragging = true;
-        touchStartElement.classList.add('dragging');
+        cancelHold();
+        draggedIdx = null;
+        touchStartElement = null;
+        return;
       }
 
       if (isTouchDragging) {
@@ -1217,6 +1228,8 @@ function makeListReorderable(container, itemSelector, onReorder) {
     };
 
     item.ontouchend = e => {
+      cancelHold();
+      if (isTouchDragging && e.cancelable) e.preventDefault();
       if (draggedIdx !== null && isTouchDragging) {
         const touch = e.changedTouches[0];
         const elUnder = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -1230,6 +1243,13 @@ function makeListReorderable(container, itemSelector, onReorder) {
       }
       if (touchStartElement) touchStartElement.classList.remove('dragging');
       items.forEach(el => el.classList.remove('dragover'));
+      touchStartElement = null;
+      draggedIdx = null;
+      isTouchDragging = false;
+    };
+    item.ontouchcancel = () => {
+      cancelHold();
+      items.forEach(el => el.classList.remove('dragging', 'dragover'));
       touchStartElement = null;
       draggedIdx = null;
       isTouchDragging = false;
@@ -2351,6 +2371,10 @@ let storyMode = 'classic';
 
 function screenSagas(focusSaga, previousScroll) {
   playMusic('menu');
+  if (!Number.isInteger(focusSaga) && meta.lastCompletedIsland && SAGAS[meta.lastCompletedIsland.saga]?.islands[meta.lastCompletedIsland.index]) {
+    storyMode = meta.lastCompletedIsland.mode === 'nuzlocke' ? 'nuzlocke' : 'classic';
+    selectedDiff = DIFFICULTIES.some(d => d.id === meta.lastCompletedIsland.diff) ? meta.lastCompletedIsland.diff : 1;
+  }
 
   const curDiffObj = DIFFICULTIES.find(d => d.id === selectedDiff) || DIFFICULTIES[0];
 
@@ -2813,8 +2837,8 @@ function worldSagaHTML(sagaIdx) {
   return `${crossing}<section class="world-saga" id="world-saga-${sagaIdx}" data-world-saga="${sagaIdx}" style="--saga-color:${saga.color}">
     <div class="world-islands">${saga.islands.map((island, i) => {
       const {active, available} = worldIslandState(sagaIdx, i);
-      const state = active ? `Continuar · mapa ${(run.mapIdx || 0) + 1}/${islandMapCount(island)}` : !available ? 'Bloqueada · consulta ⓘ' : done.includes(i) ? 'Completada · explorar' : 'Explorar destino';
-      return `<div class="world-stop ${i % 2 ? 'starboard' : 'port'} ${done.includes(i) ? 'is-complete' : ''} ${active ? 'is-current' : ''}" id="world-island-${sagaIdx}-${i}" data-location-key="${saga.id}-${i}">
+      const state = active ? `Continuar · mapa ${(run.mapIdx || 0) + 1}/${islandMapCount(island)}` : !available ? 'Bloqueada' : done.includes(i) ? 'Completada · explorar' : 'Explorar destino';
+      return `<div class="world-stop ${i % 2 ? 'starboard' : 'port'} ${done.includes(i) ? 'is-complete' : ''} ${active ? 'is-current' : ''} ${available ? '' : 'is-locked'}" id="world-island-${sagaIdx}-${i}" data-location-key="${saga.id}-${i}">
         <div class="world-island-card">
         <button class="island-select" data-world-island="${i}" data-world-saga="${sagaIdx}" aria-controls="world-island-panel" aria-expanded="false" aria-label="${island.name}. ${state}">
           <span class="island-land" aria-hidden="true">
@@ -2823,7 +2847,6 @@ function worldSagaHTML(sagaIdx) {
 
           <span class="island-label"><b>${island.location?.place || island.name}</b><span class="island-zone">${island.location?.zone || saga.name}</span><span>${islandMapCount(island)} mapas · ${island.boss.length} ${island.boss.length === 1 ? 'jefe' : 'jefes'}</span><small>${state}</small></span>
         </button>
-        <button class="island-marker" data-island-info="${i}" data-world-saga="${sagaIdx}" aria-label="Información de ${island.name}${available ? '' : ', bloqueada'}" aria-controls="world-island-panel">${available ? 'ⓘ' : '🔒'}</button>
         </div>
       </div>`;
     }).reverse().join('')}</div>
@@ -2853,7 +2876,13 @@ function scrollWorldStart(chart) {
 
 function bindWorldMapNavigation(focusSaga, previousScroll) {
   const chart = $('#world-map');
+  const recent = meta.lastCompletedIsland;
   if (previousScroll != null) chart.scrollTop = previousScroll;
+  else if (recent && SAGAS[recent.saga]?.islands[recent.index] && (!Number.isInteger(focusSaga) || focusSaga === recent.saga)) {
+    const target = $(`#world-island-${recent.saga}-${recent.index}`);
+    $('#world-jump').value = String(recent.saga);
+    chart.scrollTop = worldStopTop(chart,target) - chart.clientHeight / 2 + target.offsetHeight / 2;
+  }
   else if (Number.isInteger(focusSaga)) {
     const current = run && run.saga === focusSaga && !run.islandComplete && run.mode === storyMode && (run.diff || 1) === selectedDiff;
     const index = current ? run.islandIdx : SAGAS[focusSaga].islands.findIndex((_, i) => worldIslandState(focusSaga, i).available && !completedIslands(focusSaga).includes(i));
@@ -2866,7 +2895,7 @@ function bindWorldMapNavigation(focusSaga, previousScroll) {
     chart.scrollTop = worldStopTop(chart,target) - 16;
   };
   worldNavigator = globalThis.WorldVoyage?.mount(chart, {
-    initialId:worldShipLocation || (run && !run.islandComplete ? `${SAGAS[run.saga]?.id}-${run.islandIdx}` : null),
+    initialId:worldShipLocation || (run && !run.islandComplete ? `${SAGAS[run.saga]?.id}-${run.islandIdx}` : recent && SAGAS[recent.saga]?.islands[recent.index] ? `${SAGAS[recent.saga].id}-${recent.index}` : null),
     onTravel:() => updateWorldArrival(true),
     onArrival:id => { worldShipLocation=id; updateWorldArrival(false); }
   });
@@ -2980,7 +3009,11 @@ function screenStarter(sagaIdx, islandIdx = 0) {
   const renderSlotsGrid = () => {
     let slotsHTML = '';
     const cap = maxStartLvlCap();
-    for (let i = 0; i < maxSlots; i++) {
+    for (let i = 0; i < 6; i++) {
+      if (i >= maxSlots) {
+        slotsHTML += `<div class="starter-slot-card locked-slot" aria-label="Hueco ${i + 1} bloqueado"><div class="starter-slot-badge">HUECO ${i + 1}</div><span aria-hidden="true">🔒</span><b>Bloqueado</b><small>Desbloquea más huecos en la tienda</small></div>`;
+        continue;
+      }
       const id = picked[i];
       if (id && CHARS[id]) {
         const displayId = luffyFormAt(id, startLvlOf(id));
@@ -3002,12 +3035,12 @@ function screenStarter(sagaIdx, islandIdx = 0) {
                 <span style="font-size:7.5px;color:var(--green);font-weight:bold;background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:3px;display:inline-block;">🔒 Nv. Máx (${cap})</span>
               ` : `
                 <button class="btn small gold btn-upg-slot" data-id="${id}" ${canAfford ? '' : 'disabled'} style="font-size:7.5px;padding:3px 6px;width:100%;" title="Cuesta ${cost} Log Poses">
-                  ⬆️ Subir Nv (${cost} 🧭)
+                  Nv +1 · ${cost} 🧭
                 </button>
               `}
             </div>
             <div style="display:flex;gap:3px;margin-top:2px;width:100%;justify-content:center;">
-              <button class="btn small blue btn-swap-slot" data-slot="${i}" style="font-size:7.5px;padding:3px 5px;flex:1;">🔄 Cambiar</button>
+              <button class="btn small blue btn-swap-slot" data-slot="${i}" style="font-size:7.5px;padding:3px 5px;flex:1;" aria-label="Cambiar nakama">↔</button>
               <button class="btn small gray btn-info-slot" data-id="${id}" style="font-size:7.5px;padding:3px 5px;">ℹ️</button>
               <button class="btn small red btn-remove-slot" data-slot="${i}" style="font-size:7.5px;padding:3px 5px;">✕</button>
             </div>
@@ -3060,7 +3093,7 @@ function screenStarter(sagaIdx, islandIdx = 0) {
           🧭 Log Poses: ${meta.logPoses || 0} ℹ️
         </div>
       </div>
-      <p style="font-size:8.5px;color:#555;margin-bottom:12px;">Toca un personaje para cambiarlo, sube su nivel con 🧭 Log Poses o pulsa un hueco vacío para abrir el inventario.</p>
+      <p style="font-size:8.5px;color:#555;margin-bottom:12px;">Toca para elegir · Mantén pulsado para reordenar.</p>
       
       <div id="starter-slots-container"></div>
       ${renderPresetsBar()}
@@ -3216,13 +3249,13 @@ function screenStarter(sagaIdx, islandIdx = 0) {
 }
 
 // Límite de nivel inicial según la máxima saga accesible:
-// 5 (East Blue), 8 (Alabasta), 14 (Skypiea), 17 (Water 7), 20 (Thriller Bark), 23...
+// East Blue permite Nv.15; las siguientes sagas nunca reducen ese límite.
 function maxStartLvlCap() {
   let highestSaga = 0;
   for (let i = 0; i < SAGAS.length; i++) {
     if (sagaUnlocked(i)) highestSaga = i;
   }
-  return Math.max(10, SAGAS[highestSaga] ? SAGAS[highestSaga].islands[0].lvl[0] : 10);
+  return Math.max(15, SAGAS[highestSaga] ? SAGAS[highestSaga].islands[0].lvl[0] : 15);
 }
 
 function logPoseUpgradeCost(currentLvl) {
@@ -4001,21 +4034,22 @@ function doMystery(island) {
     const commonEvents = MYSTERY_EVENTS.filter(e => e.kind !== 'fruta');
     ev = pick(commonEvents);
   }
+  const eventArt = `<div class="event-art" aria-hidden="true">${{berries:'🎁',item:'🧑‍🌾',battle:'⚔️',healall:'♨️',boost:'🥋',damage:'🕸️',recruit:'🏴‍☠️',fruta:'🍈'}[ev.kind] || '❓'}</div>`;
   switch (ev.kind) {
     case 'berries': {
       const n = rnd(ev.min, ev.max) * (run.islandIdx + 1);
       run.berries += n; saveRun();
-      modalInfo('❓ Misterio', `<div class="reward-list">${ev.text.replace('{n}', n)}</div>`, screenMap);
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text.replace('{n}', n)}</div>`, screenMap);
       break;
     }
     case 'item': {
       const id = pick(['carne', 'cartel', 'carnereal', 'carteldorado']);
       run.items[id] = (run.items[id] || 0) + 1; saveRun();
-      modalInfo('❓ Misterio', `<div class="reward-list">${ev.text}<br><br>${ITEMS[id].emoji} <b>${ITEMS[id].name}</b></div>`, screenMap);
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS[id].emoji} <b>${ITEMS[id].name}</b></div>`, screenMap);
       break;
     }
     case 'battle': {
-      modalInfo('❓ ¡Emboscada!', `<div class="reward-list">${ev.text}</div>`, () => {
+      modalInfo('❓ ¡Emboscada!', `${eventArt}<div class="reward-list">${ev.text}</div>`, () => {
         const id = pickWildEnemy(island.pool);
         let lvl = rnd(island.lvl[0] + 1, island.lvl[1] + 2);
         if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
@@ -4027,26 +4061,26 @@ function doMystery(island) {
       trackStat('mystery_heal', 1);
       run.team.forEach(f => { if (f.hp > 0) f.hp = f.maxhp; });
       saveRun();
-      modalInfo('❓ Misterio', `<div class="reward-list">${ev.text} ♨️</div>`, screenMap);
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text} ♨️</div>`, screenMap);
       break;
     }
     case 'boost': {
       trackStat('mystery_train', 1);
       const f = run.team[0];
       f.atkBonus += 2; f.atk += 2; saveRun();
-      modalInfo('❓ Misterio', `<div class="reward-list">${ev.text}<br>(${charName(f)})</div>`, screenMap);
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br>(${charName(f)})</div>`, screenMap);
       break;
     }
     case 'damage': {
       const f = run.team[0];
       f.hp = Math.max(1, f.hp - ev.val); saveRun();
-      modalInfo('❓ Misterio', `<div class="reward-list">${ev.text}<br>(${charName(f)})</div>`, screenMap);
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br>(${charName(f)})</div>`, screenMap);
       break;
     }
     case 'recruit': {
       if (run.mode === 'nuzlocke' && run.nuzCaught[run.islandIdx]) {
         run.berries += 200; saveRun();
-        modalInfo('❓ Misterio', `<div class="reward-list">Un pirata quería unirse, pero la regla Nuzlocke lo impide.<br>Te deja 200 Berries de regalo.</div>`, screenMap);
+        modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">Un pirata quería unirse, pero la regla Nuzlocke lo impide.<br>Te deja 200 Berries de regalo.</div>`, screenMap);
       } else {
         const id = pickWildEnemy(island.pool);
         const recLvl = Math.max(1, Math.floor(island.lvl[0] * 0.85));
@@ -4055,10 +4089,10 @@ function doMystery(island) {
           if (ok) {
             if (run.mode === 'nuzlocke') run.nuzCaught[run.islandIdx] = true;
             registerRecruit(id); saveRun();
-            modalInfo('❓ ¡Nuevo nakama!', `<div class="reward-list">${ev.text}<br><br><span style="font-size:30px">${charIcon(id, 40)}</span><br><b>${CHARS[id].name}</b> Nv${f.lvl}</div>`, screenMap);
+            modalInfo('❓ ¡Nuevo nakama!', `${eventArt}<div class="reward-list">${ev.text}<br><br><span style="font-size:30px">${charIcon(id, 40)}</span><br><b>${CHARS[id].name}</b> Nv${f.lvl}</div>`, screenMap);
           } else {
             run.berries += 100; saveRun();
-            modalInfo('❓ Misterio', `<div class="reward-list">Dejas marchar al pirata. Te regala 100 Berries por la molestia.</div>`, screenMap);
+            modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">Dejas marchar al pirata. Te regala 100 Berries por la molestia.</div>`, screenMap);
           }
         });
       }
@@ -4068,7 +4102,7 @@ function doMystery(island) {
       run.items['fruta_diablo'] = (run.items['fruta_diablo'] || 0) + 1;
       trackItemCollected(1);
       saveRun();
-      modalInfo('❓ Misterio', `<div class="reward-list">${ev.text}<br><br>${ITEMS['fruta_diablo'].emoji} <b>${ITEMS['fruta_diablo'].name}</b> añadida a tu bolsa.</div>`, screenMap);
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS['fruta_diablo'].emoji} <b>${ITEMS['fruta_diablo'].name}</b> añadida a tu bolsa.</div>`, screenMap);
       break;
     }
   }
@@ -4581,14 +4615,14 @@ function doSpecialPirate(island) {
 function renderSpecialCatalog(lvl) {
   // solo puedes contratar a quienes ya venciste en el modo historia
   const ids = basePirateIds()
-    .filter(id => meta.defeated.includes(id))
+    .filter(id => CHARS[id].rareza < 5 && meta.defeated.includes(id))
     .sort((a, b) => CHARS[a].rareza - CHARS[b].rareza || CHARS[a].name.localeCompare(CHARS[b].name));
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal">
     <h2>🎯 Catálogo de reclutas (Nv${lvl})</h2>
     <div style="text-align:center;font-size:9px;margin-bottom:8px;color:var(--accent);">${berriesHTML(run.berries)} disponibles</div>
-    <p style="font-size:8px;text-align:center;color:#777;margin-bottom:8px;">Solo aparecen piratas de esta saga a los que ya hayas vencido en combate.</p>
+    <p style="font-size:8px;text-align:center;color:#777;margin-bottom:8px;">Piratas de 1–4 estrellas de esta saga que ya has derrotado.</p>
     ${ids.length ? '' : '<p style="font-size:9px;text-align:center;color:#888;padding:10px;">Aún no has vencido a nadie de esta saga.<br>¡Derrota rivales y vuelve!</p>'}
     <div class="pick-grid">
       ${ids.map(id => {
@@ -4612,6 +4646,7 @@ function renderSpecialCatalog(lvl) {
   ov.querySelectorAll('[data-hire]').forEach(btn => {
     btn.onclick = () => {
       const id = btn.dataset.hire;
+      if (!ids.includes(id) || CHARS[id].rareza >= 5) return;
       const price = hirePrice(CHARS[id]);
       if (run.berries < price) return;
       run.berries -= price;
@@ -4796,10 +4831,8 @@ function screenShop() {
     return `<div class="shop-item" style="border-color:rgba(46,204,113,0.3);background:rgba(46,204,113,0.05);">
       <span class="emoji">${it.emoji}</span>
       <div class="info">
-        <b>${it.name}</b> <span style="font-size:8.5px;color:#aaa;">(Tienes: ${n})</span> — Venta (75%): <span class="price" style="color:#2ecc71;font-weight:bold;">+${berriesHTML(sellPrice)}</span><br>
-        <small style="color:#888;">${it.desc} · Valor original: ${it.price} 💰</small>
-      </div>
-      <button class="btn small green" data-sell="${id}">VENDER (+${sellPrice} 💰)</button>
+        <b>${it.name}</b> <span style="font-size:8.5px;color:#aaa;">(Tienes: ${n})</span> — Venta (75%): <span class="price" style="color:#2ecc71;font-weight:bold;">+${berriesHTML(sellPrice)}</span></div>
+      <button class="btn small green" data-sell="${id}">VENDER</button>
     </div>`;
   }).join('') : '<div style="font-size:8.5px;color:#888;text-align:center;padding:8px;background:rgba(0,0,0,0.15);border-radius:6px;margin-bottom:10px;">Tu bolsa está vacía. No tienes objetos para vender.</div>';
 
@@ -4807,7 +4840,7 @@ function screenShop() {
     ${topbar(true, false)}
     <div class="panel">
       <h2>🏪 Tienda del puerto</h2>
-      <p style="font-size:9px;margin-bottom:6px;">"¡Bienvenido! Todo pirata necesita provisiones o vender botín sobrante."</p>
+
       <div style="font-size:9.5px;background:rgba(255,215,0,0.12);padding:6px 10px;border-radius:6px;border:1px solid var(--gold);margin-bottom:10px;text-align:center;">
         <b>🎒 Tu Bolsa:</b> ${inventorySummary || 'Vacía'}
       </div>
@@ -4826,7 +4859,7 @@ function screenShop() {
         </div>`;
   }).join('')}
 
-      <h3 style="margin-top:14px;margin-bottom:6px;font-size:11px;color:#2ecc71;">💰 VENDER OBJETOS DE TU BOLSA (75% del valor)</h3>
+      <h3 style="margin-top:14px;margin-bottom:6px;font-size:11px;color:#2ecc71;">💰 VENDER · 75% del valor</h3>
       ${sellItemsHTML}
 
       <div class="actions" style="margin-top:14px;text-align:center;">
@@ -5310,7 +5343,10 @@ function startBattle(enemies, opts) {
   [...battle.pTeam, ...battle.eTeam].forEach(f => {
     migrateFighter(f);
     f.dodgeLeft = passiveRule(f).dodge || 0;
-    f.st = {}; // estados: burn (quemadura), poison (veneno), slow (ralentizado), gust (viento a favor)
+    // Carry timed effects through the journey; reset combat-only passive flags.
+    const previous = battle.pTeam.includes(f) ? f.st || {} : {};
+    f.st = Object.fromEntries(['burn','burnRate','poison','poisonDefense','slow','slowRate','gust','gustBonus']
+      .filter(key => previous[key] !== undefined).map(key => [key, previous[key]]));
   });
   battle.firstHit = { p: true, e: true }; // para Rayo Ⅱ: primer ataque crítico garantizado
   battle.curP = activeP();
@@ -6179,7 +6215,7 @@ function endBattle(victory, fled, recruited) {
   const notes = [];
   if (victory) {
     // cada enfrentamiento ganado sube 1 nivel completo a toda la banda viva
-    run.team.forEach(f => { if (f.hp > 0) gainXP(f, Math.max(0, xpForLevel(f.lvl) - f.xp)); });
+    run.team.forEach(f => { if (f.hp > 0) gainXP(f, xpForLevel(f.lvl)); });
     notes.push('⬆️ +1 nivel a la banda');
   }
   if (victory && opts.reward) {
@@ -6203,6 +6239,7 @@ function endBattle(victory, fled, recruited) {
     const completed = completedIslands(run.saga,run.mode,run.diff || 1);
     meta.islandProgress ||= {};
     meta.islandProgress[islandProgressKey(run.saga,run.mode,run.diff || 1)] = [...new Set([...completed,run.islandIdx])];
+    meta.lastCompletedIsland = {saga:run.saga, index:run.islandIdx, mode:run.mode, diff:run.diff || 1};
     meta.totalIslands = (meta.totalIslands || 0)+1;
     const newVets = unlockRoster(true);
     if (newVets.length > 0) {
@@ -6589,7 +6626,7 @@ function endTowerBattle(victory) {
   if (!victory) return towerGameOver();
   tower.team.forEach(f => {
     if (f.hp > 0) {
-      gainXP(f, Math.max(0, xpForLevel(f.lvl) - f.xp)); // +1 nivel por piso
+      gainXP(f, xpForLevel(f.lvl)); // +1 nivel por piso conservando EXP
       gainXP(f, 30 + tower.floor * 6);
       f.hp = Math.min(f.maxhp, f.hp + Math.floor(f.maxhp * 0.3));
     }
@@ -6647,7 +6684,7 @@ function nextStarterSlotItem() {
       maxed: true,
       name: 'Tamaño Máximo Alcanzado (6 Nakamas)',
       emoji: '👥',
-      desc: 'Has alcanzado el límite máximo de 6 nakamas iniciales (tamaño completo de la banda).',
+      desc: 'Los seis huecos están disponibles.',
       cost: 0,
       lvl: 0,
     };
@@ -6805,12 +6842,8 @@ function screenShip() {
     </div>
     <div class="panel">
       <h2>🏪 Tienda</h2>
-      <p style="font-size:9px;line-height:1.9;">Gasta ⭐ Fama en mejoras permanentes.
-      La Fama se gana con emblemas (+20), sagas (+100 / +150 en Nuzlocke), pisos de la Torre (+5), Luffy Run (+25 cada 1.000 m)
-      e incluso derrotas honrosas — y cada punto también da PX de cuenta.</p>
-      <div style="text-align:center;font-size:12px;margin:12px 0;color:var(--accent);">
-        ⭐ ${meta.fame} Fama · 👤 Cuenta Nv${accLvl} (${meta.accXp || 0}/${accountNextAt()} PX)
-      </div>
+      <p>Mejoras permanentes · Cuenta Nv${accLvl}</p>
+
 
       <h2 style="font-size:11px;">👥 Casillas de Nakamas Iniciales</h2>
       <div class="global-upg-row ${nextSlot.maxed ? 'owned' : accLvl < nextSlot.lvl ? 'locked' : ''}">
@@ -6820,7 +6853,7 @@ function screenShip() {
             <b class="upg-name">${nextSlot.name}</b>
             ${nextSlot.maxed ? '' : `<span class="price">⭐${nextSlot.cost}</span>`}
           </div>
-          <div class="upg-desc">${nextSlot.desc} (Actualmente: ${starterSlotsCount()}/6 casillas)</div>
+          <div class="upg-desc">${starterSlotsCount()}/6 huecos disponibles${nextSlot.maxed ? "" : ` · Próximo: ${nextSlot.nextN}`}</div>
         </div>
         <div class="upg-action">
           ${nextSlot.maxed ? `<span class="upg-badge bought">✓ MÁXIMO (6/6)</span>`
@@ -6837,7 +6870,7 @@ function screenShip() {
             <b class="upg-name">${nextCap.name}</b>
             <span class="price">⭐${nextCap.cost}</span>
           </div>
-          <div class="upg-desc">${nextCap.desc} (Límite actual: Nv.${nextCap.curMax})</div>
+          <div class="upg-desc">Entrenamiento: Nv.${nextCap.curMax} → ${nextCap.nextMax}</div>
         </div>
         <div class="upg-action">
           ${accLvl < nextCap.lvl ? `<span class="upg-badge locked">🔒 Cuenta Nv${nextCap.lvl}</span>`
