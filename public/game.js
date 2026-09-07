@@ -1960,7 +1960,7 @@ function screenHome() {
     </div>
     <div style="text-align:center;margin-top:8px;">
       <button class="btn red small" id="btn-logpose-gacha" style="padding:7px 16px;font-size:9.5px;font-weight:bold;width:100%;max-width:280px;box-shadow:0 2px 6px rgba(231,76,60,0.4);">
-        🎰 TIRADA DE CARTELES (🧭 ${meta.logPoses || 0})
+        <img class="carteles-menu-icon" src="/art/cross-guild-map.png" alt="" aria-hidden="true" draggable="false"> CARTELES (🧭 ${meta.logPoses || 0})
       </button>
     </div>
     <div style="text-align:center;margin-top:8px;">
@@ -6050,6 +6050,12 @@ function afterRound() {
     }
     // Recompensa de Log Poses al derrotar enemigos en historia
     if (run && !b.tower) {
+      if (b.opts.boss) {
+        const fame = bossFameReward(run.diff);
+        gainFame(fame);
+        b.bossFameEarned = (b.bossFameEarned || 0) + fame;
+        log(`🏅 ${charName(defeated)}: +${fame} ⭐ Fama`);
+      }
       const logPosesWon = enemyLogPoseReward(defeated, b.opts, run.saga || 0);
       meta.logPoses = (meta.logPoses || 0) + logPosesWon;
       saveMeta();
@@ -6232,6 +6238,7 @@ function bossFameReward(diff = 1) {
 function endBattle(victory, fled, recruited) {
   if (battle && battle.tower) { battle = null; return endTowerBattle(victory); }
   const opts = battle ? battle.opts : {};
+  const bossFame = battle?.bossFameEarned || 0;
   battle = null;
   if (run && run.mode === 'nuzlocke') {
     run.team = run.team.filter(f => f && f.hp > 0);
@@ -6269,9 +6276,6 @@ function endBattle(victory, fled, recruited) {
     if (newVets.length > 0) {
       toast(`🎉 ¡${newVets.map(id => CHARS[id] ? CHARS[id].name : id).join(', ')} desbloqueado/s para tu plantilla permanente!`);
     }
-    const bossFame = bossFameReward(run.diff);
-    gainFame(bossFame);
-    toast(`🏅 Jefe derrotado: +${bossFame} ⭐ Fama`);
     const saga = SAGAS[run.saga];
     // Al vencer al jefe de la isla (en modo Clásico), toda la banda (incluyendo caídos) se recupera al 100% de PS
     run.team.forEach(f => { f.hp = f.maxhp; });
@@ -6279,7 +6283,7 @@ function endBattle(victory, fled, recruited) {
       saveRun();
       const diffLevel = (run && run.diff) || 1;
       if (diffLevel === 5) {
-        return offerCrossoverPath(newVets);
+        return offerCrossoverPath(newVets, bossFame);
       }
       return sagaComplete();
     }
@@ -6302,7 +6306,7 @@ function endBattle(victory, fled, recruited) {
 // Tras el combate del jefe final en Dificultad Rey Pirata se abre un camino alternativo
 // con un rival reforzado (+50% Daño y Defensa). Al vencerlo, eliges 1 de 3 personajes de 4⭐
 // (o un Boss de 5⭐ si ya tienes todos los de 4⭐).
-function offerCrossoverPath(newVets) {
+function offerCrossoverPath(newVets, bossFame) {
   const rows = run.map.rows;
   const last = rows[rows.length - 1];
   if (!(last && last[0] && last[0].type === 'crossover')) {
@@ -6316,7 +6320,7 @@ function offerCrossoverPath(newVets) {
   ov.innerHTML = `<div class="modal">
     <h2>🏅 ¡Último emblema conseguido!</h2>
     <p style="font-size:9px;text-align:center;line-height:1.9;margin-bottom:10px;">
-      Has vencido al último capitán de la saga. +${bossFameReward(run.diff)} ⭐ Fama<br>
+      Has vencido a los últimos jefes de la saga. +${bossFame} ⭐ Fama<br>
       ${newVets && newVets.length ? `<small>🏅 Veteranos desbloqueados: ${newVets.map(id => CHARS[id].name).join(' · ')}</small><br>` : ''}
       <br>Pero al recoger el emblema en Dificultad Rey Pirata, el aire vibra... Un <b>camino alternativo</b> 🌀
       aparece donde antes no había salida.<br><br>
