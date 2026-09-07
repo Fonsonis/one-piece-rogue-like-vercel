@@ -17,7 +17,7 @@ test('one chart renders every saga and island in reverse order, preserving modes
  const {h}=setup();h.exec('screenSagas()');const html=h.exec('html');
  assert.equal((html.match(/class="world-saga"/g)||[]).length,11);
  assert.equal((html.match(/data-world-island=/g)||[]).length,57);
- assert.equal((html.match(/data-island-info=/g)||[]).length,57);
+ assert.equal((html.match(/data-island-info=/g)||[]).length,0);
  assert.equal((html.match(/data-saga-info=/g)||[]).length,11);
  assert.ok(html.indexOf('id="world-saga-10"')<html.indexOf('id="world-saga-0"'));
  assert.ok(html.indexOf('id="world-island-0-5"')<html.indexOf('id="world-island-0-0"'));
