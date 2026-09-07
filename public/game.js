@@ -3417,7 +3417,7 @@ function confirmRestartIsland() {
   modalConfirm('🔄 ¿Reiniciar isla?',
     'Volverás al mapa 1 con el equipo que elegiste al zarpar, sus niveles base actuales y las provisiones iniciales.<br>Se perderán los reclutas y las mejoras temporales de este intento. El progreso permanente se conserva.',
     () => { if (run === journey) retryIsland(attempt); },
-    () => { if (run === journey) { autoMode = wasAuto; screenMap(2); } });
+    () => { if (run === journey) { autoMode = wasAuto; screenMap(); } });
 }
 
 // Slots are derived from quantities so every consumer (including auto mode and
@@ -3634,7 +3634,6 @@ function startRun(sagaIdx, starterIds, islandIdx = 0) {
     badges: [],
     map: genIslandMap(saga.islands[islandIdx],0),
     pos: null,
-    sagaRerollUsed: false,
     nuzCaught: {}, // isla -> ya reclutado
   };
   prepareBackpack(run);
@@ -3677,8 +3676,6 @@ function screenMap(activePageIdx = 0) {
       style="--map-x:${x}%;--map-y:${y}%;--map-forward:${100-y}%" data-r="${r}" data-i="${i}" title="${NODE_TYPES[n.type].label}" aria-label="${NODE_TYPES[n.type].label}, etapa ${r+1}${isCur ? ", posición actual" : ''}" ${isReach ? '' : 'disabled'}>${n.type === 'special' ? '<img class="map-event-icon" src="/art/cross-guild-map.png" alt="" aria-hidden="true" draggable="false">' : NODE_TYPES[n.type].emoji}</button>`;
   }));
 
-  const canReroll = (run.mapIdx || 0) === 0 && run.pos === null && !run.sagaRerollUsed;
-
   render(`
     ${topbar(true, true, true)}
     <div class="map-wrap">
@@ -3688,8 +3685,8 @@ function screenMap(activePageIdx = 0) {
           <div class="map-board" style="--scene:url('${SAGAS[run.saga]?.img}');--map-rows:${rows.length}">
             <div class="map-heading"><div class="map-title">📍 <b>${saga.name}</b> · Isla ${run.islandIdx + 1}/${saga.islands.length}: <b>${island.name}</b> · Mapa ${(run.mapIdx || 0)+1}/${islandMapCount(island)} (${run.mode === 'nuzlocke' ? 'NUZLOCKE' : 'CLÁSICO'})</div>
             <div class="map-tools">
-              <button class="btn gold small" id="btn-map-reroll" aria-label="Regenerar mapa" title="Regenerar el primer mapa una vez por expedición" ${canReroll ? '' : 'disabled'} style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
-                ↻ ${canReroll ? 1 : 0}
+              <button class="btn gold small" id="btn-restart-island" aria-label="Reiniciar isla" title="Volver a empezar esta isla con tu equipo inicial" style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
+                ↻ REINICIAR
               </button>
             </div></div>
             <div class="map-route">
@@ -3758,7 +3755,6 @@ function screenMap(activePageIdx = 0) {
             `}
             <div style="display:flex;gap:8px;margin-top:14px;">
               <button class="btn red small" id="btn-abandon" style="flex:1;">ABANDONAR</button>
-              <button class="btn gray small" id="btn-restart-island" style="flex:1;">🔄 REINICIAR ISLA</button>
             </div>
           </div>
         </div>
@@ -3824,18 +3820,6 @@ function screenMap(activePageIdx = 0) {
         }, 50);
       });
     }
-  }
-
-  const mapRerollBtn = $('#btn-map-reroll');
-  if (mapRerollBtn && canReroll) {
-    mapRerollBtn.onclick = () => {
-      run.sagaRerollUsed = true;
-      run.map = genIslandMap(island,run.mapIdx || 0);
-      run.pos = null;
-      saveRun();
-      toast('🎲 ¡Primer mapa de la isla regenerado!');
-      screenMap();
-    };
   }
 
   document.querySelectorAll('.map-node.reachable').forEach(el => {
