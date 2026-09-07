@@ -3532,6 +3532,7 @@ function confirmRestartIsland() {
 // Slots are derived from quantities so every consumer (including auto mode and
 // recruitment) immediately frees space without maintaining a second inventory.
 function backpackCapacity() { return 9 + Math.min(17, Math.max(0, meta.global.backpackTier || 0)) * 3; }
+function backpackStackLimit() { return 3 + Math.min(17, Math.max(0, meta.global.backpackTier || 0)); }
 function backpackUpgradeCost() { return 300 * ((meta.global.backpackTier || 0) + 1); }
 function buyBackpackUpgrade() {
   const cost = backpackUpgradeCost();
@@ -3544,7 +3545,7 @@ function buyBackpackUpgrade() {
 function backpackUsed(items, combat = null) {
   return Object.entries(items || {}).reduce((sum, [id, count]) => {
     const item = ITEMS[id];
-    return sum + (item && count > 0 && (combat === null || isBattleItem(id) === combat) ? Math.ceil(count / item.stackLimit) * item.slotSize : 0);
+    return sum + (item && count > 0 && (combat === null || isBattleItem(id) === combat) ? Math.ceil(count / backpackStackLimit()) * item.slotSize : 0);
   }, 0);
 }
 function backpackFits(owner, id, count = 1) {
@@ -3588,8 +3589,8 @@ function backpackStacks(owner) {
   for (const [id,total] of Object.entries(owner.items || {})) {
     const item = ITEMS[id];
     if (!item) continue;
-    for (let remaining = total; remaining > 0; remaining -= item.stackLimit) {
-      stacks.push({id, count:Math.min(remaining,item.stackLimit), size:item.slotSize});
+    for (let remaining = total; remaining > 0; remaining -= backpackStackLimit()) {
+      stacks.push({id, count:Math.min(remaining,backpackStackLimit()), size:item.slotSize});
     }
   }
   return stacks;
@@ -3624,7 +3625,7 @@ function backpackHTML(owner, combat = false, category = null) {
     <div class="bag-heading"><strong>🎒 ${battleBag ? 'COMBATE' : 'ISLA'}</strong><span aria-label="Espacio ocupado">${used}/${capacity} casillas</span></div>
     <div class="bag-grid">${cells}${empty}</div>
     ${pending ? `<div class="bag-pending"><b>Pendiente de guardar</b><p>Libera espacio o deja estos objetos para continuar.</p>${pending}</div>` : ''}
-    ${combat ? '' : `<p class="bag-help">${battleBag ? 'Curas, resurrecciones y bebidas de combate.' : 'Carteles, frutas y mejoras para la isla.'} Las dos mochilas tienen su propio espacio y se amplían juntas.</p>`}
+    ${combat ? '' : `<p class="bag-help">${battleBag ? 'Curas, resurrecciones y bebidas de combate.' : 'Carteles, frutas y mejoras para la isla.'} Hasta ${backpackStackLimit()} unidades del mismo objeto por pila. Las dos mochilas tienen su propio espacio y se amplían juntas.</p>`}
   </div>`;
 }
 function saveBackpack(owner) { if (owner === run) saveRun(); }
@@ -3658,7 +3659,7 @@ function showBackpackItem(owner, id, count, combat, refresh) {
   ov.className = 'overlay';
   const usable = combat ? isBattleItem(id) : owner === run && !['ball','battleBoost'].includes(item.kind);
   ov.innerHTML = `<div class="modal bag-item-modal"><h2>${item.emoji} ${item.name}</h2><p>${item.desc}</p>
-    <p>${item.slotSize} casilla${item.slotSize > 1 ? 's' : ''}${item.stackLimit > 1 ? ` · Hasta ${item.stackLimit} por pila` : ' por unidad'}</p>
+    <p>${item.slotSize} casilla${item.slotSize > 1 ? 's' : ''} · Hasta ${backpackStackLimit()} por pila</p>
     ${!usable ? `<p>${item.kind === 'ball' ? 'Se usa en el evento de las cadenas.' : item.kind === 'battleBoost' ? 'Se usa durante el combate.' : 'Se usa fuera del combate.'}</p>` : ''}
     <div class="actions"><button class="btn green" data-bag-use ${usable ? '' : 'disabled'}>USAR</button>
       <button class="btn red" data-bag-discard>DESCARTAR ${count > 1 ? `PILA ×${count}` : '1'}</button>
@@ -5247,7 +5248,7 @@ function screenShop() {
           <span class="emoji">${it.emoji}</span>
           <div class="info">
             <b>${it.name}</b> <span style="font-size:8.5px;color:var(--gold);font-weight:bold;margin-left:4px;">(Tienes: ${owned})</span> — <span class="price">${berriesHTML(it.price)}</span><br>
-            <small>${it.desc} · ${it.slotSize} casilla${it.slotSize > 1 ? 's' : ''}${it.stackLimit > 1 ? ` / ${it.stackLimit} uds.` : ' / ud.'}</small>
+            <small>${it.desc} · ${it.slotSize} casilla${it.slotSize > 1 ? 's' : ''} / ${backpackStackLimit()} uds.</small>
           </div>
           <button class="btn small ${run.berries >= it.price && backpackFits(run,id) ? 'green' : 'gray'}" data-buy="${id}" ${run.berries >= it.price && backpackFits(run,id) ? '' : 'disabled'}>${backpackFits(run,id) ? 'COMPRAR' : 'SIN ESPACIO'}</button>
         </div>`;
@@ -7272,7 +7273,7 @@ function screenShip() {
       <p>Mejoras permanentes · Cuenta Nv${accLvl}</p>
       <div class="global-upg-row">
         <span class="upg-emoji">🎒</span><div class="upg-details"><b class="upg-name">Ampliar ambas mochilas</b>
-          <div class="upg-desc">${backpackCapacity()} casillas cada una · ${backpackCapacity() < 60 ? '+3 casillas en la mochila de isla y +3 en la de combate' : 'Capacidad máxima'}</div>
+          <div class="upg-desc">${backpackCapacity()} casillas cada una · Pilas de ${backpackStackLimit()} · ${backpackCapacity() < 60 ? '+3 casillas en cada mochila y +1 unidad por pila' : 'Capacidad máxima'}</div>
           ${backpackCapacity() < 60 ? `<span class="price">⭐${backpackUpgradeCost()} Fama</span>` : ''}</div>
         <div class="upg-action"><button class="btn small green" id="btn-buy-backpack" ${backpackCapacity() >= 60 || meta.fame < backpackUpgradeCost() ? 'disabled' : ''}>${backpackCapacity() >= 60 ? 'MÁXIMO' : 'AMPLIAR +3'}</button></div>
       </div>
@@ -7508,7 +7509,7 @@ function screenShip() {
     shipBuyLock = Date.now();
     if (!buyBackpackUpgrade()) return;
     screenShip();
-    toast(`🎒 Ambas mochilas ampliadas a ${backpackCapacity()} casillas cada una.`);
+    toast(`🎒 Ambas mochilas ampliadas a ${backpackCapacity()} casillas cada una y pilas de ${backpackStackLimit()}.`);
   };
   const buySlotBtn = $('#btn-buy-starter-slot');
   if (buySlotBtn) {
