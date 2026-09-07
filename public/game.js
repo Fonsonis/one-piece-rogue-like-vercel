@@ -817,39 +817,56 @@ let currentTrack = null;
 let bgmAudio = null;
 let isMuted = false;
 try { isMuted = localStorage.getItem('oplike_muted') === 'true'; } catch (e) { }
+let musicFocused = document.hasFocus ? document.hasFocus() : true;
+
+function syncMusicPlayback() {
+  const audio = bgmAudio;
+  if (!audio) return;
+  if (!currentTrack || isMuted || document.hidden || !musicFocused) {
+    audio.pause();
+    return;
+  }
+  if (!audio.paused) return;
+  // Autoplay can be denied until the next user interaction.
+  audio.play()?.then(() => {
+    if (audio !== bgmAudio || !currentTrack || isMuted || document.hidden || !musicFocused) audio.pause();
+  }).catch(() => {});
+}
+
+document.addEventListener('visibilitychange', () => {
+  musicFocused = !document.hidden && (document.hasFocus ? document.hasFocus() : true);
+  syncMusicPlayback();
+});
+globalThis.addEventListener?.('blur', () => { musicFocused = false; syncMusicPlayback(); });
+globalThis.addEventListener?.('focus', () => { musicFocused = true; syncMusicPlayback(); });
+globalThis.addEventListener?.('pagehide', () => { musicFocused = false; syncMusicPlayback(); });
+globalThis.addEventListener?.('pageshow', () => {
+  musicFocused = document.hasFocus ? document.hasFocus() : true;
+  syncMusicPlayback();
+});
+['click', 'keydown', 'touchstart'].forEach(type => document.addEventListener(type, syncMusicPlayback));
 
 function playMusic(track) {
-  if (currentTrack === track) return;
+  if (currentTrack === track) return syncMusicPlayback();
   currentTrack = track;
   if (bgmAudio) {
     bgmAudio.pause();
     bgmAudio.currentTime = 0;
   }
+  bgmAudio = null;
   if (!track) return;
   bgmAudio = new Audio(`soundtracks/${track}.mp3`);
   bgmAudio.loop = true;
   bgmAudio.muted = isMuted;
   bgmAudio.volume = 0.45;
-  const playPromise = bgmAudio.play();
-  if (playPromise !== undefined) {
-    playPromise.catch(() => {
-      const unlock = () => {
-        if (bgmAudio && currentTrack === track) bgmAudio.play().catch(() => { });
-        document.removeEventListener('click', unlock);
-        document.removeEventListener('keydown', unlock);
-        document.removeEventListener('touchstart', unlock);
-      };
-      document.addEventListener('click', unlock);
-      document.addEventListener('keydown', unlock);
-      document.addEventListener('touchstart', unlock);
-    });
-  }
+  syncMusicPlayback();
 }
 
 function toggleMute() {
   isMuted = !isMuted;
   try { localStorage.setItem('oplike_muted', String(isMuted)); } catch (e) { }
   if (bgmAudio) bgmAudio.muted = isMuted;
+  syncMusicPlayback();
   const btn = $('#btn-mute');
   if (btn) btn.textContent = isMuted ? '🔇 MÚSICA' : '🎵 MÚSICA';
   const chkBtn = $('#chk-music-toggle');
