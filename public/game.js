@@ -2722,7 +2722,7 @@ function showNakamaPicker(opts) {
       return `<article class="nakama-picker-card ${team.includes(id) ? 'in-team' : ''}">
         <button class="nakama-picker-pick" data-id="${esc(id)}" aria-label="Elegir a ${esc(c.name)}${current ? ', en este hueco' : team.includes(id) ? ', en el equipo' : ''}">
           <span class="nakama-picker-badge">${current ? 'Este hueco' : team.includes(id) ? 'En equipo' : ''}</span>
-          ${charIcon(display(id), 48)}<strong>${esc(c.name)}</strong><span>Nv. ${startLvlOf(id)} · ${c.rareza} ★</span><span class="type-badges">${typeBadges(c.types)}</span>
+          ${charIcon(display(id), 48)}<strong>${esc(c.name)}</strong><span>Nv. ${startLvlOf(id)} · ${'⭐'.repeat(c.rareza)}</span><span class="type-badges">${typeBadges(c.types)}</span>
         </button><button class="nakama-picker-info" data-info="${esc(id)}" aria-label="Ver ficha de ${esc(c.name)}" title="Ver ficha">ⓘ</button>
       </article>`;
     }).join('') || '<p class="nakama-picker-empty">No hay nakamas con estos filtros. Prueba otra saga o pulsa «Limpiar filtros».</p>';
