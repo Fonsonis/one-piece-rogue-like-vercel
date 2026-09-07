@@ -78,3 +78,20 @@ test('limited supplies never go negative and pending loot is not consumed', () =
   assert.equal(h.exec('runAutoItems()'),false);
   assert.equal(h.exec('run.pendingLoot.carnereal'),2);
 });
+
+test('legacy automatic-mode choices migrate once and never overwrite backpack preferences', () => {
+  const h = setup();
+  h.exec(`meta.settings.autoConfig={healThreshold:0,revive:true,healItems:['carne'],shopItems:[{id:'hierro',qty:2}]};
+    loadedSave={meta:JSON.parse(JSON.stringify(meta))};loadMeta();`);
+  assert.equal(h.exec('autoBackpackSettings().enabled'),true);
+  assert.equal(h.exec('autoBackpackSettings().threshold'),0);
+  assert.equal(h.exec('autoBackpackSettings().items.sake'),true);
+  assert.equal(h.exec('autoBackpackSettings().items.carnereal'),false);
+  assert.equal(h.exec('autoSettings.shopItems.length'),0);
+  h.exec(`setAutoBackpackSettings({enabled:false,where:'combat',threshold:25,items:{sake:false}});
+    loadedSave={meta:JSON.parse(JSON.stringify(meta))};loadMeta();`);
+  assert.equal(h.exec('autoBackpackSettings().enabled'),false);
+  assert.equal(h.exec('autoBackpackSettings().where'),'combat');
+  assert.equal(h.exec('autoBackpackSettings().threshold'),25);
+  assert.equal(h.exec('autoBackpackSettings().items.sake'),false);
+});

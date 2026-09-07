@@ -104,16 +104,54 @@ try {
 
 let autoMode = false;
 let autoTimer = null;
-let autoSettings = {
-  speed: 'x2', // 'x1' (normal, mitad) o 'x2' (rápida, actual)
-  nodePriority: 'random', // 'random', 'item', 'battle', 'rest'
-  wildAction: 'fight', // 'fight', 'recruit', 'chains'
-  shopItems: [
-    { id: 'carne', qty: 3 },
-    { id: 'sake', qty: 2 },
-    { id: 'cartel', qty: 2 },
-  ],
-};
+const PORT_SHOP_STOCK = ['carne','carnereal','bocadillo','sake','cartel','carteldorado','cartelbuster'];
+const AUTO_ROUTE_KEYS = ['random','wild','marine','item','mystery','shop','rest','special','boss','crossover','battle'];
+const AUTO_DEFAULTS = () => ({
+  speed:'x2', healThreshold:50, nodePriority:'random', wildAction:'fight',
+  specialAction:'manual', chainItem:'risk', chainFail:'fight', crossoverAction:'fight',
+  revive:true, useUltimates:true, healItems:['carne','carnereal','bocadillo'],
+  reserveBerries:0, pauseEvents:[],
+  shopItems:[{id:'carne',qty:3},{id:'sake',qty:2},{id:'cartel',qty:2}]
+});
+function normalizeAutoSettings(value) {
+  const d = AUTO_DEFAULTS(), v = value && typeof value === 'object' ? value : {};
+  const choice = (key, allowed) => allowed.includes(v[key]) ? v[key] : d[key];
+  const integer = (value, fallback, max) => Number.isFinite(Number(value)) ? Math.min(max,Math.max(0,Math.floor(Number(value)))) : fallback;
+  return {...d,
+    speed:choice('speed',['x1','x2']), nodePriority:choice('nodePriority',AUTO_ROUTE_KEYS),
+    healThreshold:choice('healThreshold',[0,25,50,75,99]),
+    wildAction:choice('wildAction',['fight','recruit','chains','manual']),
+    specialAction:choice('specialAction',['manual','gacha','leave']),
+    chainItem:choice('chainItem',['risk','cartel','carteldorado','cartelbuster']),
+    chainFail:choice('chainFail',['fight','pay','manual']),
+    crossoverAction:choice('crossoverAction',['fight','leave','manual']),
+    revive:typeof v.revive==='boolean'?v.revive:d.revive,
+    useUltimates:typeof v.useUltimates==='boolean'?v.useUltimates:d.useUltimates,
+    healItems:Array.isArray(v.healItems)?['carne','carnereal','bocadillo'].filter(id=>v.healItems.includes(id)):d.healItems,
+    reserveBerries:integer(v.reserveBerries,0,999999),
+    pauseEvents:Array.isArray(v.pauseEvents)?['wild','marine','item','mystery','shop','rest','special','boss','crossover'].filter(id=>v.pauseEvents.includes(id)):[],
+    shopItems:Array.isArray(v.shopItems)?v.shopItems.filter(t=>t&&PORT_SHOP_STOCK.includes(t.id)).map(t=>({id:t.id,qty:integer(t.qty,0,99)})):d.shopItems
+  };
+}
+let autoSettings = AUTO_DEFAULTS();
+function pauseAutoForChoice(message) {
+  autoMode=false;
+  if(autoTimer) clearTimeout(autoTimer);
+  autoTimer=null;
+  const btn=$('#btn-topbar-auto');
+  if(btn) {btn.textContent='🤖 PAUSADO';btn.classList.remove('green');btn.classList.add('gray');}
+  if(message) toast(message);
+}
+function autoCanSpend(price) {return !!run && run.berries-price >= (autoSettings.reserveBerries || 0);}
+function advanceAutoNode(r,i) {
+  if(!autoMode || !run)return;
+  if(autoSettings.pauseEvents?.includes(run.map.rows[r][i].type)) {
+    pauseAutoForChoice();screenMap();
+    toast(`🤖 Pausa antes de ${NODE_TYPES[run.map.rows[r][i].type].label}. Elige cuándo entrar.`);
+    return;
+  }
+  enterNode(r,i);
+}
 
 function stopAutoMode() {
   autoMode = false;
@@ -139,7 +177,7 @@ function autoBackpackSettings() {
   const saved = meta.settings?.autoBackpack || {};
   return {
     enabled: saved.enabled === true,
-    threshold: [25,50,75,99].includes(saved.threshold) ? saved.threshold : 50,
+    threshold: [0,25,50,75,99].includes(saved.threshold) ? saved.threshold : 50,
     where: ['map','combat','both'].includes(saved.where) ? saved.where : 'both',
     items: {carne:saved.items?.carne !== false, carnereal:saved.items?.carnereal !== false,
       bocadillo:saved.items?.bocadillo === true, sake:saved.items?.sake === true}
@@ -176,7 +214,7 @@ function runAutoItems(refresh = true) {
     }
   }
   for (const fighter of team) {
-    if (fighter === revived || fighter.hp <= 0 || fighter.hp >= fighter.maxhp ||
+    if (!config.threshold || fighter === revived || fighter.hp <= 0 || fighter.hp >= fighter.maxhp ||
         (config.threshold !== 99 && fighter.hp / fighter.maxhp * 100 > config.threshold)) continue;
     const healing = ['carne','carnereal','bocadillo'].filter(id=>config.items[id] && owner.items[id] > 0)
       .sort((a,b)=>ITEMS[a].val-ITEMS[b].val);
@@ -199,7 +237,34 @@ function pickAutoNode(reach) {
 
   const rows = run.map.rows;
   let matches = [];
-  if (pref === 'item') {
+  if (Object.hasOwn(NODE_TYPES, pref)) {
+    // Trace actual map connections back from unvisited events of the chosen type.
+    // This keeps earlier choices on a route to the nearest reachable event.
+    const distances = new Map(), incoming = new Map(), queue = [];
+    rows.forEach((row, r) => row.forEach((node, i) => {
+      if (node.type === pref && !node.done) {
+        const key = `${r},${i}`;
+        distances.set(key, 0);
+        queue.push(key);
+      }
+    }));
+    for (const [r, i, nextR, nextI] of run.map.edges || []) {
+      if (rows[r]?.[i]?.done || rows[nextR]?.[nextI]?.done) continue;
+      const key = `${nextR},${nextI}`;
+      if (!incoming.has(key)) incoming.set(key, []);
+      incoming.get(key).push(`${r},${i}`);
+    }
+    for (let idx = 0; idx < queue.length; idx++) {
+      const key = queue[idx];
+      for (const previous of incoming.get(key) || []) {
+        if (distances.has(previous)) continue;
+        distances.set(previous, distances.get(key) + 1);
+        queue.push(previous);
+      }
+    }
+    const nearest = Math.min(...reach.map(([r, i]) => distances.get(`${r},${i}`) ?? Infinity));
+    if (Number.isFinite(nearest)) matches = reach.filter(([r, i]) => distances.get(`${r},${i}`) === nearest);
+  } else if (pref === 'item') {
     matches = reach.filter(([r, i]) => ['item', 'mystery', 'shop'].includes(rows[r][i].type));
   } else if (pref === 'battle') {
     matches = reach.filter(([r, i]) => ['wild', 'marine', 'boss'].includes(rows[r][i].type));
@@ -212,137 +277,95 @@ function pickAutoNode(reach) {
 }
 
 function showAutoSettingsModal() {
-  const ov = document.createElement('div');
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="max-width:440px;">
-    <h2>🤖 Opciones del Modo Automático</h2>
-    
-    <div style="display:flex;flex-direction:column;gap:12px;margin:14px 0;text-align:left;">
-      
-      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
-          ⚡ Velocidad del Modo Automático
-        </label>
-        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Elige el ritmo de avance en mapa y combate:</div>
-        <select id="auto-speed-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-          <option value="x2" ${autoSettings.speed === 'x2' || !autoSettings.speed ? 'selected' : ''}>⚡ Modo x2 (Rápido - Velocidad actual)</option>
-          <option value="x1" ${autoSettings.speed === 'x1' ? 'selected' : ''}>🚶 Modo x1 (Normal - Mitad de velocidad)</option>
-        </select>
-      </div>
-
-      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
-          🍖 Consumo Automático de Objetos
-        </label>
-        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Usar objetos de curación o Sake cuando el PS baje de:</div>
-        <select id="auto-heal-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-          <option value="0" ${!autoBackpackSettings().enabled ? 'selected' : ''}>❌ Desactivado (no usar objetos)</option>
-          <option value="25" ${autoBackpackSettings().enabled && autoBackpackSettings().threshold === 25 ? 'selected' : ''}>❤️ Crítico: Menos del 25% de PS</option>
-          <option value="50" ${autoBackpackSettings().enabled && autoBackpackSettings().threshold === 50 ? 'selected' : ''}>🧡 Medio: Menos del 50% de PS</option>
-          <option value="75" ${autoBackpackSettings().enabled && autoBackpackSettings().threshold === 75 ? 'selected' : ''}>💛 Leve: Menos del 75% de PS</option>
-          <option value="99" ${autoBackpackSettings().enabled && autoBackpackSettings().threshold === 99 ? 'selected' : ''}>💚 Cualquier daño recibido (<100% PS)</option>
-        </select>
-      </div>
-
-      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
-          🗺️ Prioridad de Rutas en el Mapa
-        </label>
-        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Tipo de casilla preferida al elegir camino:</div>
-        <select id="auto-node-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-          <option value="random" ${autoSettings.nodePriority === 'random' ? 'selected' : ''}>🎲 Al azar / Sin preferencia</option>
-          <option value="item" ${autoSettings.nodePriority === 'item' ? 'selected' : ''}>🎁 Priorizar Tesoros, Misterios y Tiendas</option>
-          <option value="battle" ${autoSettings.nodePriority === 'battle' ? 'selected' : ''}>⚔️ Priorizar Enfrentamientos y Combates</option>
-          <option value="rest" ${autoSettings.nodePriority === 'rest' ? 'selected' : ''}>⛺ Priorizar Campamentos y Descanso</option>
-        </select>
-      </div>
-
-      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
-          🏴‍☠️ Encuentros con Piratas Salvajes
-        </label>
-        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Acción por defecto al encontrar un pirata salvaje:</div>
-        <select id="auto-wild-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-          <option value="fight" ${autoSettings.wildAction === 'fight' ? 'selected' : ''}>⚔️ Luchar (ganar Experiencia para la banda)</option>
-          <option value="recruit" ${autoSettings.wildAction === 'recruit' ? 'selected' : ''}>💋 Reclutar / Seducir (pagando Berries)</option>
-          <option value="chains" ${autoSettings.wildAction === 'chains' ? 'selected' : ''}>⛓️ Tentar a la suerte (3 Cadenas)</option>
-        </select>
-      </div>
-
-      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
-          🏪 Compras Automáticas en Tiendas (Prioridad de 3 Objetos)
-        </label>
-        <div style="font-size:7.5px;color:#aaa;margin-bottom:8px;">
-          Elige 3 objetos en orden de prioridad y cuántos deseas mantener en inventario:
-        </div>
-        ${[0, 1, 2].map(idx => {
-    const sList = autoSettings.shopItems || [];
-    const itemSetting = sList[idx] || { id: 'none', qty: 0 };
-    return `
-          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
-            <span style="font-size:9px;font-weight:bold;color:var(--gold);width:16px;">#${idx + 1}</span>
-            <select id="auto-shop-item-${idx}" style="flex:1;padding:4px;font-size:8.5px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-              <option value="none" ${itemSetting.id === 'none' ? 'selected' : ''}>❌ Ninguno (vacío)</option>
-              <option value="carne" ${itemSetting.id === 'carne' ? 'selected' : ''}>🍖 Carne de Cerdo (40 PS)</option>
-              <option value="carnereal" ${itemSetting.id === 'carnereal' ? 'selected' : ''}>🥩 Carne Real (100% PS)</option>
-              <option value="bocadillo" ${itemSetting.id === 'bocadillo' ? 'selected' : ''}>🥪 Bocadillo de Arroz (25 PS)</option>
-              <option value="sake" ${itemSetting.id === 'sake' ? 'selected' : ''}>🍶 Sake de Binks (Revivir)</option>
-              <option value="cartel" ${itemSetting.id === 'cartel' ? 'selected' : ''}>📜 Cartel de Recluta (1 Cadena)</option>
-              <option value="carteldorado" ${itemSetting.id === 'carteldorado' ? 'selected' : ''}>🏅 Cartel Dorado (2 Cadenas)</option>
-              <option value="cartelbuster" ${itemSetting.id === 'cartelbuster' ? 'selected' : ''}>📯 Buster Call (3 Cadenas)</option>
-            </select>
-            <span style="font-size:8px;color:#aaa;">Hasta:</span>
-            <select id="auto-shop-qty-${idx}" style="width:50px;padding:4px;font-size:8.5px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-              <option value="0" ${itemSetting.qty === 0 ? 'selected' : ''}>0</option>
-              ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(q => `<option value="${q}" ${itemSetting.qty === q ? 'selected' : ''}>${q}</option>`).join('')}
-            </select>
-          </div>`;
-  }).join('')}
-      </div>
-
+  if(document.querySelector('.auto-config-overlay'))return;
+  const wasAuto=autoMode, activeBattle=battle && !battle.over ? battle : null;
+  const wasWaiting=activeBattle?.waiting;
+  pauseAutoForChoice();
+  if(activeBattle && !wasWaiting)pauseBattle();
+  const cfg=normalizeAutoSettings(autoSettings);
+  const bagAuto=autoBackpackSettings();
+  const ov=document.createElement('div');ov.className='overlay auto-config-overlay';
+  const select=(id,value,options)=>`<select id="${id}">${options.map(([key,label])=>`<option value="${key}" ${String(key)===String(value)?'selected':''}>${label}</option>`).join('')}</select>`;
+  const check=(id,label,on,disabled=false)=>`<label class="auto-check"><input type="checkbox" id="${id}" ${on?'checked':''} ${disabled?'disabled':''}><span>${label}</span></label>`;
+  const routes=AUTO_ROUTE_KEYS.filter(id=>id!=='random'&&id!=='battle').map(id=>[id,`${NODE_TYPES[id].emoji} ${NODE_TYPES[id].label}`]);
+  ov.innerHTML=`<div class="modal auto-config" role="dialog" aria-modal="true" aria-labelledby="auto-title">
+    <header class="auto-header"><div><small>PILOTO AUTOMÁTICO</small><h2 id="auto-title">Prepara tu viaje</h2><p>El avance se pausa mientras configuras.</p></div><button class="btn gray" id="auto-apply-close" aria-label="Cerrar sin guardar">✕</button></header>
+    <div class="auto-config-body">
+      <section class="auto-section"><h3>🧭 Ruta y ritmo</h3>
+        <label for="auto-node-sel">Evento al que quieres ir</label>
+        ${select('auto-node-sel',cfg.nodePriority,[['random','🎲 Sin preferencia'],...routes,['battle','⚔️ Combates (piratas, Marines y jefes)']])}
+        <p>Sigue las conexiones hacia el evento accesible más cercano. Si no hay ninguno, elige al azar. Los misterios se descubren al entrar.</p>
+        <div class="auto-two"><div><label for="auto-speed-sel">Avance por el mapa</label>${select('auto-speed-sel',cfg.speed,[['x1','Normal'],['x2','Rápido']])}</div>
+        <div><label for="auto-combat-speed">Velocidad de combate</label>${select('auto-combat-speed',preferredCombatSpeed(),[[1,'x1'],[2,'x2'],[4,'x4']])}</div></div>
+        ${check('auto-ultimates','Usar definitivas cuando estén listas',cfg.useUltimates)}
+        <details><summary>Parar antes de un evento</summary><div class="auto-check-grid">${routes.map(([id,label])=>check(`auto-pause-${id}`,label,cfg.pauseEvents.includes(id))).join('')}</div><p>Se detiene en el mapa para que entres manualmente.</p></details>
+      </section>
+      <section class="auto-section"><h3>🏴‍☠️ Encuentros y reclutas</h3>
+        <label for="auto-wild-sel">Pirata salvaje</label>${select('auto-wild-sel',cfg.wildAction,[['fight','Combatir'],['recruit','Reclutar con Berries'],['chains','Tentar a la suerte: cadenas'],['manual','Pausar y decidir yo']])}
+        <p>Si no puedes reclutar por precio, rareza o Nuzlocke, combate.</p>
+        <div class="auto-two"><div><label for="auto-chain-item">En las cadenas</label>${select('auto-chain-item',cfg.chainItem,[['risk','Arriesgar: 50%'],...['cartel','carteldorado','cartelbuster'].map(id=>[id,ITEMS[id].name])])}</div>
+        <div><label for="auto-chain-fail">Si una cadena aguanta</label>${select('auto-chain-fail',cfg.chainFail,[['fight','Combatir'],['pay','Pagar 3 carteles si tengo'],['manual','Pausar y decidir yo']])}</div></div>
+        <p>Si no tienes el cartel elegido, arriesga. Si no puedes pagar los 3 carteles, combate.</p>
+        <label for="auto-special-action">Pirata especial · Mercado clandestino</label>${select('auto-special-action',cfg.specialAction,[['manual','Pausar para elegir o jugar'],['gacha','Jugar carteles si puedo pagarlos'],['leave','Marcharme sin comprar']])}
+        <p>El catálogo se elige manualmente. Si no alcanza para los carteles o Nuzlocke lo impide, se marcha.</p>
+        <label for="auto-crossover">Camino alternativo · Crossover</label>${select('auto-crossover',cfg.crossoverAction,[['fight','Explorar y aceptar el duelo'],['leave','Retirarme y completar la saga'],['manual','Pausar y decidir yo']])}
+      </section>
+      <section class="auto-section"><h3>🎒 Uso automático de la mochila</h3>
+        ${check('auto-bag-enabled','Usar objetos automáticamente',bagAuto.enabled)}
+        <p>Comparte estas preferencias con Ajustes. Funciona también con el avance automático pausado.</p>
+        <label for="auto-bag-where">Dónde usar objetos</label>${select('auto-bag-where',bagAuto.where,[['both','Isla y combate'],['map','Solo en la isla'],['combat','Solo en combate']])}
+        <label for="auto-heal-sel">Curar cuando los PS estén al…</label>${select('auto-heal-sel',bagAuto.threshold,[[0,'No curar automáticamente'],[25,'25% o menos'],[50,'50% o menos'],[75,'75% o menos'],[99,'Cualquier daño']])}
+        <p>Objetos permitidos: usa uno por nakama y revisión, el menor que cubra el daño o el mayor disponible.</p>
+        ${['carne','carnereal','bocadillo'].map(id=>check(`auto-heal-${id}`,`${ITEMS[id].emoji} ${ITEMS[id].name} · ${ITEMS[id].desc}`,bagAuto.items[id])).join('')}
+        ${check('auto-revive',`${ITEMS.sake.emoji} Revivir con ${ITEMS.sake.name}`,bagAuto.items.sake,run?.mode==='nuzlocke')}
+        <p>${run?.mode==='nuzlocke'?'Nuzlocke: los nakamas caídos no pueden revivir.':ITEMS.sake.desc}</p>
+      </section>
+      <section class="auto-section"><h3>🏪 Compras y presupuesto</h3>
+        <label for="auto-reserve">Berries que quieres conservar</label><input id="auto-reserve" type="number" min="0" max="999999" step="50" value="${cfg.reserveBerries}">
+        <p>La reserva se respeta al comprar provisiones, reclutar y jugar carteles. Cantidad 0 = no comprar. Prioridad 1 = comprar primero.</p>
+        <div class="auto-stock-head"><span>Provisión</span><span>Hasta</span><span>Prioridad</span></div>
+        ${PORT_SHOP_STOCK.map((id,index)=>{const entry=cfg.shopItems.find(t=>t.id===id);const priority=cfg.shopItems.findIndex(t=>t.id===id);return `<div class="auto-stock-row"><div><b>${ITEMS[id].emoji} ${ITEMS[id].name}</b><small>${ITEMS[id].desc} · ${ITEMS[id].price} Berries</small></div><input aria-label="Cantidad de ${ITEMS[id].name}" data-auto-stock="${id}" type="number" min="0" max="99" value="${entry?.qty||0}">${select(`auto-priority-${id}`,priority<0?PORT_SHOP_STOCK.length:priority+1,PORT_SHOP_STOCK.map((_,i)=>[i+1,i+1]))}</div>`}).join('')}
+      </section>
     </div>
-
-    <div class="actions" style="flex-direction:column;gap:6px;">
-      <button class="btn green" id="auto-apply-start">▶️ ${autoMode ? 'GUARDAR Y CONTINUAR' : 'ACTIVAR MODO AUTOMÁTICO'}</button>
-      ${autoMode ? `<button class="btn red" id="auto-apply-stop">⏹️ DESACTIVAR MODO AUTOMÁTICO</button>` : ''}
-      <button class="btn gray" id="auto-apply-close">CANCELAR / CERRAR</button>
-    </div>
+    <footer class="auto-footer"><button class="btn gray" id="auto-save-only">Guardar y pausar</button><button class="btn green" id="auto-apply-start">Guardar y activar</button></footer>
   </div>`;
-
   document.body.appendChild(ov);
-
-  const saveFormSettings = () => {
-    autoSettings.speed = ov.querySelector('#auto-speed-sel').value;
-    const threshold = +ov.querySelector('#auto-heal-sel').value;
-    setAutoBackpackSettings({enabled:threshold > 0, ...(threshold ? {threshold} : {})});
-    autoSettings.nodePriority = ov.querySelector('#auto-node-sel').value;
-    autoSettings.wildAction = ov.querySelector('#auto-wild-sel').value;
-    autoSettings.shopItems = [0, 1, 2].map(idx => ({
-      id: ov.querySelector(`#auto-shop-item-${idx}`).value,
-      qty: +ov.querySelector(`#auto-shop-qty-${idx}`).value
-    }));
-  };
-
-  ov.querySelector('#auto-apply-start').onclick = () => {
-    saveFormSettings();
-    autoMode = true;
-    ov.remove();
-    toast('🤖 Modo Automático ACTIVADO');
-    screenMap();
-  };
-
-  if (autoMode) {
-    const stopBtn = ov.querySelector('#auto-apply-stop');
-    if (stopBtn) {
-      stopBtn.onclick = () => {
-        ov.remove();
-        stopAutoMode();
-      };
+  PORT_SHOP_STOCK.forEach(id=>ov.querySelector(`#auto-priority-${id}`).setAttribute('aria-label',`Prioridad de ${ITEMS[id].name}`));
+  let closed=false;
+  const close=(mode,save)=>{
+    if(closed)return;closed=true;
+    if(save) {
+      const val=id=>ov.querySelector(`#${id}`).value;
+      const on=id=>ov.querySelector(`#${id}`).checked;
+      autoSettings=normalizeAutoSettings({speed:val('auto-speed-sel'),nodePriority:val('auto-node-sel'),wildAction:val('auto-wild-sel'),
+        specialAction:val('auto-special-action'),chainItem:val('auto-chain-item'),chainFail:val('auto-chain-fail'),crossoverAction:val('auto-crossover'),
+        healThreshold:+val('auto-heal-sel'),revive:on('auto-revive'),useUltimates:on('auto-ultimates'),reserveBerries:val('auto-reserve'),
+        healItems:['carne','carnereal','bocadillo'].filter(id=>on(`auto-heal-${id}`)),pauseEvents:routes.filter(([id])=>on(`auto-pause-${id}`)).map(([id])=>id),
+        shopItems:PORT_SHOP_STOCK.map(id=>({id,qty:+ov.querySelector(`[data-auto-stock="${id}"]`).value,priority:+val(`auto-priority-${id}`)})).sort((a,b)=>a.priority-b.priority)
+      });
+      autoSpeed=+val('auto-combat-speed');combatSpeedOverride=autoSpeed;
+      meta.settings.autoConfig={...autoSettings,combatSpeed:autoSpeed};
+      setAutoBackpackSettings({enabled:on('auto-bag-enabled'),where:val('auto-bag-where'),threshold:+val('auto-heal-sel'),
+        items:{carne:on('auto-heal-carne'),carnereal:on('auto-heal-carnereal'),bocadillo:on('auto-heal-bocadillo'),sake:on('auto-revive')}});
+      if(activeBattle && battle===activeBattle)battle.speed=autoSpeed;
     }
-  }
-
-  ov.querySelector('#auto-apply-close').onclick = () => ov.remove();
+    ov.remove();autoMode=mode;
+    if(activeBattle && battle===activeBattle && !battle.over) {refreshControls();if(!wasWaiting)resumeBattle();}
+    else if(run)screenMap();
+  };
+  ov.querySelector('#auto-apply-start').onclick=()=>close(true,true);
+  ov.querySelector('#auto-save-only').onclick=()=>close(false,true);
+  ov.querySelector('#auto-apply-close').onclick=()=>close(wasAuto,false);
+  ov.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){e.preventDefault();close(wasAuto,false);}
+    if(e.key==='Tab') {
+      const controls=[...ov.querySelectorAll('button,input,select,summary')].filter(el=>!el.disabled&&el.getClientRects().length);
+      const first=controls[0],last=controls.at(-1);
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+    }
+  });
+  ov.querySelector('#auto-node-sel').focus({preventScroll:true});
 }
 
 // ---------- Dificultades de la aventura ----------
@@ -385,6 +408,14 @@ function loadMeta() {
     meta.roster.push('luffy');
   }
   meta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 }, meta.settings || {});
+  autoSettings = normalizeAutoSettings(meta.settings.autoConfig);
+  // Preserve saved healing choices from the previous automatic-mode panel.
+  if (!meta.settings.autoBackpack && meta.settings.autoConfig) {
+    meta.settings.autoBackpack = {enabled:!!(autoSettings.healThreshold || autoSettings.revive),
+      threshold:autoSettings.healThreshold,where:'both',
+      items:Object.fromEntries(['carne','carnereal','bocadillo','sake'].map(id=>
+        [id,id==='sake' ? autoSettings.revive : autoSettings.healItems.includes(id)]))};
+  }
   migrateLegacyIslandWins(meta);
   if (!meta.totalIslands) {
     const totalWins = Object.values(meta.wins || {}).reduce((a, b) => a + b, 0) +
@@ -903,7 +934,10 @@ function cycleTopbarAuto() {
     toast('⏹️ Modo Auto: PAUSADO');
   }
   if (typeof battle !== 'undefined' && battle && !battle.over) {
-    if (autoMode) battle.speed = (autoSettings.speed === 'x1') ? 1 : 2;
+    if (autoMode && combatSpeedOverride === null) {
+      battle.speed = (autoSettings.speed === 'x1') ? 1 : 2;
+      autoSpeed = battle.speed;
+    }
     refreshControls();
     renderBattlePreserveLog();
   } else if (typeof run !== 'undefined' && run) {
@@ -926,6 +960,8 @@ function render(html) {
   if (saveBtn) saveBtn.onclick = manualSave;
   const setBtn = $('#btn-settings');
   if (setBtn) setBtn.onclick = showSettingsModal;
+  const speedBtn = $('#btn-map-speed');
+  if (speedBtn) speedBtn.onclick = cycleBattleSpeed;
   const autoBtn = $('#btn-topbar-auto');
   if (autoBtn) autoBtn.onclick = cycleTopbarAuto;
 }
@@ -967,16 +1003,18 @@ function trackKills(qty = 1) {
 
 function berriesHTML(v) { return `฿${v.toLocaleString('es')}`; }
 
-function topbar(showBerries = false, showAuto = showBerries) {
+function topbar(showBerries = false, showAuto = showBerries, showSpeed = false) {
   const autoLabel = !autoMode ? '🤖 PAUSADO' : (autoSettings.speed === 'x1' ? '🤖 AUTO x1' : '🤖 AUTO x2');
   const autoBtnClass = !autoMode ? 'gray' : 'green';
+  const combatSpeed = preferredCombatSpeed();
   return `<div class="topbar">
     <div class="logo">ONE PIECE <span>ROGUE LIKE</span></div>
     ${showBerries && run ? `<div class="floating-berries"><div class="berries">${berriesHTML(run.berries)}</div></div>` : ''}
     <div class="floating-controls">
-      <button class="btn small green" id="btn-save" title="Guardar partida en este dispositivo" aria-label="Guardar partida en este dispositivo">💾</button>
-      <button class="btn small gray" id="btn-settings" title="Ajustes de juego">⚙️ AJUSTES</button>
       ${showAuto ? `<button class="btn small ${autoBtnClass}" id="btn-topbar-auto" title="Cambiar velocidad o activar/pausar modo auto">${autoLabel}</button>` : ''}
+      <button class="btn small gray" id="btn-settings" title="Ajustes de juego">⚙️ AJUSTES</button>
+      ${showSpeed ? `<button class="btn small gray" id="btn-map-speed" title="Velocidad de combate: x1, x2 o x4" aria-label="Velocidad de combate x${combatSpeed}" aria-live="polite">⏩ x${combatSpeed}</button>` : ''}
+      <button class="btn small green" id="btn-save" title="Guardar partida en este dispositivo" aria-label="Guardar partida en este dispositivo">💾</button>
     </div>
   </div>`;
 }
@@ -1041,7 +1079,7 @@ function showSettingsModal() {
         <label for="setting-bag-where">Dónde usar objetos</label>
         <select id="setting-bag-where"><option value="both" ${bagAuto.where === 'both' ? 'selected' : ''}>Isla y combate</option><option value="map" ${bagAuto.where === 'map' ? 'selected' : ''}>Solo en la isla</option><option value="combat" ${bagAuto.where === 'combat' ? 'selected' : ''}>Solo en combate</option></select>
         <label for="setting-bag-threshold">Curar con estos PS o menos</label>
-        <select id="setting-bag-threshold">${[25,50,75,99].map(n=>`<option value="${n}" ${bagAuto.threshold === n ? 'selected' : ''}>${n === 99 ? 'Cualquier daño' : n + '% de PS'}</option>`).join('')}</select>
+        <select id="setting-bag-threshold">${[0,25,50,75,99].map(n=>`<option value="${n}" ${bagAuto.threshold === n ? 'selected' : ''}>${n === 0 ? 'No curar automáticamente' : n === 99 ? 'Cualquier daño' : n + '% de PS'}</option>`).join('')}</select>
         <span>Objetos permitidos</span>
         ${['carne','carnereal','bocadillo','sake'].map(id=>`<label><input type="checkbox" data-setting-bag-item="${id}" ${bagAuto.items[id] ? 'checked' : ''}> ${ITEMS[id].emoji} ${ITEMS[id].name}</label>`).join('')}
         <p>Prioriza la cura más pequeña que cubra el daño. Máximo un objeto por nakama en cada comprobación. El sake revive a un caído y respeta Nuzlocke. Frutas, mejoras y carteles conservan su uso actual.</p>
@@ -3642,7 +3680,7 @@ function screenMap(activePageIdx = 0) {
   const canReroll = (run.mapIdx || 0) === 0 && run.pos === null && !run.sagaRerollUsed;
 
   render(`
-    ${topbar(true)}
+    ${topbar(true, true, true)}
     <div class="map-wrap">
       <div class="map-carousel" id="island-carousel">
         <!-- PÁGINA 1: MAPA (ANCHO Y ALTO COMPLETO) -->
@@ -3932,7 +3970,7 @@ function screenMap(activePageIdx = 0) {
       if (target) {
         const [r, i] = target;
         scheduleAutoStep(() => {
-          if (autoMode && run) enterNode(r, i);
+          advanceAutoNode(r,i);
         }, 750);
       }
     }
@@ -4378,9 +4416,10 @@ function wildEncounter(wild) {
   if (autoMode) {
     scheduleAutoStep(() => {
       if (!document.body.contains(ov)) return;
+      if(autoSettings.wildAction==='manual'){pauseAutoForChoice('Elige qué hacer con este pirata.');return;}
       if (!isLegendary && autoSettings.wildAction === 'recruit') {
         const payBtn = ov.querySelector('#we-pay');
-        if (payBtn && !payBtn.disabled) { payBtn.click(); return; }
+        if (payBtn && !payBtn.disabled && autoCanSpend(price)) { payBtn.click(); return; }
       } else if (!isLegendary && autoSettings.wildAction === 'chains') {
         const chainBtn = ov.querySelector('#we-chains');
         if (chainBtn && !chainBtn.disabled) { chainBtn.click(); return; }
@@ -4495,6 +4534,11 @@ function renderChains(wild, onRecruit) {
         advance(b === 'cartel' ? 1 : b === 'carteldorado' ? 2 : 3);
       };
     });
+    if(autoMode) scheduleAutoStep(()=>{
+      if(!document.body.contains(ov))return;
+      const item=ov.querySelector(`[data-chainball="${autoSettings.chainItem}"]`);
+      if(item)item.click();else ov.querySelector(`[data-c="${current}"]`)?.click();
+    },700);
   };
   update();
 }
@@ -4538,6 +4582,12 @@ function chainsFail(wild, onRecruit) {
     modalInfo('⚔️ ¡Furia desatada!', `<div class="reward-list">${c.emoji} ¡${c.name} rompe sus cadenas y se abalanza sobre vosotros con más fuerza que nunca!</div>`,
       () => startBattle([wild], { wild: true, xpMult: 1.5 }));
   };
+  if(autoMode)scheduleAutoStep(()=>{
+    if(!document.body.contains(ov))return;
+    if(autoSettings.chainFail==='manual'){pauseAutoForChoice('La cadena aguanta: decide si pagar o combatir.');return;}
+    ov.querySelector(autoSettings.chainFail==='pay'&&can?'#cd-pay':'#cd-fight').click();
+  },700);
+
 }
 
 // ============ RECLUTAR Y FUSIÓN DE PERSONAJES ============
@@ -4588,6 +4638,7 @@ function addToTeam(f, done) {
     done && done(true);
     return;
   }
+  if(autoMode)pauseAutoForChoice('Banda llena: elige a quién sustituir.');
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal">
@@ -4825,7 +4876,9 @@ function doSpecialPirate(island) {
   document.body.appendChild(ov);
   if (autoMode) {
     scheduleAutoStep(() => {
-      const btn = ov.querySelector('#sp-leave');
+      if(autoSettings.specialAction==='manual'){pauseAutoForChoice('Pirata especial: elige catálogo o carteles.');return;}
+      const play=ov.querySelector('#sp-gacha');
+      const btn = autoSettings.specialAction==='gacha' && play && !play.disabled && autoCanSpend(gachaPrice) ? play : ov.querySelector('#sp-leave');
       if (btn && document.body.contains(ov)) btn.click();
     }, 700);
   }
@@ -4899,6 +4952,10 @@ function revealSpecialRecruit(ov, prizeId, lvl) {
       MarketReveal.show({host:ov, name:CHARS[prizeId].name, rarity:CHARS[prizeId].rareza,
         rewardText:`+${CHARS[prizeId].rareza} Log Pose${CHARS[prizeId].rareza === 1 ? '' : 's'}`,
         portraitHTML:charIcon(prizeId, 140), onComplete:complete});
+      if(autoMode){
+        const advance=()=>{if(!ov.isConnected)return;const button=ov.querySelector('.mr-continue');if(button)button.click();if(ov.isConnected)scheduleAutoStep(advance,700);};
+        scheduleAutoStep(advance,1400);
+      }
       return;
     }
   } catch (_) { /* A cosmetic failure must not prevent recruitment. */ }
@@ -4949,6 +5006,7 @@ function renderSpecialGacha(lvl) {
       el.disabled = i !== current;
       el.onclick = i === current ? () => flip(i) : null;
     });
+    if(autoMode && !resolved)scheduleAutoStep(()=>{if(document.body.contains(ov))ov.querySelector(`[data-p="${current}"]`)?.click();},700);
   };
   const flip = i => {
     if (resolved || !ov.isConnected || i !== current) return;
@@ -5046,7 +5104,7 @@ function modalConfirm(title, html, onYes, onNo) {
 // ============ TIENDA ============
 function screenShop() {
   playMusic('menu');
-  const stock = ['carne', 'carnereal', 'bocadillo', 'sake', 'cartel', 'carteldorado', 'cartelbuster'];
+  const stock = PORT_SHOP_STOCK;
   const inventorySummary = Object.entries((run && run.items) || {})
     .filter(([, n]) => n > 0)
     .map(([id, n]) => `${ITEMS[id] ? ITEMS[id].emoji : ''} ×${n}`)
@@ -5140,7 +5198,7 @@ function screenShop() {
         const currentQty = (run.items && run.items[t.id]) || 0;
         if (currentQty < t.qty) {
           const itemPrice = ITEMS[t.id] ? ITEMS[t.id].price : 999999;
-          if (run.berries >= itemPrice) {
+          if (autoCanSpend(itemPrice)) {
             const buyBtn = document.querySelector(`[data-buy="${t.id}"]`);
             if (buyBtn && !buyBtn.disabled) {
               buyBtn.click();
@@ -5164,7 +5222,11 @@ function screenShop() {
 // eligiendo siempre el mejor movimiento según los tipos. El jugador solo
 // interviene con objetos, carteles de recluta, velocidad o huida.
 let battle = null;
-let autoSpeed = 1; // recordado entre combates
+let autoSpeed = [1,2,4].includes(meta.settings.autoConfig?.combatSpeed) ? meta.settings.autoConfig.combatSpeed : 1; // recordado entre combates
+let combatSpeedOverride = meta.settings.autoConfig?.combatSpeed === autoSpeed ? autoSpeed : null; // elección manual compartida entre mapa y combate
+function preferredCombatSpeed() {
+  return combatSpeedOverride ?? (autoMode ? (autoSettings.speed === 'x1' ? 1 : 2) : autoSpeed);
+}
 
 // ---------- Clímax de combate (anti combates eternos) ----------
 // A partir de la ronda CLIMAX_ROUND el daño de ambos bandos sube un 10%
@@ -5555,9 +5617,7 @@ function startBattle(enemies, opts) {
   playMusic('combat');
   const team = opts.tower ? tower.team : run.team;
   if (!team.some(f => f.hp > 0)) return opts.tower ? towerGameOver() : gameOver();
-  if (autoMode) {
-    autoSpeed = (autoSettings.speed === 'x1') ? 1 : 2;
-  }
+  autoSpeed = preferredCombatSpeed();
   battle = {
     pTeam: team, eTeam: enemies,
     items: opts.tower ? tower.items : run.items,
@@ -6146,7 +6206,7 @@ function runRound() {
   if (!p || !e || p.hp <= 0 || e.hp <= 0) return afterRound();
 
   // Modo auto: tira la Ultimate automáticamente si está cargada
-  if (autoMode && p.lvl >= 20 && (p.ultCharge || 0) >= 100) {
+  if (autoMode && autoSettings.useUltimates !== false && p.lvl >= 20 && (p.ultCharge || 0) >= 100) {
     useUltimate(p);
   }
 
@@ -6355,10 +6415,15 @@ function bindControls() {
 
 function cycleBattleSpeed() {
   const b = battle;
-  if (!b || b.over) return;
-  b.speed = { 1: 2, 2: 4, 4: 1 }[b.speed] || 1;
-  autoSpeed = b.speed;
-  refreshControls();
+  if (b?.over || (!b && !run)) return;
+  autoSpeed = { 1: 2, 2: 4, 4: 1 }[b ? b.speed : preferredCombatSpeed()] || 1;
+  combatSpeedOverride = autoSpeed;
+  if (b) { b.speed = autoSpeed; refreshControls(); }
+  const button = $('#btn-map-speed');
+  if (button) {
+    button.textContent = `⏩ x${autoSpeed}`;
+    button.setAttribute('aria-label', `Velocidad de combate x${autoSpeed}`);
+  }
 }
 
 // Atajo de teclado: la barra espaciadora cambia el multiplicador de velocidad en combate
@@ -6549,7 +6614,8 @@ function offerCrossoverPath(newVets, bossFame) {
   document.body.appendChild(ov);
   if (autoMode) {
     scheduleAutoStep(() => {
-      const btn = ov.querySelector('#cx-explore');
+      if(autoSettings.crossoverAction==='manual'){pauseAutoForChoice('Decide si quieres explorar el camino alternativo.');return;}
+      const btn = ov.querySelector(autoSettings.crossoverAction==='leave'?'#cx-finish':'#cx-explore');
       if (btn && document.body.contains(ov)) btn.click();
     }, 700);
   }
@@ -6599,7 +6665,8 @@ function doCrossoverEvent(island) {
   document.body.appendChild(ov);
   if (autoMode) {
     scheduleAutoStep(() => {
-      const btn = ov.querySelector('#cx-fight');
+      if(autoSettings.crossoverAction==='manual'){pauseAutoForChoice('Decide si aceptas el duelo crossover.');return;}
+      const btn = ov.querySelector(autoSettings.crossoverAction==='leave'?'#cx-leave':'#cx-fight');
       if (btn && document.body.contains(ov)) btn.click();
     }, 700);
   }
