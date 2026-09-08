@@ -52,7 +52,7 @@ test('nine slots pack three identical items together; large food keeps its footp
   assert.equal((html.match(/class="bag-icon"/g)||[]).length,7);
   const pieces = id => [...html.matchAll(new RegExp(`<button[^>]*data-bag-item="${id}"[^>]*>[\\s\\S]*?</button>`, 'g'))].map(m=>m[0]);
   assert.equal(pieces('carnereal').length,1);
-  assert.match(pieces('carnereal')[0],/grid-column:span 2/);
+  assert.match(pieces('carnereal')[0],/ocupa (?:1 por 2|2 por 1) casillas/);
   assert.equal((pieces('carnereal').join('').match(/bag-occupied/g)||[]).length,2);
   assert.equal((pieces('sake').join('').match(/bag-occupied/g)||[]).length,4);
   assert.equal((pieces('sake').join('').match(/class="bag-icon"/g)||[]).length,1);
@@ -71,13 +71,11 @@ test('full bags save pending loot, stop auto travel, and can collect after space
   assert.equal(h.exec('JSON.stringify(run.pos)'),position);
   h.exec('loadedSave=GameSaveStorage.parse(JSON.stringify(GameSaveStorage.payload(meta,run)));validateGameSave(loadedSave);loadRun()');
   assert.equal(h.exec('run.pendingLoot.sake'),1);
-  const button = {dataset:{bagCollect:'sake'}};
-  h.ctx.bagRoot = {querySelectorAll:selector=>selector==='[data-bag-collect]'?[button]:[]};
-  h.exec('bindBackpack(bagRoot,run,false,()=>{})');
-  button.onclick();
+  assert.equal(h.exec('placePendingBackpackItem(run,"sake",4,false)'),false);
   assert.equal(h.exec('run.pendingLoot.sake'),1);
-  h.exec('run.items.carne-=12');
-  button.onclick(); button.onclick();
+  h.exec('run.items.carne-=12;prepareBackpack(run);moveBackpackStack(run,"carne:3",6,false);moveBackpackStack(run,"carne:4",3,false);');
+  assert.equal(h.exec('placePendingBackpackItem(run,"sake",4,false)'),true);
+  assert.equal(h.exec('placePendingBackpackItem(run,"sake",4,false)'),false);
   assert.equal(h.exec('run.items.sake'),1);
   assert.equal(h.exec('hasPendingLoot(run)'),false);
   assert.equal(h.exec('backpackUsed(run.items)'),9);
@@ -124,6 +122,7 @@ test('shop hides iron and never charges for a purchase that no longer fits', () 
   const buy = {dataset:{buy:'sake'}};
   h.ctx.render = s => {html=s;};
   h.ctx.document.querySelectorAll = selector=>selector==='[data-buy]'?[buy]:[];
+  h.exec('showBackpackOrganizer=()=>{};');
   h.exec('run.items={carne:27};run.berries=10000;screenShop()');
   assert.doesNotMatch(html,/data-buy="hierro"/);
   assert.match(html,/SIN ESPACIO/);
@@ -132,6 +131,9 @@ test('shop hides iron and never charges for a purchase that no longer fits', () 
   h.exec('run.items.carne=15');
   buy.onclick();
   assert.equal(h.exec('run.berries'),9600);
+  assert.equal(h.exec('run.pendingLoot.sake'),1);
+  h.exec('moveBackpackStack(run,"carne:3",6,false);moveBackpackStack(run,"carne:4",3,false);');
+  assert.equal(h.exec('placePendingBackpackItem(run,"sake",4,false)'),true);
   assert.equal(h.exec('run.items.sake'),1);
   assert.equal(h.exec('backpackUsed(run.items)'),9);
 });
@@ -170,9 +172,9 @@ test('new save fields reject malformed capacity and pending inventory', () => {
 test('tower provisions and floor rewards share the capacity limit and wait for overflow resolution', () => {
   const h = setup();
   h.exec(`tower={floor:2,team:[makeChar('luffy',15)],items:{bocadillo:9,sake:1}};prepareBackpack(tower);`);
-  assert.equal(h.exec('backpackUsed(tower.items)'),9);
-  assert.equal(h.exec('tower.pendingLoot.sake'),1);
-  h.exec(`tower.pendingLoot={};let nextFloor=0,organize=0;showTowerBackpack=()=>organize++;towerNextBattle=()=>nextFloor++;endTowerBattle(true);`);
+  assert.equal(h.exec('(tower.items.bocadillo||0)+(tower.pendingLoot.bocadillo||0)'),9);
+  assert.equal(h.exec('(tower.items.sake||0)+(tower.pendingLoot.sake||0)'),1);
+  h.exec(`tower.items={bocadillo:9};tower.bagLayout={};tower.pendingLoot={};prepareBackpack(tower);let nextFloor=0,organize=0;showTowerBackpack=()=>organize++;towerNextBattle=()=>nextFloor++;endTowerBattle(true);`);
   assert.equal(h.exec('tower.floor'),3);
   assert.equal(h.exec('tower.items.bocadillo'),9);
   assert.equal(h.exec('tower.pendingLoot.bocadillo'),1);

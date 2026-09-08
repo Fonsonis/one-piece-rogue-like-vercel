@@ -11,11 +11,14 @@
     for (const key of ['dex', 'recruited', 'roster', 'defeated', 'relics']) {
       if (data.meta[key] !== undefined && (!Array.isArray(data.meta[key]) || data.meta[key].some(id => typeof id !== 'string'))) throw new Error('Progreso inválido.');
     }
-    for (const key of ['wins', 'nuzWins', 'upgrades', 'global', 'stats', 'settings', 'sagaClears', 'sagaDiffWins', 'teamPresets', 'charUpgrades', 'islandProgress']) {
+    for (const key of ['wins', 'nuzWins', 'upgrades', 'global', 'stats', 'settings', 'sagaClears', 'sagaDiffWins', 'teamPresets', 'charUpgrades', 'islandProgress', 'sagaStats']) {
       if (data.meta[key] !== undefined && !record(data.meta[key])) throw new Error('Progreso inválido.');
     }
     for (const islands of Object.values(data.meta.islandProgress || {})) {
       if (!Array.isArray(islands) || islands.some(i=>!Number.isInteger(i) || i<0)) throw new Error('Progreso de islas inválido.');
+    }
+    for (const counters of Object.values(data.meta.sagaStats || {})) {
+      if (!record(counters) || Object.values(counters).some(n => !Number.isSafeInteger(n) || n < 0)) throw new Error('Contadores de saga inválidos.');
     }
     const bagTier = data.meta.global?.backpackTier;
     if (bagTier !== undefined && (!Number.isInteger(bagTier) || bagTier < 0 || bagTier > 17)) throw new Error('Ampliación de mochila inválida.');
@@ -26,6 +29,7 @@
       const r = data.run;
       if (r?.backpackVersion !== undefined && r.backpackVersion !== 1) throw new Error('Mochila incompatible.');
       if (r?.pendingLoot !== undefined && !record(r.pendingLoot)) throw new Error('Objetos pendientes inválidos.');
+      if (r?.bagLayout !== undefined && (!record(r.bagLayout) || Object.values(r.bagLayout).some(p=>!record(p) || !Number.isInteger(p.cell) || p.cell<0 || p.cell>=60 || typeof p.vertical!=='boolean'))) throw new Error('Distribución de mochila inválida.');
       for (const inventory of [r?.items, r?.pendingLoot]) {
         if (inventory && Object.values(inventory).some(n => !Number.isSafeInteger(n) || n < 0 || n > 100000)) throw new Error('Cantidad de objetos inválida.');
       }
