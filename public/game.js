@@ -2812,7 +2812,7 @@ function showInventoryModal(opts = {}) {
         <div class="inventory-card-top"><span>${currentTeam.includes(id)?'En tu equipo':'Nakama'}</span><span class="inventory-rarity" aria-label="Rareza ${c.rareza} de 5 estrellas"><span aria-hidden="true">★</span> ${c.rareza}/5</span></div>
         <button class="inventory-profile btn-info-inv" data-id="${id}" aria-label="Ver ficha de ${collectionText(c.name)}"><span class="inventory-portrait" aria-hidden="true">${charIcon(displayId,80)}</span><strong>${c.name}</strong><span class="inventory-profile-link">Ver ficha ↗</span></button>
         <div class="inventory-level">Nivel base <strong>${level}</strong></div><div class="type-badges">${typeBadges(c.types)}</div>
-        <div class="inventory-upgrade">${maxed?`<span class="inventory-limit">Límite de saga: Nv. ${cap}</span><button class="btn btn-upg-inv" data-id="${id}" disabled>Nivel máximo</button>`:`<span class="inventory-cost" title="${number(cost)} Log Poses">Coste: <strong>${compact(cost)} 🧭</strong></span><button class="btn gold btn-upg-inv" data-id="${id}" ${canAfford?'':'disabled'} aria-label="Mejorar a ${collectionText(c.name)} al nivel base ${level+1} por ${number(cost)} Log Poses">Subir a Nv. ${level+1}</button>${canAfford?'':`<span class="inventory-shortfall">Faltan ${compact(cost-(meta.logPoses||0))} 🧭</span>`}`}</div>
+        <div class="inventory-upgrade">${maxed?`<span class="inventory-limit">Límite de saga: Nv. ${cap}</span><button class="btn btn-upg-inv" data-id="${id}" disabled aria-label="Nivel máximo de saga alcanzado"><span class="inventory-upgrade-label">Nivel máximo</span><span class="inventory-upgrade-short" aria-hidden="true">Máx.</span></button>`:`<span class="inventory-cost" title="${number(cost)} Log Poses">Coste: <strong>${compact(cost)} 🧭</strong></span><button class="btn gold btn-upg-inv" data-id="${id}" ${canAfford?'':'disabled'} aria-label="Mejorar a ${collectionText(c.name)} al nivel base ${level+1} por ${number(cost)} Log Poses"><span class="inventory-upgrade-label">Subir a Nv. ${level+1}</span><span class="inventory-upgrade-short" aria-hidden="true">↑ Lv. ${level+1}</span></button>${canAfford?'':`<span class="inventory-shortfall">Faltan ${compact(cost-(meta.logPoses||0))} 🧭</span>`}`}</div>
       </article>`;
     }).join('');
     const filtered=invViewState.type||+invViewState.rarity||invViewState.saga;
@@ -7646,7 +7646,7 @@ function dexCardHTML(id) {
   return `<div class="dex-card ${seen ? 'seen' : 'unknown'}" data-id="${id}">
     <div class="emoji">${seen ? charIcon(id, 46) : '❔'}</div>
     <div>${c.name}</div>
-    <div style="font-size:7px;">${'⭐'.repeat(c.rareza)}</div>
+    <div class="dex-rarity" style="font-size:7px;" aria-label="Rareza ${c.rareza} de 5 estrellas"><span class="dex-rarity-full" aria-hidden="true">${'⭐'.repeat(c.rareza)}</span><span class="dex-rarity-compact" aria-hidden="true">★ ${c.rareza}/5</span></div>
     ${vet ? '<div style="color:var(--accent)">🏅 veterano</div>' : got ? '<div style="color:var(--green)">✓ nakama</div>' : (seen ? '<div style="color:#999">visto</div>' : '<div style="color:#aaa">sin avistar</div>')}
   </div>`;
 }
@@ -7658,7 +7658,7 @@ function screenDex() {
   render(`
     ${topbar(false)}
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
-    <div class="panel">
+    <div class="panel pirate-dex">
       <h2>📖 Dex Pirata — ${meta.dex.length}/${all.length} avistados, ${meta.recruited.length} reclutados</h2>
       ${charControlsHTML(dexView, { sagas: sagaOpts })}
       <div id="char-grid"></div>
