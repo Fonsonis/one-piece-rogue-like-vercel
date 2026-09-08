@@ -27,6 +27,18 @@
     const envelope=Math.sin(Math.PI*attack), reach=ease(attack/.38)*returnHome;
     const m={pose:t<.08||t>.94?0:t<.27||t>.76?1:2,travel:0,lift:0,angle:0,stretch:0,scale:1,echoes:0,alpha:1};
     if(reduced){m.pose=2;return m;}
+    if(p.id==='luffy5'){
+      // Inflate, raise a foot, then drive it into the floor before shrinking home.
+      const grow=ease(between(t,.08,.32)), home=ease(between(t,.78,.98));
+      const rise=ease(between(t,.32,.48)), slam=between(t,.48,.58)**3;
+      m.scale=1+1.25*grow*(1-home);
+      m.travel=.9*ease(between(t,.28,.48))*(1-home);
+      m.lift=.3*rise*(1-slam)*(1-home);
+      m.angle=-.08*rise*(1-slam);
+      m.pose=t>=.58&&t<.78?1:0;
+      m.footLift=.2*rise*(1-slam);
+      return m;
+    }
     const moving=t>=.27&&t<=.76;
     const beat=attack*Math.min(6,p.count), pulse=Math.sin(Math.PI*(beat%1));
     switch(p.motion) {
@@ -97,14 +109,21 @@
         ctx.drawImage(image,frame,0,split*ratio,unit,originX,originY,split*k,sz);
         ctx.drawImage(image,frame+split*ratio,0,(tip-split)*ratio,unit,originX+split*k,originY,(tip-split)*k+extra,sz);
         ctx.drawImage(image,frame+tip*ratio,0,(192-tip)*ratio,unit,originX+tip*k+extra,originY,(192-tip)*k,sz);
+      }else if(state.footLift>0){
+        // Raise the leading leg from the guard cell, keeping its original pixels.
+        const splitY=142,splitX=96,k=sz/192;
+        ctx.drawImage(image,frame,0,unit,splitY*ratio,originX,originY,sz,splitY*k);
+        ctx.drawImage(image,frame,splitY*ratio,splitX*ratio,(192-splitY)*ratio,originX,originY+splitY*k,splitX*k,(192-splitY)*k);
+        ctx.drawImage(image,frame+splitX*ratio,splitY*ratio,(192-splitX)*ratio,(192-splitY)*ratio,originX+splitX*k,originY+splitY*k-state.footLift*sz,(192-splitX)*k,(192-splitY)*k);
       }else ctx.drawImage(image,frame,0,unit,unit,originX,originY,sz,sz);
       ctx.restore();
     };
     if(defender?.image){
-      const reaction=hit&&!reduced?Math.sin(Math.PI*between(t,.43,.82)):0;
+      const stomp=p.id==='luffy5';
+      const reaction=hit&&!reduced?Math.sin(Math.PI*between(t,stomp?.58:.43,.82)):0;
       const ds=defender.size;
       drawActor(defender.image,{pose:reaction>0?3:0,angle:-reaction*.09},
-        defender.x+dir*reaction*ds*.035,defender.y,ds,1,0,-dir);
+        defender.x+dir*reaction*ds*(stomp?.12:.035),defender.y-(stomp?reaction*ds*.12:0),ds,1,0,-dir);
     }
     // Afterimages repeat actual attack cells, never substitute geometric effects.
     for(let i=m.echoes;i>0;i--){
@@ -166,7 +185,8 @@
           const ar=sourceSprite?.getBoundingClientRect()||a,br=targetSprite?.getBoundingClientRect()||b;
           const stageLeft=Math.min(a.left,b.left,ar.left,br.left),stageRight=Math.max(a.right,b.right,ar.right,br.right);
           const left=Math.max(0,stageLeft-40),right=Math.min(innerWidth,stageRight+40);
-          const top=Math.max(0,Math.min(a.top,b.top,ar.top,br.top)-40),bottom=Math.min(innerHeight,Math.max(a.bottom,b.bottom,ar.bottom,br.bottom)+12);
+          const headroom=profile.id==='luffy5'&&!reduced?ar.height*1.5:40;
+          const top=Math.max(0,Math.min(a.top,b.top,ar.top,br.top)-headroom),bottom=Math.min(innerHeight,Math.max(a.bottom,b.bottom,ar.bottom,br.bottom)+12);
           const width=right-left,height=bottom-top;if(width<24||height<24){cancel();return;}
           Object.assign(el.style,{left:left+'px',top:top+'px',width:width+'px',height:height+'px'});
           const dpr=Math.min(1.5,globalThis.devicePixelRatio||1),cw=Math.round(Math.min(1600,width*dpr)),ch=Math.round(Math.min(900,height*dpr));

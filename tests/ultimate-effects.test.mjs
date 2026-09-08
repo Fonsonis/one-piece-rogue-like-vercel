@@ -114,10 +114,20 @@ test('sprite rendering uses atlas cells only, with a distinct movement for each 
    const ops=JSON.parse(recording.drain()),draws=ops.filter(op=>op[0]==='drawImage');
    assert.ok(draws.length>0,id+' draws its sprite');
    assert.ok(!ops.some(op=>['fill','stroke','arc','fillRect','bezierCurveTo'].includes(op[0])),'No detached effects');
-   for(const [,image,sx,sy,sw,sh] of draws){assert.equal(image.naturalWidth,768);assert.ok(sx>=0&&sx+sw<=768);assert.equal(Math.floor(sx/192),Math.floor((sx+sw-1)/192),'Never samples a neighboring pose');assert.equal(sy,0);assert.equal(sh,192);}
+   for(const [,image,sx,sy,sw,sh] of draws){assert.equal(image.naturalWidth,768);assert.ok(sx>=0&&sx+sw<=768);assert.equal(Math.floor(sx/192),Math.floor((sx+sw-1)/192),'Never samples a neighboring pose');assert.ok(sy>=0&&sh>0&&sy+sh<=192,'Body and lifted leg stay inside the authored cell');if(id!=='luffy5'){assert.equal(sy,0);assert.equal(sh,192);}}
   }
  }
  assert.equal(motions.size,5);
+});
+
+test('Gear 5 grows, raises its foot, stomps and returns to its original size',()=>{
+ const h=artHarness(),choreo=h.exec('UltimateFX.choreography');
+ const p=h.exec("UltimateArtProfiles.resolve('luffy5',CHARS.luffy5,getUltimateMove({id:'luffy5',lvl:100}))");
+ const raised=choreo(p,.48),landed=choreo(p,.58),home=choreo(p,1);
+ assert.ok(raised.scale>=2);assert.ok(raised.lift>0);assert.ok(raised.footLift>0);
+ assert.equal(landed.lift,0);assert.equal(landed.footLift,0);assert.equal(landed.scale,raised.scale);
+ assert.equal(home.scale,1);assert.equal(home.travel,0);
+ assert.equal(choreo(p,.48,true).scale,1);
 });
 
 test('loaded sprite replaces the original, and cancellation always restores its visibility',async()=>{

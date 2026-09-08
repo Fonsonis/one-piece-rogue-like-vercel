@@ -744,7 +744,7 @@ const NODE_TYPES = {
   mystery: { emoji: '❓', label: 'Misterio' },
   shop: { emoji: '🏪', label: 'Tienda' },
   rest: { emoji: '⛺', label: 'Campamento' },
-  special: { emoji: '🌟', label: 'Pirata especial' },
+  special: { emoji: '🌟', label: 'Crossguild' },
   boss: { emoji: '💀', label: 'Jefe' },
   crossover: { emoji: '🌀', label: 'Camino alternativo' },
   travel: { emoji: '🧭', label: 'Siguiente mapa' },
@@ -1103,7 +1103,7 @@ function showNodeConfirmModal(r, i) {
       detailsText = 'Un evento misterioso e impredecible. Puede resultar en una gran oportunidad, un tesoro o un desafío inesperado.';
       break;
     case 'shop':
-      detailsText = 'Visita el Mercado Clandestino de la isla para comprar consumibles, reclutar nakamas o mejorar tu banda con Berries.';
+      detailsText = 'Visita el Crossguild de la isla para comprar consumibles, reclutar nakamas o mejorar tu banda con Berries.';
       break;
     case 'rest':
       detailsText = 'Tu banda descansará en el campamento. Todos los nakamas conscientes recuperarán un 50% de sus PS máximos.';
@@ -1748,8 +1748,8 @@ function showLogPoseGachaModal() {
         🧭 Saldo: <b>${meta.logPoses} Log Poses</b>
       </div>
       <div style="font-size:9.5px;text-align:center;margin-bottom:10px;color:#f39c12;background:rgba(243,156,18,0.12);padding:6px 10px;border-radius:6px;border:1px solid rgba(243,156,18,0.4);display:flex;align-items:center;justify-content:center;gap:6px;">
-        <span>⭐ Estrellas acumuladas (Pity): <b>${meta.starPity || 0} / 1000</b></span>
-        ${(meta.starPity || 0) >= 1000 ? '<span style="color:#2ecc71;font-weight:bold;">¡LEGENDARIO ASEGURADO!</span>' : ''}
+        <span>⭐ Estrellas acumuladas (Pity): <b>${meta.starPity || 0} / 500</b></span>
+        ${(meta.starPity || 0) >= 500 ? '<span style="color:#2ecc71;font-weight:bold;">¡LEGENDARIO ASEGURADO!</span>' : ''}
       </div>
       <div style="font-size:8.5px;margin-bottom:6px;font-weight:bold;color:#aaa;">
         🛡️ Bloquear sagas para que no salgan en los carteles (+200 🧭 cada una):
@@ -1823,7 +1823,7 @@ function startLogPoseGacha(activeSagas) {
   meta.starPity = meta.starPity || 0;
   const weights = [41.5, 30, 21, 7, 0.5];
   let roll = Math.random() * 100, stopIdx = 4;
-  if (meta.starPity >= 1000) {
+  if (meta.starPity >= 500) {
     stopIdx = 4; // Pity activado: legendario asegurado (5⭐)
   } else {
     for (let i = 0; i < 5; i++) {
@@ -1867,7 +1867,7 @@ function startLogPoseGacha(activeSagas) {
     <h2>🎰 Carteles de SE BUSCA (Log Pose)</h2>
     <p style="font-size:8px;text-align:center;margin-bottom:6px;">Destapa los carteles en orden. ¡En uno de ellos está tu nuevo recluta!</p>
     <div style="font-size:9px;text-align:center;margin-bottom:10px;color:#f39c12;">
-      ⭐ Estrellas acumuladas (Pity): <b>${meta.starPity} / 1000</b>
+      ⭐ Estrellas acumuladas (Pity): <b>${meta.starPity} / 500</b>
     </div>
     <div class="poster-row">
       ${[0, 1, 2, 3, 4].map(i => `
@@ -2091,7 +2091,7 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
       }));
     }
 
-    // 3. Mercado Clandestino (Carteles SE BUSCA)
+    // 3. Crossguild (Carteles SE BUSCA)
     const weights = [41.5, 30, 21, 7, 0.5];
     const totalWeight = 100;
     const gachaTiers = [1, 2, 3, 4, 5].map(r => {
@@ -2269,7 +2269,7 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
       }).join('');
       tabHTML = `
         <div style="font-size:8px;line-height:1.7;margin-bottom:8px;color:#555;">
-          Probabilidades de los 5 Carteles SE BUSCA en el Mercado Clandestino 🌟.
+          Probabilidades de los 5 Carteles SE BUSCA en el Crossguild 🌟.
         </div>
         <div style="max-height:280px;overflow-y:auto;border:1px solid var(--ink);">
           <table class="chart-table">
@@ -4590,7 +4590,7 @@ function doSpecialPirate(island) {
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal">
-    <h2>🌟 Mercado clandestino</h2>
+    <h2>🌟 Crossguild</h2>
     <p style="font-size:9px;line-height:1.9;text-align:center;">Un contacto de los bajos fondos te ofrece reclutas (Nv${lvl}).<br><br>
     <b>🎯 Elegir:</b> cualquier pirata del catálogo (hasta 4⭐), pagando su caché completo.<br>
     <b>🎰 Carteles:</b> 5 carteles de SE BUSCA boca abajo. Destápalos en orden:
@@ -4604,7 +4604,7 @@ function doSpecialPirate(island) {
     ${blocked ? `<div class="special-fail">${blocked}</div>` : ''}
     <div class="actions" style="flex-direction:column;align-items:stretch;">
       <button class="btn blue" id="sp-choose" ${blocked ? 'disabled' : ''}>🎯 ELEGIR PIRATA — catálogo</button>
-      <button class="btn gold" id="sp-gacha" ${blocked || run.berries < gachaPrice ? 'disabled' : ''}>🎰 JUGAR CARTELES — ${berriesHTML(gachaPrice)}</button>
+      <button class="btn gold" id="sp-gacha" ${blocked || run.berries < gachaPrice ? 'disabled' : ''}>🌟 JUGAR CARTELES — ${berriesHTML(gachaPrice)}</button>
       <button class="btn gray" id="sp-rates">📊 TABLA DE PROBABILIDADES</button>
       <button class="btn gray" id="sp-leave">🌊 MARCHARSE</button>
     </div>
