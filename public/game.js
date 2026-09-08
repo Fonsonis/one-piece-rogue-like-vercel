@@ -13,16 +13,23 @@ const BASE_OF = {};
 for (const [id, c] of Object.entries(CHARS)) if (c.evo) BASE_OF[c.evo.to] = id;
 function baseFormOf(id) { while (BASE_OF[id]) id = BASE_OF[id]; return id; }
 
-// Only Luffy's new chain is resolved at creation; other characters keep their rules.
-function luffyFormAt(id, lvl) {
-  if (baseFormOf(id) !== 'luffy') return id;
-  let form = id;
-  while (CHARS[form].evo && lvl >= CHARS[form].evo.lvl) form = CHARS[form].evo.to;
+// Las formas requieren tanto el nivel en partida como el nivel base permanente.
+function evolutionFormAt(id, lvl, progress = meta) {
+  const baseLevel = startLvlOf(id, progress);
+  let form = baseFormOf(id);
+  while (CHARS[form].evo && Math.min(lvl, baseLevel) >= CHARS[form].evo.lvl) form = CHARS[form].evo.to;
   return form;
 }
-function migrateLuffy(f) {
-  if (baseFormOf(f.id) !== 'luffy' || f.gearRulesVersion === 1) return;
-  const old = CHARS[f.id], nextId = luffyFormAt(f.id, f.lvl), next = CHARS[nextId];
+function formMovesAt(id, lvl, exactForm = false, progress = meta) {
+  const c = CHARS[id];
+  const limit = !exactForm && c.evo && startLvlOf(id, progress) < c.evo.lvl ? c.evo.lvl - 1 : lvl;
+  const moves = c.learnset.filter(([level]) => level <= Math.min(lvl, limit)).map(([,move]) => move).slice(-2);
+  return moves.length ? moves : [c.learnset[0][1]];
+}
+function syncEvolution(f, progress = meta) {
+  if (!CHARS[f.id] || !CHARS[baseFormOf(f.id)].evo) return f;
+  const old = CHARS[f.id], nextId = evolutionFormAt(f.id, f.lvl, progress), next = CHARS[nextId];
+  if (f.id === nextId && f.evolutionRulesVersion === 1) return f;
   // Apply only the base-stat difference, preserving equipment, fusion and event bonuses.
   const deltaHP = hpAt(next.base[0], f.lvl) - hpAt(old.base[0], f.lvl);
   f.maxhp += deltaHP;
@@ -31,11 +38,9 @@ function migrateLuffy(f) {
     f[key] += statAt(next.base[i+1], f.lvl) - statAt(old.base[i+1], f.lvl);
   });
   f.id = nextId;
-  f.moves = luffyMovesAt(nextId, f.lvl);
-  f.gearRulesVersion = 1;
-}
-function luffyMovesAt(id, lvl) {
-  return CHARS[id].learnset.filter(([level]) => level <= lvl).map(([,move]) => move).slice(-2);
+  f.moves = formMovesAt(nextId, f.lvl, false, progress);
+  f.evolutionRulesVersion = 1;
+  return f;
 }
 
 // ---------- Sprites de personajes ----------
@@ -145,6 +150,11 @@ function pauseAutoForChoice(message) {
 function autoCanSpend(price) {return !!run && run.berries-price >= (autoSettings.reserveBerries || 0);}
 function advanceAutoNode(r,i) {
   if(!autoMode || !run)return;
+  if(hasPendingLoot(run)) {
+    pauseAutoForChoice('🎒 Guarda o deja los objetos pendientes para continuar.');
+    screenMap(2);
+    return;
+  }
   if(autoSettings.pauseEvents?.includes(run.map.rows[r][i].type)) {
     pauseAutoForChoice();screenMap();
     toast(`🤖 Pausa antes de ${NODE_TYPES[run.map.rows[r][i].type].label}. Elige cuándo entrar.`);
@@ -306,7 +316,7 @@ function showAutoSettingsModal() {
         <div class="auto-two"><div><label for="auto-chain-item">En las cadenas</label>${select('auto-chain-item',cfg.chainItem,[['risk','Arriesgar: 50%'],...['cartel','carteldorado','cartelbuster'].map(id=>[id,ITEMS[id].name])])}</div>
         <div><label for="auto-chain-fail">Si una cadena aguanta</label>${select('auto-chain-fail',cfg.chainFail,[['fight','Combatir'],['pay','Pagar 3 carteles si tengo'],['manual','Pausar y decidir yo']])}</div></div>
         <p>Si no tienes el cartel elegido, arriesga. Si no puedes pagar los 3 carteles, combate.</p>
-        <label for="auto-special-action">Pirata especial · Mercado clandestino</label>${select('auto-special-action',cfg.specialAction,[['manual','Pausar para elegir o jugar'],['gacha','Jugar carteles si puedo pagarlos'],['leave','Marcharme sin comprar']])}
+        <label for="auto-special-action">Crossguild</label>${select('auto-special-action',cfg.specialAction,[['manual','Pausar para elegir o jugar'],['gacha','Jugar carteles si puedo pagarlos'],['leave','Marcharme sin comprar']])}
         <p>El catálogo se elige manualmente. Si no alcanza para los carteles o Nuzlocke lo impide, se marcha.</p>
         <label for="auto-crossover">Camino alternativo · Crossover</label>${select('auto-crossover',cfg.crossoverAction,[['fight','Explorar y aceptar el duelo'],['leave','Retirarme y completar la saga'],['manual','Pausar y decidir yo']])}
       </section>
@@ -521,7 +531,7 @@ function importSaveFile(file) {
       if (nextRun) {
         ensureStartingTeam(nextRun);
         if (nextRun.mode === 'nuzlocke') nextRun.team = nextRun.team.filter(f => f.hp > 0);
-        nextRun.team.forEach(migrateFighter);
+        nextRun.team.forEach(f => migrateFighter(f, false, nextMeta));
       }
       migrateIslandJourney(nextRun, nextMeta);
       const snapshot = GameSaveStorage.payload(nextMeta, nextRun);
@@ -634,11 +644,11 @@ function loadRun() {
   if (run && run.mode === 'nuzlocke' && run.team) {
     run.team = run.team.filter(f => f && f.hp > 0);
   }
-  if (run && run.team) run.team.forEach(migrateFighter);
+  if (run && run.team) run.team.forEach(f => migrateFighter(f));
   migrateIslandJourney(run, meta);
   prepareBackpack(run);
 }
-function migrateFighter(f) {
+function migrateFighter(f, isEnemy = false, progress = meta) {
   const current = CHARS[f.id];
   if (current && (f.moveRulesVersion || 0) < 2) {
     // El aprendizaje es automático: actualizar únicamente las fichas corregidas.
@@ -656,7 +666,7 @@ function migrateFighter(f) {
   if (f.spatkBonus == null) { f.spatkBonus = f.atkBonus || 0; f.spdefBonus = f.defBonus || 0; }
   if (f.ultCharge == null) f.ultCharge = 0;
   if (f.moves && f.moves.length > 2) f.moves = f.moves.slice(-2);
-  migrateLuffy(f);
+  if (!isEnemy) syncEvolution(f, progress);
   return f;
 }
 loadRun();
@@ -673,11 +683,10 @@ function xpBarHTML(f) {
   return `<div class="xp-progress" data-level="${f.lvl}" title="${label}"><span class="xp-caption">${maxed ? 'NV. MÁX.' : 'EXP · NV. ' + f.lvl}</span><div class="xp-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${goal}" aria-valuenow="${value}"><i style="width:${value / goal * 100}%"></i></div></div>`;
 }
 
-function makeChar(id, lvl, isEnemy = false) {
-  if (!isEnemy) id = luffyFormAt(id, lvl);
+function makeChar(id, lvl, isEnemy = false, exactForm = false) {
+  if (!isEnemy && !exactForm) id = evolutionFormAt(id, lvl);
   const c = CHARS[id];
-  const moves = c.learnset.filter(([l]) => l <= lvl).map(([, m]) => m).slice(-2);
-  if (!moves.length) moves.push(c.learnset[0][1]); // nunca sin movimientos
+  const moves = formMovesAt(id, lvl, isEnemy || exactForm);
   let diffMult = 1.0;
   if (isEnemy && typeof run !== 'undefined' && run && run.diff > 1) {
     const dObj = DIFFICULTIES.find(d => d.id === run.diff);
@@ -694,7 +703,7 @@ function makeChar(id, lvl, isEnemy = false) {
     spd: Math.floor(statAt(c.base[5], lvl) * diffMult),
     atkBonus: 0, defBonus: 0, spatkBonus: 0, spdefBonus: 0,
     xp: 0, moves, ultCharge: 0, moveRulesVersion: 2,
-    ...(baseFormOf(id) === 'luffy' ? {gearRulesVersion:1} : {}),
+    ...(!isEnemy && !exactForm ? {evolutionRulesVersion:1} : {}),
   };
 }
 // Aplica las mejoras permanentes del Barco (solo a personajes del jugador)
@@ -723,6 +732,7 @@ const charData = f => CHARS[f.id];
 const charName = f => CHARS[f.id].name;
 
 function gainXP(f, amount, log) {
+  syncEvolution(f);
   f.xp += amount;
   const msgs = [];
   while (f.xp >= xpForLevel(f.lvl) && f.lvl < 100) {
@@ -742,14 +752,14 @@ function gainXP(f, amount, log) {
     msgs.push(`¡${c.name} sube al nivel ${f.lvl}!`);
     // nuevos movimientos (máximo 2 ataques regulares)
     for (const [l, m] of c.learnset) {
-      if (l === f.lvl && !f.moves.includes(m)) {
+      if (l === f.lvl && formMovesAt(f.id, f.lvl).includes(m) && !f.moves.includes(m)) {
         f.moves.push(m);
         if (f.moves.length > 2) f.moves.shift();
         msgs.push(`¡${c.name} aprende ${MOVES[m].name}!`);
       }
     }
     // transformación
-    if (c.evo && f.lvl >= c.evo.lvl) {
+    if (c.evo && f.lvl >= c.evo.lvl && startLvlOf(f.id) >= c.evo.lvl) {
       const to = c.evo.to;
       msgs.push(`✨ ¡${c.name} se transforma en ${CHARS[to].name}!`);
       f.id = to;
@@ -761,7 +771,7 @@ function gainXP(f, amount, log) {
       f.spatk = statAt(nc.base[3], f.lvl) + (f.spatkBonus || 0);
       f.spdef = statAt(nc.base[4], f.lvl) + (f.spdefBonus || 0);
       f.spd = statAt(nc.base[5], f.lvl) + (f.spdBonus || 0);
-      const nm = nc.learnset.filter(([l]) => l <= f.lvl).map(([, m]) => m).slice(-2);
+      const nm = formMovesAt(to, f.lvl);
       for (const m of nm) if (!f.moves.includes(m)) { f.moves.push(m); if (f.moves.length > 2) f.moves.shift(); }
       registerDex(to);
     }
@@ -2212,17 +2222,17 @@ function screenHome() {
 
 // ============ PANTALLA: SAGAS ============
 // Cada saga se desbloquea al conquistar la anterior en dificultad 3 (Capitán) o superior
-const sagaMaxDiffCleared = sagaId => {
-  const wins = (meta.sagaDiffWins && meta.sagaDiffWins[sagaId]) || {};
+function sagaMaxDiffCleared(sagaId, progress = meta) {
+  const wins = (progress.sagaDiffWins && progress.sagaDiffWins[sagaId]) || {};
   const diffs = Object.keys(wins).filter(k => wins[k]).map(Number);
   return diffs.length ? Math.max(...diffs) : 0;
-};
+}
 
-const sagaUnlocked = i => {
+function sagaUnlocked(i, progress = meta) {
   if (i === 0) return true;
   const prevSaga = SAGAS[i - 1];
-  return sagaMaxDiffCleared(prevSaga.id) >= 3;
-};
+  return sagaMaxDiffCleared(prevSaga.id, progress) >= 3;
+}
 
 // Desbloqueo secuencial de dificultades por saga:
 // Dificultad 1 (Grumete) siempre disponible. Para Dificultad N (N > 1), se requiere haber superado la N-1 en esa misma saga.
@@ -2780,7 +2790,7 @@ function showNakamaPicker(opts) {
   const st = nakamaPickerState;
   const team = opts.currentTeam || [];
   const unlocked = [...new Set(['luffy', ...(meta.roster || [])])].filter(id => CHARS[id] && isNakamaUnlocked(id));
-  const display = id => luffyFormAt(id, startLvlOf(id));
+  const display = id => evolutionFormAt(id, startLvlOf(id));
   const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const sagaIds = new Set(unlocked.map(id => CHARS[display(id)].saga));
   const sagas = SAGAS.filter(s => sagaIds.has(s.id));
@@ -2890,11 +2900,11 @@ function showInventoryModal(opts = {}) {
   invViewState = { q: '', type: '', rarity: 0 };
 
   const renderModalContent = () => {
-    let ids = filterSortChars(allUnlocked, invViewState, id => luffyFormAt(id, startLvlOf(id)));
+    let ids = filterSortChars(allUnlocked, invViewState, id => evolutionFormAt(id, startLvlOf(id)));
     const cap = maxStartLvlCap();
 
     const cardsHTML = ids.map(id => {
-      const displayId = luffyFormAt(id, startLvlOf(id));
+      const displayId = evolutionFormAt(id, startLvlOf(id));
       const c = CHARS[displayId];
       const inTeam = currentTeam.includes(id);
       const startLvl = startLvlOf(id);
@@ -3321,7 +3331,7 @@ function screenStarter(sagaIdx, islandIdx = 0) {
       }
       const id = picked[i];
       if (id && CHARS[id]) {
-        const displayId = luffyFormAt(id, startLvlOf(id));
+        const displayId = evolutionFormAt(id, startLvlOf(id));
         const c = CHARS[displayId];
         const startLvl = startLvlOf(id);
         const cost = logPoseUpgradeCost(startLvl);
@@ -3556,10 +3566,10 @@ function screenStarter(sagaIdx, islandIdx = 0) {
 
 // Límite de nivel inicial según la máxima saga accesible:
 // East Blue permite Nv.15; las siguientes sagas nunca reducen ese límite.
-function maxStartLvlCap() {
+function maxStartLvlCap(progress = meta) {
   let highestSaga = 0;
   for (let i = 0; i < SAGAS.length; i++) {
-    if (sagaUnlocked(i)) highestSaga = i;
+    if (sagaUnlocked(i, progress)) highestSaga = i;
   }
   return Math.max(15, SAGAS[highestSaga] ? SAGAS[highestSaga].islands[0].lvl[0] : 15);
 }
@@ -3569,11 +3579,11 @@ function logPoseUpgradeCost(currentLvl) {
   return Math.floor(3 * Math.pow(1.5, diff) + diff * 2 + 3);
 }
 
-function startLvlOf(id) {
+function startLvlOf(id, progress = meta) {
   const base = baseFormOf(id);
-  const purchased = (meta.charUpgrades || {})[base] || 0;
+  const purchased = (progress.charUpgrades || {})[base] || 0;
   const rawLvl = 5 + purchased;
-  const cap = maxStartLvlCap();
+  const cap = maxStartLvlCap(progress);
   return Math.min(rawLvl, cap);
 }
 
@@ -3594,6 +3604,13 @@ function upgradeCharLvl(id) {
   }
   meta.logPoses -= cost;
   meta.charUpgrades[base] = (meta.charUpgrades[base] || 0) + 1;
+  for (const team of [run?.team, tower?.team]) {
+    for (const f of team || []) if (baseFormOf(f.id) === base) {
+      syncEvolution(f);
+      registerDex(f.id);
+    }
+  }
+  if (run) saveRun();
   saveMeta();
   toast(`✨ ¡${CHARS[id].name} sube al Nivel ${startLvlOf(id)}! (${cost} 🧭 consumidos)`);
   return true;
@@ -3790,6 +3807,7 @@ function backpackHTML(owner, combat = false, category = null) {
 function saveBackpack(owner) { if (owner === run) saveRun(); }
 function showBackpackOrganizer(owner, battleBag, refresh, initialId = null) {
   prepareBackpack(owner);
+  if (autoMode) pauseAutoForChoice();
   const activeBattle = battle && (battle.tower ? tower : run) === owner ? battle : null;
   const wasWaiting = activeBattle?.waiting;
   if (activeBattle && !activeBattle.over) pauseBattle();
@@ -3801,6 +3819,8 @@ function showBackpackOrganizer(owner, battleBag, refresh, initialId = null) {
     if (activeBattle && battle===activeBattle && !battle.over && !wasWaiting) resumeBattle();
   };
   const renderOrganizer=()=>{
+    const modalScroll=ov.querySelector('.bag-organizer')?.scrollTop || 0;
+    const gridScroll=ov.querySelector('.bag-grid')?.scrollTop || 0;
     const stacks=backpackStacks(owner).filter(s=>isBattleItem(s.id)===battleBag);
     const pending=Object.entries(owner.pendingLoot || {}).filter(([id,n])=>n>0&&isBattleItem(id)===battleBag);
     const options=[...stacks.map(s=>({value:s.key,label:`${ITEMS[s.id].name} ×${s.count}`})),...pending.map(([id,n])=>({value:`pending:${id}`,label:`Por guardar: ${ITEMS[id].name} ×${n}`}))];
@@ -3834,6 +3854,8 @@ function showBackpackOrganizer(owner, battleBag, refresh, initialId = null) {
       saveBackpack(owner);cell=null;renderOrganizer();
     };
     ov.querySelector('[data-layout-close]').onclick=close;
+    ov.querySelector('.bag-organizer').scrollTop=modalScroll;
+    ov.querySelector('.bag-grid').scrollTop=gridScroll;
   };
   renderOrganizer();document.body.appendChild(ov);
   ov.onclick=e=>{if(e.target===ov)close();};
@@ -3964,7 +3986,7 @@ function startRun(sagaIdx, starterIds, islandIdx = 0) {
   };
   prepareBackpack(run);
   starterIds.forEach(registerRecruit);
-  run.team.filter(f => baseFormOf(f.id) === 'luffy').forEach(f => registerDex(f.id));
+  run.team.forEach(f => registerDex(f.id));
   saveRun();
   screenMap(hasPendingLoot(run) ? 2 : 0);
 }
@@ -3973,6 +3995,10 @@ function startRun(sagaIdx, starterIds, islandIdx = 0) {
 function screenMap(activePageIdx = 0) {
   playMusic('combat');
   runAutoItems(false);
+  if (autoMode && hasPendingLoot(run)) {
+    pauseAutoForChoice('🎒 Guarda o deja los objetos pendientes para continuar.');
+    activePageIdx = 2;
+  }
   if (run && run.mode === 'nuzlocke' && run.team) {
     run.team = run.team.filter(f => f && f.hp > 0);
   }
@@ -4257,7 +4283,12 @@ function screenMap(activePageIdx = 0) {
   };
 
   bindTeamSlots();
-  bindBackpack($('#map-backpack'), run, false, () => screenMap(2));
+  const refreshMapBackpack = () => {
+    const root = $('#map-backpack');
+    root.innerHTML = backpackHTML(run);
+    bindBackpack(root, run, false, refreshMapBackpack);
+  };
+  bindBackpack($('#map-backpack'), run, false, refreshMapBackpack);
   $('#btn-restart-island').onclick = confirmRestartIsland;
   $('#btn-abandon').onclick = () => {
     modalConfirm('🏳️ ¿Abandonar el viaje?',
@@ -4531,7 +4562,10 @@ function pickWildEnemy(pool) {
 
 // ============ ENTRAR EN NODO ============
 function enterNode(r, i) {
-  if (hasPendingLoot(run)) { toast('🎒 Guarda o deja los objetos pendientes antes de continuar.'); screenMap(2); return; }
+  if (hasPendingLoot(run)) {
+    if (autoMode) pauseAutoForChoice();
+    toast('🎒 Guarda o deja los objetos pendientes antes de continuar.'); screenMap(2); return;
+  }
   const node = run.map.rows[r][i];
   run.pos = [r, i];
   node.done = true;
@@ -4569,7 +4603,7 @@ function enterNode(r, i) {
       break;
     }
     case 'boss': {
-      const enemies = island.boss.map((id, k) => makeChar(id, island.bossLvl[k]));
+      const enemies = island.boss.map((id, k) => makeChar(id, island.bossLvl[k], false, true));
       startBattle(enemies, { wild: false, boss: true, reward: 400 * (run.islandIdx + 1) });
       break;
     }
@@ -4900,15 +4934,17 @@ function chainsFail(wild, onRecruit) {
 // ============ RECLUTAR Y FUSIÓN DE PERSONAJES ============
 // Si el personaje ya está en la banda, se fusionan: gana 1 estrella y +5% de stats.
 function addToTeam(f, done) {
+  syncEvolution(f);
   const existing = run.team.find(m => baseFormOf(m.id) === baseFormOf(f.id));
   if (existing) {
+    syncEvolution(existing);
     existing.stars = (existing.stars || 0) + 1;
     const oldLvl = existing.lvl;
     const newLvl = Math.max(existing.lvl, f.lvl);
     if (newLvl > oldLvl) {
       existing.lvl = newLvl;
       existing.xp = f.xp || 0;
-      existing.id = luffyFormAt(existing.id, existing.lvl);
+      existing.id = evolutionFormAt(existing.id, existing.lvl);
       const c = CHARS[existing.id];
       if (c) {
         existing.maxhp = hpAt(c.base[0], existing.lvl);
@@ -4917,11 +4953,8 @@ function addToTeam(f, done) {
         existing.spatk = statAt(c.base[3], existing.lvl);
         existing.spdef = statAt(c.base[4], existing.lvl);
         existing.spd = statAt(c.base[5], existing.lvl);
-        const updatedMoves = c.learnset.filter(([l]) => l <= existing.lvl).map(([, m]) => m).slice(-2);
+        const updatedMoves = formMovesAt(existing.id, existing.lvl);
         if (updatedMoves.length) existing.moves = updatedMoves;
-        if (c.evo && existing.lvl >= c.evo.lvl) {
-          existing.id = c.evo.to;
-        }
         applyUpgrades(existing);
       }
     }
@@ -4985,7 +5018,8 @@ function addToTeam(f, done) {
 // Muestra las características reales del personaje en la saga (nivel, fusiones y barco).
 function showCharModal(fOrId) {
   const isLive = typeof fOrId === 'object';
-  const f = isLive ? migrateFighter(fOrId) : applyUpgrades(makeChar(fOrId, startLvlOf(fOrId)));
+  const previewId = !isLive && !BASE_OF[fOrId] ? evolutionFormAt(fOrId, startLvlOf(fOrId)) : fOrId;
+  const f = isLive ? migrateFighter(fOrId, !!battle?.eTeam.includes(fOrId)) : applyUpgrades(makeChar(previewId, startLvlOf(fOrId), false, true));
   const c = CHARS[f.id];
   const lore = (typeof LORE !== 'undefined' && LORE) ? (LORE[f.id] || LORE[baseFormOf(f.id)] || {}) : {};
   const pInfo = passiveInfo(f);
@@ -5002,7 +5036,7 @@ function showCharModal(fOrId) {
   const fTypes = fighterTypes(f);
   const isFru = fTypes.includes('Fruta'), isHak = fTypes.includes('Haki');
   const known = f.moves;
-  const future = c.learnset.filter(([l, m]) => l > f.lvl && !known.includes(m));
+  const future = c.learnset.filter(([l, m]) => (l > f.lvl || (c.evo && l >= c.evo.lvl && startLvlOf(f.id) < c.evo.lvl)) && !known.includes(m));
   const rarityTag = c.rareza ? `<span style="color:var(--gold);font-size:14px;margin-left:6px;" title="Rareza: ${c.rareza} estrellas">${'⭐'.repeat(c.rareza)}</span>` : '';
   const fusionTag = f.stars ? `<span style="color:#ff6b6b;font-size:11px;font-weight:bold;margin-left:6px;">[+${f.stars}⭐ Fusión]</span>` : '';
   const hasUpgrades = (f.hpBonus || 0) + (f.atkBonus || 0) + (f.defBonus || 0) + (f.spatkBonus || 0) + (f.spdefBonus || 0) + (f.spdBonus || 0) > 0;
@@ -5066,11 +5100,11 @@ function showCharModal(fOrId) {
     return `<div class="sheet-move"><span class="type-badge" style="background:${TYPES[mv.type]?.color || '#888'}">${mv.type.toUpperCase()}</span>
               ${mv.name} <small>${mv.power ? mv.power + ' PWR · ' + Math.round((mv.acc || 0.9) * 100) + '%' + cat : 'APOYO'}</small></div>`;
   }).join('')}
-      ${future.map(([l, m]) => `<div class="sheet-move future">🔒 Nv${l} — ${MOVES[m] ? MOVES[m].name : m}</div>`).join('')}
+      ${future.map(([l, m]) => `<div class="sheet-move future">🔒 Nv${l}${c.evo && l >= c.evo.lvl ? ` · nivel base ${c.evo.lvl}` : ''} — ${MOVES[m] ? MOVES[m].name : m}</div>`).join('')}
     </div>
     ${pInfo ? `<div class="sheet-section"><b>✨ Pasiva — ${pInfo.label}</b><p>${pInfo.desc}</p></div>` : ''}
     ${ultMv ? `<div class="sheet-section"><b>💥 Habilidad Definitiva — ${ultMv.name}</b><p>${ultMv.type ? `<span class="type-badge" style="background:${TYPES[ultMv.type]?.color || '#888'}">${ultMv.type.toUpperCase()}</span> ` : ''}${ultMv.power ? ultMv.power + ' PWR · ' + Math.round((ultMv.acc || 0.9) * 100) + '% precisión' : 'MOVIMIENTO DEFINITIVO'}</p></div>` : ''}
-    ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>Al nivel ${c.evo.lvl} se convierte en ${CHARS[c.evo.to] ? CHARS[c.evo.to].name : c.evo.to}.</p></div>` : ''}
+    ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>${CHARS[c.evo.to].name} requiere nivel base ${c.evo.lvl} y nivel ${c.evo.lvl} en partida. Tu nivel base: ${startLvlOf(f.id)}. ${startLvlOf(f.id) >= c.evo.lvl ? 'Forma desbloqueada.' : 'Puedes seguir subiendo en partida, pero sus ataques se desbloquean al mejorar el nivel base.'}</p></div>` : ''}
     <p class="sheet-desc">${c.desc}</p>
     <div class="actions" style="flex-direction:column;gap:6px;">
       ${isLive && (!battle || battle.over) && run && run.team && run.team.includes(f) ? `<button class="btn red small" id="sheet-dismiss-btn" style="width:100%;">🗑️ EXPULSAR DE LA BANDA</button>` : ''}
@@ -5105,7 +5139,7 @@ function showCharModal(fOrId) {
   ov.onclick = e => { if (e.target === ov) ov.remove(); };
 }
 
-// ============ EVENTO: PIRATA ESPECIAL ============
+// ============ EVENTO: CROSSGUILD ============
 // Dos opciones: contratar a cualquier pirata del catálogo pagando su caché,
 // o jugar a los 5 carteles de SE BUSCA: se destapan en orden y el número
 // de cartel donde aparece el pirata marca su rareza (1º = 1⭐ ... 5º = 5⭐).
@@ -5196,7 +5230,7 @@ function doSpecialPirate(island) {
   document.body.appendChild(ov);
   if (autoMode) {
     scheduleAutoStep(() => {
-      if(autoSettings.specialAction==='manual'){pauseAutoForChoice('Pirata especial: elige catálogo o carteles.');return;}
+      if(autoSettings.specialAction==='manual'){pauseAutoForChoice('Crossguild: elige catálogo o carteles.');return;}
       const play=ov.querySelector('#sp-gacha');
       const btn = autoSettings.specialAction==='gacha' && play && !play.disabled && autoCanSpend(gachaPrice) ? play : ov.querySelector('#sp-leave');
       if (btn && document.body.contains(ov)) btn.click();
@@ -5909,7 +5943,13 @@ function getUltimateMove(f) {
   const c = CHARS[f.id] || CHARS[base];
   if (!c) return MOVES.punetazo;
 
-  if (isP(f,'luffy')) return MOVES[CHARS[luffyFormAt(f.id,f.lvl)].ultimate] || (f.lvl >= 20 ? MOVES.jetgatling : MOVES.gatlinggoma);
+  if (c.evo && startLvlOf(f.id) < c.evo.lvl && !battle?.eTeam.includes(f)) {
+    const lockedMoves = c.learnset.filter(([level]) => level >= c.evo.lvl).map(([,id]) => id);
+    if (!c.ultimate || lockedMoves.includes(c.ultimate)) {
+      const available = formMovesAt(f.id, f.lvl).map(id => MOVES[id]).filter(m => m?.power > 0);
+      return available.sort((a,b) => b.power * b.acc - a.power * a.acc)[0] || MOVES.punetazo;
+    }
+  }
   if (c.ultimate && MOVES[c.ultimate]) return MOVES[c.ultimate];
   if (c.learnset && c.learnset.length >= 3) {
     const highMove = c.learnset[c.learnset.length - 1][1];
@@ -5954,7 +5994,7 @@ function startBattle(enemies, opts) {
   enemies.forEach(e => registerDex(e.id));
   // reinicia pasivas y estados por-combate
   [...battle.pTeam, ...battle.eTeam].forEach(f => {
-    migrateFighter(f);
+    migrateFighter(f, battle.eTeam.includes(f));
     f.dodgeLeft = passiveRule(f).dodge || 0;
     // Carry timed effects through the journey; reset combat-only passive flags.
     const previous = battle.pTeam.includes(f) ? f.st || {} : {};
@@ -6640,7 +6680,7 @@ function afterRound() {
     b.rewarded.add(defeated);
     trackKills();
     log(`¡${charName(defeated)} cae derrotado!`);
-    // registro de vencidos en historia (habilita comprarlos en el mercado clandestino)
+    // registro de vencidos en historia (habilita comprarlos en Crossguild)
     if (run && !b.tower && !meta.defeated.includes(defeated.id)) {
       meta.defeated.push(defeated.id);
       saveMeta();
@@ -6972,8 +7012,8 @@ function doCrossoverEvent(island) {
   const escorts = s.bosses.filter(id => id !== bossId)
     .sort(() => Math.random() - 0.5)
     .slice(0, rnd(0, 2));
-  const enemies = escorts.map(id => makeChar(id, Math.max(5, lvl - 2)));
-  const boss = makeChar(bossId, lvl);
+  const enemies = escorts.map(id => makeChar(id, Math.max(5, lvl - 2), false, true));
+  const boss = makeChar(bossId, lvl, false, true);
   // el jefe del crossover recibe +50% en Daño y Defensa
   ['atk', 'def', 'spatk', 'spdef'].forEach(k => { boss[k] = Math.floor(boss[k] * (1 + CROSSOVER_BOOST)); });
   enemies.push(boss);
@@ -7264,7 +7304,7 @@ function towerNextBattle() {
   const isBossFloor = tower.floor % 5 === 0;
   const bossIds = Object.keys(CHARS).filter(id => CHARS[id].boss && CHARS[id].saga !== 'crossover');
   const id = isBossFloor ? pick(bossIds) : pick(pool);
-  const enemy = makeChar(id, lvl + (isBossFloor ? 2 : 0));
+  const enemy = makeChar(id, lvl + (isBossFloor ? 2 : 0), false, true);
   startBattle([enemy], {
     wild: false, tower: true,
     intro: `🗼 Piso ${tower.floor} — ¡${CHARS[id].name} te desafía!`,

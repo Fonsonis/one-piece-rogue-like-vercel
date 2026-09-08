@@ -190,14 +190,14 @@ const CHARS = {
     name: 'Luffy', emoji: '👒', types: ['Golpe', 'Fruta'],
     base: [24, 12, 8, 10], rareza: 1,
     learnset: [[1, 'pistolagoma'], [8, 'bazookagoma'], [13, 'gatlinggoma']],
-    evo: { lvl: 20, to: 'luffy2' },
+    evo: { lvl: 20, to: 'luffy2' }, ultimate: 'gatlinggoma',
     desc: 'Chico de goma que quiere ser Rey de los Piratas.',
   },
   luffy2: {
     name: 'Luffy Gear 2', emoji: '👒', types: ['Golpe', 'Fruta'],
     base: [30, 16, 10, 15], rareza: 2,
     learnset: [[13, 'gatlinggoma'], [20, 'jetpistol'], [30, 'hakiarm']],
-    evo: { lvl: 35, to: 'luffy3' },
+    evo: { lvl: 35, to: 'luffy3' }, ultimate: 'jetgatling',
     desc: 'Gear Second: velocidad y vapor. Gear Third al nivel 35.',
   },
   luffy3: {

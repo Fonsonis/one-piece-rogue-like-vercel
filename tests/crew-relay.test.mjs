@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {combatHarness} from './balance-harness.mjs';
 
 const setup = `
+  maxStartLvlCap=()=>100;meta.charUpgrades={luffy:15};
   run={mode:'story',saga:0,team:['luffy','zoro','nami'].map(id=>makeChar(id,20)),items:{}};
   startBattle([makeChar('bandido',50)],{wild:true});
 `;

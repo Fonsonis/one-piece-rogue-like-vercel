@@ -1,5 +1,6 @@
 .event-sprite { display:inline-block; width:1.35em; height:1.35em; min-width:1.35em; vertical-align:middle; background-image:url('event-atlas.png'); background-size:600% 600%; background-repeat:no-repeat; image-rendering:pixelated; }
 .event-sprite.ui-sprite { background-image:url('ui-atlas.png'); }
+.event-sprite.crossguild-sprite { background-image:url('cross-guild-map.png'); background-size:contain; background-position:center; }
 .event-art { text-align:center; font-size:64px; line-height:1; margin:10px auto; }
 .map-node .event-sprite { width:80%; height:80%; min-width:0; }
 .map-node .map-event-icon { display:block; width:90%; height:90%; object-fit:contain; image-rendering:pixelated; pointer-events:none; }
