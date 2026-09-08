@@ -1,0 +1,40 @@
+/* A compact roster and one persistent editor replace the long accordion list. */
+.ship-training { margin:12px 0 24px; padding:14px; border:1px solid #91aaa9; background:var(--paper-dark); border-radius:8px; }
+.ship-training > h2 { margin:0 0 8px; font-size:14px; }
+.ship-training > p { font:13px/1.5 system-ui,sans-serif; margin:0 0 12px; }
+.training-filters { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) auto; gap:8px; margin-bottom:12px; }
+.training-filters :is(input,select,button) { min-height:44px; min-width:0; font:13px/1.3 system-ui,sans-serif; padding:8px; }
+.training-layout { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:16px; align-items:start; }
+.training-portraits { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+.training-portrait { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px; min-width:0; min-height:108px; padding:6px 3px; border:2px solid #9db2b0; border-radius:6px; background:var(--paper); color:var(--ink); }
+.training-portrait > span:not(.dex-sprite) { font:600 12px/1.25 system-ui,sans-serif; overflow-wrap:anywhere; }
+.training-portrait > small { font-size:9px; }
+.training-portrait[aria-pressed="true"],#ship-training-team[aria-pressed="true"] { border-color:var(--sea); box-shadow:inset 0 0 0 2px var(--sea); background:var(--paper-dark); }
+.ship-training :is(button,input,select):focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+.training-pages { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; }
+.training-pages span { font:12px/1.4 system-ui,sans-serif; text-align:center; }
+.training-pages .btn { min-width:44px; min-height:44px; }
+.training-detail { min-width:0; }
+.training-detail .ship-card-acc { margin:0; }
+.training-detail .ship-card-header { cursor:default; padding:12px; flex-wrap:nowrap; }
+.training-detail .ship-card-header > div { flex:1!important; min-width:0; }
+.training-detail .ship-card-header b { font:700 16px/1.4 system-ui,sans-serif; }
+.training-detail .ship-card-header small { font:12px/1.5 system-ui,sans-serif!important; }
+.training-detail .ship-card-body { padding:12px; }
+.training-detail .ship-upgs { grid-template-columns:repeat(3,minmax(0,1fr))!important; }
+.training-detail .upg { display:flex; flex-direction:column; gap:6px; min-width:0; padding:4px; }
+.training-detail .upg-label { font:700 12px/1.4 system-ui,sans-serif; }
+.training-gain { font:11px/1.4 system-ui,sans-serif; }
+.training-detail .upg .btn { min-height:44px; width:100%; padding:6px 2px; font:700 13px/1.3 system-ui,sans-serif; }
+.training-detail .btn-sell-stats { min-height:44px; font:12px/1.4 system-ui,sans-serif!important; }
+@media(max-width:700px) {
+  .ship-training { padding:10px; }
+  .training-layout { grid-template-columns:minmax(0,1fr); gap:12px; }
+  .training-filters { grid-template-columns:minmax(0,1fr) minmax(0,1fr); }
+  .training-filters input { grid-column:1/-1; }
+  .training-portrait { min-height:100px; }
+  .training-detail .ship-upgs { gap:5px!important; }
+}
+.training-detail .ship-card-header { display:flex!important; text-align:left; gap:12px; }
+.training-detail .ship-card-header > .emoji { flex:0 0 56px; }
+.training-detail .ship-card-header .dex-sprite { --sprite-size:56px!important; }

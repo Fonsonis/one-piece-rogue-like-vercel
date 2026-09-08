@@ -104,17 +104,54 @@ try {
 
 let autoMode = false;
 let autoTimer = null;
-let autoSettings = {
-  speed: 'x2', // 'x1' (normal, mitad) o 'x2' (rápida, actual)
-  healThreshold: 50, // 0 = desactivo, 25, 50, 75, 99
-  nodePriority: 'random', // 'random', 'item', 'battle', 'rest'
-  wildAction: 'fight', // 'fight', 'recruit', 'chains'
-  shopItems: [
-    { id: 'carne', qty: 3 },
-    { id: 'sake', qty: 2 },
-    { id: 'cartel', qty: 2 },
-  ],
-};
+const PORT_SHOP_STOCK = ['carne','carnereal','bocadillo','sake','bebida_ataque','bebida_defensa','cartel','carteldorado','cartelbuster'];
+const AUTO_ROUTE_KEYS = ['random','wild','marine','item','mystery','shop','rest','special','boss','crossover','battle'];
+const AUTO_DEFAULTS = () => ({
+  speed:'x2', healThreshold:50, nodePriority:'random', wildAction:'fight',
+  specialAction:'manual', chainItem:'risk', chainFail:'fight', crossoverAction:'fight',
+  revive:true, useUltimates:true, healItems:['carne','carnereal','bocadillo'],
+  reserveBerries:0, pauseEvents:[],
+  shopItems:[{id:'carne',qty:3},{id:'sake',qty:2},{id:'cartel',qty:2}]
+});
+function normalizeAutoSettings(value) {
+  const d = AUTO_DEFAULTS(), v = value && typeof value === 'object' ? value : {};
+  const choice = (key, allowed) => allowed.includes(v[key]) ? v[key] : d[key];
+  const integer = (value, fallback, max) => Number.isFinite(Number(value)) ? Math.min(max,Math.max(0,Math.floor(Number(value)))) : fallback;
+  return {...d,
+    speed:choice('speed',['x1','x2']), nodePriority:choice('nodePriority',AUTO_ROUTE_KEYS),
+    healThreshold:choice('healThreshold',[0,25,50,75,99]),
+    wildAction:choice('wildAction',['fight','recruit','chains','manual']),
+    specialAction:choice('specialAction',['manual','gacha','leave']),
+    chainItem:choice('chainItem',['risk','cartel','carteldorado','cartelbuster']),
+    chainFail:choice('chainFail',['fight','pay','manual']),
+    crossoverAction:choice('crossoverAction',['fight','leave','manual']),
+    revive:typeof v.revive==='boolean'?v.revive:d.revive,
+    useUltimates:typeof v.useUltimates==='boolean'?v.useUltimates:d.useUltimates,
+    healItems:Array.isArray(v.healItems)?['carne','carnereal','bocadillo'].filter(id=>v.healItems.includes(id)):d.healItems,
+    reserveBerries:integer(v.reserveBerries,0,999999),
+    pauseEvents:Array.isArray(v.pauseEvents)?['wild','marine','item','mystery','shop','rest','special','boss','crossover'].filter(id=>v.pauseEvents.includes(id)):[],
+    shopItems:Array.isArray(v.shopItems)?v.shopItems.filter(t=>t&&PORT_SHOP_STOCK.includes(t.id)).map(t=>({id:t.id,qty:integer(t.qty,0,99)})):d.shopItems
+  };
+}
+let autoSettings = AUTO_DEFAULTS();
+function pauseAutoForChoice(message) {
+  autoMode=false;
+  if(autoTimer) clearTimeout(autoTimer);
+  autoTimer=null;
+  const btn=$('#btn-topbar-auto');
+  if(btn) {btn.textContent='🤖 PAUSADO';btn.classList.remove('green');btn.classList.add('gray');}
+  if(message) toast(message);
+}
+function autoCanSpend(price) {return !!run && run.berries-price >= (autoSettings.reserveBerries || 0);}
+function advanceAutoNode(r,i) {
+  if(!autoMode || !run)return;
+  if(autoSettings.pauseEvents?.includes(run.map.rows[r][i].type)) {
+    pauseAutoForChoice();screenMap();
+    toast(`🤖 Pausa antes de ${NODE_TYPES[run.map.rows[r][i].type].label}. Elige cuándo entrar.`);
+    return;
+  }
+  enterNode(r,i);
+}
 
 function stopAutoMode() {
   autoMode = false;
@@ -136,52 +173,61 @@ function scheduleAutoStep(fn, ms = 700) {
   }, ms * mult);
 }
 
-function runAutoItems() {
-  if (!autoMode || !autoSettings.healThreshold) return;
+function autoBackpackSettings() {
+  const saved = meta.settings?.autoBackpack || {};
+  return {
+    enabled: saved.enabled === true,
+    threshold: [0,25,50,75,99].includes(saved.threshold) ? saved.threshold : 50,
+    where: ['map','combat','both'].includes(saved.where) ? saved.where : 'both',
+    items: {carne:saved.items?.carne !== false, carnereal:saved.items?.carnereal !== false,
+      bocadillo:saved.items?.bocadillo === true, sake:saved.items?.sake === true}
+  };
+}
+function setAutoBackpackSettings(change) {
+  const current = autoBackpackSettings();
+  meta.settings ||= {};
+  meta.settings.autoBackpack = {...current,...change,items:{...current.items,...change.items}};
+  saveMeta();
+}
+function runAutoItems(refresh = true) {
+  const config = autoBackpackSettings();
+  if (!config.enabled) return false;
   const isCombat = typeof battle !== 'undefined' && battle && !battle.over;
-  const targetRun = isCombat ? { items: battle.items, team: battle.pTeam } : run;
-  if (!targetRun || !targetRun.items || !targetRun.team) return;
-  const isNuz = typeof run !== 'undefined' && run && run.mode === 'nuzlocke';
-  const thresh = autoSettings.healThreshold;
-
-  if (!isNuz && (targetRun.items.sake || 0) > 0) {
-    const dead = targetRun.team.find(f => f.hp <= 0);
-    if (dead) {
-      targetRun.items.sake--;
-      dead.hp = Math.floor(dead.maxhp * 0.5);
-      const msg = `🤖 Auto: ${charName(dead)} revivido con Sake 🍶`;
-      if (isCombat) log(msg); else toast(msg);
+  if (isCombat && battle.waiting) return false;
+  if ((isCombat && config.where === 'map') || (!isCombat && config.where === 'combat')) return false;
+  const owner = isCombat && battle.tower ? tower : run;
+  const team = isCombat ? battle.pTeam : owner?.team;
+  if (!owner?.items || !team) return false;
+  const isNuz = !(isCombat && battle.tower) && owner.mode === 'nuzlocke';
+  let changed = false, revived = null;
+  const consume = (id, fighter) => {
+    owner.items[id]--;
+    changed = true;
+    const message = `🎒 Auto: ${ITEMS[id].name} para ${charName(fighter)}.`;
+    if (isCombat) log(message); else toast(message);
+  };
+  if (config.items.sake && !isNuz && (owner.items.sake || 0) > 0) {
+    revived = team.find(f => f.hp <= 0);
+    if (revived) {
+      revived.hp = Math.max(1,Math.floor(revived.maxhp * ITEMS.sake.val));
+      consume('sake',revived);
     }
   }
-  for (const f of targetRun.team) {
-    if (f.hp > 0) {
-      const pct = (f.hp / f.maxhp) * 100;
-      if (pct <= thresh) {
-        if ((targetRun.items.carnereal || 0) > 0 && f.hp < f.maxhp * 0.5) {
-          targetRun.items.carnereal--;
-          f.hp = f.maxhp;
-          const msg = `🤖 Auto: Carne Real usada en ${charName(f)} 🥩`;
-          if (isCombat) log(msg); else toast(msg);
-        } else if ((targetRun.items.carne || 0) > 0) {
-          targetRun.items.carne--;
-          f.hp = Math.min(f.maxhp, f.hp + 40);
-          const msg = `🤖 Auto: Carne usada en ${charName(f)} 🍖`;
-          if (isCombat) log(msg); else toast(msg);
-        } else if ((targetRun.items.bocadillo || 0) > 0) {
-          targetRun.items.bocadillo--;
-          f.hp = Math.min(f.maxhp, f.hp + 25);
-          const msg = `🤖 Auto: Bocadillo usado en ${charName(f)} 🥪`;
-          if (isCombat) log(msg); else toast(msg);
-        }
-      }
-    }
+  for (const fighter of team) {
+    if (!config.threshold || fighter === revived || fighter.hp <= 0 || fighter.hp >= fighter.maxhp ||
+        (config.threshold !== 99 && fighter.hp / fighter.maxhp * 100 > config.threshold)) continue;
+    const healing = ['carne','carnereal','bocadillo'].filter(id=>config.items[id] && owner.items[id] > 0)
+      .sort((a,b)=>ITEMS[a].val-ITEMS[b].val);
+    const missing = fighter.maxhp-fighter.hp;
+    const id = healing.find(id=>ITEMS[id].val >= missing) || healing.at(-1);
+    if (!id) continue;
+    fighter.hp = Math.min(fighter.maxhp,fighter.hp + ITEMS[id].val);
+    consume(id,fighter);
   }
-  if (isCombat) {
-    refreshHPCards();
-    refreshControls();
-  } else if (typeof saveRun === 'function') {
-    saveRun();
-  }
+  if (!changed) return false;
+  if (owner === run) saveRun();
+  if (isCombat && refresh) { refreshHPCards(); refreshControls(); }
+  return true;
 }
 
 function pickAutoNode(reach) {
@@ -191,7 +237,34 @@ function pickAutoNode(reach) {
 
   const rows = run.map.rows;
   let matches = [];
-  if (pref === 'item') {
+  if (Object.hasOwn(NODE_TYPES, pref)) {
+    // Trace actual map connections back from unvisited events of the chosen type.
+    // This keeps earlier choices on a route to the nearest reachable event.
+    const distances = new Map(), incoming = new Map(), queue = [];
+    rows.forEach((row, r) => row.forEach((node, i) => {
+      if (node.type === pref && !node.done) {
+        const key = `${r},${i}`;
+        distances.set(key, 0);
+        queue.push(key);
+      }
+    }));
+    for (const [r, i, nextR, nextI] of run.map.edges || []) {
+      if (rows[r]?.[i]?.done || rows[nextR]?.[nextI]?.done) continue;
+      const key = `${nextR},${nextI}`;
+      if (!incoming.has(key)) incoming.set(key, []);
+      incoming.get(key).push(`${r},${i}`);
+    }
+    for (let idx = 0; idx < queue.length; idx++) {
+      const key = queue[idx];
+      for (const previous of incoming.get(key) || []) {
+        if (distances.has(previous)) continue;
+        distances.set(previous, distances.get(key) + 1);
+        queue.push(previous);
+      }
+    }
+    const nearest = Math.min(...reach.map(([r, i]) => distances.get(`${r},${i}`) ?? Infinity));
+    if (Number.isFinite(nearest)) matches = reach.filter(([r, i]) => distances.get(`${r},${i}`) === nearest);
+  } else if (pref === 'item') {
     matches = reach.filter(([r, i]) => ['item', 'mystery', 'shop'].includes(rows[r][i].type));
   } else if (pref === 'battle') {
     matches = reach.filter(([r, i]) => ['wild', 'marine', 'boss'].includes(rows[r][i].type));
@@ -204,137 +277,95 @@ function pickAutoNode(reach) {
 }
 
 function showAutoSettingsModal() {
-  const ov = document.createElement('div');
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="max-width:440px;">
-    <h2>🤖 Opciones del Modo Automático</h2>
-    
-    <div style="display:flex;flex-direction:column;gap:12px;margin:14px 0;text-align:left;">
-      
-      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
-          ⚡ Velocidad del Modo Automático
-        </label>
-        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Elige el ritmo de avance en mapa y combate:</div>
-        <select id="auto-speed-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-          <option value="x2" ${autoSettings.speed === 'x2' || !autoSettings.speed ? 'selected' : ''}>⚡ Modo x2 (Rápido - Velocidad actual)</option>
-          <option value="x1" ${autoSettings.speed === 'x1' ? 'selected' : ''}>🚶 Modo x1 (Normal - Mitad de velocidad)</option>
-        </select>
-      </div>
-
-      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
-          🍖 Consumo Automático de Objetos
-        </label>
-        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Usar objetos de curación o Sake cuando el PS baje de:</div>
-        <select id="auto-heal-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-          <option value="0" ${autoSettings.healThreshold === 0 ? 'selected' : ''}>❌ Desactivado (no usar objetos)</option>
-          <option value="25" ${autoSettings.healThreshold === 25 ? 'selected' : ''}>❤️ Crítico: Menos del 25% de PS</option>
-          <option value="50" ${autoSettings.healThreshold === 50 ? 'selected' : ''}>🧡 Medio: Menos del 50% de PS</option>
-          <option value="75" ${autoSettings.healThreshold === 75 ? 'selected' : ''}>💛 Leve: Menos del 75% de PS</option>
-          <option value="99" ${autoSettings.healThreshold === 99 ? 'selected' : ''}>💚 Cualquier daño recibido (<100% PS)</option>
-        </select>
-      </div>
-
-      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
-          🗺️ Prioridad de Rutas en el Mapa
-        </label>
-        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Tipo de casilla preferida al elegir camino:</div>
-        <select id="auto-node-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-          <option value="random" ${autoSettings.nodePriority === 'random' ? 'selected' : ''}>🎲 Al azar / Sin preferencia</option>
-          <option value="item" ${autoSettings.nodePriority === 'item' ? 'selected' : ''}>🎁 Priorizar Tesoros, Misterios y Tiendas</option>
-          <option value="battle" ${autoSettings.nodePriority === 'battle' ? 'selected' : ''}>⚔️ Priorizar Enfrentamientos y Combates</option>
-          <option value="rest" ${autoSettings.nodePriority === 'rest' ? 'selected' : ''}>⛺ Priorizar Campamentos y Descanso</option>
-        </select>
-      </div>
-
-      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
-          🏴‍☠️ Encuentros con Piratas Salvajes
-        </label>
-        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Acción por defecto al encontrar un pirata salvaje:</div>
-        <select id="auto-wild-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-          <option value="fight" ${autoSettings.wildAction === 'fight' ? 'selected' : ''}>⚔️ Luchar (ganar Experiencia para la banda)</option>
-          <option value="recruit" ${autoSettings.wildAction === 'recruit' ? 'selected' : ''}>💋 Reclutar / Seducir (pagando Berries)</option>
-          <option value="chains" ${autoSettings.wildAction === 'chains' ? 'selected' : ''}>⛓️ Tentar a la suerte (3 Cadenas)</option>
-        </select>
-      </div>
-
-      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
-          🏪 Compras Automáticas en Tiendas (Prioridad de 3 Objetos)
-        </label>
-        <div style="font-size:7.5px;color:#aaa;margin-bottom:8px;">
-          Elige 3 objetos en orden de prioridad y cuántos deseas mantener en inventario:
-        </div>
-        ${[0, 1, 2].map(idx => {
-    const sList = autoSettings.shopItems || [];
-    const itemSetting = sList[idx] || { id: 'none', qty: 0 };
-    return `
-          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
-            <span style="font-size:9px;font-weight:bold;color:var(--gold);width:16px;">#${idx + 1}</span>
-            <select id="auto-shop-item-${idx}" style="flex:1;padding:4px;font-size:8.5px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-              <option value="none" ${itemSetting.id === 'none' ? 'selected' : ''}>❌ Ninguno (vacío)</option>
-              <option value="carne" ${itemSetting.id === 'carne' ? 'selected' : ''}>🍖 Carne de Cerdo (40 PS)</option>
-              <option value="carnereal" ${itemSetting.id === 'carnereal' ? 'selected' : ''}>🥩 Carne Real (100% PS)</option>
-              <option value="bocadillo" ${itemSetting.id === 'bocadillo' ? 'selected' : ''}>🥪 Bocadillo de Arroz (25 PS)</option>
-              <option value="sake" ${itemSetting.id === 'sake' ? 'selected' : ''}>🍶 Sake de Binks (Revivir)</option>
-              <option value="cartel" ${itemSetting.id === 'cartel' ? 'selected' : ''}>📜 Cartel de Recluta (1 Cadena)</option>
-              <option value="carteldorado" ${itemSetting.id === 'carteldorado' ? 'selected' : ''}>🏅 Cartel Dorado (2 Cadenas)</option>
-              <option value="cartelbuster" ${itemSetting.id === 'cartelbuster' ? 'selected' : ''}>📯 Buster Call (3 Cadenas)</option>
-              <option value="hierro" ${itemSetting.id === 'hierro' ? 'selected' : ''}>🛡️ Hierro Forjado (Exp)</option>
-            </select>
-            <span style="font-size:8px;color:#aaa;">Hasta:</span>
-            <select id="auto-shop-qty-${idx}" style="width:50px;padding:4px;font-size:8.5px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-              <option value="0" ${itemSetting.qty === 0 ? 'selected' : ''}>0</option>
-              ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(q => `<option value="${q}" ${itemSetting.qty === q ? 'selected' : ''}>${q}</option>`).join('')}
-            </select>
-          </div>`;
-  }).join('')}
-      </div>
-
+  if(document.querySelector('.auto-config-overlay'))return;
+  const wasAuto=autoMode, activeBattle=battle && !battle.over ? battle : null;
+  const wasWaiting=activeBattle?.waiting;
+  pauseAutoForChoice();
+  if(activeBattle && !wasWaiting)pauseBattle();
+  const cfg=normalizeAutoSettings(autoSettings);
+  const bagAuto=autoBackpackSettings();
+  const ov=document.createElement('div');ov.className='overlay auto-config-overlay';
+  const select=(id,value,options)=>`<select id="${id}">${options.map(([key,label])=>`<option value="${key}" ${String(key)===String(value)?'selected':''}>${label}</option>`).join('')}</select>`;
+  const check=(id,label,on,disabled=false)=>`<label class="auto-check"><input type="checkbox" id="${id}" ${on?'checked':''} ${disabled?'disabled':''}><span>${label}</span></label>`;
+  const routes=AUTO_ROUTE_KEYS.filter(id=>id!=='random'&&id!=='battle').map(id=>[id,`${NODE_TYPES[id].emoji} ${NODE_TYPES[id].label}`]);
+  ov.innerHTML=`<div class="modal auto-config" role="dialog" aria-modal="true" aria-labelledby="auto-title">
+    <header class="auto-header"><div><small>PILOTO AUTOMÁTICO</small><h2 id="auto-title">Prepara tu viaje</h2><p>El avance se pausa mientras configuras.</p></div><button class="btn gray" id="auto-apply-close" aria-label="Cerrar sin guardar">✕</button></header>
+    <div class="auto-config-body">
+      <section class="auto-section"><h3>🧭 Ruta y ritmo</h3>
+        <label for="auto-node-sel">Evento al que quieres ir</label>
+        ${select('auto-node-sel',cfg.nodePriority,[['random','🎲 Sin preferencia'],...routes,['battle','⚔️ Combates (piratas, Marines y jefes)']])}
+        <p>Sigue las conexiones hacia el evento accesible más cercano. Si no hay ninguno, elige al azar. Los misterios se descubren al entrar.</p>
+        <div class="auto-two"><div><label for="auto-speed-sel">Avance por el mapa</label>${select('auto-speed-sel',cfg.speed,[['x1','Normal'],['x2','Rápido']])}</div>
+        <div><label for="auto-combat-speed">Velocidad de combate</label>${select('auto-combat-speed',preferredCombatSpeed(),[[1,'x1'],[2,'x2'],[4,'x4']])}</div></div>
+        ${check('auto-ultimates','Usar definitivas cuando estén listas',cfg.useUltimates)}
+        <details><summary>Parar antes de un evento</summary><div class="auto-check-grid">${routes.map(([id,label])=>check(`auto-pause-${id}`,label,cfg.pauseEvents.includes(id))).join('')}</div><p>Se detiene en el mapa para que entres manualmente.</p></details>
+      </section>
+      <section class="auto-section"><h3>🏴‍☠️ Encuentros y reclutas</h3>
+        <label for="auto-wild-sel">Pirata salvaje</label>${select('auto-wild-sel',cfg.wildAction,[['fight','Combatir'],['recruit','Reclutar con Berries'],['chains','Tentar a la suerte: cadenas'],['manual','Pausar y decidir yo']])}
+        <p>Si no puedes reclutar por precio, rareza o Nuzlocke, combate.</p>
+        <div class="auto-two"><div><label for="auto-chain-item">En las cadenas</label>${select('auto-chain-item',cfg.chainItem,[['risk','Arriesgar: 50%'],...['cartel','carteldorado','cartelbuster'].map(id=>[id,ITEMS[id].name])])}</div>
+        <div><label for="auto-chain-fail">Si una cadena aguanta</label>${select('auto-chain-fail',cfg.chainFail,[['fight','Combatir'],['pay','Pagar 3 carteles si tengo'],['manual','Pausar y decidir yo']])}</div></div>
+        <p>Si no tienes el cartel elegido, arriesga. Si no puedes pagar los 3 carteles, combate.</p>
+        <label for="auto-special-action">Pirata especial · Mercado clandestino</label>${select('auto-special-action',cfg.specialAction,[['manual','Pausar para elegir o jugar'],['gacha','Jugar carteles si puedo pagarlos'],['leave','Marcharme sin comprar']])}
+        <p>El catálogo se elige manualmente. Si no alcanza para los carteles o Nuzlocke lo impide, se marcha.</p>
+        <label for="auto-crossover">Camino alternativo · Crossover</label>${select('auto-crossover',cfg.crossoverAction,[['fight','Explorar y aceptar el duelo'],['leave','Retirarme y completar la saga'],['manual','Pausar y decidir yo']])}
+      </section>
+      <section class="auto-section"><h3>🎒 Uso automático de la mochila</h3>
+        ${check('auto-bag-enabled','Usar objetos automáticamente',bagAuto.enabled)}
+        <p>Comparte estas preferencias con Ajustes. Funciona también con el avance automático pausado.</p>
+        <label for="auto-bag-where">Dónde usar objetos</label>${select('auto-bag-where',bagAuto.where,[['both','Isla y combate'],['map','Solo en la isla'],['combat','Solo en combate']])}
+        <label for="auto-heal-sel">Curar cuando los PS estén al…</label>${select('auto-heal-sel',bagAuto.threshold,[[0,'No curar automáticamente'],[25,'25% o menos'],[50,'50% o menos'],[75,'75% o menos'],[99,'Cualquier daño']])}
+        <p>Objetos permitidos: usa uno por nakama y revisión, el menor que cubra el daño o el mayor disponible.</p>
+        ${['carne','carnereal','bocadillo'].map(id=>check(`auto-heal-${id}`,`${ITEMS[id].emoji} ${ITEMS[id].name} · ${ITEMS[id].desc}`,bagAuto.items[id])).join('')}
+        ${check('auto-revive',`${ITEMS.sake.emoji} Revivir con ${ITEMS.sake.name}`,bagAuto.items.sake,run?.mode==='nuzlocke')}
+        <p>${run?.mode==='nuzlocke'?'Nuzlocke: los nakamas caídos no pueden revivir.':ITEMS.sake.desc}</p>
+      </section>
+      <section class="auto-section"><h3>🏪 Compras y presupuesto</h3>
+        <label for="auto-reserve">Berries que quieres conservar</label><input id="auto-reserve" type="number" min="0" max="999999" step="50" value="${cfg.reserveBerries}">
+        <p>La reserva se respeta al comprar provisiones, reclutar y jugar carteles. Cantidad 0 = no comprar. Prioridad 1 = comprar primero.</p>
+        <div class="auto-stock-head"><span>Provisión</span><span>Hasta</span><span>Prioridad</span></div>
+        ${PORT_SHOP_STOCK.map((id,index)=>{const entry=cfg.shopItems.find(t=>t.id===id);const priority=cfg.shopItems.findIndex(t=>t.id===id);return `<div class="auto-stock-row"><div><b>${ITEMS[id].emoji} ${ITEMS[id].name}</b><small>${ITEMS[id].desc} · ${ITEMS[id].price} Berries</small></div><input aria-label="Cantidad de ${ITEMS[id].name}" data-auto-stock="${id}" type="number" min="0" max="99" value="${entry?.qty||0}">${select(`auto-priority-${id}`,priority<0?PORT_SHOP_STOCK.length:priority+1,PORT_SHOP_STOCK.map((_,i)=>[i+1,i+1]))}</div>`}).join('')}
+      </section>
     </div>
-
-    <div class="actions" style="flex-direction:column;gap:6px;">
-      <button class="btn green" id="auto-apply-start">▶️ ${autoMode ? 'GUARDAR Y CONTINUAR' : 'ACTIVAR MODO AUTOMÁTICO'}</button>
-      ${autoMode ? `<button class="btn red" id="auto-apply-stop">⏹️ DESACTIVAR MODO AUTOMÁTICO</button>` : ''}
-      <button class="btn gray" id="auto-apply-close">CANCELAR / CERRAR</button>
-    </div>
+    <footer class="auto-footer"><button class="btn gray" id="auto-save-only">Guardar y pausar</button><button class="btn green" id="auto-apply-start">Guardar y activar</button></footer>
   </div>`;
-
   document.body.appendChild(ov);
-
-  const saveFormSettings = () => {
-    autoSettings.speed = ov.querySelector('#auto-speed-sel').value;
-    autoSettings.healThreshold = +ov.querySelector('#auto-heal-sel').value;
-    autoSettings.nodePriority = ov.querySelector('#auto-node-sel').value;
-    autoSettings.wildAction = ov.querySelector('#auto-wild-sel').value;
-    autoSettings.shopItems = [0, 1, 2].map(idx => ({
-      id: ov.querySelector(`#auto-shop-item-${idx}`).value,
-      qty: +ov.querySelector(`#auto-shop-qty-${idx}`).value
-    }));
-  };
-
-  ov.querySelector('#auto-apply-start').onclick = () => {
-    saveFormSettings();
-    autoMode = true;
-    ov.remove();
-    toast('🤖 Modo Automático ACTIVADO');
-    screenMap();
-  };
-
-  if (autoMode) {
-    const stopBtn = ov.querySelector('#auto-apply-stop');
-    if (stopBtn) {
-      stopBtn.onclick = () => {
-        ov.remove();
-        stopAutoMode();
-      };
+  PORT_SHOP_STOCK.forEach(id=>ov.querySelector(`#auto-priority-${id}`).setAttribute('aria-label',`Prioridad de ${ITEMS[id].name}`));
+  let closed=false;
+  const close=(mode,save)=>{
+    if(closed)return;closed=true;
+    if(save) {
+      const val=id=>ov.querySelector(`#${id}`).value;
+      const on=id=>ov.querySelector(`#${id}`).checked;
+      autoSettings=normalizeAutoSettings({speed:val('auto-speed-sel'),nodePriority:val('auto-node-sel'),wildAction:val('auto-wild-sel'),
+        specialAction:val('auto-special-action'),chainItem:val('auto-chain-item'),chainFail:val('auto-chain-fail'),crossoverAction:val('auto-crossover'),
+        healThreshold:+val('auto-heal-sel'),revive:on('auto-revive'),useUltimates:on('auto-ultimates'),reserveBerries:val('auto-reserve'),
+        healItems:['carne','carnereal','bocadillo'].filter(id=>on(`auto-heal-${id}`)),pauseEvents:routes.filter(([id])=>on(`auto-pause-${id}`)).map(([id])=>id),
+        shopItems:PORT_SHOP_STOCK.map(id=>({id,qty:+ov.querySelector(`[data-auto-stock="${id}"]`).value,priority:+val(`auto-priority-${id}`)})).sort((a,b)=>a.priority-b.priority)
+      });
+      autoSpeed=+val('auto-combat-speed');combatSpeedOverride=autoSpeed;
+      meta.settings.autoConfig={...autoSettings,combatSpeed:autoSpeed};
+      setAutoBackpackSettings({enabled:on('auto-bag-enabled'),where:val('auto-bag-where'),threshold:+val('auto-heal-sel'),
+        items:{carne:on('auto-heal-carne'),carnereal:on('auto-heal-carnereal'),bocadillo:on('auto-heal-bocadillo'),sake:on('auto-revive')}});
+      if(activeBattle && battle===activeBattle)battle.speed=autoSpeed;
     }
-  }
-
-  ov.querySelector('#auto-apply-close').onclick = () => ov.remove();
+    ov.remove();autoMode=mode;
+    if(activeBattle && battle===activeBattle && !battle.over) {refreshControls();if(!wasWaiting)resumeBattle();}
+    else if(run)screenMap();
+  };
+  ov.querySelector('#auto-apply-start').onclick=()=>close(true,true);
+  ov.querySelector('#auto-save-only').onclick=()=>close(false,true);
+  ov.querySelector('#auto-apply-close').onclick=()=>close(wasAuto,false);
+  ov.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){e.preventDefault();close(wasAuto,false);}
+    if(e.key==='Tab') {
+      const controls=[...ov.querySelectorAll('button,input,select,summary')].filter(el=>!el.disabled&&el.getClientRects().length);
+      const first=controls[0],last=controls.at(-1);
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+    }
+  });
+  ov.querySelector('#auto-node-sel').focus({preventScroll:true});
 }
 
 // ---------- Dificultades de la aventura ----------
@@ -377,6 +408,14 @@ function loadMeta() {
     meta.roster.push('luffy');
   }
   meta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 }, meta.settings || {});
+  autoSettings = normalizeAutoSettings(meta.settings.autoConfig);
+  // Preserve saved healing choices from the previous automatic-mode panel.
+  if (!meta.settings.autoBackpack && meta.settings.autoConfig) {
+    meta.settings.autoBackpack = {enabled:!!(autoSettings.healThreshold || autoSettings.revive),
+      threshold:autoSettings.healThreshold,where:'both',
+      items:Object.fromEntries(['carne','carnereal','bocadillo','sake'].map(id=>
+        [id,id==='sake' ? autoSettings.revive : autoSettings.healItems.includes(id)]))};
+  }
   migrateLegacyIslandWins(meta);
   if (!meta.totalIslands) {
     const totalWins = Object.values(meta.wins || {}).reduce((a, b) => a + b, 0) +
@@ -513,6 +552,7 @@ function validateGameSave(data) {
     if (!saga || !['classic','nuzlocke'].includes(mode) || !['1','2','3','4','5'].includes(diff) || islands.some(i=>i>=saga.islands.length)) throw new Error('Progreso de islas incompatible.');
   }
   if (!r) return;
+  if ([...Object.keys(r.items || {}), ...Object.keys(r.pendingLoot || {})].some(id => !Object.hasOwn(ITEMS,id))) throw new Error('Objeto desconocido en la mochila.');
   if (r.startingTeam?.some(id => !CHARS[id] || baseFormOf(id) !== id)) throw new Error('Equipo inicial incompatible.');
   if (!SAGAS[r.saga]?.islands[r.islandIdx] || r.team.some(f => !CHARS[f.id] || f.moves.some(id => !MOVES[id]))) throw new Error('Viaje incompatible.');
   if (r.mapIdx !== undefined && r.mapIdx >= islandMapCount(SAGAS[r.saga].islands[r.islandIdx])) throw new Error('Mapa de isla incompatible.');
@@ -581,6 +621,7 @@ function loadRun() {
   }
   if (run && run.team) run.team.forEach(migrateFighter);
   migrateIslandJourney(run, meta);
+  prepareBackpack(run);
 }
 function migrateFighter(f) {
   const current = CHARS[f.id];
@@ -893,7 +934,10 @@ function cycleTopbarAuto() {
     toast('⏹️ Modo Auto: PAUSADO');
   }
   if (typeof battle !== 'undefined' && battle && !battle.over) {
-    if (autoMode) battle.speed = (autoSettings.speed === 'x1') ? 1 : 2;
+    if (autoMode && combatSpeedOverride === null) {
+      battle.speed = (autoSettings.speed === 'x1') ? 1 : 2;
+      autoSpeed = battle.speed;
+    }
     refreshControls();
     renderBattlePreserveLog();
   } else if (typeof run !== 'undefined' && run) {
@@ -916,6 +960,8 @@ function render(html) {
   if (saveBtn) saveBtn.onclick = manualSave;
   const setBtn = $('#btn-settings');
   if (setBtn) setBtn.onclick = showSettingsModal;
+  const speedBtn = $('#btn-map-speed');
+  if (speedBtn) speedBtn.onclick = cycleBattleSpeed;
   const autoBtn = $('#btn-topbar-auto');
   if (autoBtn) autoBtn.onclick = cycleTopbarAuto;
 }
@@ -957,16 +1003,19 @@ function trackKills(qty = 1) {
 
 function berriesHTML(v) { return `฿${v.toLocaleString('es')}`; }
 
-function topbar(showBerries = false, showAuto = showBerries) {
+function topbar(showBerries = false, showAuto = showBerries, showSpeed = false, showFlee = false) {
   const autoLabel = !autoMode ? '🤖 PAUSADO' : (autoSettings.speed === 'x1' ? '🤖 AUTO x1' : '🤖 AUTO x2');
   const autoBtnClass = !autoMode ? 'gray' : 'green';
+  const combatSpeed = battle?.speed ?? preferredCombatSpeed();
   return `<div class="topbar">
     <div class="logo">ONE PIECE <span>ROGUE LIKE</span></div>
     ${showBerries && run ? `<div class="floating-berries"><div class="berries">${berriesHTML(run.berries)}</div></div>` : ''}
     <div class="floating-controls">
-      <button class="btn small green" id="btn-save" title="Guardar partida en este dispositivo" aria-label="Guardar partida en este dispositivo">💾</button>
-      <button class="btn small gray" id="btn-settings" title="Ajustes de juego">⚙️ AJUSTES</button>
       ${showAuto ? `<button class="btn small ${autoBtnClass}" id="btn-topbar-auto" title="Cambiar velocidad o activar/pausar modo auto">${autoLabel}</button>` : ''}
+      <button class="btn small gray" id="btn-settings" title="Ajustes de juego">⚙️ AJUSTES</button>
+      ${showSpeed ? `<button class="btn small gray" id="btn-map-speed" title="Velocidad de combate: x1, x2 o x4" aria-label="Velocidad de combate x${combatSpeed}" aria-live="polite">⏩ x${combatSpeed}</button>` : ''}
+      <button class="btn small green" id="btn-save" title="Guardar partida en este dispositivo" aria-label="Guardar partida en este dispositivo">💾</button>
+      ${showFlee ? '<button class="btn small red" data-ctl="run">🏃 HUIR</button>' : ''}
     </div>
   </div>`;
 }
@@ -1000,7 +1049,7 @@ function showSettingsModal() {
   meta.settings = meta.settings || { showEventConfirm: true, customSounds: false };
 
   const existing = document.querySelector('#settings-modal-overlay');
-  if (existing) existing.remove();
+  if (existing) return;
 
   const ov = document.createElement('div');
   ov.id = 'settings-modal-overlay';
@@ -1008,6 +1057,12 @@ function showSettingsModal() {
 
   const showConfirm = meta.settings.showEventConfirm !== false;
   const customSounds = !!meta.settings.customSounds;
+  const bagAuto = autoBackpackSettings();
+  const settingsBattle = battle && !battle.over ? battle : null;
+  const wasWaiting = settingsBattle?.waiting;
+  const settingsRun = run;
+  const onMap = !!document.getElementById?.('island-carousel');
+  if (settingsBattle) pauseBattle();
 
   ov.innerHTML = `
     <div class="modal" style="max-width:440px;width:90%;">
@@ -1018,6 +1073,18 @@ function showSettingsModal() {
         ${mobileColumnsControl()}
         <p>El aspecto y las columnas se guardan en este dispositivo.</p>
       </div>
+      <fieldset class="bag-auto-settings">
+        <legend>🎒 Uso automático de la mochila</legend>
+        <label><input type="checkbox" id="setting-bag-auto" ${bagAuto.enabled ? 'checked' : ''}> Usar objetos automáticamente</label>
+        <p>Funciona aunque el avance automático esté pausado. Se comprueba al volver al mapa y al inicio de cada ronda.</p>
+        <label for="setting-bag-where">Dónde usar objetos</label>
+        <select id="setting-bag-where"><option value="both" ${bagAuto.where === 'both' ? 'selected' : ''}>Isla y combate</option><option value="map" ${bagAuto.where === 'map' ? 'selected' : ''}>Solo en la isla</option><option value="combat" ${bagAuto.where === 'combat' ? 'selected' : ''}>Solo en combate</option></select>
+        <label for="setting-bag-threshold">Curar con estos PS o menos</label>
+        <select id="setting-bag-threshold">${[0,25,50,75,99].map(n=>`<option value="${n}" ${bagAuto.threshold === n ? 'selected' : ''}>${n === 0 ? 'No curar automáticamente' : n === 99 ? 'Cualquier daño' : n + '% de PS'}</option>`).join('')}</select>
+        <span>Objetos permitidos</span>
+        ${['carne','carnereal','bocadillo','sake'].map(id=>`<label><input type="checkbox" data-setting-bag-item="${id}" ${bagAuto.items[id] ? 'checked' : ''}> ${ITEMS[id].emoji} ${ITEMS[id].name}</label>`).join('')}
+        <p>Prioriza la cura más pequeña que cubra el daño. Máximo un objeto por nakama en cada comprobación. El sake revive a un caído y respeta Nuzlocke. Frutas, mejoras y carteles conservan su uso actual.</p>
+      </fieldset>
       <div style="display:flex;flex-direction:column;gap:12px;margin:16px 0;">
         <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.05);padding:10px;border-radius:6px;border:1px solid #ccc;">
           <div style="flex:1;padding-right:10px;">
@@ -1056,6 +1123,13 @@ function showSettingsModal() {
   `;
   document.body.appendChild(ov);
 
+  ov.querySelector('#setting-bag-auto').onchange = e => setAutoBackpackSettings({enabled:e.target.checked});
+  ov.querySelector('#setting-bag-where').onchange = e => setAutoBackpackSettings({where:e.target.value});
+  ov.querySelector('#setting-bag-threshold').onchange = e => setAutoBackpackSettings({threshold:Number(e.target.value)});
+  ov.querySelectorAll('[data-setting-bag-item]').forEach(input => {
+    input.onchange = e => setAutoBackpackSettings({items:{[input.dataset.settingBagItem]:e.target.checked}});
+  });
+
   ov.querySelector('#setting-theme').onchange = e => setDisplayPreference('theme', e.target.value);
 
   ov.querySelector('#chk-music-toggle').onclick = () => {
@@ -1075,8 +1149,15 @@ function showSettingsModal() {
     }
   };
 
-  ov.querySelector('#btn-save-settings').onclick = () => ov.remove();
-  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true; ov.remove();
+    if (settingsBattle && battle === settingsBattle && !battle.over && !wasWaiting) resumeBattle();
+    else if (!settingsBattle && onMap && run === settingsRun) screenMap(2);
+  };
+  ov.querySelector('#btn-save-settings').onclick = close;
+  ov.onclick = e => { if (e.target === ov) close(); };
 }
 
 function showNodeConfirmModal(r, i) {
@@ -1109,7 +1190,7 @@ function showNodeConfirmModal(r, i) {
       detailsText = 'Tu banda descansará en el campamento. Todos los nakamas conscientes recuperarán un 50% de sus PS máximos.';
       break;
     case 'special':
-      detailsText = 'Un contacto te ofrece reclutas y carteles de recompensa. Los nuevos nakamas solo serán permanentes al completar la isla.';
+      detailsText = specialPiratePoolHTML();
       break;
     case 'travel':
       detailsText = 'Continúa al siguiente mapa de esta isla con tu banda, objetos y PS actuales. El jefe espera al final del último mapa.';
@@ -2590,7 +2671,114 @@ function renderCharGrid(el, ids, st, cardFn, bindFn) {
 // ============ MODAL: INVENTARIO DE NAKAMAS ============
 let invViewState = { q: '', type: '', rarity: 0 };
 
+// Keep the roster position when opening another team slot.
+let nakamaPickerState = { q:'', saga:'', type:'', rarity:0, sort:'name', scope:'all', page:0 };
+function showNakamaPicker(opts) {
+  document.querySelector('#inventory-modal-overlay')?.remove();
+  const previousFocus = document.activeElement;
+  const st = nakamaPickerState;
+  const team = opts.currentTeam || [];
+  const unlocked = [...new Set(['luffy', ...(meta.roster || [])])].filter(id => CHARS[id] && isNakamaUnlocked(id));
+  const display = id => luffyFormAt(id, startLvlOf(id));
+  const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const sagaIds = new Set(unlocked.map(id => CHARS[display(id)].saga));
+  const sagas = SAGAS.filter(s => sagaIds.has(s.id));
+  if (!sagas.some(s => s.id === st.saga)) st.saga = '';
+  const ov = document.createElement('div');
+  ov.id = 'inventory-modal-overlay';
+  ov.className = 'overlay nakama-picker-overlay';
+  ov.innerHTML = `<section class="modal nakama-picker" role="dialog" aria-modal="true" aria-labelledby="nakama-picker-title" aria-describedby="nakama-picker-hint">
+    <header class="nakama-picker-header"><div><small>TU TRIPULACIÓN</small><h2 id="nakama-picker-title">${esc(opts.title || 'Elige un nakama')}</h2></div><button class="btn gray" id="np-close" aria-label="Cerrar selector">✕</button></header>
+    <p id="nakama-picker-hint">Pulsa un retrato para elegirlo. Los nakamas de otro hueco se intercambian.</p>
+    <div class="nakama-picker-filters">
+      <label>Nombre<input id="np-search" type="search" placeholder="Buscar nakama…" value="${esc(st.q)}" autocomplete="off"></label>
+      <label>Saga<select id="np-saga"><option value="">Todas las sagas</option>${sagas.map(s => `<option value="${esc(s.id)}" ${st.saga === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+    </div>
+    <div class="nakama-picker-scopes" role="group" aria-label="Disponibilidad">${[['all','Todos'],['free','Fuera del equipo'],['team','En el equipo']].map(([value,label]) => `<button class="btn gray" data-scope="${value}" aria-pressed="${st.scope === value}">${label}</button>`).join('')}</div>
+    <details class="nakama-picker-more"><summary>Tipo, rareza y orden</summary><div class="nakama-picker-extra">
+      <label>Tipo<select id="np-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t => `<option value="${esc(t)}" ${st.type === t ? 'selected' : ''}>${TYPES[t].emoji} ${esc(t)}</option>`).join('')}</select></label>
+      <label>Rareza<select id="np-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r => `<option value="${r}" ${+st.rarity === r ? 'selected' : ''}>${r} estrellas</option>`).join('')}</select></label>
+      <label>Orden<select id="np-sort">${[['name','Nombre A–Z'],['rarezaDesc','Mayor rareza'],['statTotalDesc','Stats base totales'],['atkDesc','Ataque base'],['spatkDesc','Ataque especial base'],['spdDesc','Velocidad base']].map(([value,label]) => `<option value="${value}" ${st.sort === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+    </div></details>
+    <div class="nakama-picker-summary"><span id="np-count" role="status"></span><button class="btn gray" id="np-reset">Limpiar filtros</button></div>
+    <div class="nakama-picker-roster" id="np-roster"></div>
+    <footer class="nakama-picker-pages"><button class="btn gray" id="np-prev" aria-label="Página anterior">◀</button><span id="np-page" role="status"></span><button class="btn gray" id="np-next" aria-label="Página siguiente">▶</button></footer>
+  </section>`;
+  document.body.appendChild(ov);
+  const find = sel => ov.querySelector(sel);
+  const close = () => { ov.remove(); if (previousFocus?.isConnected) previousFocus.focus(); };
+  const draw = () => {
+    const ids = filterSortChars(unlocked, st, display).filter(id => st.scope === 'all' || (st.scope === 'team' ? team.includes(id) : !team.includes(id)));
+    const pageSize = 12, pages = Math.max(1, Math.ceil(ids.length / pageSize));
+    st.page = clamp(st.page, 0, pages - 1);
+    find('#np-count').textContent = `${ids.length} de ${unlocked.length} nakamas`;
+    find('#np-page').textContent = `Página ${st.page + 1} de ${pages}`;
+    find('#np-prev').disabled = st.page === 0;
+    find('#np-next').disabled = st.page === pages - 1;
+    find('#np-reset').disabled = !st.q && !st.saga && !st.type && !+st.rarity && st.scope === 'all' && st.sort === 'name';
+    find('.nakama-picker-more').classList.toggle('filtered', !!st.type || !!+st.rarity || st.sort !== 'name');
+    ov.querySelectorAll('[data-scope]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.scope === st.scope)));
+    find('#np-roster').innerHTML = ids.slice(st.page * pageSize, (st.page + 1) * pageSize).map(id => {
+      const c = CHARS[display(id)], current = opts.selectedId === id;
+      return `<article class="nakama-picker-card ${team.includes(id) ? 'in-team' : ''}">
+        <button class="nakama-picker-pick" data-id="${esc(id)}" aria-label="Elegir a ${esc(c.name)}${current ? ', en este hueco' : team.includes(id) ? ', en el equipo' : ''}">
+          <span class="nakama-picker-badge">${current ? 'Este hueco' : team.includes(id) ? 'En equipo' : ''}</span>
+          ${charIcon(display(id), 48)}<strong>${esc(c.name)}</strong><span>Nv. ${startLvlOf(id)} · ${'⭐'.repeat(c.rareza)}</span><span class="type-badges">${typeBadges(c.types)}</span>
+        </button><button class="nakama-picker-info" data-info="${esc(id)}" aria-label="Ver ficha de ${esc(c.name)}" title="Ver ficha">ⓘ</button>
+      </article>`;
+    }).join('') || '<p class="nakama-picker-empty">No hay nakamas con estos filtros. Prueba otra saga o pulsa «Limpiar filtros».</p>';
+    find('#np-roster').scrollTop = 0;
+    ov.querySelectorAll('[data-id]').forEach(btn => btn.onclick = () => { close(); opts.onSelect(btn.dataset.id); });
+    ov.querySelectorAll('[data-info]').forEach(btn => btn.onclick = () => {
+      showCharModal(btn.dataset.info);
+      const closeSheet = document.querySelector('#sheet-close');
+      const sheet = closeSheet.closest('.overlay');
+      const returnToPicker = () => { sheet.remove(); btn.focus(); };
+      closeSheet.onclick = returnToPicker;
+      sheet.onclick = e => { if (e.target === sheet) returnToPicker(); };
+      sheet.onkeydown = e => {
+        if (e.key === 'Escape') { e.preventDefault(); returnToPicker(); }
+        if (e.key === 'Tab') {
+          const buttons = [...sheet.querySelectorAll('button:not(:disabled)')];
+          const first = buttons[0], last = buttons[buttons.length - 1];
+          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
+      };
+      closeSheet.focus();
+    });
+  };
+  find('#np-close').onclick = close;
+  find('#np-search').oninput = e => { st.q = e.target.value; st.page = 0; draw(); };
+  for (const key of ['saga','type','rarity','sort']) find(`#np-${key}`).onchange = e => { st[key] = e.target.value; st.page = 0; draw(); };
+  ov.querySelectorAll('[data-scope]').forEach(btn => btn.onclick = () => { st.scope = btn.dataset.scope; st.page = 0; draw(); });
+  find('#np-reset').onclick = () => {
+    Object.assign(st, {q:'', saga:'', type:'', rarity:0, sort:'name', scope:'all', page:0});
+    find('#np-search').value = '';
+    for (const key of ['saga','type','rarity','sort']) find(`#np-${key}`).value = st[key];
+    draw();
+  };
+  for (const [key, step] of [['prev',-1],['next',1]]) find(`#np-${key}`).onclick = () => {
+    st.page += step; draw();
+    // A disabled paging control must not strand keyboard focus.
+    if (find(`#np-${key}`).disabled) find('.nakama-picker-pick')?.focus();
+  };
+  ov.onclick = e => { if (e.target === ov) close(); };
+  ov.onkeydown = e => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    if (e.key === 'Tab') {
+      const focusable = [...ov.querySelectorAll('button:not(:disabled),input,select,summary')].filter(el => el.getClientRects().length);
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  };
+  draw();
+  find('#np-close').focus();
+}
+
 function showInventoryModal(opts = {}) {
+  if (opts.onSelect) return showNakamaPicker(opts);
   const onSelect = opts.onSelect || null;
   const currentTeam = opts.currentTeam || [];
   const title = opts.title || '🎒 INVENTARIO DE NAKAMAS';
@@ -2629,7 +2817,6 @@ function showInventoryModal(opts = {}) {
               </button>
             `}
             <div style="display:flex;gap:3px;justify-content:center;">
-              ${onSelect ? `<button class="btn small green btn-pick-inv" data-id="${id}" style="font-size:7px;padding:3px 6px;flex:1;">${inTeam ? 'SELECCIONADO' : 'ELEGIR'}</button>` : ''}
               <button class="btn small gray btn-info-inv" data-id="${id}" style="font-size:7px;padding:3px 6px;">ℹ️ FICHA</button>
             </div>
           </div>
@@ -3129,6 +3316,7 @@ function screenStarter(sagaIdx, islandIdx = 0) {
     showInventoryModal({
       title: `Añadir / Sustituir Nakama (Hueco ${slotIdx + 1})`,
       currentTeam: picked,
+      selectedId: picked[slotIdx],
       onSelect: (newId) => {
         const existingIdx = picked.indexOf(newId);
         if (existingIdx >= 0 && existingIdx !== slotIdx) {
@@ -3338,7 +3526,189 @@ function confirmRestartIsland() {
   modalConfirm('🔄 ¿Reiniciar isla?',
     'Volverás al mapa 1 con el equipo que elegiste al zarpar, sus niveles base actuales y las provisiones iniciales.<br>Se perderán los reclutas y las mejoras temporales de este intento. El progreso permanente se conserva.',
     () => { if (run === journey) retryIsland(attempt); },
-    () => { if (run === journey) { autoMode = wasAuto; screenMap(2); } });
+    () => { if (run === journey) { autoMode = wasAuto; screenMap(); } });
+}
+
+// Slots are derived from quantities so every consumer (including auto mode and
+// recruitment) immediately frees space without maintaining a second inventory.
+function backpackCapacity() { return 9 + Math.min(17, Math.max(0, meta.global.backpackTier || 0)) * 3; }
+function backpackStackLimit() { return 3 + Math.min(17, Math.max(0, meta.global.backpackTier || 0)); }
+function backpackUpgradeCost() { return 300 * ((meta.global.backpackTier || 0) + 1); }
+function buyBackpackUpgrade() {
+  const cost = backpackUpgradeCost();
+  if (backpackCapacity() >= 60 || meta.fame < cost) return false;
+  meta.fame -= cost;
+  meta.global.backpackTier = (meta.global.backpackTier || 0) + 1;
+  saveMeta();
+  return true;
+}
+function backpackUsed(items, combat = null) {
+  return Object.entries(items || {}).reduce((sum, [id, count]) => {
+    const item = ITEMS[id];
+    return sum + (item && count > 0 && (combat === null || isBattleItem(id) === combat) ? Math.ceil(count / backpackStackLimit()) * item.slotSize : 0);
+  }, 0);
+}
+function backpackFits(owner, id, count = 1) {
+  return !!ITEMS[id] && Number.isInteger(count) && count > 0 &&
+    backpackUsed({...owner.items, [id]:(owner.items[id] || 0) + count},isBattleItem(id)) <= backpackCapacity();
+}
+function addBackpackItem(owner, id, count = 1) {
+  if (!backpackFits(owner, id, count)) return false;
+  owner.items[id] = (owner.items[id] || 0) + count;
+  return true;
+}
+function receiveBackpackItem(owner, id, count = 1) {
+  if (!ITEMS[id] || !Number.isInteger(count) || count < 1) return false;
+  const stored = addBackpackItem(owner, id, count);
+  if (!stored) {
+    owner.pendingLoot ||= {};
+    owner.pendingLoot[id] = (owner.pendingLoot[id] || 0) + count;
+    autoMode = false;
+    clearTimeout(autoTimer); autoTimer = null;
+  }
+  return stored;
+}
+function prepareBackpack(owner) {
+  if (!owner || (owner.backpackVersion === 1 && [false,true].every(combat=>backpackUsed(owner.items,combat) <= backpackCapacity()))) return;
+  const original = owner.items || {};
+  owner.items = {};
+  owner.pendingLoot ||= {};
+  for (const [id,count] of Object.entries(original)) {
+    if (!ITEMS[id]) continue;
+    // Move excess to a saved collection tray; never discard old saves or provisions.
+    let kept = 0;
+    while (kept < count && addBackpackItem(owner,id)) kept++;
+    if (count > kept) owner.pendingLoot[id] = (owner.pendingLoot[id] || 0) + count - kept;
+  }
+  owner.backpackVersion = 1;
+}
+function hasPendingLoot(owner) { return Object.values(owner?.pendingLoot || {}).some(n => n > 0); }
+function isBattleItem(id) { return ['heal','revive','battleBoost'].includes(ITEMS[id]?.kind); }
+function backpackStacks(owner) {
+  const stacks = [];
+  for (const [id,total] of Object.entries(owner.items || {})) {
+    const item = ITEMS[id];
+    if (!item) continue;
+    for (let remaining = total; remaining > 0; remaining -= backpackStackLimit()) {
+      stacks.push({id, count:Math.min(remaining,backpackStackLimit()), size:item.slotSize});
+    }
+  }
+  return stacks;
+}
+function backpackHTML(owner, combat = false, category = null) {
+  if (!combat && category === null) return `<div class="backpacks">${backpackHTML(owner,false,false)}${backpackHTML(owner,false,true)}</div>`;
+  const battleBag = combat || category === true;
+  const capacity = backpackCapacity(), used = backpackUsed(owner.items,battleBag);
+  const stacks = backpackStacks(owner).filter(({id}) => isBattleItem(id) === battleBag);
+  let slot = 0;
+  const cells = stacks.map(({id,count,size},stack) => {
+    const item = ITEMS[id], pieces = [];
+    let part = 0;
+    while (part < size) {
+      const length = Math.min(size-part,3-slot%3);
+      pieces.push({start:slot,length,part}); slot += length; part += length;
+    }
+    // A footprint can wrap to another row, but only one segment carries the icon.
+    const illustrated = pieces.reduce((best,piece)=>piece.length > best.length ? piece : best,pieces[0]);
+    return pieces.map(piece => `<button type="button" class="bag-piece bag-filled ${piece !== illustrated ? 'bag-continuation' : ''}" style="grid-column:span ${piece.length};--bag-piece-columns:${piece.length}" data-bag-item="${id}" data-bag-count="${count}" data-bag-stack="${stack}" title="${item.name} ×${count} · ${size} casilla${size > 1 ? 's' : ''}" aria-label="${item.name} ×${count}, ocupa ${size} casilla${size > 1 ? 's' : ''}">
+      <span class="bag-piece-cells">${Array.from({length:piece.length},(_,i)=>`<span class="bag-cell bag-occupied"><span class="bag-slot-number">${piece.start+i+1}</span></span>`).join('')}</span>
+      ${piece === illustrated ? `<span class="bag-icon">${item.emoji}</span><span class="bag-quantity">×${count}</span>` : '<span class="bag-link" aria-hidden="true">↳</span>'}
+      <span class="bag-item-name">${item.name}${size > 1 ? ` · ${size} casillas` : ''}</span>
+    </button>`).join('');
+  }).join('');
+  const empty = Array.from({length:Math.max(0,capacity-used)},(_,i)=>`<div class="bag-cell bag-empty" aria-label="Casilla ${used+i+1} libre"><span class="bag-slot-number">${used+i+1}</span><span>＋</span></div>`).join('');
+  const pending = Object.entries(owner.pendingLoot || {}).filter(([id,n])=>ITEMS[id] && n>0 && (isBattleItem(id) === battleBag)).map(([id,n])=>`
+    <div class="bag-pending-item"><span>${ITEMS[id].emoji} ${ITEMS[id].name} ×${n}</span>
+      <button type="button" data-bag-collect="${id}" ${backpackFits(owner,id) ? '' : 'disabled'}>GUARDAR 1</button>
+      <button type="button" data-bag-leave="${id}">DEJAR ×${n}</button></div>`).join('');
+  return `<div class="backpack ${combat ? 'backpack-combat' : ''}">
+    <div class="bag-heading"><strong>🎒 ${battleBag ? 'COMBATE' : 'ISLA'}</strong><span aria-label="Espacio ocupado">${used}/${capacity} casillas</span></div>
+    <div class="bag-grid">${cells}${empty}</div>
+    ${pending ? `<div class="bag-pending"><b>Pendiente de guardar</b><p>Libera espacio o deja estos objetos para continuar.</p>${pending}</div>` : ''}
+    ${combat ? '' : `<p class="bag-help">${battleBag ? 'Curas, resurrecciones y bebidas de combate.' : 'Carteles, frutas y mejoras para la isla.'} Hasta ${backpackStackLimit()} unidades del mismo objeto por pila. Las dos mochilas tienen su propio espacio y se amplían juntas.</p>`}
+  </div>`;
+}
+function saveBackpack(owner) { if (owner === run) saveRun(); }
+function bindBackpack(root, owner, combat, refresh) {
+  root.querySelectorAll('[data-bag-item]').forEach(button => {
+    button.onclick = () => showBackpackItem(owner, button.dataset.bagItem, Number(button.dataset.bagCount), combat, refresh);
+  });
+  root.querySelectorAll('[data-bag-collect]').forEach(button => {
+    button.onclick = () => {
+      const id = button.dataset.bagCollect;
+      if (!(owner.pendingLoot?.[id] > 0) || !addBackpackItem(owner,id)) return;
+      owner.pendingLoot[id]--;
+      saveBackpack(owner); refresh();
+    };
+  });
+  root.querySelectorAll('[data-bag-leave]').forEach(button => {
+    button.onclick = () => {
+      const id = button.dataset.bagLeave;
+      modalConfirm('¿Dejar el objeto?', `Dejarás ${ITEMS[id].name} ×${owner.pendingLoot[id]}.`, () => {
+        delete owner.pendingLoot[id]; saveBackpack(owner); refresh();
+      });
+    };
+  });
+}
+function showBackpackItem(owner, id, count, combat, refresh) {
+  if (!(owner.items[id] > 0) || (combat && !isBattleItem(id))) return;
+  const b = combat ? battle : null;
+  if (combat && (!b || b.over || b.waiting)) return;
+  if (b) pauseBattle();
+  const item = ITEMS[id], ov = document.createElement('div');
+  ov.className = 'overlay';
+  const usable = combat ? isBattleItem(id) : owner === run && !['ball','battleBoost'].includes(item.kind);
+  ov.innerHTML = `<div class="modal bag-item-modal"><h2>${item.emoji} ${item.name}</h2><p>${item.desc}</p>
+    <p>${item.slotSize} casilla${item.slotSize > 1 ? 's' : ''} · Hasta ${backpackStackLimit()} por pila</p>
+    ${!usable ? `<p>${item.kind === 'ball' ? 'Se usa en el evento de las cadenas.' : item.kind === 'battleBoost' ? 'Se usa durante el combate.' : 'Se usa fuera del combate.'}</p>` : ''}
+    <div class="actions"><button class="btn green" data-bag-use ${usable ? '' : 'disabled'}>USAR</button>
+      <button class="btn red" data-bag-discard>DESCARTAR ${count > 1 ? `PILA ×${count}` : '1'}</button>
+      <button class="btn gray" data-bag-close>VOLVER</button></div></div>`;
+  document.body.appendChild(ov);
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true; ov.remove();
+    if (b && battle === b && !b.over) resumeBattle();
+  };
+  ov.querySelector('[data-bag-close]').onclick = close;
+  ov.querySelector('[data-bag-use]').onclick = () => {
+    if (!usable || closed) return;
+    close();
+    if (combat) useBattleItem(id); else useItemFromMap(id);
+  };
+  ov.querySelector('[data-bag-discard]').onclick = () => {
+    if (closed) return;
+    modalConfirm('¿Descartar objeto?', `Descartarás ${item.name} ×${Math.min(count,owner.items[id])}.`, () => {
+      if (closed) return;
+      owner.items[id] = Math.max(0,owner.items[id]-count);
+      saveBackpack(owner); close(); refresh();
+    });
+  };
+  ov.onclick = event => { if (event.target === ov) close(); };
+}
+function refreshBattleBackpack() {
+  const el = $('#battle-backpack');
+  if (!el || !battle) return;
+  const owner = battle.tower ? tower : run;
+  if (!owner) return;
+  el.innerHTML = backpackHTML(owner,true);
+  bindBackpack(el,owner,true,refreshBattleBackpack);
+}
+
+function showTowerBackpack(onContinue) {
+  const owner = tower, ov = document.createElement('div');
+  ov.className = 'overlay';
+  let continued = false;
+  const update = () => {
+    ov.innerHTML = `<div class="modal"><h2>🎒 Prepara tu mochila</h2>${backpackHTML(owner)}<div class="actions"><button class="btn green" data-bag-continue ${hasPendingLoot(owner) ? 'disabled' : ''}>CONTINUAR</button></div></div>`;
+    bindBackpack(ov,owner,false,update);
+    ov.querySelector('[data-bag-continue]').onclick = () => {
+      if (continued || hasPendingLoot(owner) || tower !== owner) return;
+      continued = true; ov.remove(); onContinue();
+    };
+  };
+  update(); document.body.appendChild(ov);
 }
 
 function startRun(sagaIdx, starterIds, islandIdx = 0) {
@@ -3378,18 +3748,19 @@ function startRun(sagaIdx, starterIds, islandIdx = 0) {
     badges: [],
     map: genIslandMap(saga.islands[islandIdx],0),
     pos: null,
-    sagaRerollUsed: false,
     nuzCaught: {}, // isla -> ya reclutado
   };
+  prepareBackpack(run);
   starterIds.forEach(registerRecruit);
   run.team.filter(f => baseFormOf(f.id) === 'luffy').forEach(f => registerDex(f.id));
   saveRun();
-  screenMap();
+  screenMap(hasPendingLoot(run) ? 2 : 0);
 }
 
 // ============ PANTALLA: MAPA ============
 function screenMap(activePageIdx = 0) {
   playMusic('menu');
+  runAutoItems(false);
   if (run && run.mode === 'nuzlocke' && run.team) {
     run.team = run.team.filter(f => f && f.hp > 0);
   }
@@ -3419,10 +3790,8 @@ function screenMap(activePageIdx = 0) {
       style="--map-x:${x}%;--map-y:${y}%;--map-forward:${100-y}%" data-r="${r}" data-i="${i}" title="${NODE_TYPES[n.type].label}" aria-label="${NODE_TYPES[n.type].label}, etapa ${r+1}${isCur ? ", posición actual" : ''}" ${isReach ? '' : 'disabled'}>${n.type === 'special' ? '<img class="map-event-icon" src="/art/cross-guild-map.png" alt="" aria-hidden="true" draggable="false">' : NODE_TYPES[n.type].emoji}</button>`;
   }));
 
-  const canReroll = (run.mapIdx || 0) === 0 && run.pos === null && !run.sagaRerollUsed;
-
   render(`
-    ${topbar(true)}
+    ${topbar(true, true, true)}
     <div class="map-wrap">
       <div class="map-carousel" id="island-carousel">
         <!-- PÁGINA 1: MAPA (ANCHO Y ALTO COMPLETO) -->
@@ -3430,8 +3799,8 @@ function screenMap(activePageIdx = 0) {
           <div class="map-board" style="--scene:url('${SAGAS[run.saga]?.img}');--map-rows:${rows.length}">
             <div class="map-heading"><div class="map-title">📍 <b>${saga.name}</b> · Isla ${run.islandIdx + 1}/${saga.islands.length}: <b>${island.name}</b> · Mapa ${(run.mapIdx || 0)+1}/${islandMapCount(island)} (${run.mode === 'nuzlocke' ? 'NUZLOCKE' : 'CLÁSICO'})</div>
             <div class="map-tools">
-              <button class="btn gold small" id="btn-map-reroll" aria-label="Regenerar mapa" title="Regenerar el primer mapa una vez por expedición" ${canReroll ? '' : 'disabled'} style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
-                ↻ ${canReroll ? 1 : 0}
+              <button class="btn gold small" id="btn-restart-island" aria-label="Reiniciar isla" title="Volver a empezar esta isla con tu equipo inicial" style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
+                ↻ REINICIAR
               </button>
             </div></div>
             <div class="map-route">
@@ -3473,10 +3842,7 @@ function screenMap(activePageIdx = 0) {
         <!-- PÁGINA 3: MOCHILA Y EMBLEMAS (ANCHO COMPLETO) -->
         <div class="carousel-page" id="page-bag">
           <div class="panel">
-            <h3>🎒 MOCHILA DE OBJETOS</h3>
-            ${Object.entries(run.items).filter(([, n]) => n > 0).map(([id, n]) =>
-              `<div class="item-row" data-item="${id}"><span>${ITEMS[id].emoji}</span> ${ITEMS[id].name} ×${n}</div>`
-            ).join('') || '<div style="font-size:8px;color:#888;">Bolsa vacía</div>'}
+            <div id="map-backpack">${backpackHTML(run)}</div>
             <h3 style="margin-top:14px;">🏅 EMBLEMAS DE LA SAGA</h3>
             <div class="badge-grid">
               ${saga.islands.map((isl, i) =>
@@ -3503,7 +3869,6 @@ function screenMap(activePageIdx = 0) {
             `}
             <div style="display:flex;gap:8px;margin-top:14px;">
               <button class="btn red small" id="btn-abandon" style="flex:1;">ABANDONAR</button>
-              <button class="btn gray small" id="btn-restart-island" style="flex:1;">🔄 REINICIAR ISLA</button>
             </div>
           </div>
         </div>
@@ -3569,18 +3934,6 @@ function screenMap(activePageIdx = 0) {
         }, 50);
       });
     }
-  }
-
-  const mapRerollBtn = $('#btn-map-reroll');
-  if (mapRerollBtn && canReroll) {
-    mapRerollBtn.onclick = () => {
-      run.sagaRerollUsed = true;
-      run.map = genIslandMap(island,run.mapIdx || 0);
-      run.pos = null;
-      saveRun();
-      toast('🎲 ¡Primer mapa de la isla regenerado!');
-      screenMap();
-    };
   }
 
   document.querySelectorAll('.map-node.reachable').forEach(el => {
@@ -3692,9 +4045,7 @@ function screenMap(activePageIdx = 0) {
   };
 
   bindTeamSlots();
-  document.querySelectorAll('.item-row').forEach(el => {
-    el.onclick = () => useItemFromMap(el.dataset.item);
-  });
+  bindBackpack($('#map-backpack'), run, false, () => screenMap(2));
   $('#btn-restart-island').onclick = confirmRestartIsland;
   $('#btn-abandon').onclick = () => {
     modalConfirm('🏳️ ¿Abandonar el viaje?',
@@ -3712,13 +4063,12 @@ function screenMap(activePageIdx = 0) {
   if (toggleAutoBtn) toggleAutoBtn.onclick = showAutoSettingsModal;
 
   if (autoMode && run) {
-    runAutoItems();
     if (reach.length > 0) {
       const target = pickAutoNode(reach);
       if (target) {
         const [r, i] = target;
         scheduleAutoStep(() => {
-          if (autoMode && run) enterNode(r, i);
+          advanceAutoNode(r,i);
         }, 750);
       }
     }
@@ -3757,7 +4107,8 @@ function showItemTargetModal(item, title, renderRow, onSelect) {
 
 function useItemFromMap(id) {
   const item = ITEMS[id];
-  if (!item) return;
+  if (!item || !run || !(run.items[id] > 0) || (battle && !battle.over)) return;
+  if (item.kind === 'battleBoost') return toast('Esta bebida se usa durante el combate.');
 
   if (item.kind === 'ball') {
     return toast(`📜 ${item.name}: Se usa automáticamente al intentar reclutar piratas.`);
@@ -3842,9 +4193,7 @@ function useItemFromMap(id) {
           trackItemCollected(1);
           trackStat('fruit_use', 1);
           saveRun();
-          if (grantedLog.length) {
-            screenMap(2);
-          }
+          screenMap(2);
         };
       }
 
@@ -3974,6 +4323,7 @@ function pickWildEnemy(pool) {
 
 // ============ ENTRAR EN NODO ============
 function enterNode(r, i) {
+  if (hasPendingLoot(run)) { toast('🎒 Guarda o deja los objetos pendientes antes de continuar.'); screenMap(2); return; }
   const node = run.map.rows[r][i];
   run.pos = [r, i];
   node.done = true;
@@ -4023,10 +4373,10 @@ function enterNode(r, i) {
         const commonLoot = ['carne', 'carne', 'carnereal', 'cartel', 'cartel', 'carteldorado', 'sake', 'bocadillo'];
         id = pick(commonLoot);
       }
-      run.items[id] = (run.items[id] || 0) + 1;
+      const stored = receiveBackpackItem(run,id);
       trackItemCollected(1);
       saveRun();
-      modalInfo('🎁 ¡Objeto encontrado!', `<div class="reward-list">${ITEMS[id].emoji} <b>${ITEMS[id].name}</b><br><small>${ITEMS[id].desc}</small></div>`, screenMap);
+      modalInfo('🎁 ¡Objeto encontrado!', `<div class="reward-list">${ITEMS[id].emoji} <b>${ITEMS[id].name}</b><br><small>${ITEMS[id].desc}</small>${stored ? '' : '<br>🎒 Mochila llena. Elige qué guardar.'}</div>`, () => screenMap(stored ? 0 : 2));
       break;
     }
     case 'mystery': trackStat('mystery_visit', 1); doMystery(island); break;
@@ -4061,8 +4411,8 @@ function doMystery(island) {
     }
     case 'item': {
       const id = pick(['carne', 'cartel', 'carnereal', 'carteldorado']);
-      run.items[id] = (run.items[id] || 0) + 1; saveRun();
-      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS[id].emoji} <b>${ITEMS[id].name}</b></div>`, screenMap);
+      const stored = receiveBackpackItem(run,id); saveRun();
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS[id].emoji} <b>${ITEMS[id].name}</b>${stored ? '' : '<br>🎒 Mochila llena. Elige qué guardar.'}</div>`, () => screenMap(stored ? 0 : 2));
       break;
     }
     case 'battle': {
@@ -4116,10 +4466,10 @@ function doMystery(island) {
       break;
     }
     case 'fruta': {
-      run.items['fruta_diablo'] = (run.items['fruta_diablo'] || 0) + 1;
+      const stored = receiveBackpackItem(run,'fruta_diablo');
       trackItemCollected(1);
       saveRun();
-      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS['fruta_diablo'].emoji} <b>${ITEMS['fruta_diablo'].name}</b> añadida a tu bolsa.</div>`, screenMap);
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS['fruta_diablo'].emoji} <b>${ITEMS['fruta_diablo'].name}</b>${stored ? ' añadida a tu mochila.' : '<br>🎒 Mochila llena. Elige qué guardar.'}</div>`, () => screenMap(stored ? 0 : 2));
       break;
     }
   }
@@ -4165,9 +4515,10 @@ function wildEncounter(wild) {
   if (autoMode) {
     scheduleAutoStep(() => {
       if (!document.body.contains(ov)) return;
+      if(autoSettings.wildAction==='manual'){pauseAutoForChoice('Elige qué hacer con este pirata.');return;}
       if (!isLegendary && autoSettings.wildAction === 'recruit') {
         const payBtn = ov.querySelector('#we-pay');
-        if (payBtn && !payBtn.disabled) { payBtn.click(); return; }
+        if (payBtn && !payBtn.disabled && autoCanSpend(price)) { payBtn.click(); return; }
       } else if (!isLegendary && autoSettings.wildAction === 'chains') {
         const chainBtn = ov.querySelector('#we-chains');
         if (chainBtn && !chainBtn.disabled) { chainBtn.click(); return; }
@@ -4282,6 +4633,11 @@ function renderChains(wild, onRecruit) {
         advance(b === 'cartel' ? 1 : b === 'carteldorado' ? 2 : 3);
       };
     });
+    if(autoMode) scheduleAutoStep(()=>{
+      if(!document.body.contains(ov))return;
+      const item=ov.querySelector(`[data-chainball="${autoSettings.chainItem}"]`);
+      if(item)item.click();else ov.querySelector(`[data-c="${current}"]`)?.click();
+    },700);
   };
   update();
 }
@@ -4325,6 +4681,12 @@ function chainsFail(wild, onRecruit) {
     modalInfo('⚔️ ¡Furia desatada!', `<div class="reward-list">${c.emoji} ¡${c.name} rompe sus cadenas y se abalanza sobre vosotros con más fuerza que nunca!</div>`,
       () => startBattle([wild], { wild: true, xpMult: 1.5 }));
   };
+  if(autoMode)scheduleAutoStep(()=>{
+    if(!document.body.contains(ov))return;
+    if(autoSettings.chainFail==='manual'){pauseAutoForChoice('La cadena aguanta: decide si pagar o combatir.');return;}
+    ov.querySelector(autoSettings.chainFail==='pay'&&can?'#cd-pay':'#cd-fight').click();
+  },700);
+
 }
 
 // ============ RECLUTAR Y FUSIÓN DE PERSONAJES ============
@@ -4375,6 +4737,7 @@ function addToTeam(f, done) {
     done && done(true);
     return;
   }
+  if(autoMode)pauseAutoForChoice('Banda llena: elige a quién sustituir.');
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal">
@@ -4582,6 +4945,22 @@ function specialJoin(id, lvl) {
   });
 }
 
+function specialPiratePoolHTML() {
+  const pool = basePirateIds().sort((a, b) => CHARS[a].rareza - CHARS[b].rareza || CHARS[a].name.localeCompare(CHARS[b].name));
+  const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return `
+    <p class="special-pool-heading">${esc(SAGAS[run.saga].name)} · ${pool.length} piratas posibles</p>
+    <div class="special-pool" role="list" aria-label="Piratas disponibles en este evento">
+      ${pool.map(id => {
+        const c = CHARS[id], seen = meta.dex.includes(id);
+        return `<div class="special-pool-card ${seen ? 'seen' : 'unseen'}" role="listitem" aria-label="${seen ? esc(c.name) : 'Pirata sin avistar'}, ${c.rareza} estrellas">
+          <div class="special-pool-portrait" aria-hidden="true">${charIcon(id, 54)}</div>
+          <b>${seen ? esc(c.name) : '???'}</b><span class="special-pool-stars">${'⭐'.repeat(c.rareza)}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
 function doSpecialPirate(island) {
   meta.starPity = meta.starPity || 0;
   const lvl = island.lvl[1] + 2;
@@ -4591,11 +4970,8 @@ function doSpecialPirate(island) {
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal">
     <h2>🌟 Crossguild</h2>
-    <p style="font-size:9px;line-height:1.9;text-align:center;">Un contacto de los bajos fondos te ofrece reclutas (Nv${lvl}).<br><br>
-    <b>🎯 Elegir:</b> cualquier pirata del catálogo (hasta 4⭐), pagando su caché completo.<br>
-    <b>🎰 Carteles:</b> 5 carteles de SE BUSCA boca abajo. Destápalos en orden:
-    el 1º es el más probable (recluta de 1⭐)... y el 5º, el premio gordo (5⭐).</p>
-    <p class="special-map-price" style="font-size:8px;text-align:center;line-height:1.8;">Mapa ${specialMapMultiplier()} · Carteles ×${specialMapMultiplier()}. Vuelven a ×1 al empezar otra isla. El catálogo depende solo de las estrellas.</p>
+    ${specialPiratePoolHTML()}
+    <p class="special-map-price" style="font-size:8px;text-align:center;line-height:1.8;">Mapa ${specialMapMultiplier()} · Carteles ×${specialMapMultiplier()} · 5⭐ solo en carteles</p>
     ${cartelesBadgeHTML()}
     <div style="font-size:9.5px;text-align:center;margin-top:6px;margin-bottom:6px;color:#f39c12;background:rgba(243,156,18,0.12);padding:6px 10px;border-radius:6px;border:1px solid rgba(243,156,18,0.4);display:flex;align-items:center;justify-content:center;gap:6px;">
       <span>⭐ Estrellas acumuladas (Pity): <b>${meta.starPity || 0} / 1000</b></span>
@@ -4612,7 +4988,9 @@ function doSpecialPirate(island) {
   document.body.appendChild(ov);
   if (autoMode) {
     scheduleAutoStep(() => {
-      const btn = ov.querySelector('#sp-leave');
+      if(autoSettings.specialAction==='manual'){pauseAutoForChoice('Pirata especial: elige catálogo o carteles.');return;}
+      const play=ov.querySelector('#sp-gacha');
+      const btn = autoSettings.specialAction==='gacha' && play && !play.disabled && autoCanSpend(gachaPrice) ? play : ov.querySelector('#sp-leave');
       if (btn && document.body.contains(ov)) btn.click();
     }, 700);
   }
@@ -4686,6 +5064,10 @@ function revealSpecialRecruit(ov, prizeId, lvl) {
       MarketReveal.show({host:ov, name:CHARS[prizeId].name, rarity:CHARS[prizeId].rareza,
         rewardText:`+${CHARS[prizeId].rareza} Log Pose${CHARS[prizeId].rareza === 1 ? '' : 's'}`,
         portraitHTML:charIcon(prizeId, 140), onComplete:complete});
+      if(autoMode){
+        const advance=()=>{if(!ov.isConnected)return;const button=ov.querySelector('.mr-continue');if(button)button.click();if(ov.isConnected)scheduleAutoStep(advance,700);};
+        scheduleAutoStep(advance,1400);
+      }
       return;
     }
   } catch (_) { /* A cosmetic failure must not prevent recruitment. */ }
@@ -4736,6 +5118,7 @@ function renderSpecialGacha(lvl) {
       el.disabled = i !== current;
       el.onclick = i === current ? () => flip(i) : null;
     });
+    if(autoMode && !resolved)scheduleAutoStep(()=>{if(document.body.contains(ov))ov.querySelector(`[data-p="${current}"]`)?.click();},700);
   };
   const flip = i => {
     if (resolved || !ov.isConnected || i !== current) return;
@@ -4833,7 +5216,7 @@ function modalConfirm(title, html, onYes, onNo) {
 // ============ TIENDA ============
 function screenShop() {
   playMusic('menu');
-  const stock = ['carne', 'carnereal', 'bocadillo', 'sake', 'cartel', 'carteldorado', 'cartelbuster', 'hierro'];
+  const stock = PORT_SHOP_STOCK;
   const inventorySummary = Object.entries((run && run.items) || {})
     .filter(([, n]) => n > 0)
     .map(([id, n]) => `${ITEMS[id] ? ITEMS[id].emoji : ''} ×${n}`)
@@ -4859,7 +5242,7 @@ function screenShop() {
       <h2>🏪 Tienda del puerto</h2>
 
       <div style="font-size:9.5px;background:rgba(255,215,0,0.12);padding:6px 10px;border-radius:6px;border:1px solid var(--gold);margin-bottom:10px;text-align:center;">
-        <b>🎒 Tu Bolsa:</b> ${inventorySummary || 'Vacía'}
+        <b>🎒 Isla: ${backpackUsed(run.items,false)}/${backpackCapacity()} · Combate: ${backpackUsed(run.items,true)}/${backpackCapacity()} casillas</b><br>${inventorySummary || 'Vacía'}
       </div>
 
       <h3 style="margin-top:10px;margin-bottom:6px;font-size:11px;color:var(--gold);">🛒 COMPRAR PROVISIONES</h3>
@@ -4870,9 +5253,9 @@ function screenShop() {
           <span class="emoji">${it.emoji}</span>
           <div class="info">
             <b>${it.name}</b> <span style="font-size:8.5px;color:var(--gold);font-weight:bold;margin-left:4px;">(Tienes: ${owned})</span> — <span class="price">${berriesHTML(it.price)}</span><br>
-            <small>${it.desc}</small>
+            <small>${it.desc} · ${it.slotSize} casilla${it.slotSize > 1 ? 's' : ''} / ${backpackStackLimit()} uds.</small>
           </div>
-          <button class="btn small ${run.berries >= it.price ? 'green' : 'gray'}" data-buy="${id}" ${run.berries >= it.price ? '' : 'disabled'}>COMPRAR</button>
+          <button class="btn small ${run.berries >= it.price && backpackFits(run,id) ? 'green' : 'gray'}" data-buy="${id}" ${run.berries >= it.price && backpackFits(run,id) ? '' : 'disabled'}>${backpackFits(run,id) ? 'COMPRAR' : 'SIN ESPACIO'}</button>
         </div>`;
   }).join('')}
 
@@ -4887,9 +5270,9 @@ function screenShop() {
   document.querySelectorAll('[data-buy]').forEach(b => {
     b.onclick = () => {
       const id = b.dataset.buy;
-      if (run.berries < ITEMS[id].price) return;
+      if (!stock.includes(id) || run.berries < ITEMS[id].price) return;
+      if (!addBackpackItem(run,id)) { toast('🎒 No hay espacio en la mochila.'); return; }
       run.berries -= ITEMS[id].price;
-      run.items[id] = (run.items[id] || 0) + 1;
       trackItemCollected(1);
       trackStat('shop_buy', 1);
       saveRun();
@@ -4927,7 +5310,7 @@ function screenShop() {
         const currentQty = (run.items && run.items[t.id]) || 0;
         if (currentQty < t.qty) {
           const itemPrice = ITEMS[t.id] ? ITEMS[t.id].price : 999999;
-          if (run.berries >= itemPrice) {
+          if (autoCanSpend(itemPrice)) {
             const buyBtn = document.querySelector(`[data-buy="${t.id}"]`);
             if (buyBtn && !buyBtn.disabled) {
               buyBtn.click();
@@ -4951,7 +5334,11 @@ function screenShop() {
 // eligiendo siempre el mejor movimiento según los tipos. El jugador solo
 // interviene con objetos, carteles de recluta, velocidad o huida.
 let battle = null;
-let autoSpeed = 1; // recordado entre combates
+let autoSpeed = [1,2,4].includes(meta.settings.autoConfig?.combatSpeed) ? meta.settings.autoConfig.combatSpeed : 1; // recordado entre combates
+let combatSpeedOverride = meta.settings.autoConfig?.combatSpeed === autoSpeed ? autoSpeed : null; // elección manual compartida entre mapa y combate
+function preferredCombatSpeed() {
+  return combatSpeedOverride ?? (autoMode ? (autoSettings.speed === 'x1' ? 1 : 2) : autoSpeed);
+}
 
 // ---------- Clímax de combate (anti combates eternos) ----------
 // A partir de la ronda CLIMAX_ROUND el daño de ambos bandos sube un 10%
@@ -5342,9 +5729,7 @@ function startBattle(enemies, opts) {
   playMusic('combat');
   const team = opts.tower ? tower.team : run.team;
   if (!team.some(f => f.hp > 0)) return opts.tower ? towerGameOver() : gameOver();
-  if (autoMode) {
-    autoSpeed = (autoSettings.speed === 'x1') ? 1 : 2;
-  }
+  autoSpeed = preferredCombatSpeed();
   battle = {
     pTeam: team, eTeam: enemies,
     items: opts.tower ? tower.items : run.items,
@@ -5353,6 +5738,7 @@ function startBattle(enemies, opts) {
     timer: null,
     round: 1,
     switchUsed: false,
+    itemBuffs: new Map(),
     teamTotals: {p: team.length, e: enemies.length},
   };
   enemies.forEach(e => registerDex(e.id));
@@ -5377,6 +5763,14 @@ function startBattle(enemies, opts) {
   scheduleRound(900);
 }
 
+function battleItemMult(f, stat) {
+  return 1 + ((!battle || battle.over) ? 0 : battle.itemBuffs?.get(f)?.[stat] || 0);
+}
+function combatStatsHTML(f) {
+  return `      <span class="combat-stat">⚔️ ATQ ${Math.floor(f.atk * battleItemMult(f,'atk'))}${battleItemMult(f,'atk') > 1 ? ' ↑' : ''}</span>
+      <span class="combat-stat">🛡️ DEF ${Math.floor(f.def * battleItemMult(f,'def'))}${battleItemMult(f,'def') > 1 ? ' ↑' : ''}</span>
+      <span class="combat-stat">⚡ VEL ${f.spd}</span>`;
+}
 function hpBarClass(f) {
   const p = f.hp / f.maxhp;
   return p < 0.25 ? 'crit' : p < 0.5 ? 'low' : '';
@@ -5418,9 +5812,7 @@ function fighterCardHTML(f, side, idx, active) {
     </div>
     <div class="fcard-meters">${ultBarHTML}</div>
     <div class="fcard-stats-mini" style="font-size:7.5px;color:#eee;text-align:center;margin:2px 0;background:rgba(0,0,0,0.3);padding:2px 4px;border-radius:3px;">
-      <span class="combat-stat">⚔️ ATQ ${f.atk}</span>
-      <span class="combat-stat">🛡️ DEF ${f.def}</span>
-      <span class="combat-stat">⚡ VEL ${f.spd}</span>
+      ${combatStatsHTML(f)}
     </div>
     <div class="fcard-sprite" data-character="${f.id}">
       <span class="sprite ${side === 'e' ? 'flip' : ''}">${charIcon(f.id, 64)}</span>
@@ -5455,21 +5847,9 @@ function showBattleCrew() {
 
 function controlsHTML() {
   const b = battle;
-  let html = '<div class="battle-control-row battle-items" aria-label="Objetos">';
-  let hasItems = false;
-  for (const id of ['carne', 'carnereal', 'bocadillo', 'sake']) {
-    if (b.items[id] > 0) {
-      hasItems = true;
-      html += `<button class="btn small blue" data-ctl="item" data-arg="${id}" title="${ITEMS[id].name}">${ITEMS[id].emoji} ×${b.items[id]}</button>`;
-    }
-  }
-  if (!hasItems) html += '<span class="battle-no-items">Sin objetos de combate</span>';
-  html += '</div><div class="battle-control-row battle-tools" aria-label="Controles del combate">';
+  let html = '<div class="battle-control-row battle-tools" aria-label="Controles del combate">';
   html += `<button class="btn small gray battle-crew-button" data-ctl="crew">👥 BANDAS</button>`;
-  html += `<button class="btn small gray" data-ctl="speed" title="Atajo: barra espaciadora">⏩ VELOCIDAD x${b.speed}</button>`;
-  html += `<button class="btn small gray" data-ctl="info">🧩 SINERGIAS Y TIPOS</button>`;
   html += '</div><div class="battle-control-row battle-exit" aria-label="Salir del combate">';
-  if (b.opts.wild && !b.tower) html += `<button class="btn small red" data-ctl="run">🏃 HUIR</button>`;
   if (b.tower) html += `<button class="btn small red" data-ctl="quit">🏳️ RENDIRSE</button>`;
   return html + '</div>';
 }
@@ -5520,7 +5900,7 @@ function renderBattle(logLines) {
   const b = battle;
   const eHead = b.opts.wild ? '🌊' : b.opts.boss ? '💀' : '⚓';
   render(`
-    ${topbar(!b.tower)}
+    ${topbar(!b.tower, !b.tower, true, b.opts.wild && !b.tower)}
     <div class="battle-layout">
       <div class="battle-main">
         <div class="battle-cols" style="--scene:url('${b.tower ? '/art/scenes/marineford.webp' : (SAGAS[run?.saga || 0]?.img || '/art/scenes/eastblue.webp')}')">
@@ -5540,7 +5920,10 @@ function renderBattle(logLines) {
           </div>
         </div>
         <div class="battle-reserves" id="battle-reserves"></div>
-        <div class="battle-log" id="battle-log">${logLines.map(l => `<div>${l}</div>`).join('')}</div>
+        <div class="battle-lower-panels">
+          <section class="battle-log-panel"><h3>REGISTRO</h3><div class="battle-log" id="battle-log">${logLines.map(l => `<div>${l}</div>`).join('')}</div></section>
+          <section id="battle-backpack" aria-label="Mochila de combate"></section>
+        </div>
       </div>
       <div class="battle-sidebar" id="battle-controls">${controlsHTML()}</div>
     </div>
@@ -5572,6 +5955,7 @@ function renderBattle(logLines) {
       }
     });
   });
+  refreshBattleBackpack();
   keepActiveFightersVisible();
 }
 
@@ -5584,15 +5968,18 @@ function renderBattlePreserveLog() {
 function refreshControls() {
   const el = $('#battle-controls');
   if (el) { el.innerHTML = controlsHTML(); bindControls(); }
+  refreshBattleBackpack();
 }
 
 function log(msg) {
   const el = $('#battle-log');
   if (!el) return;
+  const follow = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
   const d = document.createElement('div');
   d.innerHTML = msg;
   el.appendChild(d);
-  while (el.children.length > 5) el.removeChild(el.firstChild);
+  while (el.children.length > 30) el.removeChild(el.firstChild);
+  if (follow) el.scrollTop = el.scrollHeight;
 }
 
 function keepActiveFightersVisible() {
@@ -5629,6 +6016,8 @@ function refreshHPCards() {
       if (ultBar) ultBar.style.width = clamp(f.ultCharge || 0, 0, 100) + '%';
       const xpEl = card.querySelector('.xp-progress');
       if (xpEl) xpEl.outerHTML = xpBarHTML(f);
+      const statsEl = card.querySelector('.fcard-stats-mini');
+      if (statsEl) statsEl.innerHTML = combatStatsHTML(f);
       const stEl = card.querySelector('.fcard-st');
       if (stEl) stEl.textContent = stIcons(f);
       const pEl = card.querySelector('.fcard-passive');
@@ -5707,8 +6096,8 @@ function calcDamage(att, dfd, mv, crit, variance) {
   if (isP(dfd, 'luffy') && mv.type === 'Rayo') eff = 0;
   const atkTeam = teamOf(att), defTeam = teamOf(dfd);
   // Categoría: físico usa ATQ vs DEF; especial usa ESP_ATQ vs ESP_DEF
-  let atkStat = (phys ? att.atk : att.spatk) * nakamaStatMult(atkTeam);
-  let defStat = (phys ? dfd.def : dfd.spdef) * nakamaStatMult(defTeam);
+  let atkStat = (phys ? att.atk : att.spatk) * nakamaStatMult(atkTeam) * battleItemMult(att,'atk');
+  let defStat = (phys ? dfd.def : dfd.spdef) * nakamaStatMult(defTeam) * battleItemMult(dfd,'def');
   const ar = passiveRule(att), dr = passiveRule(dfd);
   atkStat *= ar.attack || 1;
   defStat *= dr.defense || 1;
@@ -5930,12 +6319,12 @@ function effectiveSpeed(f) {
 function runRound() {
   const b = battle;
   if (!b || b.over || b.waiting) return;
-  if (autoMode) runAutoItems();
+  runAutoItems();
   const p = b.curP, e = b.curE;
   if (!p || !e || p.hp <= 0 || e.hp <= 0) return afterRound();
 
   // Modo auto: tira la Ultimate automáticamente si está cargada
-  if (autoMode && p.lvl >= 20 && (p.ultCharge || 0) >= 100) {
+  if (autoMode && autoSettings.useUltimates !== false && p.lvl >= 20 && (p.ultCharge || 0) >= 100) {
     useUltimate(p);
   }
 
@@ -6144,10 +6533,15 @@ function bindControls() {
 
 function cycleBattleSpeed() {
   const b = battle;
-  if (!b || b.over) return;
-  b.speed = { 1: 2, 2: 4, 4: 1 }[b.speed] || 1;
-  autoSpeed = b.speed;
-  refreshControls();
+  if (b?.over || (!b && !run)) return;
+  autoSpeed = { 1: 2, 2: 4, 4: 1 }[b ? b.speed : preferredCombatSpeed()] || 1;
+  combatSpeedOverride = autoSpeed;
+  if (b) { b.speed = autoSpeed; refreshControls(); }
+  const button = $('#btn-map-speed');
+  if (button) {
+    button.textContent = `⏩ x${autoSpeed}`;
+    button.setAttribute('aria-label', `Velocidad de combate x${autoSpeed}`);
+  }
 }
 
 // Atajo de teclado: la barra espaciadora cambia el multiplicador de velocidad en combate
@@ -6177,8 +6571,10 @@ function resumeBattle(delay) {
 function useBattleItem(id) {
   const item = ITEMS[id];
   const b = battle;
+  if (!isBattleItem(id) || !b || b.over || b.waiting || !(b.items[id] > 0)) return;
   if (item.kind === 'heal') {
     const f = b.curP;
+    if (!f || f.hp <= 0) return toast('No hay un nakama activo consciente.');
     if (f.hp >= f.maxhp) return toast('PS al máximo.');
     b.items[id]--;
     f.hp = Math.min(f.maxhp, f.hp + item.val);
@@ -6191,7 +6587,17 @@ function useBattleItem(id) {
     b.items[id]--;
     f.hp = Math.floor(f.maxhp * item.val);
     log(`¡${charName(f)} vuelve a la lucha! 🍶`);
+  } else if (item.kind === 'battleBoost') {
+    const f = b.curP;
+    if (!f || f.hp <= 0) return toast('No hay un nakama activo consciente.');
+    const buffs = b.itemBuffs.get(f) || {};
+    if (buffs[item.stat]) return toast(`${charName(f)} ya tiene esta mejora durante el combate.`);
+    b.items[id]--;
+    b.itemBuffs.set(f,{...buffs,[item.stat]:item.val});
+    log(`${item.emoji} ${charName(f)} usa ${item.name}: +${item.val * 100}% hasta el final del combate.`);
   }
+  if (!b.tower) saveRun();
+  refreshHPCards();
   refreshControls();
 }
 
@@ -6334,7 +6740,8 @@ function offerCrossoverPath(newVets, bossFame) {
   document.body.appendChild(ov);
   if (autoMode) {
     scheduleAutoStep(() => {
-      const btn = ov.querySelector('#cx-explore');
+      if(autoSettings.crossoverAction==='manual'){pauseAutoForChoice('Decide si quieres explorar el camino alternativo.');return;}
+      const btn = ov.querySelector(autoSettings.crossoverAction==='leave'?'#cx-finish':'#cx-explore');
       if (btn && document.body.contains(ov)) btn.click();
     }, 700);
   }
@@ -6384,7 +6791,8 @@ function doCrossoverEvent(island) {
   document.body.appendChild(ov);
   if (autoMode) {
     scheduleAutoStep(() => {
-      const btn = ov.querySelector('#cx-fight');
+      if(autoSettings.crossoverAction==='manual'){pauseAutoForChoice('Decide si aceptas el duelo crossover.');return;}
+      const btn = ov.querySelector(autoSettings.crossoverAction==='leave'?'#cx-leave':'#cx-fight');
       if (btn && document.body.contains(ov)) btn.click();
     }, 700);
   }
@@ -6634,7 +7042,8 @@ function screenTowerIntro() {
   startBtn.onclick = () => {
     if (picked.length !== 3) return;
     tower = { floor: startFloor, team: picked.map(id => applyUpgrades(makeChar(id, startLvl))), items: { bocadillo: 3, sake: 1 } };
-    towerNextBattle();
+    prepareBackpack(tower);
+    if (hasPendingLoot(tower)) showTowerBackpack(towerNextBattle); else towerNextBattle();
   };
 }
 
@@ -6662,8 +7071,8 @@ function endTowerBattle(victory) {
     }
   });
   tower.floor++;
-  if (tower.floor % 3 === 0) tower.items.bocadillo = (tower.items.bocadillo || 0) + 1;
-  towerNextBattle();
+  if (tower.floor % 3 === 0) receiveBackpackItem(tower,'bocadillo');
+  if (hasPendingLoot(tower)) showTowerBackpack(towerNextBattle); else towerNextBattle();
 }
 
 function towerGameOver() {
@@ -6772,8 +7181,7 @@ const UPG_STATS = [
 ];
 let shipBuyLock = 0;
 let shipSearchQ = '';
-let shipExpanded = {};
-let shipSagaExpanded = {};
+const shipTraining = { selected: null, saga: '', teamOnly: false, page: 0 };
 function groupUpgradeRoster(ids) {
   const groups = [...SAGAS.map(s => ({id:s.id,name:s.name})), {id:'crossover',name:'CROSSOVER'}, {id:'other',name:'OTROS'}];
   const known = new Set(groups.map(g => g.id));
@@ -6827,6 +7235,7 @@ function showSellStatsConfirmModal(id, spent, refund, onConfirm) {
 
 function screenShip() {
   playMusic('menu');
+  if (!run?.team?.length) shipTraining.teamOnly = false;
   const roster = meta.roster.filter(id => CHARS[id]);
   const accLvl = accountLevel();
   const maxLvl = maxUpgLvl();
@@ -6858,12 +7267,6 @@ function screenShip() {
     }
   });
 
-  const q = (shipSearchQ || '').trim().toLowerCase();
-  const filteredRoster = roster.filter(id => {
-    if (!q) return true;
-    return CHARS[id].name.toLowerCase().includes(q);
-  });
-
   render(`
     ${topbar(false)}
     <div class="shop-sticky-bar">
@@ -6873,6 +7276,25 @@ function screenShip() {
     <div class="panel">
       <h2>🏪 Tienda</h2>
       <p>Mejoras permanentes · Cuenta Nv${accLvl}</p>
+      <div class="global-upg-row">
+        <span class="upg-emoji">🎒</span><div class="upg-details"><b class="upg-name">Ampliar ambas mochilas</b>
+          <div class="upg-desc">${backpackCapacity()} casillas cada una · Pilas de ${backpackStackLimit()} · ${backpackCapacity() < 60 ? '+3 casillas en cada mochila y +1 unidad por pila' : 'Capacidad máxima'}</div>
+          ${backpackCapacity() < 60 ? `<span class="price">⭐${backpackUpgradeCost()} Fama</span>` : ''}</div>
+        <div class="upg-action"><button class="btn small green" id="btn-buy-backpack" ${backpackCapacity() >= 60 || meta.fame < backpackUpgradeCost() ? 'disabled' : ''}>${backpackCapacity() >= 60 ? 'MÁXIMO' : 'AMPLIAR +3'}</button></div>
+      </div>
+      <section class="ship-training" aria-label="Entrenamiento de nakamas">
+        <h2>Entrena a tu tripulación</h2>
+        <p>Elige un retrato y mejora sus stats.</p>
+        <div class="training-filters">
+          <input id="ship-search-q" aria-label="Buscar nakama" placeholder="Buscar nakama…" value="${(shipSearchQ || '').replace(/"/g, '&quot;')}">
+          <select id="ship-training-saga" aria-label="Filtrar por saga">
+            <option value="">Todas las sagas</option>
+            ${groupUpgradeRoster(roster).map(g => `<option value="${g.id}" ${shipTraining.saga === g.id ? 'selected' : ''}>${g.name}</option>`).join('')}
+          </select>
+          <button class="btn small gray" id="ship-training-team" aria-pressed="${shipTraining.teamOnly}" ${run?.team?.length ? '' : 'disabled'}>Mi equipo</button>
+        </div>
+        <div id="ship-roster-list"></div>
+      </section>
 
 
       <h2 style="font-size:11px;">👥 Casillas de Nakamas Iniciales</h2>
@@ -6932,38 +7354,48 @@ function screenShip() {
       }).join('')}
       </div>
 
-      <h2 style="font-size:11px;margin-top:16px;">⚓ Mi Barco — Entrenamiento de veteranos</h2>
-      <div style="margin:8px 0;">
-        <input id="ship-search-q" placeholder="🔎 Buscar veterano por nombre..." value="${(shipSearchQ || '').replace(/"/g, '&quot;')}" style="width:100%;padding:8px;border:2px solid var(--ink);font-family:inherit;font-size:9px;background:#fff;">
-      </div>
-      <div id="ship-roster-list"></div>
+
     </div>
   `);
 
   const renderRosterUI = () => {
-    const q = (shipSearchQ || '').trim().toLowerCase();
-    const filteredRoster = roster.filter(id => {
-      if (!q) return true;
-      return CHARS[id].name.toLowerCase().includes(q);
-    });
+    const q = (shipSearchQ || '').trim().toLocaleLowerCase('es');
+    const teamIds = new Set((run?.team || []).map(f => baseFormOf(f.id)));
+    const filteredRoster = groupUpgradeRoster(roster)
+      .filter(g => !shipTraining.saga || g.id === shipTraining.saga)
+      .flatMap(g => g.ids)
+      .filter(id => (!shipTraining.teamOnly || teamIds.has(baseFormOf(id))) && CHARS[id].name.toLocaleLowerCase('es').includes(q));
     const container = $('#ship-roster-list');
     if (!container) return;
+    const pageSize = 8;
+    const pages = Math.max(1, Math.ceil(filteredRoster.length / pageSize));
+    shipTraining.page = Math.min(shipTraining.page, pages - 1);
+    if (!filteredRoster.includes(shipTraining.selected)) shipTraining.selected = filteredRoster[0] || null;
+    const visible = filteredRoster.slice(shipTraining.page * pageSize, (shipTraining.page + 1) * pageSize);
+    const fame = document.querySelector('.shop-fame');
+    if (fame) fame.textContent = `⭐ ${meta.fame.toLocaleString('es')} Fama`;
+    document.querySelectorAll('[data-global],#btn-buy-starter-slot,#btn-buy-capitania').forEach(btn => {
+      const item = btn.dataset.global ? GLOBAL_ITEMS[btn.dataset.global] : btn.id === 'btn-buy-starter-slot' ? nextSlot : nextCap;
+      const can = !item.maxed && !(btn.dataset.global && meta.global[btn.dataset.global]) && accLvl >= item.lvl && meta.fame >= item.cost;
+      btn.disabled = !can;
+      btn.classList.toggle('green', can);
+      btn.classList.toggle('gray', !can);
+    });
 
     const cardHTML = id => {
       const c = CHARS[id];
       const u = meta.upgrades[id] || {};
-      const isExpanded = !!shipExpanded[id];
+      const isExpanded = true;
       const totalStats = UPG_STATS.reduce((acc, [st]) => acc + (u[st] || 0), 0);
       const totalSpent = charTotalUpgSpent(id);
       const refund = Math.floor(totalSpent * 0.5);
       return `<div class="ship-card-acc">
-        <div class="ship-card-header" data-toggle-ship="${id}">
+        <div class="ship-card-header">
           <span class="emoji">${charIcon(id, 28)}</span>
           <div style="flex:1;">
             <b>${c.name}</b> ${typeBadges(c.types)}<br>
             <small style="color:#666;font-size:7px;">Stats mejorados: <b>${totalStats}</b> (Límite: Nv${maxLvl})</small>
           </div>
-          <button class="btn small gray">${isExpanded ? '▲ CERRAR' : '▼ MEJORAR'}</button>
         </div>
         ${isExpanded ? `
           <div class="ship-card-body">
@@ -6974,9 +7406,9 @@ function screenShip() {
         const maxed = lvl >= maxLvl;
         const can = !maxed && meta.fame >= cost;
         return `<div class="upg">
-                  <span class="upg-label">${label} ${lvl}/${maxLvl}</span>
+                  <span class="upg-label">${label} ${lvl}/${maxLvl}</span><small class="training-gain">${desc}</small>
                   <button class="btn small ${can ? 'green' : 'gray'}" data-up="${id}" data-stat="${stat}"
-                    title="${desc}" ${can ? '' : 'disabled'}>${maxed ? 'MÁX' : `⭐${cost}`}</button>
+                    aria-label="Mejorar ${label} de ${c.name}: ${desc}, ${cost} Fama" title="${desc}" ${can ? '' : 'disabled'}>${maxed ? 'MÁX' : `⭐${cost}`}</button>
                 </div>`;
       }).join('')}
             </div>
@@ -6994,21 +7426,33 @@ function screenShip() {
         ` : ''}
       </div>`;
     };
-    const groups = groupUpgradeRoster(filteredRoster);
-    container.innerHTML = groups.length ? groups.map((group, index) => `
-      <details class="ship-saga" data-upgrade-saga="${group.id}" ${(q || shipSagaExpanded[group.id] === true || (shipSagaExpanded[group.id] === undefined && index === 0)) ? 'open' : ''}>
-        <summary><span>${group.name}</span><span>${group.ids.length} ${group.ids.length === 1 ? 'nakama' : 'nakamas'}</span></summary>
-        <div class="ship-saga-list">${group.ids.map(cardHTML).join('')}</div>
-      </details>`).join('') : '<p>No se han encontrado veteranos con ese nombre.</p>';
-    container.querySelectorAll('[data-upgrade-saga]').forEach(section => {
-      section.ontoggle = () => { shipSagaExpanded[section.dataset.upgradeSaga] = section.open; };
-    });
-
-    container.querySelectorAll('[data-toggle-ship]').forEach(hdr => {
-      hdr.onclick = () => {
-        const id = hdr.dataset.toggleShip;
-        shipExpanded[id] = !shipExpanded[id];
+    container.innerHTML = `<div class="training-layout">
+      <div class="training-picker">
+        <div class="training-portraits">${visible.map(id => `<button type="button" class="training-portrait" data-train="${id}" aria-pressed="${id === shipTraining.selected}">
+          ${charIcon(id,48)}<span>${CHARS[id].name}</span><small>${'⭐'.repeat(CHARS[id].rareza)}</small>
+        </button>`).join('') || '<p>No hay nakamas con estos filtros.</p>'}</div>
+        <nav class="training-pages" aria-label="Páginas de nakamas">
+          <button class="btn small gray" data-training-page="-1" aria-label="Página anterior" ${shipTraining.page === 0 ? 'disabled' : ''}>←</button>
+          <span aria-live="polite">${shipTraining.page + 1} / ${pages} · ${filteredRoster.length} nakamas</span>
+          <button class="btn small gray" data-training-page="1" aria-label="Página siguiente" ${shipTraining.page >= pages - 1 ? 'disabled' : ''}>→</button>
+        </nav>
+      </div>
+      <div class="training-detail" aria-label="Stats del nakama seleccionado">${shipTraining.selected ? cardHTML(shipTraining.selected) : '<p>Cambia los filtros para elegir un nakama.</p>'}</div>
+    </div>`;
+    container.querySelectorAll('[data-train]').forEach(btn => {
+      btn.onclick = () => {
+        shipTraining.selected = btn.dataset.train;
         renderRosterUI();
+        container.querySelector(`[data-train="${shipTraining.selected}"]`)?.focus({preventScroll:true});
+      };
+    });
+    container.querySelectorAll('[data-training-page]').forEach(btn => {
+      btn.onclick = () => {
+        const direction = btn.dataset.trainingPage;
+        shipTraining.page += Number(direction);
+        renderRosterUI();
+        const next = container.querySelector(`[data-training-page="${direction}"]`);
+        (next?.disabled ? container.querySelector('[data-train]') : next)?.focus({preventScroll:true});
       };
     });
 
@@ -7027,7 +7471,8 @@ function screenShip() {
         u[stat] = lvl + 1;
         saveMeta();
         toast(`✨ ${CHARS[id].name}: ${stat.toUpperCase()} sube a Nv.${u[stat]}`);
-        screenShip();
+        renderRosterUI();
+        container.querySelector(`[data-up="${id}"][data-stat="${stat}"]`)?.focus({preventScroll:true});
       };
     });
 
@@ -7044,7 +7489,7 @@ function screenShip() {
           delete meta.upgrades[id];
           saveMeta();
           toast(`💰 Has recibido ⭐${refund} Fama al vender las mejoras de ${c.name}.`);
-          screenShip();
+          renderRosterUI();
         });
       };
     });
@@ -7054,8 +7499,23 @@ function screenShip() {
 
   $('#btn-back').onclick = screenHome;
   const searchInput = $('#ship-search-q');
-  if (searchInput) searchInput.oninput = e => { shipSearchQ = e.target.value; renderRosterUI(); };
+  if (searchInput) searchInput.oninput = e => { shipSearchQ = e.target.value; shipTraining.page = 0; renderRosterUI(); };
+  $('#ship-training-saga').onchange = e => { shipTraining.saga = e.target.value; shipTraining.page = 0; renderRosterUI(); };
+  $('#ship-training-team').onclick = e => {
+    shipTraining.teamOnly = !shipTraining.teamOnly;
+    shipTraining.page = 0;
+    e.currentTarget.setAttribute('aria-pressed', String(shipTraining.teamOnly));
+    renderRosterUI();
+  };
 
+  const backpackBtn = $('#btn-buy-backpack');
+  if (backpackBtn) backpackBtn.onclick = () => {
+    if (Date.now() - shipBuyLock < 300) return;
+    shipBuyLock = Date.now();
+    if (!buyBackpackUpgrade()) return;
+    screenShip();
+    toast(`🎒 Ambas mochilas ampliadas a ${backpackCapacity()} casillas cada una y pilas de ${backpackStackLimit()}.`);
+  };
   const buySlotBtn = $('#btn-buy-starter-slot');
   if (buySlotBtn) {
     buySlotBtn.onclick = () => {
@@ -7104,30 +7564,6 @@ function screenShip() {
     };
   });
 
-  document.querySelectorAll('[data-toggle-ship]').forEach(el => {
-    el.onclick = () => {
-      const id = el.dataset.toggleShip;
-      shipExpanded[id] = !shipExpanded[id];
-      screenShip();
-    };
-  });
-
-  document.querySelectorAll('[data-up]').forEach(btn => {
-    btn.onclick = () => {
-      if (Date.now() - shipBuyLock < 300) return;
-      shipBuyLock = Date.now();
-      const id = btn.dataset.up, stat = btn.dataset.stat;
-      const u = meta.upgrades[id] = meta.upgrades[id] || {};
-      const lvl = u[stat] || 0;
-      const cost = upgCost(lvl);
-      if (lvl >= maxLvl || meta.fame < cost) return;
-      meta.fame -= cost;
-      u[stat] = lvl + 1;
-      saveMeta();
-      toast(`${CHARS[id].name}: ${stat.toUpperCase()} mejorado ⭐`);
-      screenShip();
-    };
-  });
 }
 
 // ============ DEX PIRATA ============
