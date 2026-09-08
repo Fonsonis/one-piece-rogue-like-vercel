@@ -4,6 +4,7 @@ import {combatHarness} from './balance-harness.mjs';
 
 test('Luffy keeps his base stats and evolves at 20/35/70/100 with matching stars and signatures',()=>{
  const h=combatHarness();
+ h.exec('maxStartLvlCap=()=>100;meta.charUpgrades={luffy:95};');
  assert.deepEqual(Array.from(h.exec('CHARS.luffy.base')),[24,12,8,10,7,10]);
  for(const [lvl,id,stars,ult] of [[5,'luffy',1,'gatlinggoma'],[19,'luffy',1,'gatlinggoma'],[20,'luffy2',2,'jetgatling'],[34,'luffy2',2,'jetgatling'],[35,'luffy3',3,'elephantgatling'],[69,'luffy3',3,'elephantgatling'],[70,'luffy4',4,'kingkonggun'],[99,'luffy4',4,'kingkonggun'],[100,'luffy5',5,'bajranggun']]){
   assert.equal(h.exec(`makeChar('luffy',${lvl}).id`),id);
@@ -12,15 +13,16 @@ test('Luffy keeps his base stats and evolves at 20/35/70/100 with matching stars
   assert.equal(h.exec(`baseFormOf('${id}')`),'luffy');
  }
  for(const lvl of [20,35,70,100]) {
-  assert.equal(h.exec(`(()=>{const f=applyUpgrades(makeChar('luffy',${lvl-1}));f.hp=1;gainXP(f,xpForLevel(f.lvl));return f.id===luffyFormAt('luffy',${lvl})&&f.lvl===${lvl}&&f.moves.length<=2&&f.maxhp===makeChar('luffy',${lvl}).maxhp;})()`),true);
+  assert.equal(h.exec(`(()=>{const f=applyUpgrades(makeChar('luffy',${lvl-1}));f.hp=1;gainXP(f,xpForLevel(f.lvl));return f.id===evolutionFormAt('luffy',${lvl})&&f.lvl===${lvl}&&f.moves.length<=2&&f.maxhp===makeChar('luffy',${lvl}).maxhp;})()`),true);
  }
  assert.equal(h.exec(`(()=>{const f=makeChar('luffy',100);gainXP(f,999999);return f.id==='luffy5'&&f.lvl===100&&xpBarHTML(f).includes('Nivel máximo');})()`),true);
- assert.equal(h.exec("makeChar('luffy5',5).id"),'luffy5','Dex previews retain the explicitly selected form');
+ assert.equal(h.exec("makeChar('luffy5',5,false,true).id"),'luffy5','Dex previews retain the explicitly selected form');
  assert.equal(h.exec("xpBarHTML(makeChar('luffy',99)).includes('siguiente nivel 100')"),true);
 });
 
 test('old Luffy saves migrate once, preserving HP deficit, KO, XP, boosts, fusion and upgrades',()=>{
  const h=combatHarness();
+ h.exec('maxStartLvlCap=()=>100;meta.charUpgrades={luffy:95};');
  for(const [lvl,dead] of [[30,false],[35,false],[70,false],[100,false],[100,true]]) {
   assert.equal(h.exec(`(()=>{
    const f=makeChar('luffy2',${lvl},true);delete f.gearRulesVersion;
@@ -39,13 +41,14 @@ test('old Luffy saves migrate once, preserving HP deficit, KO, XP, boosts, fusio
 
 test('fusion crossing multiple Gear levels uses final form stats and starting inventory rarity',()=>{
  const h=combatHarness();
+ h.exec('maxStartLvlCap=()=>100;meta.charUpgrades={luffy:95};');
  assert.equal(h.exec(`(()=>{
   const f=makeChar('luffy',10);run={mode:'classic',saga:0,team:[f],items:{}};
   addToTeam(makeChar('luffy',100));const base=makeChar('luffy',100);
   return f.id==='luffy5'&&f.maxhp===base.maxhp+Math.floor(base.maxhp*.05)&&f.hp===f.maxhp&&f.stars===1&&f.moves.includes('stargun');
  })()`),true);
  h.exec(`maxStartLvlCap=()=>100;meta.charUpgrades={luffy:65};`);
- assert.deepEqual(Array.from(h.exec("filterSortChars(['luffy','bandido'],{rarity:4},id=>luffyFormAt(id,startLvlOf(id)))")),['luffy']);
+ assert.deepEqual(Array.from(h.exec("filterSortChars(['luffy','bandido'],{rarity:4},id=>evolutionFormAt(id,startLvlOf(id)))")),['luffy']);
 });
 
 test('each defeated enemy grants 3/4/7 Log Poses in East Blue, scaled across all sagas, without duplicate claims',()=>{

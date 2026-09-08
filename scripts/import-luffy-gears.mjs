@@ -1,5 +1,5 @@
 // Pack the three image_gen sheets into the existing four-cell animation format.
-// Usage: node scripts/import-luffy-gears.mjs (requires the local sharp dev tool).
+// Usage: node scripts/import-luffy-gears.mjs [luffy3] (requires the local sharp dev tool).
 import fs from 'node:fs';
 import sharp from 'sharp';
 import {createHash} from 'node:crypto';
@@ -11,12 +11,18 @@ function box(data,width,height,left=0,right=width){
  for(let y=0;y<height;y++)for(let x=left;x<right;x++)if(data[(y*width+x)*4+3]){x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x+1);y1=Math.max(y1,y+1);}
  return [x0,y0,x1,y1];
 }
-for(const [id,cuts,ratio] of [
- ['luffy3',[0,480,935,1715,2172],1],
+for(const [id,cuts,ratio,chromaGreen=false] of [
+ ['luffy3',[0,500,1020,1740,2169],1,true],
  ['luffy4',[0,435,970,1707,2172],1.2],
  ['luffy5',[0,474,943,1684,2172],1]
 ]){
+ const selected=process.argv.slice(2);
+ if(selected.length&&!selected.includes(id))continue;
  const {data,info}=await sharp(`docs/luffy-art-sources/${id}.png`).ensureAlpha().raw().toBuffer({resolveWithObject:true});
+ // Generated sheets can use a solid green key; retain the character and steam colors.
+ if(chromaGreen)for(let i=0;i<data.length;i+=4){
+  if(data[i+1]>data[i]+35&&data[i+1]>data[i+2]+35)data[i+3]=0;
+ }
  // Quantize soft transparency for crisp pixel art; discard imperceptible alpha noise.
  for(let i=3;i<data.length;i+=4)data[i]=data[i]>=128?255:0;
  const bounds=cuts.slice(0,4).map((x,i)=>box(data,info.width,info.height,x,cuts[i+1]));

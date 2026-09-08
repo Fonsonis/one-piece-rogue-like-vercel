@@ -74,11 +74,12 @@ test('unlucky full teams terminate even when all attacks miss',()=>{
 
 test('canonical signatures and learned Haki; XP and evolution keep two moves',()=>{
  const h=combatHarness();
+ h.exec('maxStartLvlCap=()=>100;meta.charUpgrades={luffy:25,zoro:15,nami:15,usopp:17,coby:11};');
  assert.ok(h.exec(`(()=>{
   const luffy=makeChar('luffy2',30),enel=makeChar('enel',30);
   battle={pTeam:[luffy],eTeam:[enel],curP:luffy,curE:enel,round:1};
   if(!hasHaki(luffy)||calcDamage(enel,luffy,MOVES.descarga,false,1).dmg!==0)return false;
-  for(const [id,m] of Object.entries(SIGNATURE_MOVES))if(CHARS[id]&&getUltimateMove(makeChar(id,35))!==MOVES[m])return false;
+  for(const [id,m] of Object.entries(SIGNATURE_MOVES))if(CHARS[id]&&getUltimateMove(makeChar(id,35,false,true))!==MOVES[m])return false;
   const f=makeChar('luffy',19);f.xp=xpForLevel(19)-1;gainXP(f,1);
   if(f.id!=='luffy2'||f.lvl!==20||f.xp!==0||f.moves.length!==2)return false;
   f.xp=xpForLevel(20)/2;

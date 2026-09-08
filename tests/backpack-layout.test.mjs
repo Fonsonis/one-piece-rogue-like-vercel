@@ -3,6 +3,17 @@ import assert from 'node:assert/strict';
 import {combatHarness} from './balance-harness.mjs';
 function setup(){const h=combatHarness();h.exec("screenMap=()=>{};storyMode='classic';selectedDiff=1;startRun(0,['luffy']);run.items={};run.bagLayout={};run.pendingLoot={};");return h;}
 
+test('pending loot pauses automatic progression and cancels its timer instead of refreshing forever',()=>{
+ const h=setup();
+ h.ctx.document.querySelector=()=>null;
+ h.exec(`run.pendingLoot={cartel:1};autoMode=true;let redraws=0;screenMap=page=>{if(page===2)redraws++;};
+ scheduleAutoStep(()=>{throw Error('stale auto step');},750);advanceAutoNode(0,0);`);
+ assert.equal(h.exec('autoMode'),false);assert.equal(h.exec('autoTimer'),null);
+ assert.equal(h.exec('redraws'),1);assert.equal(h.pending(),0);
+ h.exec('advanceAutoNode(0,0);');assert.equal(h.exec('redraws'),1);
+ assert.equal(h.exec('run.pendingLoot.cartel'),1);
+});
+
 test('rectangular footprints reject row wrapping, bottom overflow and overlap',()=>{
  const h=setup();
  assert.equal(h.exec('backpackCells(2,2,false).length'),0);

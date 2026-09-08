@@ -31,8 +31,8 @@
       for(const match of matches){
         fragment.append(value.slice(offset,match.index));
         const index=icons.get(match[0]), icon=document.createElement('span');
-        icon.className='event-sprite'+(index>=36?' ui-sprite':'');icon.setAttribute('role','img');icon.setAttribute('aria-label',labels[index]);
-        icon.style.backgroundPosition=`${index%6*20}% ${Math.floor(index%36/6)*20}%`;
+        icon.className='event-sprite'+(index===17?' crossguild-sprite':index>=36?' ui-sprite':'');icon.setAttribute('role','img');icon.setAttribute('aria-label',labels[index]);
+        if(index!==17)icon.style.backgroundPosition=`${index%6*20}% ${Math.floor(index%36/6)*20}%`;
         fragment.append(icon);offset=match.index+match[0].length;
       }
       fragment.append(value.slice(offset));text.replaceWith(fragment);

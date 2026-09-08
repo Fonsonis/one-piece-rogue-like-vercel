@@ -40,6 +40,7 @@ document.querySelector('#qa-cartels').onclick=()=>{qaRun();renderSpecialGacha(35
 document.querySelector('#qa-islands').onclick=()=>{qaStop();run=null;screenIslands(0);};
 document.querySelectorAll('[data-qa-gear]').forEach(button=>button.onclick=()=>{
  qaStop();const n=+button.dataset.qaGear,lvl={2:20,3:35,4:70,5:100}[n];
+ meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.charUpgrades={...meta.charUpgrades,luffy:lvl-5};
  run={mode:'classic',saga:0,islandIdx:0,diff:1,team:[makeChar('luffy',lvl)],items:{carne:2},berries:300};
  battle=null;startBattle([makeChar('kaido',lvl,true)],{wild:true});pauseBattle();
 });

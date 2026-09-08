@@ -21,6 +21,18 @@ function harness(memory = new Map(), blocked = false) {
   return {run,memory,messages,ctx};
 }
 
+test('imports resolve evolution against imported permanent levels, independently of the current profile',()=>{
+ for(const [currentLevel,importedLevel,expected] of [[100,15,'luffy'],[15,35,'luffy3']]){
+  const h=harness();
+  h.run(`meta.charUpgrades={luffy:${currentLevel-5}};meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));
+   const incoming=GameSaveStorage.payload({...meta,charUpgrades:{luffy:${importedLevel-5}}},{...sampleRun(),team:[makeChar('luffy5',100,true)]});
+   importSaveFile({size:100,text:JSON.stringify(incoming)});`);
+  assert.equal(h.run('run.team[0].id'),expected);
+  assert.equal(h.run('startLvlOf("luffy")'),importedLevel);
+  assert.equal(JSON.parse(h.memory.get('oplike_save')).run.team[0].id,expected);
+ }
+});
+
 test('manual save overwrites a single JSON and a fresh game restores all progress',()=>{
   const h=harness();
   h.run("run=sampleRun(); meta.fame=41; meta.runnerBest=123; manualSave();");
