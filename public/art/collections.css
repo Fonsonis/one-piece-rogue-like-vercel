@@ -1,0 +1,138 @@
+/* Readable collection dialogs; game rewards, levels and saved preferences stay in game.js. */
+.collection-overlay { padding:16px; }
+.modal.collection-modal {
+  --collection-ink:#203c48; --collection-muted:#52646b; --collection-line:#c6d3cf;
+  --collection-surface:#fffdf6; --collection-soft:#eef3ef; --collection-ready:#166447;
+  width:100%; max-width:960px; height:min(850px,calc(100dvh - 32px)); max-height:calc(100dvh - 32px);
+  display:flex; flex-direction:column; gap:12px; overflow:hidden; padding:22px;
+  color:var(--collection-ink); background:var(--collection-surface); border:1px solid var(--collection-line);
+  border-top:5px solid #d9ab52; border-radius:20px; font:15px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;
+  box-shadow:0 22px 80px #08283350;
+}
+.collection-modal > :not(.collection-list) { flex-shrink:0; }
+.collection-modal :is(button,input,select,summary) { font:inherit; font-size:14px; }
+.collection-modal :is(button,summary) { cursor:pointer; }
+.collection-modal :is(button,input,select,summary):focus-visible,.collection-list:focus-visible,.achievement-card:focus-visible { outline:3px solid #1676b8; outline-offset:2px; }
+.collection-modal :is(h2,h3,p) { margin:0; color:inherit; }
+.collection-header { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.collection-header > div { min-width:0; }
+.collection-eyebrow { display:block; font-size:12px; letter-spacing:.06em; text-transform:uppercase; font-weight:750; color:var(--collection-muted); }
+.collection-modal .collection-header h2 { margin-top:2px; font:750 27px/1.2 system-ui,sans-serif; color:var(--collection-ink); text-align:left; }
+.collection-header h2:focus { outline:none; }
+.collection-modal .btn { min-height:44px; padding:8px 14px; border-radius:9px; border:1px solid var(--collection-line); box-shadow:0 2px 0 #153c4520; font:650 14px/1.3 system-ui,sans-serif; text-shadow:none; letter-spacing:0; }
+.collection-modal .btn.gray { color:var(--collection-ink); background:var(--collection-soft); }
+.collection-modal .btn.green { background:#176b4b; border-color:#176b4b; color:white; }
+.collection-modal .btn.gold { background:#edc66e; border-color:#b58b30; color:#332b16; }
+.collection-modal .btn:disabled { opacity:1; color:var(--collection-muted); background:var(--collection-soft); border-color:var(--collection-line); box-shadow:none; cursor:not-allowed; }
+.collection-close { display:flex; gap:10px; align-items:center; flex-shrink:0; }
+.collection-close > span { font:25px/1 system-ui,sans-serif; }
+.collection-summary { display:grid; grid-template-columns:1fr 1fr; gap:12px; padding:12px 16px; background:var(--collection-soft); border:1px solid var(--collection-line); border-radius:12px; }
+.collection-summary > :last-child { border-left:1px solid var(--collection-line); padding-left:16px; }
+.collection-summary strong { display:block; font-size:24px; line-height:1.2; color:var(--collection-ink); }
+.collection-summary small { font-size:15px; font-weight:500; }
+.collection-summary > * > span { display:block; margin-top:3px; color:var(--collection-muted); font-size:13px; }
+.collection-summary-action { padding:0; border:0; background:none; text-align:left; color:inherit; border-radius:3px; }
+.collection-summary-action:hover span { text-decoration:underline; }
+.collection-modal label { display:flex; flex-direction:column; min-width:0; gap:5px; font-size:13px; font-weight:650; }
+.collection-modal :is(input,select) { min-height:44px; width:100%; min-width:0; padding:9px 11px; border:1px solid #8ba3a6; border-radius:8px; background:var(--collection-surface); color:var(--collection-ink); }
+.collection-modal input::placeholder { color:var(--collection-muted); opacity:1; }
+.collection-search { display:grid; grid-template-columns:minmax(0,1.6fr) minmax(125px,1fr); gap:12px; }
+.collection-extra { border:1px solid var(--collection-line); border-radius:9px; background:var(--collection-soft); max-height:32dvh; overflow-y:auto; }
+.collection-extra summary { padding:10px 12px; min-height:44px; font-weight:650; color:var(--collection-ink); }
+.collection-filter-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; padding:0 12px 12px; }
+.collection-results { display:flex; justify-content:space-between; align-items:center; gap:8px; font-size:13px; color:var(--collection-muted); }
+.collection-text-button { min-height:44px; padding:5px 4px; border:0; background:none; color:var(--collection-ink); text-decoration:underline; text-underline-offset:3px; }
+.collection-list { flex:1 1 auto; min-height:110px; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; padding:4px; border-radius:8px; }
+.collection-pagination { display:flex; align-items:center; justify-content:space-between; gap:10px; padding-top:10px; border-top:1px solid var(--collection-line); }
+.collection-pagination > span { font-size:13px; text-align:center; color:var(--collection-muted); }
+.collection-empty { grid-column:1/-1; padding:30px 18px; text-align:center; color:var(--collection-muted); }
+.collection-empty h3 { font-size:17px; margin-bottom:8px; }
+.collection-help { font:15px/1.6 system-ui,sans-serif; }.collection-help p + p { margin-top:14px; }
+
+.achievement-card { display:grid; grid-template-columns:46px minmax(0,1fr) 118px; align-items:start; gap:14px; padding:17px; margin-bottom:10px; border:1px solid var(--collection-line); border-radius:12px; background:var(--collection-surface); }
+.achievement-card.ready { border:2px solid #5b9c80; padding:16px; background:linear-gradient(90deg,#eaf6ed,var(--collection-surface) 60%); }
+.achievement-icon { display:flex; justify-content:center; align-items:center; width:46px; height:46px; font-size:28px; background:var(--collection-soft); border-radius:10px; }
+.achievement-content { min-width:0; }
+.achievement-meta { display:flex; flex-wrap:wrap; gap:5px 12px; font-size:12px; color:var(--collection-muted); margin-bottom:5px; }
+.achievement-status { font-weight:750; }
+.ready .achievement-status,.claimed .achievement-status { color:var(--collection-ready); }
+.collection-modal .achievement-card h3 { font:750 16px/1.35 system-ui,sans-serif; margin-bottom:5px; }
+.collection-modal .achievement-card p { font-size:14px; line-height:1.5; color:var(--collection-muted); }
+.achievement-progress { height:8px; border-radius:6px; background:#d9e2dd; overflow:hidden; margin-top:12px; }
+.achievement-progress i { display:block; height:100%; background:#26775c; border-radius:6px; }
+.achievement-count { display:flex; justify-content:space-between; font-size:12px; color:var(--collection-muted); margin-top:4px; font-variant-numeric:tabular-nums; }
+.achievement-reward { display:flex; flex-direction:column; gap:8px; text-align:right; }
+.achievement-reward strong { font-size:20px; line-height:1.3; color:var(--collection-ink); }
+.achievement-reward strong span { display:block; font-size:12px; font-weight:650; }
+.achievement-reward > span { font-size:12px; color:var(--collection-muted); }
+.achievement-reward .btn { width:100%; }
+
+.collection-modal #inv-cards-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); align-items:stretch; align-content:start; gap:12px; padding:4px; border:0; background:none; }
+.inventory-card { display:flex; flex-direction:column; min-width:0; border:1px solid var(--collection-line); border-radius:12px; padding:12px; background:var(--collection-surface); }
+.inventory-card.in-team { border-color:#508b78; box-shadow:inset 0 3px #508b78; }
+.inventory-card-top { display:flex; justify-content:space-between; align-items:center; gap:6px; color:var(--collection-muted); font-size:11px; }
+.inventory-rarity { flex-shrink:0; color:#745210; background:#fff0c6; border-radius:5px; padding:2px 5px; font-weight:750; }
+.inventory-profile { display:flex; flex-direction:column; align-items:center; justify-content:start; gap:6px; width:100%; flex:1; padding:6px 0; border:0; border-radius:7px; background:none; color:var(--collection-ink); text-align:center; }
+.inventory-profile:hover { background:var(--collection-soft); }
+.inventory-portrait { display:flex; align-items:center; justify-content:center; width:100%; height:94px; }
+.inventory-profile strong { font:750 16px/1.35 system-ui,sans-serif; overflow-wrap:anywhere; }
+.inventory-profile-link { font-size:12px; text-decoration:underline; text-underline-offset:2px; color:var(--collection-muted); }
+.inventory-level { display:flex; justify-content:space-between; align-items:center; margin:8px 0; padding:6px 8px; background:var(--collection-soft); border-radius:6px; color:var(--collection-muted); font-size:13px; }
+.inventory-level strong { font-size:19px; color:var(--collection-ink); }
+.inventory-card .type-badges { justify-content:center; flex-wrap:wrap; gap:4px; min-height:24px; }
+.collection-modal #inv-cards-grid .type-badge { font:650 10px/1.3 system-ui,sans-serif; padding:4px 6px; }
+.inventory-upgrade { display:flex; flex-direction:column; gap:7px; text-align:center; padding-top:11px; margin-top:11px; border-top:1px solid var(--collection-line); }
+.inventory-cost,.inventory-limit,.inventory-shortfall { font-size:12px; color:var(--collection-muted); }
+.inventory-cost strong { color:var(--collection-ink); }
+.inventory-shortfall { font-size:11px; }
+.collection-modal .inventory-filters { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.inventory-columns { display:none; }
+.inventory-columns small { display:block; font-size:12px; color:var(--collection-muted); }
+
+html[data-theme="dark"] .collection-modal { --collection-ink:#eff6f4; --collection-muted:#c1d0d1; --collection-line:#50676b; --collection-surface:#182e38; --collection-soft:#253f49; --collection-ready:#94e0b7; border-top-color:#d9ab52; }
+html[data-theme="dark"] .achievement-card.ready { background:linear-gradient(90deg,#1c4436,var(--collection-surface) 75%); border-color:#65ac87; }
+html[data-theme="dark"] .achievement-progress { background:#496365; } html[data-theme="dark"] .achievement-progress i { background:#6ccca2; }
+html[data-theme="dark"] .inventory-rarity { background:#503f1b; color:#ffe2a0; }
+html[data-theme="dark"] .collection-modal :is(button,input,select,summary):focus-visible { outline-color:#7bcaff; }
+
+@media(max-width:700px) {
+  .collection-overlay { padding:8px; }
+  .modal.collection-modal { height:calc(100dvh - 16px); max-height:calc(100dvh - 16px); padding:14px; border-radius:14px; gap:8px; }
+  .collection-modal .collection-header h2 { font-size:21px!important; }
+  .collection-summary { padding:10px 12px; gap:8px; }
+  .collection-summary > :last-child { padding-left:12px; }
+  .collection-summary strong { font-size:21px; }
+  .collection-summary > * > span { font-size:12px; }
+  .collection-modal .collection-search { gap:8px; grid-template-columns:minmax(0,1.2fr) minmax(120px,1fr); }
+  .collection-modal .inventory-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .collection-modal .inventory-filters .mobile-columns-control { display:flex; }
+  .inventory-columns { display:block; }
+  .achievement-card { grid-template-columns:34px minmax(0,1fr); gap:10px; padding:12px; }
+  .achievement-card.ready { padding:11px; }
+  .achievement-icon { width:34px; height:34px; font-size:24px; }
+  .achievement-reward { grid-column:2; flex-direction:row; align-items:center; justify-content:space-between; text-align:left; }
+  .achievement-reward strong { font-size:18px; }
+  .achievement-reward strong span { display:inline; }
+  .achievement-reward .btn { width:auto; min-width:114px; }
+  .collection-modal #inv-cards-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .inventory-card { padding:9px; }
+  .inventory-card-top { flex-wrap:wrap; gap:3px; }
+  .inventory-profile strong { font-size:14px; }
+  .inventory-portrait { height:80px; }
+  .collection-modal #inv-cards-grid .btn { min-height:44px; padding:8px 5px!important; font:650 13px/1.35 system-ui,sans-serif!important; }
+  .collection-modal #inv-cards-grid .type-badge { padding:3px 4px; font-size:10px; }
+  .inventory-level { padding:5px; flex-wrap:wrap; gap:3px; font-size:12px; }
+  .inventory-cost,.inventory-limit,.inventory-shortfall { overflow-wrap:anywhere; }
+  .collection-modal .collection-pagination .btn { padding:8px; font-size:13px; }
+  .collection-pagination { gap:6px; }
+}
+@media(max-width:480px) {
+  html[data-mobile-columns] .collection-modal #inv-cards-grid { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
+}
+@media(max-height:620px) {
+  .modal.collection-modal { display:block; height:auto; overflow-y:auto; }
+  .collection-modal > * + * { margin-top:10px; }
+  .collection-modal .collection-list { min-height:180px; max-height:55dvh; }
+  .collection-extra { max-height:none; }
+}
+@media(prefers-reduced-motion:reduce) { .collection-modal * { scroll-behavior:auto!important; } }
