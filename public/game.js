@@ -3759,7 +3759,7 @@ function startRun(sagaIdx, starterIds, islandIdx = 0) {
 
 // ============ PANTALLA: MAPA ============
 function screenMap(activePageIdx = 0) {
-  playMusic('menu');
+  playMusic('combat');
   runAutoItems(false);
   if (run && run.mode === 'nuzlocke' && run.team) {
     run.team = run.team.filter(f => f && f.hp > 0);
@@ -5215,7 +5215,7 @@ function modalConfirm(title, html, onYes, onNo) {
 
 // ============ TIENDA ============
 function screenShop() {
-  playMusic('menu');
+  playMusic('combat');
   const stock = PORT_SHOP_STOCK;
   const inventorySummary = Object.entries((run && run.items) || {})
     .filter(([, n]) => n > 0)
