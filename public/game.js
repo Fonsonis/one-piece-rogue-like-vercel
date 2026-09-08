@@ -387,6 +387,7 @@ const META_DEFAULTS = () => ({
   islandProgress: {}, // saga:mode:difficulty -> completed island indices
   teamPresets: { 1: [], 2: [], 3: [] },
   stats: { kills: 0, items: 0 },
+  sagaStats: {}, // sagaId -> repeatable achievement counters
   relics: [],
   soloWins: 0,
   logPoses: 0,
@@ -463,11 +464,13 @@ function saveMeta() { return persistLocalSave(); }
 function manualSave() {
   if (battle) return toast('💾 Termina el combate para guardar el viaje. El progreso se conserva en cada punto de guardado.');
   const write = () => {
-    if (persistLocalSave(run, true)) toast('💾 Partida guardada en este dispositivo');
+    prepareBackpack(run);
+    persistLocalSave(run, true);
+    return exportSave();
   };
   if (saveReadError) {
     modalConfirm('💾 ¿Sustituir el guardado?', 'No se pudo leer la copia anterior. Guardar la sustituirá por el progreso actual.', write);
-  } else write();
+  } else return write();
 }
 
 // ---------- Copias JSON portátiles, compatibles con el juego original ----------
@@ -542,6 +545,7 @@ function importSaveFile(file) {
   reader.readAsText(file);
 }
 function validateGameSave(data) {
+  if (Object.keys(data.meta.sagaStats || {}).some(id => !SAGAS.some(s => s.id === id))) throw new Error('Contadores de saga incompatibles.');
   for (const key of ['dex', 'recruited', 'roster', 'defeated']) {
     if (data.meta[key]?.some(id => !CHARS[id])) throw new Error('Personaje desconocido.');
   }
@@ -552,6 +556,16 @@ function validateGameSave(data) {
     if (!saga || !['classic','nuzlocke'].includes(mode) || !['1','2','3','4','5'].includes(diff) || islands.some(i=>i>=saga.islands.length)) throw new Error('Progreso de islas incompatible.');
   }
   if (!r) return;
+  const bagCapacity = 9 + (data.meta.global?.backpackTier || 0) * 3;
+  const stackLimit = 3 + (data.meta.global?.backpackTier || 0), occupied = [new Set(),new Set()];
+  for (const [key,pos] of Object.entries(r.bagLayout || {})) {
+    const [id,index] = key.split(':');
+    if (!ITEMS[id] || !/^\d+$/.test(index) || key !== `${id}:${Number(index)}`) throw new Error('Pila de mochila incompatible.');
+    if (Number(index) >= Math.ceil((r.items[id] || 0)/stackLimit)) continue; // A consumed stack may leave an old placement until the next checkpoint.
+    const cells = backpackCells(ITEMS[id].slotSize,pos.cell,pos.vertical,bagCapacity), used = occupied[+isBattleItem(id)];
+    if (cells.length !== ITEMS[id].slotSize || cells.some(c=>used.has(c))) throw new Error('Posición de mochila incompatible.');
+    cells.forEach(c=>used.add(c));
+  }
   if ([...Object.keys(r.items || {}), ...Object.keys(r.pendingLoot || {})].some(id => !Object.hasOwn(ITEMS,id))) throw new Error('Objeto desconocido en la mochila.');
   if (r.startingTeam?.some(id => !CHARS[id] || baseFormOf(id) !== id)) throw new Error('Equipo inicial incompatible.');
   if (!SAGAS[r.saga]?.islands[r.islandIdx] || r.team.some(f => !CHARS[f.id] || f.moves.some(id => !MOVES[id]))) throw new Error('Viaje incompatible.');
@@ -601,6 +615,7 @@ function gainFame(n) {
 let run = null; // partida actual (historia)
 function saveRun() {
   ensureStartingTeam(run);
+  prepareBackpack(run);
   if (run && run.mode === 'nuzlocke' && run.team) {
     run.team = run.team.filter(f => f && f.hp > 0);
   }
@@ -987,9 +1002,18 @@ function typeBadges(types) {
   ).join('')}</div>`;
 }
 
+function trackSagaStat(key, qty = 1) {
+  if (!run || battle?.tower || !['classic','nuzlocke'].includes(run.mode) || !SAGAS[run.saga]) return;
+  const sagaId = SAGAS[run.saga].id;
+  meta.sagaStats ||= {};
+  meta.sagaStats[sagaId] ||= {};
+  meta.sagaStats[sagaId][key] = (meta.sagaStats[sagaId][key] || 0) + qty;
+}
+
 function trackStat(key, qty = 1) {
   meta.stats = meta.stats || { kills: 0, items: 0 };
   meta.stats[key] = (meta.stats[key] || 0) + qty;
+  trackSagaStat(key, qty);
   saveMeta();
 }
 
@@ -1014,7 +1038,7 @@ function topbar(showBerries = false, showAuto = showBerries, showSpeed = false, 
       ${showAuto ? `<button class="btn small ${autoBtnClass}" id="btn-topbar-auto" title="Cambiar velocidad o activar/pausar modo auto">${autoLabel}</button>` : ''}
       <button class="btn small gray" id="btn-settings" title="Ajustes de juego">⚙️ AJUSTES</button>
       ${showSpeed ? `<button class="btn small gray" id="btn-map-speed" title="Velocidad de combate: x1, x2 o x4" aria-label="Velocidad de combate x${combatSpeed}" aria-live="polite">⏩ x${combatSpeed}</button>` : ''}
-      <button class="btn small green" id="btn-save" title="Guardar partida en este dispositivo" aria-label="Guardar partida en este dispositivo">💾</button>
+      <button class="btn small green" id="btn-save" title="Guardar partida como JSON" aria-label="Guardar partida como JSON">💾</button>
       ${showFlee ? '<button class="btn small red" data-ctl="run">🏃 HUIR</button>' : ''}
     </div>
   </div>`;
@@ -1502,7 +1526,7 @@ const PROGRESSIVE_ACHIEVEMENTS = [
     id: 'special_visit',
     title: 'Encuentros Especiales',
     emoji: '🌟',
-    desc: 'Visita nodos de piratas especiales.',
+    desc: 'Visita nodos de Crossguild.',
     goals: [5, 15, 35, 75, 150],
     fames: [50, 100, 180, 300, 500],
     check: () => (meta.stats && meta.stats.special_visit) || 0,
@@ -1538,6 +1562,33 @@ const PROGRESSIVE_ACHIEVEMENTS = [
   }
 ];
 
+// Preserve existing tiers and claims; append repeatable goals up to 10,000.
+const GLOBAL_PROGRESSIVE_ACHIEVEMENTS = [...PROGRESSIVE_ACHIEVEMENTS];
+for (const p of GLOBAL_PROGRESSIVE_ACHIEVEMENTS) {
+  p.legacyTierLimit = p.goals.length;
+  if (p.id === 'dex') continue; // Unique discoveries are bounded by the character roster.
+  for (const goal of [100,250,500,1000,2000,3500,5000,7500,10000]) {
+    if (goal <= p.goals.at(-1)) continue;
+    p.goals.push(goal);
+    p.fames.push(Math.ceil(p.fames.at(-1) * 1.35 / 50) * 50);
+  }
+}
+const SAGA_PROGRESSIVE_ACHIEVEMENTS = SAGAS.flatMap(saga =>
+  GLOBAL_PROGRESSIVE_ACHIEVEMENTS.filter(p => p.id !== 'dex').map(p => ({
+    id: `saga_prog_${saga.id}_${p.id}`,
+    sagaId: saga.id,
+    title: `${p.title} · ${saga.name}`, emoji: p.emoji,
+    desc: `${p.desc} Solo en ${saga.name}.`,
+    goals: [...p.goals], fames: [...p.fames],
+    check: () => {
+      if (p.id === 'sagas') return (meta.wins[saga.id] || 0) + (meta.nuzWins[saga.id] || 0);
+      if (p.id === 'nuzlocke_wins') return meta.nuzWins[saga.id] || 0;
+      return meta.sagaStats?.[saga.id]?.[p.id] || 0;
+    }
+  }))
+);
+PROGRESSIVE_ACHIEVEMENTS.push(...SAGA_PROGRESSIVE_ACHIEVEMENTS);
+
 const STATIC_ACHIEVEMENTS = [
   { id: 'solo_sailor', title: 'Lobo de Mar Solitario', emoji: '🐺', desc: 'Zarpa y completa una saga con solo 1 personaje.', goal: 1, check: () => (meta.soloWins || 0), fame: 300, cat: 'desafios' },
   { id: 'straw_hats', title: 'Los 10 Sombrero de Paja', emoji: '🏴‍☠️', desc: 'Desbloquea o recluta a los 10 nakamas principales.', goal: 10, check: () => STRAW_HAT_MEMBERS.filter(id => isNakamaUnlocked(id)).length, fame: 250, cat: 'desafios' },
@@ -1559,8 +1610,20 @@ const SAGA_DIFF_ACHIEVEMENTS = SAGA_DEFS.flatMap(s =>
     goal: 1,
     check: () => (meta.sagaDiffWins && meta.sagaDiffWins[s.id] && meta.sagaDiffWins[s.id][d.id]) ? 1 : 0,
     fame: 40 + d.id * 30,
-    cat: 'sagas'
+    sagaId: s.id, cat: 'sagas'
   }))
+);
+
+const ISLAND_DIFF_ACHIEVEMENTS = SAGAS.flatMap((saga, sagaIdx) =>
+  saga.islands.flatMap((island, islandIdx) => DIFFICULTIES.map(d => ({
+    id: `island_diff_${saga.id}_${islandIdx}_${d.id}`,
+    sagaId: saga.id, cat: 'islas', emoji: d.emoji,
+    title: `${island.name} · ${d.name}`,
+    desc: `Supera ${island.name} (${saga.name}) por primera vez en ${d.name}, en Clásico o Nuzlocke.`,
+    goal: 1,
+    check: () => ['classic','nuzlocke'].some(mode => completedIslands(sagaIdx,mode,d.id).includes(islandIdx)) ? 1 : 0,
+    fame: 25 * (sagaIdx + 1) * d.id * d.id
+  })))
 );
 
 function getClaimedProgTier(p) {
@@ -1574,13 +1637,13 @@ function getClaimedProgTier(p) {
       if (meta.claimedAch[legId]) count++;
     }
   }
-  return count;
+  return Math.min(count, p.legacyTierLimit || p.goals.length);
 }
 
 function getAchievementsInfo() {
   meta.claimedAch = meta.claimedAch || {};
   meta.claimedProg = meta.claimedProg || {};
-  const visibleStaticList = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS).filter(isVisibleAch);
+  const visibleStaticList = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS, ISLAND_DIFF_ACHIEVEMENTS).filter(isVisibleAch);
   const completedStaticCount = visibleStaticList.filter(a => a.check() >= a.goal).length;
   const completedProgTiers = PROGRESSIVE_ACHIEVEMENTS.reduce((acc, p) => acc + getClaimedProgTier(p), 0);
   const totalCompleted = completedStaticCount + completedProgTiers;
@@ -1606,14 +1669,33 @@ function isVisibleAch(a) {
   return true;
 }
 
+function claimAchievement(id, progressive = false) {
+  if (progressive) {
+    const p = PROGRESSIVE_ACHIEVEMENTS.find(a=>a.id===id);
+    if (!p) return 0;
+    const tier = getClaimedProgTier(p);
+    if (tier >= p.goals.length || p.check() < p.goals[tier]) return 0;
+    meta.claimedProg[id] = tier + 1;
+    gainFame(p.fames[tier]);
+    return p.fames[tier];
+  }
+  const a = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS,ISLAND_DIFF_ACHIEVEMENTS).find(a=>a.id===id);
+  if (!a || meta.claimedAch?.[id] || a.check() < a.goal) return 0;
+  meta.claimedAch ||= {};
+  meta.claimedAch[id] = true;
+  gainFame(a.fame);
+  return a.fame;
+}
+
 let currentAchCategory = 'all';
+let currentAchSaga = 'all';
 
 function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchCategory) {
   meta.claimedAch = meta.claimedAch || {};
   meta.claimedProg = meta.claimedProg || {};
   currentAchCategory = initialCategory;
 
-  const visibleStaticList = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS).filter(isVisibleAch);
+  const visibleStaticList = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS, ISLAND_DIFF_ACHIEVEMENTS).filter(isVisibleAch);
   const { totalCompleted, totalAchievements } = getAchievementsInfo();
 
   const renderProgCardHTML = p => {
@@ -1649,7 +1731,7 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
     const done = val >= a.goal;
     const claimed = !!meta.claimedAch[a.id];
     const pct = Math.min(100, Math.floor((val / a.goal) * 100));
-    return `<div class="achieve-row ${claimed ? 'done' : ''} ${a.id.startsWith('saga_diff_') ? 'native-difficulty' : ''}">
+    return `<div class="achieve-row ${claimed ? 'done' : ''} ${['sagas','islas'].includes(a.cat) ? 'native-difficulty' : ''}">
       <span class="emoji">${a.emoji}</span>
       <div class="info">
         <b>${a.title}</b> — <span style="color:var(--accent);">⭐+${a.fame} Fama</span><br>
@@ -1682,18 +1764,23 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
   };
 
   const renderModalContent = () => {
+    const inSaga = a => currentAchSaga === 'all' || (currentAchSaga === 'global' ? !a.sagaId : a.sagaId === currentAchSaga);
+    const progressive = PROGRESSIVE_ACHIEVEMENTS.filter(inSaga);
+    const staticList = visibleStaticList.filter(inSaga);
     let items = [];
     if (currentAchCategory === 'all') {
       items = [
-        ...PROGRESSIVE_ACHIEVEMENTS.map(getProgCardItem),
-        ...visibleStaticList.map(getStaticCardItem)
+        ...progressive.map(getProgCardItem),
+        ...staticList.map(getStaticCardItem)
       ];
     } else if (currentAchCategory === 'prog') {
-      items = PROGRESSIVE_ACHIEVEMENTS.map(getProgCardItem);
+      items = progressive.map(getProgCardItem);
     } else if (currentAchCategory === 'sagas') {
-      items = visibleStaticList.filter(a => a.id.startsWith('saga_diff_')).map(getStaticCardItem);
+      items = staticList.filter(a => a.cat === 'sagas').map(getStaticCardItem);
+    } else if (currentAchCategory === 'islas') {
+      items = staticList.filter(a => a.cat === 'islas').map(getStaticCardItem);
     } else if (currentAchCategory === 'desafios') {
-      items = visibleStaticList.filter(a => !a.id.startsWith('saga_diff_')).map(getStaticCardItem);
+      items = staticList.filter(a => a.cat === 'desafios').map(getStaticCardItem);
     }
 
     items.sort((a, b) => (b.canClaim ? 1 : 0) - (a.canClaim ? 1 : 0));
@@ -1708,7 +1795,12 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
       </p>
       <label class="achievement-filter" for="ach-category">Tipo de logro
         <select id="ach-category">
-          ${[['all', 'Todos'], ['prog', `🔄 Progresivos (${PROGRESSIVE_ACHIEVEMENTS.length})`], ['sagas', `📜 Sagas (${visibleStaticList.filter(a => a.id.startsWith('saga_diff_')).length})`], ['desafios', `🎯 Desafíos (${visibleStaticList.filter(a => !a.id.startsWith('saga_diff_')).length})`]].map(([value, label]) => `<option value="${value}" ${currentAchCategory === value ? 'selected' : ''}>${label}</option>`).join('')}
+          ${[['all', 'Todos'], ['prog', `🔄 Progresivos (${PROGRESSIVE_ACHIEVEMENTS.length})`], ['sagas', `📜 Sagas (${SAGA_DIFF_ACHIEVEMENTS.length})`], ['islas', `🏝️ Islas (${ISLAND_DIFF_ACHIEVEMENTS.length})`], ['desafios', `🎯 Desafíos (${visibleStaticList.filter(a => a.cat === 'desafios').length})`]].map(([value, label]) => `<option value="${value}" ${currentAchCategory === value ? 'selected' : ''}>${label}</option>`).join('')}
+        </select>
+      </label>
+      <label class="achievement-filter" for="ach-saga">Saga
+        <select id="ach-saga">
+          ${[['all','Todas'],['global','Globales'],...SAGAS.map(s => [s.id,s.name])].map(([id,name]) => `<option value="${id}" ${currentAchSaga === id ? 'selected' : ''}>${name}</option>`).join('')}
         </select>
       </label>
       <div class="achieve-list-container" style="max-height:340px;overflow-y:auto;">
@@ -1758,14 +1850,18 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
         bindEvents();
     };
 
+    ov.querySelector('#ach-saga').onchange = event => {
+      currentAchSaga = event.target.value;
+      ov.querySelector('.modal').innerHTML = renderModalContent();
+      bindEvents();
+    };
+
     ov.querySelectorAll('[data-claim]').forEach(btn => {
       btn.onclick = () => {
         const st = cont ? cont.scrollTop : 0;
         const id = btn.dataset.claim;
         const a = visibleStaticList.find(x => x.id === id);
-        if (!a || meta.claimedAch[id] || a.check() < a.goal) return;
-        meta.claimedAch[id] = true;
-        gainFame(a.fame);
+        if (!a || !claimAchievement(id)) return;
         saveMeta();
         syncFameUI();
         toast(`🏆 Logro completado: ¡+${a.fame} Fama!`);
@@ -1782,11 +1878,7 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
         const p = PROGRESSIVE_ACHIEVEMENTS.find(x => x.id === id);
         if (!p) return;
         const tierIdx = getClaimedProgTier(p);
-        if (tierIdx >= p.goals.length || p.check() < p.goals[tierIdx]) return;
-
-        meta.claimedProg = meta.claimedProg || {};
-        meta.claimedProg[id] = tierIdx + 1;
-        gainFame(p.fames[tierIdx]);
+        if (!claimAchievement(id,true)) return;
         saveMeta();
         syncFameUI();
         toast(`🏆 Logro Nivel ${tierIdx + 1} completado: ¡+${p.fames[tierIdx]} Fama!`);
@@ -3538,8 +3630,7 @@ function confirmRestartIsland() {
     () => { if (run === journey) { autoMode = wasAuto; screenMap(); } });
 }
 
-// Slots are derived from quantities so every consumer (including auto mode and
-// recruitment) immediately frees space without maintaining a second inventory.
+// Quantities remain authoritative; placements only describe each stack's footprint.
 function backpackCapacity() { return 9 + Math.min(17, Math.max(0, meta.global.backpackTier || 0)) * 3; }
 function backpackStackLimit() { return 3 + Math.min(17, Math.max(0, meta.global.backpackTier || 0)); }
 function backpackUpgradeCost() { return 300 * ((meta.global.backpackTier || 0) + 1); }
@@ -3558,17 +3649,23 @@ function backpackUsed(items, combat = null) {
   }, 0);
 }
 function backpackFits(owner, id, count = 1) {
-  return !!ITEMS[id] && Number.isInteger(count) && count > 0 &&
-    backpackUsed({...owner.items, [id]:(owner.items[id] || 0) + count},isBattleItem(id)) <= backpackCapacity();
+  if (!owner || !ITEMS[id] || !Number.isInteger(count) || count <= 0) return false;
+  const items = {...owner.items, [id]:(owner.items[id] || 0) + count};
+  return backpackUsed(items,isBattleItem(id)) <= backpackCapacity() &&
+    !planBackpack({...owner,items}).missing.some(s => isBattleItem(s.id) === isBattleItem(id));
 }
 function addBackpackItem(owner, id, count = 1) {
   if (!backpackFits(owner, id, count)) return false;
   owner.items[id] = (owner.items[id] || 0) + count;
+  owner.bagLayout = planBackpack(owner).layout;
   return true;
 }
 function receiveBackpackItem(owner, id, count = 1) {
   if (!ITEMS[id] || !Number.isInteger(count) || count < 1) return false;
-  const stored = addBackpackItem(owner, id, count);
+  const before = Math.ceil((owner.items[id] || 0) / backpackStackLimit());
+  const after = Math.ceil(((owner.items[id] || 0) + count) / backpackStackLimit());
+  // A new footprint waits in the tray until the player chooses its location.
+  const stored = before === after && addBackpackItem(owner, id, count);
   if (!stored) {
     owner.pendingLoot ||= {};
     owner.pendingLoot[id] = (owner.pendingLoot[id] || 0) + count;
@@ -3578,17 +3675,15 @@ function receiveBackpackItem(owner, id, count = 1) {
   return stored;
 }
 function prepareBackpack(owner) {
-  if (!owner || (owner.backpackVersion === 1 && [false,true].every(combat=>backpackUsed(owner.items,combat) <= backpackCapacity()))) return;
-  const original = owner.items || {};
-  owner.items = {};
+  if (!owner) return;
+  owner.items ||= {};
   owner.pendingLoot ||= {};
-  for (const [id,count] of Object.entries(original)) {
-    if (!ITEMS[id]) continue;
-    // Move excess to a saved collection tray; never discard old saves or provisions.
-    let kept = 0;
-    while (kept < count && addBackpackItem(owner,id)) kept++;
-    if (count > kept) owner.pendingLoot[id] = (owner.pendingLoot[id] || 0) + count - kept;
+  const plan = planBackpack(owner);
+  for (const {id,count} of plan.missing) {
+    owner.items[id] -= count;
+    owner.pendingLoot[id] = (owner.pendingLoot[id] || 0) + count;
   }
+  owner.bagLayout = planBackpack({...owner,bagLayout:plan.layout}).layout;
   owner.backpackVersion = 1;
 }
 function hasPendingLoot(owner) { return Object.values(owner?.pendingLoot || {}).some(n => n > 0); }
@@ -3598,56 +3693,163 @@ function backpackStacks(owner) {
   for (const [id,total] of Object.entries(owner.items || {})) {
     const item = ITEMS[id];
     if (!item) continue;
-    for (let remaining = total; remaining > 0; remaining -= backpackStackLimit()) {
-      stacks.push({id, count:Math.min(remaining,backpackStackLimit()), size:item.slotSize});
+    for (let remaining = total, index = 0; remaining > 0; remaining -= backpackStackLimit(), index++) {
+      stacks.push({id, key:`${id}:${index}`, count:Math.min(remaining,backpackStackLimit()), size:item.slotSize});
     }
   }
   return stacks;
+}
+function backpackShape(size, vertical = false) {
+  return size === 4 ? {w:2,h:2} : {w:vertical ? 1 : size,h:vertical ? size : 1};
+}
+function backpackCells(size, cell, vertical = false, capacity = backpackCapacity()) {
+  const {w,h} = backpackShape(size,vertical);
+  if (!Number.isInteger(cell) || cell < 0 || cell % 3 + w > 3 || Math.floor(cell / 3) + h > capacity / 3) return [];
+  return Array.from({length:h},(_,r)=>Array.from({length:w},(_,c)=>cell+r*3+c)).flat();
+}
+function planBackpack(owner) {
+  const stacks = backpackStacks(owner), layout = {}, missing = [], occupied = [new Set(),new Set()];
+  const reserve = (s,pos) => {
+    if (!pos || typeof pos.vertical !== 'boolean') return false;
+    const cells = backpackCells(s.size,pos.cell,pos.vertical), used = occupied[+isBattleItem(s.id)];
+    if (cells.length !== s.size || cells.some(c => used.has(c))) return false;
+    layout[s.key] = {cell:pos.cell,vertical:pos.vertical};
+    cells.forEach(c => used.add(c)); return true;
+  };
+  // Keep valid user placements. Pack only new stacks and legacy inventories.
+  for (const s of stacks) reserve(s,owner.bagLayout?.[s.key]);
+  for (const s of stacks.filter(s=>!layout[s.key]).sort((a,b)=>b.size-a.size)) {
+    let stored = false;
+    for (let cell=0; cell<backpackCapacity() && !stored; cell++) {
+      for (const vertical of [false,true]) if (reserve(s,{cell,vertical})) { stored=true;break; }
+    }
+    if (!stored) missing.push(s);
+  }
+  return {layout,missing};
+}
+function canPlaceBackpackStack(owner, key, cell, vertical) {
+  const stacks = backpackStacks(owner), stack = stacks.find(s=>s.key===key);
+  if (!stack) return false;
+  const cells = backpackCells(stack.size,cell,vertical);
+  if (cells.length !== stack.size) return false;
+  return stacks.filter(s=>s.key!==key && isBattleItem(s.id)===isBattleItem(stack.id)).every(s=>{
+    const p = owner.bagLayout?.[s.key];
+    return !p || !backpackCells(s.size,p.cell,p.vertical).some(c=>cells.includes(c));
+  });
+}
+function moveBackpackStack(owner, key, cell, vertical) {
+  prepareBackpack(owner);
+  if (!canPlaceBackpackStack(owner,key,cell,vertical)) return false;
+  owner.bagLayout[key] = {cell,vertical};
+  return true;
+}
+function placePendingBackpackItem(owner, id, cell, vertical) {
+  if (!(owner.pendingLoot?.[id] > 0) || !ITEMS[id]) return false;
+  prepareBackpack(owner);
+  const total = owner.items[id] || 0, key = `${id}:${Math.floor(total/backpackStackLimit())}`;
+  if (total % backpackStackLimit()) {
+    if (!addBackpackItem(owner,id)) return false;
+  } else {
+    const proposed = {...owner,items:{...owner.items,[id]:total+1}};
+    if (!canPlaceBackpackStack(proposed,key,cell,vertical)) return false;
+    owner.items[id] = total+1;
+    owner.bagLayout[key] = {cell,vertical};
+  }
+  owner.pendingLoot[id]--;
+  return true;
 }
 function backpackHTML(owner, combat = false, category = null) {
   if (!combat && category === null) return `<div class="backpacks">${backpackHTML(owner,false,false)}${backpackHTML(owner,false,true)}</div>`;
   const battleBag = combat || category === true;
   const capacity = backpackCapacity(), used = backpackUsed(owner.items,battleBag);
-  const stacks = backpackStacks(owner).filter(({id}) => isBattleItem(id) === battleBag);
-  let slot = 0;
-  const cells = stacks.map(({id,count,size},stack) => {
-    const item = ITEMS[id], pieces = [];
-    let part = 0;
-    while (part < size) {
-      const length = Math.min(size-part,3-slot%3);
-      pieces.push({start:slot,length,part}); slot += length; part += length;
-    }
-    // A footprint can wrap to another row, but only one segment carries the icon.
-    const illustrated = pieces.reduce((best,piece)=>piece.length > best.length ? piece : best,pieces[0]);
-    return pieces.map(piece => `<button type="button" class="bag-piece bag-filled ${piece !== illustrated ? 'bag-continuation' : ''}" style="grid-column:span ${piece.length};--bag-piece-columns:${piece.length}" data-bag-item="${id}" data-bag-count="${count}" data-bag-stack="${stack}" title="${item.name} ×${count} · ${size} casilla${size > 1 ? 's' : ''}" aria-label="${item.name} ×${count}, ocupa ${size} casilla${size > 1 ? 's' : ''}">
-      <span class="bag-piece-cells">${Array.from({length:piece.length},(_,i)=>`<span class="bag-cell bag-occupied"><span class="bag-slot-number">${piece.start+i+1}</span></span>`).join('')}</span>
-      ${piece === illustrated ? `<span class="bag-icon">${item.emoji}</span><span class="bag-quantity">×${count}</span>` : '<span class="bag-link" aria-hidden="true">↳</span>'}
-      <span class="bag-item-name">${item.name}${size > 1 ? ` · ${size} casillas` : ''}</span>
-    </button>`).join('');
+  const layout = planBackpack(owner).layout;
+  const stacks = backpackStacks(owner).filter(({id,key}) => isBattleItem(id) === battleBag && layout[key]);
+  const occupied = new Set();
+  const cells = stacks.map(({id,key,count,size}) => {
+    const item = ITEMS[id], pos = layout[key], {w,h} = backpackShape(size,pos.vertical);
+    const footprint = backpackCells(size,pos.cell,pos.vertical);footprint.forEach(c=>occupied.add(c));
+    return `<button type="button" class="bag-piece bag-filled" style="grid-column:${pos.cell%3+1}/span ${w};grid-row:${Math.floor(pos.cell/3)+1}/span ${h};--bag-piece-columns:${w}" data-bag-item="${id}" data-bag-count="${count}" data-bag-stack="${key}" title="${item.name} ×${count} · ${w}×${h}" aria-label="${item.name} ×${count}, ocupa ${w} por ${h} casillas">
+      <span class="bag-piece-cells">${footprint.map(c=>`<span class="bag-cell bag-occupied"><span class="bag-slot-number">${c+1}</span></span>`).join('')}</span>
+      <span class="bag-icon">${item.emoji}</span><span class="bag-quantity">×${count}</span>
+      <span class="bag-item-name">${item.name}${size > 1 ? ` · ${w}×${h}` : ''}</span>
+    </button>`;
   }).join('');
-  const empty = Array.from({length:Math.max(0,capacity-used)},(_,i)=>`<div class="bag-cell bag-empty" aria-label="Casilla ${used+i+1} libre"><span class="bag-slot-number">${used+i+1}</span><span>＋</span></div>`).join('');
+  const empty = Array.from({length:capacity},(_,i)=>i).filter(i=>!occupied.has(i)).map(i=>`<div class="bag-cell bag-empty" style="grid-column:${i%3+1};grid-row:${Math.floor(i/3)+1}" aria-label="Casilla ${i+1} libre"><span class="bag-slot-number">${i+1}</span><span>＋</span></div>`).join('');
   const pending = Object.entries(owner.pendingLoot || {}).filter(([id,n])=>ITEMS[id] && n>0 && (isBattleItem(id) === battleBag)).map(([id,n])=>`
     <div class="bag-pending-item"><span>${ITEMS[id].emoji} ${ITEMS[id].name} ×${n}</span>
-      <button type="button" data-bag-collect="${id}" ${backpackFits(owner,id) ? '' : 'disabled'}>GUARDAR 1</button>
+      <button type="button" data-bag-collect="${id}">COLOCAR</button>
       <button type="button" data-bag-leave="${id}">DEJAR ×${n}</button></div>`).join('');
   return `<div class="backpack ${combat ? 'backpack-combat' : ''}">
     <div class="bag-heading"><strong>🎒 ${battleBag ? 'COMBATE' : 'ISLA'}</strong><span aria-label="Espacio ocupado">${used}/${capacity} casillas</span></div>
     <div class="bag-grid">${cells}${empty}</div>
-    ${pending ? `<div class="bag-pending"><b>Pendiente de guardar</b><p>Libera espacio o deja estos objetos para continuar.</p>${pending}</div>` : ''}
+    <button type="button" class="btn small" data-bag-organize="${battleBag}">ORGANIZAR MOCHILA</button>
+    ${pending ? `<div class="bag-pending"><b>Pendiente de guardar</b><p>Elige una posición, reorganiza la mochila o deja los objetos para continuar.</p>${pending}</div>` : ''}
     ${combat ? '' : `<p class="bag-help">${battleBag ? 'Curas, resurrecciones y bebidas de combate.' : 'Carteles, frutas y mejoras para la isla.'} Hasta ${backpackStackLimit()} unidades del mismo objeto por pila. Las dos mochilas tienen su propio espacio y se amplían juntas.</p>`}
   </div>`;
 }
 function saveBackpack(owner) { if (owner === run) saveRun(); }
+function showBackpackOrganizer(owner, battleBag, refresh, initialId = null) {
+  prepareBackpack(owner);
+  const activeBattle = battle && (battle.tower ? tower : run) === owner ? battle : null;
+  const wasWaiting = activeBattle?.waiting;
+  if (activeBattle && !activeBattle.over) pauseBattle();
+  const ov = document.createElement('div');ov.className='overlay';
+  let selection=initialId ? `pending:${initialId}` : '', cell=null, vertical=false, closed=false;
+  const close=()=>{
+    if (closed) return;
+    closed=true;ov.remove();refresh();
+    if (activeBattle && battle===activeBattle && !battle.over && !wasWaiting) resumeBattle();
+  };
+  const renderOrganizer=()=>{
+    const stacks=backpackStacks(owner).filter(s=>isBattleItem(s.id)===battleBag);
+    const pending=Object.entries(owner.pendingLoot || {}).filter(([id,n])=>n>0&&isBattleItem(id)===battleBag);
+    const options=[...stacks.map(s=>({value:s.key,label:`${ITEMS[s.id].name} ×${s.count}`})),...pending.map(([id,n])=>({value:`pending:${id}`,label:`Por guardar: ${ITEMS[id].name} ×${n}`}))];
+    if (!options.some(o=>o.value===selection)) {selection=options[0]?.value || '';cell=null;}
+    const incoming=selection.startsWith('pending:'), id=incoming ? selection.slice(8) : stacks.find(s=>s.key===selection)?.id;
+    const total=owner.items[id] || 0, merging=incoming && total%backpackStackLimit()>0;
+    const key=incoming ? `${id}:${Math.floor(total/backpackStackLimit())}` : selection;
+    if (cell===null && !incoming) {cell=owner.bagLayout[key]?.cell ?? null;vertical=owner.bagLayout[key]?.vertical || false;}
+    const proposed=incoming ? {...owner,items:{...owner.items,[id]:total+1}} : owner;
+    const valid=!!id && (merging || canPlaceBackpackStack(proposed,key,cell,vertical));
+    const footprint=id ? backpackCells(ITEMS[id].slotSize,cell,vertical) : [];
+    const occupied=new Map();
+    for(const s of stacks){const p=owner.bagLayout[s.key];for(const c of backpackCells(s.size,p.cell,p.vertical))occupied.set(c,s);}
+    ov.innerHTML=`<div class="modal bag-organizer"><h2>🎒 Organizar ${battleBag?'combate':'isla'}</h2>
+      <p>Elige una pila, gírala y toca su casilla inicial. Cada pieza debe caber entera, sin cruzar el borde de una fila.</p>
+      <label>Pila de objetos<select data-layout-select>${options.map(o=>`<option value="${o.value}" ${selection===o.value?'selected':''}>${o.label}</option>`).join('')}</select></label>
+      <div class="actions"><button class="btn small" data-layout-rotate ${!id||[1,4].includes(ITEMS[id].slotSize)||merging?'disabled':''}>GIRAR · ${vertical?'VERTICAL':'HORIZONTAL'}</button></div>
+      <div class="bag-grid">${Array.from({length:backpackCapacity()},(_,i)=>{
+        const stack=occupied.get(i),ghost=footprint.includes(i);
+        return `<button type="button" class="bag-cell ${stack?'bag-occupied':'bag-empty'} ${ghost?(valid?'bag-placement-valid':'bag-placement-invalid'):''}" data-layout-cell="${i}" aria-label="Casilla ${i+1}${stack?`: ${ITEMS[stack.id].name}`:': libre'}"><span class="bag-slot-number">${i+1}</span><span>${stack?ITEMS[stack.id].emoji:ghost&&id?ITEMS[id].emoji:'＋'}</span></button>`;
+      }).join('')}</div>
+      <p role="status">${!id?'No hay objetos en esta mochila.':merging?'Se añadirá a una pila del mismo objeto.':cell===null?'Selecciona una casilla inicial.':valid?'La pieza cabe en esta posición.':'No cabe aquí: gira la pieza o elige otras casillas.'}</p>
+      <div class="actions"><button class="btn green" data-layout-place ${valid?'':'disabled'}>${merging?'APILAR 1':incoming?'GUARDAR 1':'MOVER PILA'}</button><button class="btn gray" data-layout-close>VOLVER</button></div></div>`;
+    ov.querySelector('[data-layout-select]').onchange=e=>{selection=e.target.value;cell=null;vertical=false;renderOrganizer();};
+    ov.querySelector('[data-layout-rotate]').onclick=()=>{vertical=!vertical;renderOrganizer();};
+    ov.querySelectorAll('[data-layout-cell]').forEach(btn=>{btn.onclick=()=>{cell=Number(btn.dataset.layoutCell);renderOrganizer();};});
+    ov.querySelector('[data-layout-place]').onclick=()=>{
+      if(closed || !valid) return;
+      const done=incoming ? placePendingBackpackItem(owner,id,cell,vertical) : moveBackpackStack(owner,key,cell,vertical);
+      if(!done){renderOrganizer();return;}
+      saveBackpack(owner);cell=null;renderOrganizer();
+    };
+    ov.querySelector('[data-layout-close]').onclick=close;
+  };
+  renderOrganizer();document.body.appendChild(ov);
+  ov.onclick=e=>{if(e.target===ov)close();};
+}
 function bindBackpack(root, owner, combat, refresh) {
+  root.querySelectorAll('[data-bag-organize]').forEach(button => {
+    button.onclick = () => showBackpackOrganizer(owner,button.dataset.bagOrganize==='true',refresh);
+  });
   root.querySelectorAll('[data-bag-item]').forEach(button => {
     button.onclick = () => showBackpackItem(owner, button.dataset.bagItem, Number(button.dataset.bagCount), combat, refresh);
   });
   root.querySelectorAll('[data-bag-collect]').forEach(button => {
     button.onclick = () => {
       const id = button.dataset.bagCollect;
-      if (!(owner.pendingLoot?.[id] > 0) || !addBackpackItem(owner,id)) return;
-      owner.pendingLoot[id]--;
-      saveBackpack(owner); refresh();
+      if (!(owner.pendingLoot?.[id] > 0)) return;
+      showBackpackOrganizer(owner,isBattleItem(id),refresh,id);
     };
   });
   root.querySelectorAll('[data-bag-leave]').forEach(button => {
@@ -4200,7 +4402,6 @@ function useItemFromMap(id) {
             }
           });
           run.items[id]--;
-          trackItemCollected(1);
           trackStat('fruit_use', 1);
           saveRun();
           screenMap(2);
@@ -4244,7 +4445,6 @@ function useItemFromMap(id) {
       const restored = Math.min(target.maxhp - target.hp, val);
       target.hp = Math.min(target.maxhp, target.hp + val);
       run.items[id]--;
-      trackItemCollected(1);
       trackStat('item_use', 1);
       saveRun();
       toast(`💚 ¡${charName(target)} recupera ${restored} PS!`);
@@ -4274,7 +4474,6 @@ function useItemFromMap(id) {
     }, (target) => {
       target.hp = Math.floor(target.maxhp * (item.val || 0.5));
       run.items[id]--;
-      trackItemCollected(1);
       trackStat('item_use', 1);
       saveRun();
       toast(`✨ ¡${charName(target)} ha sido revivido con ${target.hp} PS!`);
@@ -4306,7 +4505,6 @@ function useItemFromMap(id) {
         target.def += 2;
       }
       run.items[id]--;
-      trackItemCollected(1);
       trackStat('item_use', 1);
       saveRun();
       toast(`⚡ ¡${charName(target)} ha ganado +2 ${isAtk ? 'ATQ' : 'DEF'} permanentemente!`);
@@ -4386,7 +4584,7 @@ function enterNode(r, i) {
       const stored = receiveBackpackItem(run,id);
       trackItemCollected(1);
       saveRun();
-      modalInfo('🎁 ¡Objeto encontrado!', `<div class="reward-list">${ITEMS[id].emoji} <b>${ITEMS[id].name}</b><br><small>${ITEMS[id].desc}</small>${stored ? '' : '<br>🎒 Mochila llena. Elige qué guardar.'}</div>`, () => screenMap(stored ? 0 : 2));
+      modalInfo('🎁 ¡Objeto encontrado!', `<div class="reward-list">${ITEMS[id].emoji} <b>${ITEMS[id].name}</b><br><small>${ITEMS[id].desc}</small>${stored ? '' : '<br>🎒 Elige dónde guardar el objeto en la mochila.'}</div>`, () => screenMap(stored ? 0 : 2));
       break;
     }
     case 'mystery': trackStat('mystery_visit', 1); doMystery(island); break;
@@ -4422,7 +4620,7 @@ function doMystery(island) {
     case 'item': {
       const id = pick(['carne', 'cartel', 'carnereal', 'carteldorado']);
       const stored = receiveBackpackItem(run,id); saveRun();
-      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS[id].emoji} <b>${ITEMS[id].name}</b>${stored ? '' : '<br>🎒 Mochila llena. Elige qué guardar.'}</div>`, () => screenMap(stored ? 0 : 2));
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS[id].emoji} <b>${ITEMS[id].name}</b>${stored ? '' : '<br>🎒 Elige dónde guardar el objeto en la mochila.'}</div>`, () => screenMap(stored ? 0 : 2));
       break;
     }
     case 'battle': {
@@ -4479,7 +4677,7 @@ function doMystery(island) {
       const stored = receiveBackpackItem(run,'fruta_diablo');
       trackItemCollected(1);
       saveRun();
-      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS['fruta_diablo'].emoji} <b>${ITEMS['fruta_diablo'].name}</b>${stored ? ' añadida a tu mochila.' : '<br>🎒 Mochila llena. Elige qué guardar.'}</div>`, () => screenMap(stored ? 0 : 2));
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS['fruta_diablo'].emoji} <b>${ITEMS['fruta_diablo'].name}</b>${stored ? ' añadida a tu mochila.' : '<br>🎒 Elige dónde guardar el objeto en la mochila.'}</div>`, () => screenMap(stored ? 0 : 2));
       break;
     }
   }
@@ -5281,13 +5479,15 @@ function screenShop() {
     b.onclick = () => {
       const id = b.dataset.buy;
       if (!stock.includes(id) || run.berries < ITEMS[id].price) return;
-      if (!addBackpackItem(run,id)) { toast('🎒 No hay espacio en la mochila.'); return; }
+      if (!backpackFits(run,id)) { toast('🎒 No hay espacio en la mochila.'); return; }
+      const stored = receiveBackpackItem(run,id);
       run.berries -= ITEMS[id].price;
       trackItemCollected(1);
       trackStat('shop_buy', 1);
       saveRun();
       toast(`Comprado: ${ITEMS[id].name} ${ITEMS[id].emoji}`);
       screenShop();
+      if (!stored) showBackpackOrganizer(run,isBattleItem(id),screenShop,id);
     };
   });
   document.querySelectorAll('[data-sell]').forEach(b => {
@@ -6438,9 +6638,7 @@ function afterRound() {
   b.rewarded ||= new Set();
   for (const defeated of b.eTeam.filter(f => f.hp <= 0 && !b.rewarded.has(f))) {
     b.rewarded.add(defeated);
-    meta.stats ||= {kills:0,items:0};
-    meta.stats.kills = (meta.stats.kills || 0) + 1;
-    saveMeta();
+    trackKills();
     log(`¡${charName(defeated)} cae derrotado!`);
     // registro de vencidos en historia (habilita comprarlos en el mercado clandestino)
     if (run && !b.tower && !meta.defeated.includes(defeated.id)) {
@@ -6688,6 +6886,7 @@ function endBattle(victory, fled, recruited) {
     meta.islandProgress[islandProgressKey(run.saga,run.mode,run.diff || 1)] = [...new Set([...completed,run.islandIdx])];
     meta.lastCompletedIsland = {saga:run.saga, index:run.islandIdx, mode:run.mode, diff:run.diff || 1};
     meta.totalIslands = (meta.totalIslands || 0)+1;
+    trackSagaStat('islands');
     const newVets = unlockRoster(true);
     if (newVets.length > 0) {
       toast(`🎉 ¡${newVets.map(id => CHARS[id] ? CHARS[id].name : id).join(', ')} desbloqueado/s para tu plantilla permanente!`);
@@ -6926,6 +7125,7 @@ function sagaComplete() {
   });
   if (isAllNakamas) {
     meta.allNakamaWins = (meta.allNakamaWins || 0) + 1;
+    trackSagaStat('all_nakama_wins');
   }
 
   meta.sagaDiffWins = meta.sagaDiffWins || {};

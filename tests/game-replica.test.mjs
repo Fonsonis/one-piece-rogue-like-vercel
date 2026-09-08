@@ -32,6 +32,6 @@ test('complete character database, all saga maps, moves, damage and Nuzlocke per
     loadRun();if(run.team[0].id!=='luffy') throw Error('Run restore failed');
     return {characters:Object.keys(CHARS).length,sagas:SAGAS.length,islands,achievements:getAchievementsInfo().totalAchievements};
   })()`,ctx);
-  assert.equal(stats.achievements,140);
+  assert.equal(stats.achievements,2403);
   console.log('Verified original game content:',stats);
 });
