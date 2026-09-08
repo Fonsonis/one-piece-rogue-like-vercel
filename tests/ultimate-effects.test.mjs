@@ -123,9 +123,12 @@ test('sprite rendering uses atlas cells only, with a distinct movement for each 
 test('Gear 5 grows, raises its foot, stomps and returns to its original size',()=>{
  const h=artHarness(),choreo=h.exec('UltimateFX.choreography');
  const p=h.exec("UltimateArtProfiles.resolve('luffy5',CHARS.luffy5,getUltimateMove({id:'luffy5',lvl:100}))");
- const raised=choreo(p,.48),landed=choreo(p,.58),home=choreo(p,1);
- assert.ok(raised.scale>=2);assert.ok(raised.lift>0);assert.ok(raised.footLift>0);
- assert.equal(landed.lift,0);assert.equal(landed.footLift,0);assert.equal(landed.scale,raised.scale);
+ const raised=choreo(p,.48),landed=choreo(p,.62),home=choreo(p,1);
+ assert.ok(raised.scale>=2);assert.ok(raised.lift>0);assert.equal(raised.legBend,1);
+ assert.equal(choreo(p,.52).legBend,1,'The raised knee holds before the downstroke');
+ assert.ok(choreo(p,.58).legBend<1&&choreo(p,.58).legBend>0);
+ assert.equal(landed.lift,0);assert.equal(landed.legBend,0);assert.equal(landed.scale,raised.scale);
+ assert.ok(landed.footScale>1.5,'The enlarged foot carries through the impact');
  assert.equal(home.scale,1);assert.equal(home.travel,0);
  assert.equal(choreo(p,.48,true).scale,1);
 });
