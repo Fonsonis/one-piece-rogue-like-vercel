@@ -989,6 +989,8 @@ function render(html) {
   if (speedBtn) speedBtn.onclick = cycleBattleSpeed;
   const autoBtn = $('#btn-topbar-auto');
   if (autoBtn) autoBtn.onclick = cycleTopbarAuto;
+  const cancelRepeat = $('#btn-cancel-island-repeat');
+  if (cancelRepeat) cancelRepeat.onclick = cancelIslandRepeats;
 }
 function toast(msg) {
   document.querySelectorAll('.toast').forEach(el => el.remove());
@@ -1051,7 +1053,7 @@ function topbar(showBerries = false, showAuto = showBerries, showSpeed = false, 
       <button class="btn small green" id="btn-save" title="Guardar partida como JSON" aria-label="Guardar partida como JSON">💾</button>
       ${showFlee ? '<button class="btn small red" data-ctl="run">🏃 HUIR</button>' : ''}
     </div>
-  </div>`;
+  </div>${islandRepeatStatusHTML()}`;
 }
 
 function applyDisplayPreferences() {
@@ -2812,7 +2814,7 @@ function showInventoryModal(opts = {}) {
         <div class="inventory-card-top"><span>${currentTeam.includes(id)?'En tu equipo':'Nakama'}</span><span class="inventory-rarity" aria-label="Rareza ${c.rareza} de 5 estrellas"><span aria-hidden="true">★</span> ${c.rareza}/5</span></div>
         <button class="inventory-profile btn-info-inv" data-id="${id}" aria-label="Ver ficha de ${collectionText(c.name)}"><span class="inventory-portrait" aria-hidden="true">${charIcon(displayId,80)}</span><strong>${c.name}</strong><span class="inventory-profile-link">Ver ficha ↗</span></button>
         <div class="inventory-level">Nivel base <strong>${level}</strong></div><div class="type-badges">${typeBadges(c.types)}</div>
-        <div class="inventory-upgrade">${maxed?`<span class="inventory-limit">Límite de saga: Nv. ${cap}</span><button class="btn btn-upg-inv" data-id="${id}" disabled>Nivel máximo</button>`:`<span class="inventory-cost" title="${number(cost)} Log Poses">Coste: <strong>${compact(cost)} 🧭</strong></span><button class="btn gold btn-upg-inv" data-id="${id}" ${canAfford?'':'disabled'} aria-label="Mejorar a ${collectionText(c.name)} al nivel base ${level+1} por ${number(cost)} Log Poses">Subir a Nv. ${level+1}</button>${canAfford?'':`<span class="inventory-shortfall">Faltan ${compact(cost-(meta.logPoses||0))} 🧭</span>`}`}</div>
+        <div class="inventory-upgrade">${maxed?`<span class="inventory-limit">Límite de saga: Nv. ${cap}</span><button class="btn btn-upg-inv" data-id="${id}" disabled aria-label="Nivel máximo de saga alcanzado"><span class="inventory-upgrade-label">Nivel máximo</span><span class="inventory-upgrade-short" aria-hidden="true">Máx.</span></button>`:`<span class="inventory-cost" title="${number(cost)} Log Poses">Coste: <strong>${compact(cost)} 🧭</strong></span><button class="btn gold btn-upg-inv" data-id="${id}" ${canAfford?'':'disabled'} aria-label="Mejorar a ${collectionText(c.name)} al nivel base ${level+1} por ${number(cost)} Log Poses"><span class="inventory-upgrade-label">Subir a Nv. ${level+1}</span><span class="inventory-upgrade-short" aria-hidden="true">↑ Lv. ${level+1}</span></button>${canAfford?'':`<span class="inventory-shortfall">Faltan ${compact(cost-(meta.logPoses||0))} 🧭</span>`}`}</div>
       </article>`;
     }).join('');
     const filtered=invViewState.type||+invViewState.rarity||invViewState.saga;
@@ -3218,10 +3220,11 @@ function screenStarter(sagaIdx, islandIdx = 0) {
       <div id="starter-slots-container"></div>
       ${renderPresetsBar()}
 
-      <div style="text-align:center;margin-top:16px;">
+      <div class="starter-launch-actions" style="text-align:center;margin-top:16px;">
         <button class="btn green" id="btn-zarpar" style="font-size:11px;padding:10px 20px;">
           ⚔️ ZARPAR CON TU BANDA (${picked.length}/${maxSlots})
         </button>
+        <button class="btn blue" id="btn-auto-island">🤖 Automático</button>
       </div>
     </div>
   `);
@@ -3343,6 +3346,12 @@ function screenStarter(sagaIdx, islandIdx = 0) {
     });
 
     const zarparBtn = $('#btn-zarpar');
+    const repeatBtn = $('#btn-auto-island');
+    if (repeatBtn) {
+      const team = picked.filter(Boolean);
+      repeatBtn.disabled = team.length < 1;
+      repeatBtn.onclick = () => showIslandRepeatSetup(sagaIdx, team, islandIdx);
+    }
     if (zarparBtn) {
       const cleanPicked = picked.filter(Boolean);
       zarparBtn.disabled = cleanPicked.length < 1;
@@ -3426,6 +3435,91 @@ function ensureStartingTeam(journey) {
   if (!journey || journey.startingTeam !== undefined) return;
   const ids = (journey.team || []).filter(f => f && CHARS[f.id]).map(f => baseFormOf(f.id)).slice(0,6);
   if (ids.length) journey.startingTeam = ids;
+}
+function islandRepeatStatusHTML() {
+  const repeat = run?.islandRepeat;
+  if (!repeat || repeat.result) return '';
+  return `<div class="island-repeat-status"><span title="${repeat.wins} victorias · ${repeat.losses} derrotas">🤖 Intento <b>${repeat.completed+1}/${repeat.total}</b></span><button class="btn small gray" id="btn-cancel-island-repeat" aria-label="Cancelar repeticiones automáticas">Cancelar serie</button></div>`;
+}
+function showIslandRepeatSetup(sagaIdx, starterIds, islandIdx) {
+  const island = SAGAS[sagaIdx].islands[islandIdx], trigger = document.activeElement;
+  const difficulty = DIFFICULTIES.find(d => d.id === selectedDiff) || DIFFICULTIES[0];
+  const ov = document.createElement('div'); ov.className = 'overlay';
+  ov.innerHTML = `<section class="modal repeat-setup" role="dialog" aria-modal="true" aria-labelledby="repeat-title">
+    <h2 id="repeat-title">🤖 Repetir isla</h2><p><strong>${island.name}</strong> · ${storyMode==='nuzlocke'?'Nuzlocke':'Clásico'} · ${difficulty.name}</p>
+    <p class="repeat-team">${starterIds.map(id=>CHARS[id].name).join(' · ')}</p>
+    <label for="repeat-count">Número de intentos<input id="repeat-count" type="number" inputmode="numeric" min="1" max="1000" step="1" value="10" required></label>
+    <p>Cada victoria o derrota cuenta como un intento. Cada salida empieza con este mismo equipo, sus niveles base y las provisiones iniciales.</p>
+    <p>Usa tu configuración actual del modo automático: ruta, eventos, reclutamiento, compras, curas y velocidad. Si necesita una decisión o falta espacio en la mochila, la serie se pausa sin perder el contador. Puedes continuarla o cancelarla.</p>
+    <p id="repeat-error" role="alert"></p><div class="actions"><button class="btn gray" id="repeat-cancel">Volver</button><button class="btn green" id="repeat-start">Jugar 10 intentos</button></div>
+  </section>`;
+  document.body.appendChild(ov);
+  const close=()=>{ov.remove();if(trigger?.isConnected)trigger.focus({preventScroll:true});};
+  const input=ov.querySelector('#repeat-count'), start=ov.querySelector('#repeat-start');
+  input.oninput=()=>{start.textContent=`Jugar ${input.value || '…'} intentos`;};
+  ov.querySelector('#repeat-cancel').onclick=close;
+  start.onclick=()=>{
+    if (!input.reportValidity()) return;
+    if (!startIslandRepeats(sagaIdx,starterIds,islandIdx,Number(input.value))) {
+      ov.querySelector('#repeat-error').textContent='Revisa el número de intentos, la isla y el equipo.';return;
+    }
+    ov.remove();
+  };
+  ov.onclick=e=>{if(e.target===ov)close();};bindCollectionDialog(ov,close,'#repeat-count');
+}
+function startIslandRepeats(sagaIdx, starterIds, islandIdx, total) {
+  if (!Number.isInteger(total) || total<1 || total>1000 || !SAGAS[sagaIdx]?.islands[islandIdx] ||
+      !Array.isArray(starterIds) || !starterIds.length || starterIds.length>starterSlotsCount() ||
+      new Set(starterIds).size!==starterIds.length || starterIds.some(id=>!CHARS[id] || baseFormOf(id)!==id || !isNakamaUnlocked(id)) ||
+      !islandAvailable(sagaIdx,islandIdx)) return false;
+  clearTimeout(autoTimer);autoTimer=null;autoMode=true;
+  startRun(sagaIdx,starterIds,islandIdx,{total,completed:0,wins:0,losses:0,result:null});
+  return true;
+}
+function finishIslandRepeat(result, continueAuto = autoMode) {
+  const repeat=run?.islandRepeat;
+  if (!repeat) return false;
+  if (!repeat.result) {
+    repeat.result=result;repeat.completed++;
+    if(result==='win')repeat.wins++;else repeat.losses++;
+    saveRun();
+  }
+  showIslandRepeatCheckpoint(continueAuto);
+  return true;
+}
+function showIslandRepeatCheckpoint(continueAuto = false) {
+  const journey=run, repeat=journey?.islandRepeat;
+  if (!repeat?.result) return;
+  clearTimeout(autoTimer);autoTimer=null;
+  const finished=repeat.completed>=repeat.total;
+  autoMode=!!continueAuto && !finished;
+  const attempt=islandRetrySpec(journey);
+  render(`${topbar(false)}<section class="panel repeat-checkpoint" id="repeat-checkpoint">
+    <h2>${finished?'🏁 Serie completada':'🤖 Intento completado'}</h2><p>${SAGAS[journey.saga].islands[journey.islandIdx].name}</p>
+    <p class="repeat-progress"><strong>${repeat.completed} / ${repeat.total}</strong> intentos</p>
+    <p>${repeat.wins} victorias · ${repeat.losses} derrotas</p><p>Último resultado: ${repeat.result==='win'?'victoria':'derrota'}. El progreso permanente se conserva.</p>
+    ${finished?'':`<p>${autoMode?'El siguiente intento comienza automáticamente.':'Serie pausada. Continúa cuando quieras.'}</p><button class="btn green" id="repeat-next">Continuar serie</button>`}
+    <button class="btn gray" id="repeat-finish">${finished?'Volver a las islas':'Cancelar repeticiones'}</button></section>`);
+  const next=()=>{
+    if(run!==journey || !journey.islandRepeat || !$('#repeat-checkpoint') || finished)return;
+    clearTimeout(autoTimer);autoTimer=null;
+    storyMode=attempt.mode;selectedDiff=attempt.diff;autoMode=true;
+    startRun(attempt.saga,attempt.starterIds,attempt.islandIdx,{...repeat,result:null});
+  };
+  if(!finished)$('#repeat-next').onclick=next;
+  $('#repeat-finish').onclick=()=>{
+    if(run!==journey)return;
+    autoMode=false;clearTimeout(autoTimer);autoTimer=null;
+    storyMode=attempt.mode;selectedDiff=attempt.diff;clearRun();screenIslands(attempt.saga);
+  };
+  if(autoMode)scheduleAutoStep(next,1200);
+}
+function cancelIslandRepeats() {
+  if(!run?.islandRepeat)return;
+  delete run.islandRepeat;
+  autoMode=false;clearTimeout(autoTimer);autoTimer=null;saveRun();
+  toast('Repeticiones canceladas. Puedes terminar este intento manualmente.');
+  if(battle)renderBattlePreserveLog();else screenMap();
 }
 function islandRetrySpec(journey) {
   ensureStartingTeam(journey);
@@ -3618,7 +3712,7 @@ function backpackHTML(owner, combat = false, category = null) {
   return `<div class="backpack ${combat ? 'backpack-combat' : ''}">
     <div class="bag-heading"><strong>🎒 ${battleBag ? 'COMBATE' : 'ISLA'}</strong><span aria-label="Espacio ocupado">${used}/${capacity} casillas</span></div>
     <div class="bag-grid">${cells}${empty}</div>
-    <button type="button" class="btn small" data-bag-organize="${battleBag}">ORGANIZAR MOCHILA</button>
+    ${combat ? '' : `<button type="button" class="btn small" data-bag-organize="${battleBag}">ORGANIZAR MOCHILA</button>`}
     ${pending ? `<div class="bag-pending"><b>Pendiente de guardar</b><p>Elige una posición, reorganiza la mochila o deja los objetos para continuar.</p>${pending}</div>` : ''}
     ${combat ? '' : `<p class="bag-help">${battleBag ? 'Curas, resurrecciones y bebidas de combate.' : 'Carteles, frutas y mejoras para la isla.'} Hasta ${backpackStackLimit()} unidades del mismo objeto por pila. Las dos mochilas tienen su propio espacio y se amplían juntas.</p>`}
   </div>`;
@@ -3764,7 +3858,7 @@ function showTowerBackpack(onContinue) {
   update(); document.body.appendChild(ov);
 }
 
-function startRun(sagaIdx, starterIds, islandIdx = 0) {
+function startRun(sagaIdx, starterIds, islandIdx = 0, islandRepeat = null) {
   const saga = SAGAS[sagaIdx];
   if (!saga?.islands[islandIdx] || !islandAvailable(sagaIdx,islandIdx)) return;
   const items = {
@@ -3803,6 +3897,7 @@ function startRun(sagaIdx, starterIds, islandIdx = 0) {
     pos: null,
     nuzCaught: {}, // isla -> ya reclutado
   };
+  if(islandRepeat)run.islandRepeat={...islandRepeat};
   prepareBackpack(run);
   starterIds.forEach(registerRecruit);
   run.team.forEach(f => registerDex(f.id));
@@ -3812,6 +3907,8 @@ function startRun(sagaIdx, starterIds, islandIdx = 0) {
 
 // ============ PANTALLA: MAPA ============
 function screenMap(activePageIdx = 0) {
+  if(run?.islandRepeat?.result)return showIslandRepeatCheckpoint(autoMode);
+  if(run?.islandRepeat && !run.team.some(f=>f.hp>0))return gameOver();
   playMusic('combat');
   runAutoItems(false);
   if (autoMode && hasPendingLoot(run)) {
@@ -6761,6 +6858,7 @@ function endBattle(victory, fled, recruited) {
       }
       return sagaComplete();
     }
+    if(finishIslandRepeat('win'))return;
     const sagaIdx = run.saga, islandIdx = run.islandIdx;
     storyMode = run.mode; selectedDiff = run.diff || 1;
     autoMode = false;
@@ -6964,6 +7062,8 @@ function crossoverReward(key) {
 }
 
 function sagaComplete() {
+  if(run?.islandRepeat?.result)return showIslandRepeatCheckpoint(autoMode);
+  const continueRepeat=autoMode;
   autoMode = false;
   if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
   playMusic('menu');
@@ -7010,7 +7110,7 @@ function sagaComplete() {
   // Guarda la banda completa (incluyendo legendarios/jefes) en meta.roster
   const addedLegendaries = unlockRoster(true);
   saveMeta();
-
+  if(finishIslandRepeat('win',continueRepeat))return;
   const team = run.team;
   clearRun();
   render(`
@@ -7030,6 +7130,7 @@ function sagaComplete() {
 }
 
 function gameOver() {
+  const continueRepeat=autoMode;
   autoMode = false;
   if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
   playMusic('dead');
@@ -7038,6 +7139,7 @@ function gameOver() {
   const wasNuz = run && run.mode === 'nuzlocke';
   const consuelo = run ? run.badges.length * 10 : 0;
   if (consuelo) gainFame(consuelo);
+  if(finishIslandRepeat('loss',continueRepeat))return;
   clearRun();
   render(`
     ${topbar(false)}
@@ -7646,7 +7748,7 @@ function dexCardHTML(id) {
   return `<div class="dex-card ${seen ? 'seen' : 'unknown'}" data-id="${id}">
     <div class="emoji">${seen ? charIcon(id, 46) : '❔'}</div>
     <div>${c.name}</div>
-    <div style="font-size:7px;">${'⭐'.repeat(c.rareza)}</div>
+    <div class="dex-rarity" style="font-size:7px;" aria-label="Rareza ${c.rareza} de 5 estrellas"><span class="dex-rarity-full" aria-hidden="true">${'⭐'.repeat(c.rareza)}</span><span class="dex-rarity-compact" aria-hidden="true">★ ${c.rareza}/5</span></div>
     ${vet ? '<div style="color:var(--accent)">🏅 veterano</div>' : got ? '<div style="color:var(--green)">✓ nakama</div>' : (seen ? '<div style="color:#999">visto</div>' : '<div style="color:#aaa">sin avistar</div>')}
   </div>`;
 }
@@ -7658,11 +7760,11 @@ function screenDex() {
   render(`
     ${topbar(false)}
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
-    <div class="panel">
-      <h2>📖 Dex Pirata — ${meta.dex.length}/${all.length} avistados, ${meta.recruited.length} reclutados</h2>
+    <div class="panel pirate-dex">
+      <header class="dex-header"><h2>📖 Dex Pirata</h2><div class="dex-progress" aria-label="Progreso de la colección"><span><strong>${meta.dex.length} <small>/ ${all.length}</small></strong>Avistados</span><span><strong>${meta.recruited.length}</strong>Reclutados</span></div></header>
       ${charControlsHTML(dexView, { sagas: sagaOpts })}
       <div id="char-grid"></div>
-      <div style="font-size:8px;color:#888;margin-top:10px;text-align:center;">Toca un personaje avistado para ver su ficha completa. Los no avistados solo muestran su nombre.</div>
+      <p class="dex-help">Toca un personaje avistado para abrir su ficha. Los no avistados solo muestran su nombre.</p>
     </div>
   `);
   $('#btn-back').onclick = screenHome;
