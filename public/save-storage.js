@@ -34,6 +34,14 @@
         if (inventory && Object.values(inventory).some(n => !Number.isSafeInteger(n) || n < 0 || n > 100000)) throw new Error('Cantidad de objetos inválida.');
       }
       if (r?.startingTeam !== undefined && (!Array.isArray(r.startingTeam) || r.startingTeam.length < 1 || r.startingTeam.length > 6 || r.startingTeam.some(id => typeof id !== 'string'))) throw new Error('Equipo inicial inválido.');
+      if (r?.islandRepeat !== undefined) {
+        const repeat=r.islandRepeat;
+        if (!record(repeat) || !Number.isInteger(repeat.total) || repeat.total<1 || repeat.total>1000 ||
+            ['completed','wins','losses'].some(key=>!Number.isInteger(repeat[key]) || repeat[key]<0) ||
+            repeat.completed>repeat.total || repeat.wins+repeat.losses!==repeat.completed ||
+            ![null,'win','loss'].includes(repeat.result) || (repeat.result===null ? repeat.completed>=repeat.total : repeat.completed===0) ||
+            !r.startingTeam?.length || new Set(r.startingTeam).size!==r.startingTeam.length || ![1,2,3,4,5].includes(r.diff)) throw new Error('Repeticiones de isla inválidas.');
+      }
       if (r?.mapIdx !== undefined && (!Number.isInteger(r.mapIdx) || r.mapIdx<0 || r.mapIdx>4)) throw new Error('Mapa de isla inválido.');
       if (r?.campaignVersion !== undefined && r.campaignVersion !== 1) throw new Error('Campaña incompatible.');
       if (!record(r) || !Number.isInteger(r.saga) || !Number.isInteger(r.islandIdx) ||
