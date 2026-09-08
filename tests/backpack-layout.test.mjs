@@ -29,20 +29,62 @@ test('rectangular footprints reject row wrapping, bottom overflow and overlap',(
  assert.equal(h.exec('run.bagLayout["carnereal:0"].vertical'),true);
 });
 
-test('new items require placement; existing stacks merge and quantities never duplicate',()=>{
+test('new items are placed automatically; existing stacks merge without moving or interrupting auto mode',()=>{
  const h=setup();h.exec('autoMode=true;');
- assert.equal(h.exec('receiveBackpackItem(run,"carnereal")'),false);
- assert.equal(h.exec('autoMode'),false);
- assert.equal(h.exec('run.items.carnereal||0'),0);
- assert.equal(h.exec('placePendingBackpackItem(run,"carnereal",2,false)'),false);
- assert.equal(h.exec('placePendingBackpackItem(run,"carnereal",2,true)'),true);
+ assert.equal(h.exec('receiveBackpackItem(run,"carnereal")'),true);
+ assert.equal(h.exec('autoMode'),true);
+ assert.equal(h.exec('run.items.carnereal'),1);
+ assert.equal(h.exec('hasPendingLoot(run)'),false);
+ assert.equal(h.exec('moveBackpackStack(run,"carnereal:0",2,true)'),true);
  assert.equal(h.exec('placePendingBackpackItem(run,"carnereal",2,true)'),false);
  assert.equal(h.exec('receiveBackpackItem(run,"carnereal",2)'),true);
  assert.equal(h.exec('run.items.carnereal'),3);
  assert.equal(h.exec('run.bagLayout["carnereal:0"].cell'),2);
- assert.equal(h.exec('receiveBackpackItem(run,"carnereal")'),false);
- assert.equal(h.exec('placePendingBackpackItem(run,"carnereal",0,false)'),true);
+ assert.equal(h.exec('receiveBackpackItem(run,"carnereal")'),true);
  assert.equal(h.exec('run.items.carnereal'),4);
+ assert.equal(h.exec('run.bagLayout["carnereal:0"].cell'),2);
+ assert.equal(h.exec('planBackpack(run).missing.length'),0);
+});
+
+test('automatic placement rotates to use a vertical gap and reorganizes fragmented space only when needed',()=>{
+ const h=setup();
+ h.exec('run.items={carne:9,cartel:1};run.bagLayout={"carne:0":{cell:0,vertical:false},"carne:1":{cell:1,vertical:false},"carne:2":{cell:2,vertical:false},"cartel:0":{cell:8,vertical:false}};');
+ assert.equal(h.exec('receiveBackpackItem(run,"sake")'),true);
+ assert.equal(h.exec('run.bagLayout["carne:0"].cell'),0);
+ assert.equal(h.exec('run.bagLayout["carne:1"].cell'),1);
+ assert.equal(h.exec('receiveBackpackItem(run,"carnereal")'),true);
+ assert.equal(h.exec('run.bagLayout["carnereal:0"].vertical'),true);
+ assert.equal(h.exec('run.bagLayout["cartel:0"].cell'),8,'the island bag is independent');
+ assert.equal(h.exec('planBackpack(run).missing.length'),0);
+ h.exec('run.items={carne:15,cartel:1};run.bagLayout={"carne:0":{cell:0,vertical:false},"carne:1":{cell:2,vertical:false},"carne:2":{cell:4,vertical:false},"carne:3":{cell:6,vertical:false},"carne:4":{cell:8,vertical:false},"cartel:0":{cell:8,vertical:false}};const before=JSON.stringify(run);');
+ assert.equal(h.exec('backpackFits(run,"sake")'),true);
+ assert.equal(h.exec('JSON.stringify(run)===before'),true,'checking the shop must not mutate the bag');
+ assert.equal(h.exec('receiveBackpackItem(run,"sake")'),true);
+ assert.equal(h.exec('run.items.carne'),15);
+ assert.equal(h.exec('run.items.sake'),1);
+ assert.equal(h.exec('run.bagLayout["cartel:0"].cell'),8);
+ assert.equal(h.exec('backpackUsed(run.items,true)'),9);
+ assert.equal(h.exec('hasPendingLoot(run)'),false);
+ assert.equal(h.exec('planBackpack(run).missing.length'),0);
+});
+
+test('items that cannot fit remain pending and failed placement does not rearrange or lose inventory',()=>{
+ const h=setup();
+ h.exec('run.items={sake:3};prepareBackpack(run);autoMode=true;const before=JSON.stringify({items:run.items,layout:run.bagLayout});');
+ // Two 2x2 pieces cannot fit in a 3x3 bag even though eight cells are below capacity.
+ assert.equal(h.exec('receiveBackpackItem(run,"sake")'),false);
+ assert.equal(h.exec('JSON.stringify({items:run.items,layout:run.bagLayout})===before'),true);
+ assert.equal(h.exec('run.pendingLoot.sake'),1);
+ assert.equal(h.exec('autoMode'),false);
+});
+
+test('repacking keeps full rows for large food and fits mixed shapes up to exact capacity',()=>{
+ const h=setup();
+ h.exec('meta.global.backpackTier=3;const limit=backpackStackLimit();run.items={sake:limit+1,bocadillo:limit+1,carnereal:limit};prepareBackpack(run);');
+ assert.equal(h.exec('receiveBackpackItem(run,"carnereal")'),true);
+ assert.equal(h.exec('backpackUsed(run.items,true)'),18);
+ assert.equal(h.exec('planBackpack(run).missing.length'),0);
+ assert.equal(h.exec('hasPendingLoot(run)'),false);
 });
 
 test('positions survive save/load, consumption and upgrades; both bags use independent grids',()=>{
