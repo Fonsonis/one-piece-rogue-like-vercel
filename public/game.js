@@ -1700,211 +1700,113 @@ function claimAchievement(id, progressive = false) {
 let currentAchCategory = 'all';
 let currentAchSaga = 'all';
 
-function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchCategory) {
-  meta.claimedAch = meta.claimedAch || {};
-  meta.claimedProg = meta.claimedProg || {};
-  currentAchCategory = initialCategory;
-
-  const visibleStaticList = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS, ISLAND_DIFF_ACHIEVEMENTS).filter(isVisibleAch);
-  const { totalCompleted, totalAchievements } = getAchievementsInfo();
-
-  const renderProgCardHTML = p => {
-    const tierIdx = getClaimedProgTier(p);
-    const val = p.check();
-    const totalTiers = p.goals.length;
-    const isMax = tierIdx >= totalTiers;
-    const currentGoal = isMax ? p.goals[totalTiers - 1] : p.goals[tierIdx];
-    const currentFame = isMax ? p.fames[totalTiers - 1] : p.fames[tierIdx];
-    const done = !isMax && val >= currentGoal;
-    const pct = isMax ? 100 : Math.min(100, Math.floor((val / currentGoal) * 100));
-
-    return `<div class="achieve-row ${isMax ? 'done' : ''}">
-      <span class="emoji">${p.emoji}</span>
-      <div class="info">
-        <b>${p.title} ${isMax ? '(MÁXIMO)' : `Nivel ${tierIdx + 1}/${totalTiers}`}</b> — <span style="color:var(--accent);">⭐+${currentFame} Fama</span><br>
-        <small style="color:#555;">${p.desc}</small>
-        <div class="achieve-bar"><i style="width:${pct}%"></i></div>
-        <div style="font-size:7.5px;color:#666;margin-top:3px;font-weight:bold;">
-          ${isMax ? `Completado: ${val}/${currentGoal} (100%)` : `Progreso Nivel ${tierIdx + 1}: ${val}/${currentGoal} (${pct}%)`}
-        </div>
-      </div>
-      ${isMax
-        ? '<span style="font-size:8px;color:var(--green);font-weight:bold;">✓ MÁXIMO</span>'
-        : done
-          ? `<button class="btn small green" data-claim-prog="${p.id}">RECLAMAR ⭐${currentFame}</button>`
-          : '<span style="font-size:8px;color:#888;">🔒 EN PROGRESO</span>'}
-    </div>`;
-  };
-
-  const renderStaticCardHTML = a => {
-    const val = a.check();
-    const done = val >= a.goal;
-    const claimed = !!meta.claimedAch[a.id];
-    const pct = Math.min(100, Math.floor((val / a.goal) * 100));
-    return `<div class="achieve-row ${claimed ? 'done' : ''} ${['sagas','islas'].includes(a.cat) ? 'native-difficulty' : ''}">
-      <span class="emoji">${a.emoji}</span>
-      <div class="info">
-        <b>${a.title}</b> — <span style="color:var(--accent);">⭐+${a.fame} Fama</span><br>
-        <small style="color:#555;">${a.desc}</small>
-        <div class="achieve-bar"><i style="width:${pct}%"></i></div>
-        <div style="font-size:7.5px;color:#666;margin-top:3px;font-weight:bold;">Progreso: ${val}/${a.goal} (${pct}%)</div>
-      </div>
-      ${claimed ? '<span style="font-size:8px;color:var(--green);font-weight:bold;">✓ RECLAMADO</span>'
-        : done ? `<button class="btn small green" data-claim="${a.id}">RECLAMAR ⭐${a.fame}</button>`
-          : '<span style="font-size:8px;color:#888;">🔒 EN PROGRESO</span>'}
-    </div>`;
-  };
-
-  const getProgCardItem = p => {
-    const tierIdx = getClaimedProgTier(p);
-    const val = p.check();
-    const totalTiers = p.goals.length;
-    const isMax = tierIdx >= totalTiers;
-    const currentGoal = isMax ? p.goals[totalTiers - 1] : p.goals[tierIdx];
-    const canClaim = !isMax && val >= currentGoal;
-    return { canClaim, html: renderProgCardHTML(p) };
-  };
-
-  const getStaticCardItem = a => {
-    const val = a.check();
-    const done = val >= a.goal;
-    const claimed = !!meta.claimedAch[a.id];
-    const canClaim = !claimed && done;
-    return { canClaim, html: renderStaticCardHTML(a) };
-  };
-
-  const renderModalContent = () => {
-    const inSaga = a => currentAchSaga === 'all' || (currentAchSaga === 'global' ? !a.sagaId : a.sagaId === currentAchSaga);
-    const progressive = PROGRESSIVE_ACHIEVEMENTS.filter(inSaga);
-    const staticList = visibleStaticList.filter(inSaga);
-    let items = [];
-    if (currentAchCategory === 'all') {
-      items = [
-        ...progressive.map(getProgCardItem),
-        ...staticList.map(getStaticCardItem)
-      ];
-    } else if (currentAchCategory === 'prog') {
-      items = progressive.map(getProgCardItem);
-    } else if (currentAchCategory === 'sagas') {
-      items = staticList.filter(a => a.cat === 'sagas').map(getStaticCardItem);
-    } else if (currentAchCategory === 'islas') {
-      items = staticList.filter(a => a.cat === 'islas').map(getStaticCardItem);
-    } else if (currentAchCategory === 'desafios') {
-      items = staticList.filter(a => a.cat === 'desafios').map(getStaticCardItem);
-    }
-
-    items.sort((a, b) => (b.canClaim ? 1 : 0) - (a.canClaim ? 1 : 0));
-    let html = items.map(x => x.html).join('');
-
-    if (!html) html = '<div style="font-size:9px;color:#888;text-align:center;padding:20px;">No hay logros en esta categoría.</div>';
-
-    return `
-      <h2>🏆 Logros de Pirata (${totalCompleted}/${totalAchievements})</h2>
-      <p style="font-size:8px;text-align:center;margin-bottom:8px;color:#666;">
-        Completa desafíos en tus aventuras para ganar ⭐ Fama adicional.
-      </p>
-      <label class="achievement-filter" for="ach-category">Tipo de logro
-        <select id="ach-category">
-          ${[['all', 'Todos'], ['prog', `🔄 Progresivos (${PROGRESSIVE_ACHIEVEMENTS.length})`], ['sagas', `📜 Sagas (${SAGA_DIFF_ACHIEVEMENTS.length})`], ['islas', `🏝️ Islas (${ISLAND_DIFF_ACHIEVEMENTS.length})`], ['desafios', `🎯 Desafíos (${visibleStaticList.filter(a => a.cat === 'desafios').length})`]].map(([value, label]) => `<option value="${value}" ${currentAchCategory === value ? 'selected' : ''}>${label}</option>`).join('')}
-        </select>
-      </label>
-      <label class="achievement-filter" for="ach-saga">Saga
-        <select id="ach-saga">
-          ${[['all','Todas'],['global','Globales'],...SAGAS.map(s => [s.id,s.name])].map(([id,name]) => `<option value="${id}" ${currentAchSaga === id ? 'selected' : ''}>${name}</option>`).join('')}
-        </select>
-      </label>
-      <div class="achieve-list-container" style="max-height:340px;overflow-y:auto;">
-        ${html}
-      </div>
-      <div class="actions" style="margin-top:12px;"><button class="btn gray" id="ach-close">CERRAR</button></div>
-    `;
-  };
-
-  const existingOverlay = document.querySelector('#achievements-overlay');
-  if (existingOverlay) existingOverlay.remove();
-
-  const ov = document.createElement('div');
-  ov.id = 'achievements-overlay';
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="max-width:600px;">${renderModalContent()}</div>`;
-  document.body.appendChild(ov);
-
-  const container = ov.querySelector('.achieve-list-container');
-  if (container && savedScrollTop) {
-    container.scrollTop = savedScrollTop;
-  }
-
-  const syncFameUI = () => {
-    const shipBtn = $('#btn-ship');
-    if (shipBtn) shipBtn.innerHTML = `🏪 Tienda (⭐${meta.fame})`;
-    const achBtn = $('#btn-achievements');
-    const { totalCompleted, totalAchievements, hasUnclaimedAch } = getAchievementsInfo();
-
-    if (achBtn) {
-      achBtn.innerHTML = `
-        <span>🏆 Logros${hasUnclaimedAch ? ' <span class="ach-badge-dot" style="background:#e74c3c;color:#fff;font-size:7px;border-radius:50%;padding:1px 4px;margin-left:2px;font-weight:bold;animation:pulse 1s infinite alternate;border:1px solid #fff;">!</span>' : ''}</span>
-        <span style="font-size:8px;opacity:0.85;margin-top:2px;">(${totalCompleted}/${totalAchievements})</span>
-      `;
-    }
-    const topAchBtn = $('#btn-top-ach');
-    if (topAchBtn) {
-      topAchBtn.innerHTML = `🏆${hasUnclaimedAch ? '🔴' : ''}`;
-    }
-  };
-
-  const bindEvents = () => {
-    const cont = ov.querySelector('.achieve-list-container');
-    ov.querySelector('#ach-category').onchange = event => {
-        currentAchCategory = event.target.value;
-        ov.querySelector('.modal').innerHTML = renderModalContent();
-        bindEvents();
-    };
-
-    ov.querySelector('#ach-saga').onchange = event => {
-      currentAchSaga = event.target.value;
-      ov.querySelector('.modal').innerHTML = renderModalContent();
-      bindEvents();
-    };
-
-    ov.querySelectorAll('[data-claim]').forEach(btn => {
-      btn.onclick = () => {
-        const st = cont ? cont.scrollTop : 0;
-        const id = btn.dataset.claim;
-        const a = visibleStaticList.find(x => x.id === id);
-        if (!a || !claimAchievement(id)) return;
-        saveMeta();
-        syncFameUI();
-        toast(`🏆 Logro completado: ¡+${a.fame} Fama!`);
-        ov.querySelector('.modal').innerHTML = renderModalContent();
-        bindEvents();
-        if (cont) cont.scrollTop = st;
-      };
-    });
-
-    ov.querySelectorAll('[data-claim-prog]').forEach(btn => {
-      btn.onclick = () => {
-        const st = cont ? cont.scrollTop : 0;
-        const id = btn.dataset.claimProg;
-        const p = PROGRESSIVE_ACHIEVEMENTS.find(x => x.id === id);
-        if (!p) return;
-        const tierIdx = getClaimedProgTier(p);
-        if (!claimAchievement(id,true)) return;
-        saveMeta();
-        syncFameUI();
-        toast(`🏆 Logro Nivel ${tierIdx + 1} completado: ¡+${p.fames[tierIdx]} Fama!`);
-        ov.querySelector('.modal').innerHTML = renderModalContent();
-        bindEvents();
-        if (cont) cont.scrollTop = st;
-      };
-    });
-
-    const closeBtn = ov.querySelector('#ach-close');
-    if (closeBtn) closeBtn.onclick = () => { ov.remove(); syncFameUI(); };
-  };
-
-  bindEvents();
-  ov.onclick = e => { if (e.target === ov) { ov.remove(); syncFameUI(); } };
+function collectionText(value) {
+  return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
+function bindCollectionDialog(ov, close, initialSelector) {
+  ov.onkeydown = event => {
+    if ([...document.querySelectorAll('.overlay')].at(-1) !== ov) return;
+    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); return; }
+    if (event.key !== 'Tab') return;
+    const buttons = [...ov.querySelectorAll('button:not(:disabled),input,select,summary,[tabindex="0"]')].filter(el => el.getClientRects().length);
+    const first = buttons[0], last = buttons.at(-1);
+    if (!first) return;
+    const active = document.activeElement, outside = !ov.contains(active);
+    if (event.shiftKey && (outside || active === first || (first.compareDocumentPosition(active) & Node.DOCUMENT_POSITION_PRECEDING))) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && (outside || active === last || (last.compareDocumentPosition(active) & Node.DOCUMENT_POSITION_FOLLOWING))) { event.preventDefault(); first.focus(); }
+  };
+  ov.querySelector(initialSelector)?.focus({preventScroll:true});
+}
+function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchCategory) {
+  meta.claimedAch ||= {};
+  meta.claimedProg ||= {};
+  currentAchCategory = initialCategory;
+  const previousFocus = document.activeElement;
+  const visibleStaticList = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS, ISLAND_DIFF_ACHIEVEMENTS).filter(isVisibleAch);
+  let query = '', state = 'all', page = 0, filtersOpen = false;
+  const pageSize = 20, number = value => Number(value).toLocaleString('es');
+  const describe = (a, progressive) => {
+    const tier = progressive ? getClaimedProgTier(a) : 0;
+    const claimed = progressive ? tier >= a.goals.length : !!meta.claimedAch[a.id];
+    const goal = progressive ? a.goals[Math.min(tier,a.goals.length-1)] : a.goal;
+    const fame = progressive ? a.fames[Math.min(tier,a.fames.length-1)] : a.fame;
+    const value = a.check(), ready = !claimed && value >= goal;
+    return {a,progressive,tier,claimed,goal,fame,value,ready,status:claimed?'claimed':ready?'ready':'progress'};
+  };
+  const renderCard = item => {
+    const {a,progressive,tier,claimed,goal,fame,value,ready} = item;
+    const pct = Math.min(100,Math.floor(value/goal*100));
+    const label = claimed ? 'Completado' : ready ? 'Por reclamar' : 'En progreso';
+    return `<article class="achievement-card ${item.status} ${['sagas','islas'].includes(a.cat)?'native-difficulty':''}" data-achievement="${a.id}" tabindex="-1">
+      <span class="achievement-icon" aria-hidden="true">${a.emoji}</span>
+      <div class="achievement-content"><div class="achievement-meta"><span class="achievement-status">${claimed?'✓ ':''}${label}</span>${progressive?`<span>Etapa ${Math.min(tier+1,a.goals.length)} de ${a.goals.length}</span>`:''}</div>
+        <h3>${a.title}</h3><p>${a.desc}</p>
+        <div class="achievement-progress" role="progressbar" aria-label="Progreso de ${collectionText(a.title)}" aria-valuemin="0" aria-valuemax="${goal}" aria-valuenow="${Math.min(value,goal)}" aria-valuetext="${number(value)} de ${number(goal)}"><i style="width:${pct}%"></i></div>
+        <div class="achievement-count"><span>${number(value)} / ${number(goal)}</span><span>${pct}%</span></div>
+      </div>
+      <div class="achievement-reward"><strong>+${number(fame)} <span>Fama</span></strong>${ready?`<button class="btn green" ${progressive?'data-claim-prog':'data-claim'}="${a.id}" aria-label="Reclamar ${number(fame)} Fama por ${collectionText(a.title)}">Reclamar</button>`:`<span>${claimed?'Recompensa recibida':'Recompensa'}</span>`}</div>
+    </article>`;
+  };
+  const renderContent = () => {
+    const all = [...PROGRESSIVE_ACHIEVEMENTS.map(a=>describe(a,true)),...visibleStaticList.map(a=>describe(a,false))];
+    const readyCount = all.filter(a=>a.ready).length;
+    const q = query.trim().toLocaleLowerCase('es');
+    const items = all.filter(({a,progressive,status}) =>
+      (currentAchCategory==='all' || (currentAchCategory==='prog'?progressive:!progressive&&a.cat===currentAchCategory)) &&
+      (currentAchSaga==='all' || (currentAchSaga==='global'?!a.sagaId:a.sagaId===currentAchSaga)) &&
+      (state==='all'||state===status) && (!q || `${a.title} ${a.desc}`.toLocaleLowerCase('es').includes(q))
+    ).sort((a,b)=>Number(b.ready)-Number(a.ready));
+    const pages = Math.max(1,Math.ceil(items.length/pageSize));page=Math.min(page,pages-1);
+    const {totalCompleted,totalAchievements} = getAchievementsInfo();
+    return `<header class="collection-header"><div><span class="collection-eyebrow">Tu aventura</span><h2 id="ach-title" tabindex="-1">Logros de pirata</h2></div><button class="btn gray collection-close" id="ach-close" aria-label="Cerrar logros">Cerrar <span aria-hidden="true">×</span></button></header>
+      <div class="collection-summary"><div><strong>${number(totalCompleted)} <small>/ ${number(totalAchievements)}</small></strong><span>Objetivos completados</span></div><button class="collection-summary-action" id="ach-show-ready"><strong>${number(readyCount)}</strong><span>Por reclamar →</span></button></div>
+      <div class="collection-search"><label for="ach-search">Buscar logro<input id="ach-search" type="search" placeholder="Nombre, isla u objetivo" value="${collectionText(query)}"></label><label for="ach-state">Estado<select id="ach-state">${[['all','Todos'],['ready','Por reclamar'],['progress','En progreso'],['claimed','Completados']].map(([v,l])=>`<option value="${v}" ${state===v?'selected':''}>${l}</option>`).join('')}</select></label></div>
+      <details class="collection-extra" ${filtersOpen?'open':''}><summary>Filtrar por tipo y saga${currentAchCategory!=='all'||currentAchSaga!=='all'?' · activos':''}</summary><div class="collection-filter-grid">
+        <label for="ach-category">Tipo de logro<select id="ach-category">${[['all','Todos los tipos'],['prog','Progresivos'],['sagas','Sagas'],['islas','Islas'],['desafios','Desafíos']].map(([v,l])=>`<option value="${v}" ${currentAchCategory===v?'selected':''}>${l}</option>`).join('')}</select></label>
+        <label for="ach-saga">Saga<select id="ach-saga">${[['all','Todas las sagas'],['global','Globales'],...SAGAS.map(s=>[s.id,s.name])].map(([v,l])=>`<option value="${v}" ${currentAchSaga===v?'selected':''}>${l}</option>`).join('')}</select></label>
+      </div></details>
+      <div class="collection-results"><span role="status">${number(items.length)} logros${items.length?` · ${number(page*pageSize+1)}–${number(Math.min((page+1)*pageSize,items.length))}`:''}</span><button class="collection-text-button" id="ach-reset">Limpiar filtros</button></div>
+      <div class="achieve-list-container collection-list" aria-label="Lista de logros" tabindex="0">${items.slice(page*pageSize,(page+1)*pageSize).map(renderCard).join('')||'<div class="collection-empty"><h3>No hay logros con estos filtros</h3><p>Prueba otra búsqueda o limpia los filtros.</p></div>'}</div>
+      <nav class="collection-pagination" aria-label="Páginas de logros"><button class="btn gray" data-ach-page="-1" ${page===0?'disabled':''} aria-label="Página anterior de logros">← Anterior</button><span>Página ${page+1} de ${pages}</span><button class="btn gray" data-ach-page="1" ${page===pages-1?'disabled':''} aria-label="Página siguiente de logros">Siguiente →</button></nav>`;
+  };
+  document.querySelector('#achievements-overlay')?.remove();
+  const ov = document.createElement('div');ov.id='achievements-overlay';ov.className='overlay collection-overlay';
+  ov.innerHTML=`<section class="modal collection-modal achievements-modal" role="dialog" aria-modal="true" aria-labelledby="ach-title">${renderContent()}</section>`;
+  document.body.appendChild(ov);
+  const syncFameUI = () => {
+    const info=getAchievementsInfo(),ach=$('#btn-achievements'),shop=$('#btn-ship'),top=$('#btn-top-ach');
+    if(shop)shop.innerHTML=`🏪 Tienda (⭐${meta.fame})`;
+    if(ach)ach.innerHTML=`<span>🏆 Logros${info.hasUnclaimedAch?' · ¡Por reclamar!':''}</span><span>(${info.totalCompleted}/${info.totalAchievements})</span>`;
+    if(top)top.innerHTML=`🏆${info.hasUnclaimedAch?'🔴':''}`;
+  };
+  const close=()=>{ov.remove();syncFameUI();if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});};
+  const refresh=(selector,scroll=0,cursor=null)=>{
+    filtersOpen=ov.querySelector('details').open;
+    ov.querySelector('.modal').innerHTML=renderContent();bindEvents();
+    ov.querySelector('.collection-list').scrollTop=scroll;
+    const target=ov.querySelector(selector)||ov.querySelector('#ach-title');
+    target.focus({preventScroll:true});if(cursor!==null)target.setSelectionRange?.(cursor,cursor);
+  };
+  const bindEvents=()=>{
+    ov.querySelector('#ach-close').onclick=close;
+    ov.querySelector('#ach-search').oninput=e=>{query=e.target.value;page=0;refresh('#ach-search',0,e.target.selectionStart);};
+    for(const [id,update] of [['ach-state',v=>state=v],['ach-category',v=>currentAchCategory=v],['ach-saga',v=>currentAchSaga=v]])ov.querySelector('#'+id).onchange=e=>{update(e.target.value);page=0;refresh('#'+id);};
+    ov.querySelector('#ach-show-ready').onclick=()=>{state='ready';query='';currentAchCategory='all';currentAchSaga='all';page=0;refresh('#ach-state');};
+    ov.querySelector('#ach-reset').onclick=()=>{query='';state='all';currentAchCategory='all';currentAchSaga='all';page=0;refresh('#ach-search');};
+    ov.querySelectorAll('[data-ach-page]').forEach(btn=>btn.onclick=()=>{page+=Number(btn.dataset.achPage);refresh('.collection-list');});
+    ov.querySelectorAll('[data-claim],[data-claim-prog]').forEach(btn=>btn.onclick=()=>{
+      const progressive=!!btn.dataset.claimProg,id=btn.dataset.claimProg||btn.dataset.claim;
+      const scroll=ov.querySelector('.collection-list').scrollTop;
+      const fame=claimAchievement(id,progressive);if(!fame)return;
+      saveMeta();syncFameUI();toast(`🏆 ¡Recompensa recibida: +${number(fame)} Fama!`);
+      refresh(`[data-achievement="${id}"]`,scroll);
+    });
+  };
+  bindEvents();if(typeof savedScrollTop==='number')ov.querySelector('.collection-list').scrollTop=savedScrollTop;
+  ov.onclick=e=>{if(e.target===ov)close();};
+  bindCollectionDialog(ov,close,'#ach-title');
+}
+
 
 // ============ LOG POSE GACHA CARTELES ============
 let logPoseBlockedSagaIds = [];
@@ -2890,182 +2792,85 @@ function showNakamaPicker(opts) {
 
 function showInventoryModal(opts = {}) {
   if (opts.onSelect) return showNakamaPicker(opts);
-  const onSelect = opts.onSelect || null;
-  const currentTeam = opts.currentTeam || [];
-  const title = opts.title || '🎒 INVENTARIO DE NAKAMAS';
-
-  const rosterChars = (meta.roster || []).filter(id => CHARS[id]);
-  const allUnlocked = [...new Set(['luffy', ...rosterChars])].filter(id => CHARS[id] && isNakamaUnlocked(id));
-
-  invViewState = { q: '', type: '', rarity: 0 };
-
-  const renderModalContent = () => {
-    let ids = filterSortChars(allUnlocked, invViewState, id => evolutionFormAt(id, startLvlOf(id)));
-    const cap = maxStartLvlCap();
-
-    const cardsHTML = ids.map(id => {
-      const displayId = evolutionFormAt(id, startLvlOf(id));
-      const c = CHARS[displayId];
-      const inTeam = currentTeam.includes(id);
-      const startLvl = startLvlOf(id);
-      const cost = logPoseUpgradeCost(startLvl);
-      const isMax = startLvl >= cap;
-      const canAfford = (meta.logPoses || 0) >= cost;
-
-      return `
-        <div class="dex-card sel-card ${inTeam ? 'picked' : ''}" data-id="${id}" style="position:relative;background:var(--paper);border:2px solid var(--ink);padding:8px 6px;text-align:center;cursor:pointer;">
-          ${inTeam ? '<div class="veteran-tag" style="background:var(--green);font-size:7px;">EN EQUIPO</div>' : ''}
-          <div class="emoji">${charIcon(displayId, 34)}</div>
-          <div style="font-size:8.5px;margin:3px 0;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</div>
-          <div class="char-lvl" style="font-size:7.5px;">Nv. ${startLvl} · ${'⭐'.repeat(c.rareza)}</div>
-          <div class="type-badges" style="margin:3px 0;justify-content:center;">${typeBadges(c.types)}</div>
-          <div style="display:flex;flex-direction:column;gap:3px;margin-top:4px;">
-            ${isMax ? `
-              <span style="font-size:7px;color:var(--green);font-weight:bold;background:rgba(0,0,0,0.06);padding:2px;border-radius:3px;">🔒 Nv. Máx (${cap})</span>
-            ` : `
-              <button class="btn small gold btn-upg-inv" data-id="${id}" ${canAfford ? '' : 'disabled'} style="font-size:7px;padding:3px 4px;" title="Cuesta ${cost} Log Poses">
-                ⬆️ Nv ${startLvl + 1} (${cost} 🧭)
-              </button>
-            `}
-            <div style="display:flex;gap:3px;justify-content:center;">
-              <button class="btn small gray btn-info-inv" data-id="${id}" style="font-size:7px;padding:3px 6px;">ℹ️ FICHA</button>
-            </div>
-          </div>
-        </div>
-      `;
+  const previousFocus=document.activeElement;
+  const currentTeam=opts.currentTeam || (run?.team || []).map(f=>baseFormOf(f.id));
+  const roster=(meta.roster || []).filter(id=>CHARS[id]);
+  const allUnlocked=[...new Set(['luffy',...roster])].filter(id=>CHARS[id]&&isNakamaUnlocked(id));
+  const number=value=>Number(value).toLocaleString('es');
+  const compact=value=>Number(value).toLocaleString('es',{notation:value>=1000000?'compact':'standard',maximumFractionDigits:1});
+  let page=0,filtersOpen=false;
+  const pageSize=12;
+  invViewState={q:'',type:'',rarity:0,saga:'',sort:'name'};
+  const renderContent=()=>{
+    const ids=filterSortChars(allUnlocked,invViewState,id=>evolutionFormAt(id,startLvlOf(id)));
+    const pages=Math.max(1,Math.ceil(ids.length/pageSize));page=Math.min(page,pages-1);
+    const cap=maxStartLvlCap();
+    const cards=ids.slice(page*pageSize,(page+1)*pageSize).map(id=>{
+      const displayId=evolutionFormAt(id,startLvlOf(id)),c=CHARS[displayId],level=startLvlOf(id);
+      const cost=logPoseUpgradeCost(level),maxed=level>=cap,canAfford=(meta.logPoses||0)>=cost;
+      return `<article class="inventory-card ${currentTeam.includes(id)?'in-team':''}" data-id="${id}">
+        <div class="inventory-card-top"><span>${currentTeam.includes(id)?'En tu equipo':'Nakama'}</span><span class="inventory-rarity" aria-label="Rareza ${c.rareza} de 5 estrellas"><span aria-hidden="true">★</span> ${c.rareza}/5</span></div>
+        <button class="inventory-profile btn-info-inv" data-id="${id}" aria-label="Ver ficha de ${collectionText(c.name)}"><span class="inventory-portrait" aria-hidden="true">${charIcon(displayId,80)}</span><strong>${c.name}</strong><span class="inventory-profile-link">Ver ficha ↗</span></button>
+        <div class="inventory-level">Nivel base <strong>${level}</strong></div><div class="type-badges">${typeBadges(c.types)}</div>
+        <div class="inventory-upgrade">${maxed?`<span class="inventory-limit">Límite de saga: Nv. ${cap}</span><button class="btn btn-upg-inv" data-id="${id}" disabled>Nivel máximo</button>`:`<span class="inventory-cost" title="${number(cost)} Log Poses">Coste: <strong>${compact(cost)} 🧭</strong></span><button class="btn gold btn-upg-inv" data-id="${id}" ${canAfford?'':'disabled'} aria-label="Mejorar a ${collectionText(c.name)} al nivel base ${level+1} por ${number(cost)} Log Poses">Subir a Nv. ${level+1}</button>${canAfford?'':`<span class="inventory-shortfall">Faltan ${compact(cost-(meta.logPoses||0))} 🧭</span>`}`}</div>
+      </article>`;
     }).join('');
-
-    return `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
-        <h2 style="margin:0;font-size:12px;color:var(--sea);">${title}</h2>
-        <div id="inv-logpose-info" style="font-size:9.5px;font-weight:bold;color:var(--gold);background:var(--ink);padding:3px 8px;border-radius:4px;border:1px solid var(--gold);cursor:pointer;" title="Toca para saber más sobre los Log Poses">
-          🧭 Log Poses: ${meta.logPoses || 0} ℹ️
-        </div>
-        <button class="btn gray small" id="inv-close-x" style="padding:2px 6px;font-size:9px;">✕</button>
-      </div>
-      <div style="font-size:8px;color:#555;margin-bottom:8px;">
-        Nakamas disponibles: <b>${allUnlocked.length}</b> ${onSelect ? '· Toca un personaje para elegirlo para tu equipo' : ''}
-      </div>
-      <div class="char-controls" style="margin-bottom:10px;gap:4px;">
-        <input id="inv-q" placeholder="🔎 Buscar por nombre..." value="${(invViewState.q || '').replace(/"/g, '&quot;')}" style="font-size:8px;padding:5px;">
-        <select id="inv-type" style="font-size:8px;padding:5px;">
-          <option value="">Todos los tipos</option>
-          ${Object.keys(TYPES).map(t => `<option value="${t}" ${invViewState.type === t ? 'selected' : ''}>${TYPES[t].emoji} ${t}</option>`).join('')}
-        </select>
-        <select id="inv-rarity" style="font-size:8px;padding:5px;">
-          <option value="0">Toda rareza</option>
-          ${[1, 2, 3, 4, 5].map(r => `<option value="${r}" ${+invViewState.rarity === r ? 'selected' : ''}>${'⭐'.repeat(r)}</option>`).join('')}
-        </select>
-      </div>
-      ${mobileColumnsControl()}
-      <div id="inv-cards-grid" style="max-height:360px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:8px;padding:4px;border:1px solid #ccc;background:rgba(0,0,0,0.05);">
-        ${cardsHTML || '<div style="grid-column:1/-1;text-align:center;font-size:9px;color:#888;padding:20px;">Sin nakamas que coincidan.</div>'}
-      </div>
-      <div class="actions" style="margin-top:10px;text-align:right;">
-        <button class="btn gray small" id="inv-close-btn">CERRAR</button>
-      </div>
-    `;
+    const filtered=invViewState.type||+invViewState.rarity||invViewState.saga;
+    return `<header class="collection-header"><div><span class="collection-eyebrow">Tu tripulación</span><h2 id="inv-title" tabindex="-1">${collectionText(opts.title || 'Inventario de nakamas')}</h2></div><button class="btn gray collection-close" id="inv-close-x" aria-label="Cerrar inventario">Cerrar <span aria-hidden="true">×</span></button></header>
+      <div class="collection-summary"><div><strong>${allUnlocked.length}</strong><span>Nakamas disponibles</span></div><button class="collection-summary-action" id="inv-logpose-info" aria-label="${number(meta.logPoses||0)} Log Poses disponibles. Ver cómo conseguirlos"><strong>${compact(meta.logPoses||0)} 🧭</strong><span>Log Poses · ¿Cómo conseguirlos?</span></button></div>
+      <label for="inv-q" class="inventory-search-label">Buscar nakama<input id="inv-q" type="search" placeholder="Nombre del personaje o su forma" value="${collectionText(invViewState.q)}"></label>
+      <details class="collection-extra" ${filtersOpen?'open':''}><summary>Filtros y vista${filtered?' · activos':''}</summary><div class="collection-filter-grid inventory-filters">
+        <label for="inv-saga">Saga<select id="inv-saga"><option value="">Todas las sagas</option>${groupUpgradeRoster(allUnlocked).map(g=>`<option value="${g.id}" ${invViewState.saga===g.id?'selected':''}>${g.name}</option>`).join('')}</select></label>
+        <label for="inv-type">Tipo<select id="inv-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t=>`<option value="${t}" ${invViewState.type===t?'selected':''}>${t}</option>`).join('')}</select></label>
+        <label for="inv-rarity">Rareza<select id="inv-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r=>`<option value="${r}" ${+invViewState.rarity===r?'selected':''}>${r} ${r===1?'estrella':'estrellas'}</option>`).join('')}</select></label>
+        <label for="inv-sort">Ordenar<select id="inv-sort">${[['name','Nombre A–Z'],['rarezaDesc','Mayor rareza'],['rarezaAsc','Menor rareza'],['statTotalDesc','Mayor fuerza base']].map(([v,l])=>`<option value="${v}" ${invViewState.sort===v?'selected':''}>${l}</option>`).join('')}</select></label>
+      </div></details>
+      <div class="collection-results"><span role="status">${ids.length} nakamas${ids.length?` · ${page*pageSize+1}–${Math.min((page+1)*pageSize,ids.length)}`:''}</span><button class="collection-text-button" id="inv-reset">Limpiar filtros</button></div>
+      <div id="inv-cards-grid" class="collection-list inventory-grid" aria-label="Lista de nakamas" tabindex="0">${cards||'<div class="collection-empty"><h3>No hay nakamas con estos filtros</h3><p>Prueba otro nombre o limpia los filtros.</p></div>'}</div>
+      <nav class="collection-pagination" aria-label="Páginas de nakamas"><button class="btn gray" data-inv-page="-1" ${page===0?'disabled':''} aria-label="Página anterior de nakamas">← Anterior</button><span>Página ${page+1} de ${pages}</span><button class="btn gray" data-inv-page="1" ${page===pages-1?'disabled':''} aria-label="Página siguiente de nakamas">Siguiente →</button></nav>`;
   };
-
-  const existing = document.querySelector('#inventory-modal-overlay');
-  if (existing) existing.remove();
-
-  const ov = document.createElement('div');
-  ov.id = 'inventory-modal-overlay';
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="max-width:640px;width:95%;">${renderModalContent()}</div>`;
+  document.querySelector('#inventory-modal-overlay')?.remove();
+  const ov=document.createElement('div');ov.id='inventory-modal-overlay';ov.className='overlay collection-overlay';
+  ov.innerHTML=`<section class="modal collection-modal inventory-modal" role="dialog" aria-modal="true" aria-labelledby="inv-title">${renderContent()}</section>`;
   document.body.appendChild(ov);
-
-  const refreshModalContent = () => {
-    const grid = ov.querySelector('#inv-cards-grid');
-    const gridScrollTop = grid ? grid.scrollTop : 0;
-    const modal = ov.querySelector('.modal');
-    const modalScrollTop = modal ? modal.scrollTop : 0;
-
-    modal.innerHTML = renderModalContent();
-    bindEvents();
-
-    const newGrid = ov.querySelector('#inv-cards-grid');
-    if (newGrid) newGrid.scrollTop = gridScrollTop;
-    const newModal = ov.querySelector('.modal');
-    if (newModal) newModal.scrollTop = modalScrollTop;
+  const close=()=>{ov.remove();if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});};
+  const refresh=(selector,resetScroll=false,cursor=null)=>{
+    const scroll=resetScroll?0:ov.querySelector('#inv-cards-grid').scrollTop;
+    filtersOpen=ov.querySelector('details').open;
+    ov.querySelector('.modal').innerHTML=renderContent();bindEvents();
+    ov.querySelector('#inv-cards-grid').scrollTop=scroll;
+    const target=selector.split(',').map(part=>ov.querySelector(part)).find(Boolean)||ov.querySelector('#inv-cards-grid');
+    target.focus({preventScroll:true});if(cursor!==null)target.setSelectionRange?.(cursor,cursor);
   };
-
-  const bindEvents = () => {
-    const logPoseBtn = ov.querySelector('#inv-logpose-info');
-    if (logPoseBtn) {
-      logPoseBtn.onclick = () => {
-        modalInfo(
-          '🧭 Log Poses de Navegación',
-          `<div style="font-size:8.5px;line-height:1.5;color:#333;text-align:left;padding:4px;">
-            Los <b>Log Poses 🧭</b> son brujulas de navegación de Grand Line que obtienes al derrotar enemigos durante tu travesía en el modo Historia.<br><br>
-            • <b>¿Para qué sirven?</b> Se consumen para entrenar y <b>subir de nivel base permanente</b> a tus nakamas desde este inventario.<br>
-            • <b>Recompensas en combate:</b> En East Blue, cada pirata da 3, cada marine 4 y cada jefe 7 Log Poses. Se multiplica por el número de saga (×2 en Alabasta, ×3 en Skypiea…).<br>
-            • <b>Coste incremental:</b> Cuanto mayor sea el nivel de un nakama, más Log Poses necesitarás para subirlo al siguiente nivel (hasta el límite de tu saga actual).
-          </div>`
-        );
-      };
-    }
-
-    const qInput = ov.querySelector('#inv-q');
-    if (qInput) qInput.oninput = e => {
-      invViewState.q = e.target.value;
-      refreshModalContent();
-      const newQ = ov.querySelector('#inv-q');
-      if (newQ) { newQ.focus(); newQ.selectionStart = newQ.selectionEnd = newQ.value.length; }
-    };
-
-    const typeSel = ov.querySelector('#inv-type');
-    if (typeSel) typeSel.onchange = e => {
-      invViewState.type = e.target.value;
-      refreshModalContent();
-    };
-
-    const raritySel = ov.querySelector('#inv-rarity');
-    if (raritySel) raritySel.onchange = e => {
-      invViewState.rarity = +e.target.value;
-      refreshModalContent();
-    };
-
-    ov.querySelectorAll('.btn-upg-inv').forEach(btn => {
-      btn.onclick = e => {
-        e.stopPropagation();
-        if (upgradeCharLvl(btn.dataset.id)) {
-          refreshModalContent();
-        }
-      };
+  const bindEvents=()=>{
+    ov.querySelector('#inv-close-x').onclick=close;
+    ov.querySelector('#inv-q').oninput=e=>{invViewState.q=e.target.value;page=0;refresh('#inv-q',true,e.target.selectionStart);};
+    for(const [id,key] of [['inv-type','type'],['inv-rarity','rarity'],['inv-saga','saga'],['inv-sort','sort']])ov.querySelector('#'+id).onchange=e=>{invViewState[key]=e.target.value;page=0;refresh('#'+id,true);};
+    ov.querySelector('#inv-reset').onclick=()=>{invViewState={q:'',type:'',rarity:0,saga:'',sort:'name'};page=0;refresh('#inv-q',true);};
+    ov.querySelectorAll('[data-inv-page]').forEach(btn=>btn.onclick=()=>{page+=Number(btn.dataset.invPage);refresh('#inv-cards-grid',true);});
+    ov.querySelectorAll('.btn-upg-inv').forEach(btn=>btn.onclick=()=>{
+      if(upgradeCharLvl(btn.dataset.id))refresh(`.btn-upg-inv[data-id="${btn.dataset.id}"]:not(:disabled),.btn-info-inv[data-id="${btn.dataset.id}"]`);
     });
-
-    ov.querySelectorAll('.dex-card').forEach(card => {
-      card.onclick = (e) => {
-        if (e.target.closest('.btn-upg-inv') || e.target.closest('.btn-info-inv')) return;
-        const id = card.dataset.id;
-        if (onSelect) {
-          ov.remove();
-          onSelect(id);
-        } else {
-          showCharModal(id);
-        }
-      };
+    ov.querySelectorAll('.btn-info-inv').forEach(btn=>btn.onclick=()=>{
+      showCharModal(btn.dataset.id);
+      const sheet=document.querySelector('#sheet-close')?.closest('.overlay');if(!sheet)return;
+      const closeSheet=()=>{sheet.remove();if(btn.isConnected)btn.focus({preventScroll:true});};
+      sheet.querySelector('#sheet-close').onclick=closeSheet;
+      sheet.onclick=e=>{if(e.target===sheet)closeSheet();};
+      sheet.querySelector('.modal').setAttribute('role','dialog');sheet.querySelector('.modal').setAttribute('aria-modal','true');sheet.querySelector('.modal').setAttribute('aria-label',`Ficha de ${CHARS[evolutionFormAt(btn.dataset.id,startLvlOf(btn.dataset.id))].name}`);
+      bindCollectionDialog(sheet,closeSheet,'#sheet-close');
     });
-
-    ov.querySelectorAll('.btn-info-inv').forEach(btn => {
-      btn.onclick = e => {
-        e.stopPropagation();
-        showCharModal(btn.dataset.id);
-      };
-    });
-
-    const closeBtn = ov.querySelector('#inv-close-btn');
-    if (closeBtn) closeBtn.onclick = () => ov.remove();
-
-    const closeX = ov.querySelector('#inv-close-x');
-    if (closeX) closeX.onclick = () => ov.remove();
+    ov.querySelector('#inv-logpose-info').onclick=()=>{
+      const returnFocus=()=>ov.querySelector('#inv-logpose-info')?.focus({preventScroll:true});
+      modalInfo('🧭 Log Poses de navegación','<div class="collection-help"><p>Sirven para subir el <strong>nivel base permanente</strong> de tus nakamas y desbloquear sus evoluciones.</p><p>Se obtienen al derrotar enemigos: en East Blue, cada pirata entrega 3, cada marine 4 y cada jefe 7. La cantidad se multiplica por el número de saga.</p><p>El coste aumenta con cada nivel. El nivel máximo disponible depende de tu progreso en las sagas.</p></div>',returnFocus);
+      const help=document.querySelector('#modal-ok').closest('.overlay');const closeHelp=()=>{help.remove();returnFocus();};
+      help.querySelector('.modal').setAttribute('role','dialog');help.querySelector('.modal').setAttribute('aria-modal','true');help.querySelector('.modal').setAttribute('aria-label','Log Poses de navegación');
+      bindCollectionDialog(help,closeHelp,'#modal-ok');
+    };
   };
-
-  bindEvents();
-  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  bindEvents();ov.onclick=e=>{if(e.target===ov)close();};bindCollectionDialog(ov,close,'#inv-title');
 }
+
 
 // ============ PANTALLA: INICIAL ============
 const starterView = { q: '', saga: '', type: '', rarity: 0, sort: 'default', page: 0 };
