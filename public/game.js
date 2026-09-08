@@ -2824,7 +2824,6 @@ function showInventoryModal(opts = {}) {
         <label for="inv-type">Tipo<select id="inv-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t=>`<option value="${t}" ${invViewState.type===t?'selected':''}>${t}</option>`).join('')}</select></label>
         <label for="inv-rarity">Rareza<select id="inv-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r=>`<option value="${r}" ${+invViewState.rarity===r?'selected':''}>${r} ${r===1?'estrella':'estrellas'}</option>`).join('')}</select></label>
         <label for="inv-sort">Ordenar<select id="inv-sort">${[['name','Nombre A–Z'],['rarezaDesc','Mayor rareza'],['rarezaAsc','Menor rareza'],['statTotalDesc','Mayor fuerza base']].map(([v,l])=>`<option value="${v}" ${invViewState.sort===v?'selected':''}>${l}</option>`).join('')}</select></label>
-        <div class="inventory-columns">${mobileColumnsControl()}<small>En pantallas estrechas se muestran 2 columnas para facilitar la lectura.</small></div>
       </div></details>
       <div class="collection-results"><span role="status">${ids.length} nakamas${ids.length?` · ${page*pageSize+1}–${Math.min((page+1)*pageSize,ids.length)}`:''}</span><button class="collection-text-button" id="inv-reset">Limpiar filtros</button></div>
       <div id="inv-cards-grid" class="collection-list inventory-grid" aria-label="Lista de nakamas" tabindex="0">${cards||'<div class="collection-empty"><h3>No hay nakamas con estos filtros</h3><p>Prueba otro nombre o limpia los filtros.</p></div>'}</div>

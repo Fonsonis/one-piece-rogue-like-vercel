@@ -67,27 +67,25 @@
 .achievement-reward > span { font-size:12px; color:var(--collection-muted); }
 .achievement-reward .btn { width:100%; }
 
-.collection-modal #inv-cards-grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); align-items:stretch; align-content:start; gap:12px; padding:4px; border:0; background:none; }
+html .collection-modal #inv-cards-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr))!important; align-items:stretch; align-content:start; gap:12px; padding:4px; border:0; background:none; }
 .inventory-card { display:flex; flex-direction:column; min-width:0; border:1px solid var(--collection-line); border-radius:12px; padding:12px; background:var(--collection-surface); }
 .inventory-card.in-team { border-color:#508b78; box-shadow:inset 0 3px #508b78; }
 .inventory-card-top { display:flex; justify-content:space-between; align-items:center; gap:6px; color:var(--collection-muted); font-size:11px; }
 .inventory-rarity { flex-shrink:0; color:#745210; background:#fff0c6; border-radius:5px; padding:2px 5px; font-weight:750; }
 .inventory-profile { display:flex; flex-direction:column; align-items:center; justify-content:start; gap:6px; width:100%; flex:1; padding:6px 0; border:0; border-radius:7px; background:none; color:var(--collection-ink); text-align:center; }
 .inventory-profile:hover { background:var(--collection-soft); }
-.inventory-portrait { display:flex; align-items:center; justify-content:center; width:100%; height:94px; }
+.inventory-portrait { display:flex; align-items:center; justify-content:center; width:100%; height:80px; }
 .inventory-profile strong { font:750 16px/1.35 system-ui,sans-serif; overflow-wrap:anywhere; }
 .inventory-profile-link { font-size:12px; text-decoration:underline; text-underline-offset:2px; color:var(--collection-muted); }
-.inventory-level { display:flex; justify-content:space-between; align-items:center; margin:8px 0; padding:6px 8px; background:var(--collection-soft); border-radius:6px; color:var(--collection-muted); font-size:13px; }
+.inventory-level { display:flex; justify-content:space-between; align-items:center; margin:6px 0; padding:6px 8px; background:var(--collection-soft); border-radius:6px; color:var(--collection-muted); font-size:13px; }
 .inventory-level strong { font-size:19px; color:var(--collection-ink); }
 .inventory-card .type-badges { justify-content:center; flex-wrap:wrap; gap:4px; min-height:24px; }
 .collection-modal #inv-cards-grid .type-badge { font:650 10px/1.3 system-ui,sans-serif; padding:4px 6px; }
-.inventory-upgrade { display:flex; flex-direction:column; gap:7px; text-align:center; padding-top:11px; margin-top:11px; border-top:1px solid var(--collection-line); }
+.inventory-upgrade { display:flex; flex-direction:column; gap:7px; text-align:center; padding-top:8px; margin-top:8px; border-top:1px solid var(--collection-line); }
 .inventory-cost,.inventory-limit,.inventory-shortfall { font-size:12px; color:var(--collection-muted); }
 .inventory-cost strong { color:var(--collection-ink); }
 .inventory-shortfall { font-size:11px; }
 .collection-modal .inventory-filters { grid-template-columns:repeat(3,minmax(0,1fr)); }
-.inventory-columns { display:none; }
-.inventory-columns small { display:block; font-size:12px; color:var(--collection-muted); }
 
 html[data-theme="dark"] .collection-modal { --collection-ink:#eff6f4; --collection-muted:#c1d0d1; --collection-line:#50676b; --collection-surface:#182e38; --collection-soft:#253f49; --collection-ready:#94e0b7; border-top-color:#d9ab52; }
 html[data-theme="dark"] .achievement-card.ready { background:linear-gradient(90deg,#1c4436,var(--collection-surface) 75%); border-color:#65ac87; }
@@ -105,8 +103,6 @@ html[data-theme="dark"] .collection-modal :is(button,input,select,summary):focus
   .collection-summary > * > span { font-size:12px; }
   .collection-modal .collection-search { gap:8px; grid-template-columns:minmax(0,1.2fr) minmax(120px,1fr); }
   .collection-modal .inventory-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
-  .collection-modal .inventory-filters .mobile-columns-control { display:flex; }
-  .inventory-columns { display:block; }
   .achievement-card { grid-template-columns:34px minmax(0,1fr); gap:10px; padding:12px; }
   .achievement-card.ready { padding:11px; }
   .achievement-icon { width:34px; height:34px; font-size:24px; }
@@ -114,20 +110,17 @@ html[data-theme="dark"] .collection-modal :is(button,input,select,summary):focus
   .achievement-reward strong { font-size:18px; }
   .achievement-reward strong span { display:inline; }
   .achievement-reward .btn { width:auto; min-width:114px; }
-  .collection-modal #inv-cards-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
-  .inventory-card { padding:9px; }
+  html .collection-modal #inv-cards-grid { gap:6px; }
+  .inventory-card { padding:6px; }
   .inventory-card-top { flex-wrap:wrap; gap:3px; }
   .inventory-profile strong { font-size:14px; }
-  .inventory-portrait { height:80px; }
+  .inventory-portrait { height:64px; }
   .collection-modal #inv-cards-grid .btn { min-height:44px; padding:8px 5px!important; font:650 13px/1.35 system-ui,sans-serif!important; }
   .collection-modal #inv-cards-grid .type-badge { padding:3px 4px; font-size:10px; }
-  .inventory-level { padding:5px; flex-wrap:wrap; gap:3px; font-size:12px; }
+  .inventory-level { padding:5px; flex-direction:column; gap:3px; font-size:12px; }
   .inventory-cost,.inventory-limit,.inventory-shortfall { overflow-wrap:anywhere; }
   .collection-modal .collection-pagination .btn { padding:8px; font-size:13px; }
   .collection-pagination { gap:6px; }
-}
-@media(max-width:480px) {
-  html[data-mobile-columns] .collection-modal #inv-cards-grid { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
 }
 @media(max-height:620px) {
   .modal.collection-modal { display:block; height:auto; overflow-y:auto; }
