@@ -7659,10 +7659,10 @@ function screenDex() {
     ${topbar(false)}
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
     <div class="panel pirate-dex">
-      <h2>📖 Dex Pirata — ${meta.dex.length}/${all.length} avistados, ${meta.recruited.length} reclutados</h2>
+      <header class="dex-header"><h2>📖 Dex Pirata</h2><div class="dex-progress" aria-label="Progreso de la colección"><span><strong>${meta.dex.length} <small>/ ${all.length}</small></strong>Avistados</span><span><strong>${meta.recruited.length}</strong>Reclutados</span></div></header>
       ${charControlsHTML(dexView, { sagas: sagaOpts })}
       <div id="char-grid"></div>
-      <div style="font-size:8px;color:#888;margin-top:10px;text-align:center;">Toca un personaje avistado para ver su ficha completa. Los no avistados solo muestran su nombre.</div>
+      <p class="dex-help">Toca un personaje avistado para abrir su ficha. Los no avistados solo muestran su nombre.</p>
     </div>
   `);
   $('#btn-back').onclick = screenHome;
