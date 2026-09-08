@@ -11,6 +11,61 @@ function setup(towerMode=false) {
   return h;
 }
 
+test('quick battle items consume one unit per click without pausing or opening a modal',()=>{
+  for (const tower of [false,true]) {
+    const h=setup(tower), button={dataset:{bagItem:'carne',bagCount:'3'}};
+    h.ctx.bagRoot={querySelectorAll:s=>s==='[data-bag-item]'?[button]:[]};
+    h.ctx.document.createElement=()=>{throw Error('Quick use must not open a modal');};
+    h.exec(`meta.settings.quickBattleItems=true;battle.items.carne=3;
+      battle.curP.maxhp=1000;battle.curP.hp=1;
+      bindBackpack(bagRoot,battle.tower?tower:run,true,()=>{});`);
+    const pending=h.pending();
+    button.onclick();button.onclick();button.onclick();button.onclick();
+    assert.equal(h.exec('battle.items.carne'),0);
+    assert.equal(h.exec('battle.curP.hp'),91);
+    assert.equal(h.exec('battle.waiting'),false);
+    assert.equal(h.pending(),pending);
+  }
+});
+
+test('quick use keeps full HP, KO, pause, defeat, Nuzlocke and duplicate boost guards',()=>{
+  const h=setup();
+  h.ctx.document.createElement=()=>{throw Error('Quick use must not open a modal');};
+  h.exec(`meta.settings.quickBattleItems=true;run.items.carne=2;run.items.sake=1;
+    var clickItem=id=>showBackpackItem(run,id,1,true,()=>{});
+    battle.curP.hp=battle.curP.maxhp;clickItem('carne');
+    battle.curP.hp=0;clickItem('carne');
+    run.mode='nuzlocke';clickItem('sake');
+    battle.curP.hp=1;battle.waiting=true;clickItem('carne');
+    battle.waiting=false;battle.over=true;clickItem('carne');
+    battle.over=false;clickItem('bebida_ataque');clickItem('bebida_ataque');`);
+  assert.equal(h.exec('run.items.carne'),2);
+  assert.equal(h.exec('run.items.sake'),1);
+  assert.equal(h.exec('run.items.bebida_ataque'),1);
+});
+
+test('quick use is opt-in and the setting survives saving and loading',()=>{
+  const h=setup(), actions=new Map();let opened=0;
+  const overlay={remove(){},querySelector(s){if(!actions.has(s))actions.set(s,{});return actions.get(s);}};
+  h.ctx.document.createElement=()=>overlay;
+  h.ctx.document.body={appendChild(){opened++;}};
+  h.exec("showBackpackItem(run,'bebida_ataque',2,true,()=>{})");
+  assert.equal(opened,1);
+  assert.equal(h.exec('run.items.bebida_ataque'),2);
+  assert.equal(h.exec('battle.waiting'),true);
+  actions.get('[data-bag-close]').onclick();
+  h.exec(`meta.settings.quickBattleItems=true;
+    loadedSave=GameSaveStorage.parse(JSON.stringify(GameSaveStorage.payload(meta,run)));
+    validateGameSave(loadedSave);loadMeta();`);
+  assert.equal(h.exec('meta.settings.quickBattleItems'),true);
+  h.exec("showBackpackItem(run,'bebida_ataque',2,true,()=>{})");
+  assert.equal(opened,1);
+  assert.equal(h.exec('run.items.bebida_ataque'),1);
+  h.exec("meta.settings.quickBattleItems=false;showBackpackItem(run,'bebida_defensa',1,true,()=>{})");
+  assert.equal(opened,2);
+  assert.equal(h.exec('run.items.bebida_defensa'),1);
+});
+
 test('combat bag has its own free space and only displays usable items',()=>{
   const h=setup();
   h.exec('run.items={cartel:4,fruta_diablo:1,carne:1,bebida_ataque:1,bebida_defensa:1};run.pendingLoot={cartel:1}');
