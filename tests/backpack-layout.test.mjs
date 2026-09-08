@@ -48,10 +48,10 @@ test('new items are placed automatically; existing stacks merge without moving o
 
 test('automatic placement rotates to use a vertical gap and reorganizes fragmented space only when needed',()=>{
  const h=setup();
- h.exec('run.items={carne:9,cartel:1};run.bagLayout={"carne:0":{cell:0,vertical:false},"carne:1":{cell:3,vertical:false},"carne:2":{cell:7,vertical:false},"cartel:0":{cell:8,vertical:false}};');
+ h.exec('run.items={carne:9,cartel:1};run.bagLayout={"carne:0":{cell:0,vertical:false},"carne:1":{cell:1,vertical:false},"carne:2":{cell:2,vertical:false},"cartel:0":{cell:8,vertical:false}};');
  assert.equal(h.exec('receiveBackpackItem(run,"sake")'),true);
  assert.equal(h.exec('run.bagLayout["carne:0"].cell'),0);
- assert.equal(h.exec('run.bagLayout["carne:1"].cell'),3);
+ assert.equal(h.exec('run.bagLayout["carne:1"].cell'),1);
  assert.equal(h.exec('receiveBackpackItem(run,"carnereal")'),true);
  assert.equal(h.exec('run.bagLayout["carnereal:0"].vertical'),true);
  assert.equal(h.exec('run.bagLayout["cartel:0"].cell'),8,'the island bag is independent');
