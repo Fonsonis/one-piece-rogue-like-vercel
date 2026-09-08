@@ -3665,24 +3665,35 @@ function backpackUsed(items, combat = null) {
     return sum + (item && count > 0 && (combat === null || isBattleItem(id) === combat) ? Math.ceil(count / backpackStackLimit()) * item.slotSize : 0);
   }, 0);
 }
-function backpackFits(owner, id, count = 1) {
-  if (!owner || !ITEMS[id] || !Number.isInteger(count) || count <= 0) return false;
+function planBackpackAddition(owner, id, count = 1) {
+  if (!owner || !ITEMS[id] || !Number.isInteger(count) || count <= 0) return null;
   const items = {...owner.items, [id]:(owner.items[id] || 0) + count};
-  return backpackUsed(items,isBattleItem(id)) <= backpackCapacity() &&
-    !planBackpack({...owner,items}).missing.some(s => isBattleItem(s.id) === isBattleItem(id));
+  const category = isBattleItem(id);
+  if (backpackUsed(items,category) > backpackCapacity()) return null;
+  let plan = planBackpack({...owner,items});
+  const fits = () => !plan.missing.some(s => isBattleItem(s.id) === category);
+  if (!fits()) {
+    // Reorganize this bag only when the free cells are too fragmented.
+    const bagLayout = Object.fromEntries(backpackStacks(owner)
+      .filter(s => isBattleItem(s.id) !== category && owner.bagLayout?.[s.key])
+      .map(s => [s.key,owner.bagLayout[s.key]]));
+    plan = planBackpack({...owner,items,bagLayout},true);
+  }
+  return fits() ? plan : null;
+}
+function backpackFits(owner, id, count = 1) {
+  return !!planBackpackAddition(owner,id,count);
 }
 function addBackpackItem(owner, id, count = 1) {
-  if (!backpackFits(owner, id, count)) return false;
+  const plan = planBackpackAddition(owner,id,count);
+  if (!plan) return false;
   owner.items[id] = (owner.items[id] || 0) + count;
-  owner.bagLayout = planBackpack(owner).layout;
+  owner.bagLayout = plan.layout;
   return true;
 }
 function receiveBackpackItem(owner, id, count = 1) {
   if (!ITEMS[id] || !Number.isInteger(count) || count < 1) return false;
-  const before = Math.ceil((owner.items[id] || 0) / backpackStackLimit());
-  const after = Math.ceil(((owner.items[id] || 0) + count) / backpackStackLimit());
-  // A new footprint waits in the tray until the player chooses its location.
-  const stored = before === after && addBackpackItem(owner, id, count);
+  const stored = addBackpackItem(owner, id, count);
   if (!stored) {
     owner.pendingLoot ||= {};
     owner.pendingLoot[id] = (owner.pendingLoot[id] || 0) + count;
@@ -3724,7 +3735,7 @@ function backpackCells(size, cell, vertical = false, capacity = backpackCapacity
   if (!Number.isInteger(cell) || cell < 0 || cell % 3 + w > 3 || Math.floor(cell / 3) + h > capacity / 3) return [];
   return Array.from({length:h},(_,r)=>Array.from({length:w},(_,c)=>cell+r*3+c)).flat();
 }
-function planBackpack(owner) {
+function planBackpack(owner, horizontalFirst = false) {
   const stacks = backpackStacks(owner), layout = {}, missing = [], occupied = [new Set(),new Set()];
   const reserve = (s,pos) => {
     if (!pos || typeof pos.vertical !== 'boolean') return false;
@@ -3735,11 +3746,14 @@ function planBackpack(owner) {
   };
   // Keep valid user placements. Pack only new stacks and legacy inventories.
   for (const s of stacks) reserve(s,owner.bagLayout?.[s.key]);
+  const positions = Array.from({length:backpackCapacity()},(_,cell)=>[
+    {cell,vertical:false},{cell,vertical:true}
+  ]).flat();
+  // During repacking, keep full-width pieces in rows before using narrow side gaps.
+  if (horizontalFirst) positions.sort((a,b)=>Number(a.vertical)-Number(b.vertical));
   for (const s of stacks.filter(s=>!layout[s.key]).sort((a,b)=>b.size-a.size)) {
     let stored = false;
-    for (let cell=0; cell<backpackCapacity() && !stored; cell++) {
-      for (const vertical of [false,true]) if (reserve(s,{cell,vertical})) { stored=true;break; }
-    }
+    for (const pos of positions) if (reserve(s,pos)) { stored=true;break; }
     if (!stored) missing.push(s);
   }
   return {layout,missing};
@@ -7526,12 +7540,6 @@ function screenShip() {
     <div class="panel">
       <h2>🏪 Tienda</h2>
       <p>Mejoras permanentes · Cuenta Nv${accLvl}</p>
-      <div class="global-upg-row">
-        <span class="upg-emoji">🎒</span><div class="upg-details"><b class="upg-name">Ampliar ambas mochilas</b>
-          <div class="upg-desc">${backpackCapacity()} casillas cada una · Pilas de ${backpackStackLimit()} · ${backpackCapacity() < 60 ? '+3 casillas en cada mochila y +1 unidad por pila' : 'Capacidad máxima'}</div>
-          ${backpackCapacity() < 60 ? `<span class="price">⭐${backpackUpgradeCost()} Fama</span>` : ''}</div>
-        <div class="upg-action"><button class="btn small green" id="btn-buy-backpack" ${backpackCapacity() >= 60 || meta.fame < backpackUpgradeCost() ? 'disabled' : ''}>${backpackCapacity() >= 60 ? 'MÁXIMO' : 'AMPLIAR +3'}</button></div>
-      </div>
       <section class="ship-training" aria-label="Entrenamiento de nakamas">
         <h2>Entrena a tu tripulación</h2>
         <p>Elige un retrato y mejora sus stats.</p>
@@ -7582,6 +7590,12 @@ function screenShip() {
 
       <h2 style="font-size:11px;margin-top:14px;">🌍 Añadidos globales</h2>
       <div class="global-upg-grid">
+        <div class="global-upg-row">
+          <span class="upg-emoji">🎒</span><div class="upg-details"><b class="upg-name">Ampliar ambas mochilas</b>
+            <div class="upg-desc">${backpackCapacity()} casillas cada una · Pilas de ${backpackStackLimit()} · ${backpackCapacity() < 60 ? '+3 casillas en cada mochila y +1 unidad por pila' : 'Capacidad máxima'}</div>
+            ${backpackCapacity() < 60 ? `<span class="price">⭐${backpackUpgradeCost()} Fama</span>` : ''}</div>
+          <div class="upg-action"><button class="btn small green" id="btn-buy-backpack" ${backpackCapacity() >= 60 || meta.fame < backpackUpgradeCost() ? 'disabled' : ''}>${backpackCapacity() >= 60 ? 'MÁXIMO' : 'AMPLIAR +3'}</button></div>
+        </div>
         ${availableGlobals.map(([id, it]) => {
         const owned = !!meta.global[id];
         const locked = accLvl < it.lvl;

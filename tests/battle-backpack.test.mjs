@@ -130,8 +130,8 @@ test('drinks are sold for 200 Berries and need two free slots; iron stays unavai
   assert.doesNotMatch(html,/data-buy="hierro"/);
   button.onclick();assert.equal(h.exec('run.berries'),500);
   h.exec('run.items.carne=21');button.onclick();
-  assert.equal(h.exec('run.pendingLoot.bebida_defensa'),1);
-  assert.equal(h.exec('placePendingBackpackItem(run,"bebida_defensa",7,false)'),true);
+  assert.equal(h.exec('run.pendingLoot.bebida_defensa||0'),0);
+  assert.equal(h.exec('run.items.bebida_defensa'),1);
   assert.equal(h.exec('run.berries'),300);assert.equal(h.exec('backpackUsed(run.items)'),9);
   h.exec("useItemFromMap('bebida_defensa')");
   assert.equal(h.exec('run.items.bebida_defensa'),1);

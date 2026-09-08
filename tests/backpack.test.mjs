@@ -122,7 +122,7 @@ test('shop hides iron and never charges for a purchase that no longer fits', () 
   const buy = {dataset:{buy:'sake'}};
   h.ctx.render = s => {html=s;};
   h.ctx.document.querySelectorAll = selector=>selector==='[data-buy]'?[buy]:[];
-  h.exec('showBackpackOrganizer=()=>{};');
+  h.exec('showBackpackOrganizer=()=>{throw Error("A fitting purchase should be stored automatically");};');
   h.exec('run.items={carne:27};run.berries=10000;screenShop()');
   assert.doesNotMatch(html,/data-buy="hierro"/);
   assert.match(html,/SIN ESPACIO/);
@@ -131,9 +131,7 @@ test('shop hides iron and never charges for a purchase that no longer fits', () 
   h.exec('run.items.carne=15');
   buy.onclick();
   assert.equal(h.exec('run.berries'),9600);
-  assert.equal(h.exec('run.pendingLoot.sake'),1);
-  h.exec('moveBackpackStack(run,"carne:3",6,false);moveBackpackStack(run,"carne:4",3,false);');
-  assert.equal(h.exec('placePendingBackpackItem(run,"sake",4,false)'),true);
+  assert.equal(h.exec('run.pendingLoot.sake||0'),0);
   assert.equal(h.exec('run.items.sake'),1);
   assert.equal(h.exec('backpackUsed(run.items)'),9);
 });
