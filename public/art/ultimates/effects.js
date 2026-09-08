@@ -28,15 +28,17 @@
     const m={pose:t<.08||t>.94?0:t<.27||t>.76?1:2,travel:0,lift:0,angle:0,stretch:0,scale:1,echoes:0,alpha:1};
     if(reduced){m.pose=2;return m;}
     if(p.id==='luffy5'){
-      // Inflate, raise a foot, then drive it into the floor before shrinking home.
+      // Hold the raised knee, then accelerate the articulated leg into the stomp.
       const grow=ease(between(t,.08,.32)), home=ease(between(t,.78,.98));
-      const rise=ease(between(t,.32,.48)), slam=between(t,.48,.58)**3;
+      const rise=ease(between(t,.28,.43)), slam=between(t,.52,.62)**3;
       m.scale=1+1.25*grow*(1-home);
       m.travel=.9*ease(between(t,.28,.48))*(1-home);
-      m.lift=.3*rise*(1-slam)*(1-home);
-      m.angle=-.08*rise*(1-slam);
-      m.pose=t>=.58&&t<.78?1:0;
-      m.footLift=.2*rise*(1-slam);
+      const raised=rise*(1-slam)*(1-home);
+      m.lift=.2*raised;
+      m.angle=-.06*raised;
+      m.pose=t>=.08&&t<.94?1:0;
+      m.legBend=raised;
+      m.footScale=1+.65*grow*(1-home);
       return m;
     }
     const moving=t>=.27&&t<=.76;
@@ -109,18 +111,31 @@
         ctx.drawImage(image,frame,0,split*ratio,unit,originX,originY,split*k,sz);
         ctx.drawImage(image,frame+split*ratio,0,(tip-split)*ratio,unit,originX+split*k,originY,(tip-split)*k+extra,sz);
         ctx.drawImage(image,frame+tip*ratio,0,(192-tip)*ratio,unit,originX+tip*k+extra,originY,(192-tip)*k,sz);
-      }else if(state.footLift>0){
-        // Raise the leading leg from the guard cell, keeping its original pixels.
-        const splitY=142,splitX=96,k=sz/192;
-        ctx.drawImage(image,frame,0,unit,splitY*ratio,originX,originY,sz,splitY*k);
-        ctx.drawImage(image,frame,splitY*ratio,splitX*ratio,(192-splitY)*ratio,originX,originY+splitY*k,splitX*k,(192-splitY)*k);
-        ctx.drawImage(image,frame+splitX*ratio,splitY*ratio,(192-splitX)*ratio,(192-splitY)*ratio,originX+splitX*k,originY+splitY*k-state.footLift*sz,(192-splitX)*k,(192-splitY)*k);
+      }else if(state.footScale>1&&state.pose===1){
+        // A hip → knee → ankle chain keeps the leg attached throughout the swing.
+        // Sample the planted windup pose; overlapping joints hide crop seams.
+        const k=sz/192,bend=state.legBend||0;
+        const slice=(sx,sy,w,h,dx,dy)=>ctx.drawImage(image,frame+sx*ratio,sy*ratio,w*ratio,h*ratio,dx,dy,w,h);
+        ctx.save();ctx.translate(originX,originY);ctx.scale(k,k);
+        // Back leg and sash retain their authored position.
+        slice(0,142,107,50,0,142);
+        ctx.save();ctx.translate(112,145);ctx.rotate(-1.65*bend);
+        slice(107,139,31,21,-5,-6);
+        ctx.translate(11,12);ctx.rotate(.95*bend);
+        slice(117,155,19,21,-6,-2);
+        ctx.translate(0,17);ctx.rotate(.7*bend);
+        ctx.scale(state.footScale,state.footScale);
+        slice(116,172,24,9,-7,-2);
+        ctx.restore();
+        // Draw the waist over the hip joint so there is never a floating limb.
+        slice(0,0,192,145,0,0);
+        ctx.restore();
       }else ctx.drawImage(image,frame,0,unit,unit,originX,originY,sz,sz);
       ctx.restore();
     };
     if(defender?.image){
       const stomp=p.id==='luffy5';
-      const reaction=hit&&!reduced?Math.sin(Math.PI*between(t,stomp?.58:.43,.82)):0;
+      const reaction=hit&&!reduced?Math.sin(Math.PI*between(t,stomp?.62:.43,.82)):0;
       const ds=defender.size;
       drawActor(defender.image,{pose:reaction>0?3:0,angle:-reaction*.09},
         defender.x+dir*reaction*ds*(stomp?.12:.035),defender.y-(stomp?reaction*ds*.12:0),ds,1,0,-dir);
