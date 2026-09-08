@@ -1085,6 +1085,11 @@ function showSettingsModal() {
         ${['carne','carnereal','bocadillo','sake'].map(id=>`<label><input type="checkbox" data-setting-bag-item="${id}" ${bagAuto.items[id] ? 'checked' : ''}> ${ITEMS[id].emoji} ${ITEMS[id].name}</label>`).join('')}
         <p>Prioriza la cura más pequeña que cubra el daño. Máximo un objeto por nakama en cada comprobación. El sake revive a un caído y respeta Nuzlocke. Frutas, mejoras y carteles conservan su uso actual.</p>
       </fieldset>
+      <fieldset class="bag-auto-settings">
+        <legend>🎒 Uso manual en combate</legend>
+        <label><input type="checkbox" id="setting-bag-quick-use" ${meta.settings.quickBattleItems === true ? 'checked' : ''}> Usar objetos sin confirmación</label>
+        <p>Al pulsar un objeto durante el combate se usa una unidad al instante. Puedes pulsar varios seguidos sin abrir su ficha.</p>
+      </fieldset>
       <div style="display:flex;flex-direction:column;gap:12px;margin:16px 0;">
         <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.05);padding:10px;border-radius:6px;border:1px solid #ccc;">
           <div style="flex:1;padding-right:10px;">
@@ -1124,6 +1129,10 @@ function showSettingsModal() {
   document.body.appendChild(ov);
 
   ov.querySelector('#setting-bag-auto').onchange = e => setAutoBackpackSettings({enabled:e.target.checked});
+  ov.querySelector('#setting-bag-quick-use').onchange = e => {
+    meta.settings.quickBattleItems = e.target.checked;
+    saveMeta();
+  };
   ov.querySelector('#setting-bag-where').onchange = e => setAutoBackpackSettings({where:e.target.value});
   ov.querySelector('#setting-bag-threshold').onchange = e => setAutoBackpackSettings({threshold:Number(e.target.value)});
   ov.querySelectorAll('[data-setting-bag-item]').forEach(input => {
@@ -3654,6 +3663,7 @@ function showBackpackItem(owner, id, count, combat, refresh) {
   if (!(owner.items[id] > 0) || (combat && !isBattleItem(id))) return;
   const b = combat ? battle : null;
   if (combat && (!b || b.over || b.waiting)) return;
+  if (combat && meta.settings.quickBattleItems === true) return useBattleItem(id);
   if (b) pauseBattle();
   const item = ITEMS[id], ov = document.createElement('div');
   ov.className = 'overlay';
