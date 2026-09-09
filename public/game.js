@@ -5002,7 +5002,7 @@ function addToTeam(f, done) {
 
 // ============ FICHA DE PERSONAJE ============
 // Muestra las características reales del personaje en la saga (nivel, fusiones y barco).
-function showCharModal(fOrId) {
+function showCharModal(fOrId, existingOverlay = null) {
   const isLive = typeof fOrId === 'object';
   const previewId = !isLive && !BASE_OF[fOrId] ? evolutionFormAt(fOrId, startLvlOf(fOrId)) : fOrId;
   const f = isLive ? migrateFighter(fOrId, !!battle?.eTeam.includes(fOrId)) : applyUpgrades(makeChar(previewId, startLvlOf(fOrId), false, true));
@@ -5032,9 +5032,10 @@ function showCharModal(fOrId) {
   const canAffordUpg = (meta.logPoses || 0) >= upgCost;
   const isMaxLvl = f.lvl >= cap;
 
-  const ov = document.createElement('div');
+  const ov = existingOverlay || document.createElement('div');
+  const closeSheet = existingOverlay?.querySelector('#sheet-close')?.onclick || (() => ov.remove());
   ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal char-sheet">
+  ov.innerHTML = `<div class="modal char-sheet" role="dialog" aria-modal="true" aria-label="Ficha de ${collectionText(c.name)}">
     <h2><span style="font-size:26px;vertical-align:middle;">${charIcon(f.id, 34)}</span> ${c.name}${rarityTag}${fusionTag} <small>Nv.${f.lvl}</small></h2>
     <div class="char-sheet-hero" style="text-align:center;padding:12px;margin:8px 0 12px;background:radial-gradient(ellipse at center, rgba(232, 200, 50, 0.22) 0%, rgba(0,0,0,0.35) 75%);border:2px solid var(--gold);border-radius:8px;position:relative;">
       <div class="char-sheet-sprite" data-character="${f.id}" style="display:inline-block;filter:drop-shadow(3px 5px 8px rgba(0,0,0,0.6));">
@@ -5097,7 +5098,20 @@ function showCharModal(fOrId) {
       <button class="btn gray" id="sheet-close" style="width:100%;">CERRAR</button>
     </div>
   </div>`;
-  document.body.appendChild(ov);
+  if (!existingOverlay) document.body.appendChild(ov);
+  const upgradeBtn = ov.querySelector('#sheet-upg-btn');
+  if (upgradeBtn) {
+    let upgrading = false;
+    upgradeBtn.onclick = () => {
+      if (upgrading || upgradeBtn.disabled) return;
+      upgrading = true;
+      if (!upgradeCharLvl(f.id)) { upgrading = false; return; }
+      const scrollTop = ov.querySelector('.modal').scrollTop;
+      showCharModal(fOrId, ov);
+      ov.querySelector('.modal').scrollTop = scrollTop;
+      (ov.querySelector('#sheet-upg-btn:not(:disabled)') || ov.querySelector('#sheet-close')).focus?.({preventScroll:true});
+    };
+  }
   const dismissBtn = ov.querySelector('#sheet-dismiss-btn');
   if (dismissBtn) {
     dismissBtn.onclick = () => {
@@ -5121,8 +5135,8 @@ function showCharModal(fOrId) {
       );
     };
   }
-  ov.querySelector('#sheet-close').onclick = () => ov.remove();
-  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.querySelector('#sheet-close').onclick = closeSheet;
+  if (!existingOverlay) ov.onclick = e => { if (e.target === ov) closeSheet(); };
 }
 
 // ============ EVENTO: CROSSGUILD ============
@@ -7008,7 +7022,7 @@ function doCrossoverEvent(island) {
   // el aire dimensional reconforta: la banda consciente recupera un 50% de PS
   run.team.forEach(f => { if (f.hp > 0) f.hp = Math.min(f.maxhp, f.hp + Math.floor(f.maxhp * 0.5)); });
   saveRun();
-  const lvl = island.bossLvl[island.bossLvl.length - 1] + 1;
+  const lvl = island.bossLvl[island.bossLvl.length - 1] + 50;
   const bossId = pick(s.bosses);
   const escorts = s.bosses.filter(id => id !== bossId)
     .sort(() => Math.random() - 0.5)
