@@ -116,6 +116,7 @@ const AUTO_DEFAULTS = () => ({
   specialAction:'manual', chainItem:'risk', chainFail:'fight', crossoverAction:'fight',
   revive:true, useUltimates:true, healItems:['carne','carnereal','bocadillo'],
   reserveBerries:0, pauseEvents:[],
+  fullTeamAction:'keep', fullBagAction:'leave',
   shopItems:[{id:'carne',qty:3},{id:'sake',qty:2},{id:'cartel',qty:2}]
 });
 function normalizeAutoSettings(value) {
@@ -130,6 +131,8 @@ function normalizeAutoSettings(value) {
     chainItem:choice('chainItem',['risk','cartel','carteldorado','cartelbuster']),
     chainFail:choice('chainFail',['fight','pay','manual']),
     crossoverAction:choice('crossoverAction',['fight','leave','manual']),
+    fullTeamAction:choice('fullTeamAction',['keep','higherLevel','manual']),
+    fullBagAction:choice('fullBagAction',['leave','manual']),
     revive:typeof v.revive==='boolean'?v.revive:d.revive,
     useUltimates:typeof v.useUltimates==='boolean'?v.useUltimates:d.useUltimates,
     healItems:Array.isArray(v.healItems)?['carne','carnereal','bocadillo'].filter(id=>v.healItems.includes(id)):d.healItems,
@@ -320,8 +323,12 @@ function showAutoSettingsModal(settingsHost = null, onClose = null) {
         <label for="auto-special-action">Crossguild</label>${select('auto-special-action',cfg.specialAction,[['manual','Pausar para elegir o jugar'],['gacha','Jugar carteles si puedo pagarlos'],['leave','Marcharme sin comprar']])}
         <p>El catálogo se elige manualmente. Si no alcanza para los carteles o Nuzlocke lo impide, se marcha.</p>
         <label for="auto-crossover">Camino alternativo · Crossover</label>${select('auto-crossover',cfg.crossoverAction,[['fight','Explorar y aceptar el duelo'],['leave','Retirarme y completar la saga'],['manual','Pausar y decidir yo']])}
+        <label for="auto-full-team">Si el equipo está lleno</label>${select('auto-full-team',cfg.fullTeamAction,[['keep','Conservar el equipo y dejar al nuevo'],['higherLevel','Sustituir al de menor nivel si el nuevo lo supera'],['manual','Pausar y decidir yo']])}
+        <p>Los personajes repetidos se fusionan. En caso de empate de nivel, se conserva el equipo.</p>
       </section>
       <section class="auto-section"><h3>🎒 Uso automático de la mochila</h3>
+        <label for="auto-full-bag">Si no cabe el objeto recogido</label>${select('auto-full-bag',cfg.fullBagAction,[['leave','Guardar lo que quepa y dejar el resto'],['manual','Pausar y decidir yo']])}
+        <p>La opción automática conserva los objetos que ya llevas y se aplica a ambas mochilas.</p>
         ${check('auto-bag-enabled','Usar objetos automáticamente',bagAuto.enabled)}
         <p>Comparte estas preferencias con Ajustes. Funciona también con el avance automático pausado.</p>
         <label for="auto-bag-where">Dónde usar objetos</label>${select('auto-bag-where',bagAuto.where,[['both','Isla y combate'],['map','Solo en la isla'],['combat','Solo en combate']])}
@@ -356,6 +363,7 @@ function showAutoSettingsModal(settingsHost = null, onClose = null) {
       const on=id=>ov.querySelector(`#${id}`).checked;
       autoSettings=normalizeAutoSettings({speed:val('auto-speed-sel'),nodePriority:val('auto-node-sel'),wildAction:val('auto-wild-sel'),
         specialAction:val('auto-special-action'),chainItem:val('auto-chain-item'),chainFail:val('auto-chain-fail'),crossoverAction:val('auto-crossover'),
+        fullTeamAction:val('auto-full-team'),fullBagAction:val('auto-full-bag'),
         healThreshold:+val('auto-heal-sel'),revive:on('auto-revive'),useUltimates:on('auto-ultimates'),reserveBerries:val('auto-reserve'),
         healItems:['carne','carnereal','bocadillo'].filter(id=>on(`auto-heal-${id}`)),pauseEvents:routes.filter(([id])=>on(`auto-pause-${id}`)).map(([id])=>id),
         shopItems:PORT_SHOP_STOCK.map(id=>({id,qty:+ov.querySelector(`[data-auto-stock="${id}"]`).value,priority:+val(`auto-priority-${id}`)})).sort((a,b)=>a.priority-b.priority)
@@ -3678,6 +3686,10 @@ function receiveBackpackItem(owner, id, count = 1) {
 }
 function resolveAutoLoot(owner) {
   if (!autoMode || !hasPendingLoot(owner)) return;
+  if (autoSettings.fullBagAction === 'manual') {
+    pauseAutoForChoice('🎒 Mochila llena: guarda o deja el objeto.');
+    return;
+  }
   const left = [];
   for (const [id, count] of Object.entries(owner.pendingLoot || {})) {
     if (!ITEMS[id] || count <= 0) continue;
@@ -4962,6 +4974,18 @@ function addToTeam(f, done) {
     run.team.push(f);
     saveRun();
     done && done(true);
+    return;
+  }
+  if (autoMode && autoSettings.fullTeamAction !== 'manual') {
+    const lowest = run.team.reduce((index, member, i) => member.lvl < run.team[index].lvl ? i : index, 0);
+    const replace = autoSettings.fullTeamAction === 'higherLevel' && f.lvl > run.team[lowest].lvl;
+    if (replace) {
+      const out = run.team[lowest];
+      run.team[lowest] = f;
+      saveRun();
+      toast(`🤖 ${charName(f)} (Nv${f.lvl}) sustituye a ${charName(out)} (Nv${out.lvl}).`);
+    } else toast(`🤖 Equipo lleno: se conserva la banda y se deja marchar a ${charName(f)}.`);
+    done && done(replace);
     return;
   }
   if(autoMode)pauseAutoForChoice('Banda llena: elige a quién sustituir.');
