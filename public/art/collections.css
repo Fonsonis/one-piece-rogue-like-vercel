@@ -1,4 +1,5 @@
 /* Readable collection dialogs; game rewards, levels and saved preferences stay in game.js. */
+#app .floating-controls #btn-abandon { flex:0 0 40px; width:40px; min-width:40px; min-height:40px; padding:6px; background:#bc4038; border-color:#96312c; color:#fff; font:20px/1 system-ui,sans-serif; }
 
 /* Guides, saga probabilities and team selection share the collection surfaces. */
 .modal.guide-modal { max-width:850px; }
@@ -11,11 +12,15 @@
 .guide-modal .sheet-section b { font-size:15px; line-height:1.5; }
 .guide-modal .sheet-section p { font:14px/1.65 system-ui,sans-serif; margin-top:8px; color:var(--collection-ink); }
 .guide-modal .synergy-guide-card.is-active { border-left:5px solid var(--collection-ready); }
-.guide-modal .chart-table { min-width:580px; width:100%; border-collapse:collapse; font:14px/1.5 system-ui,sans-serif; }
-.guide-modal .chart-table :is(th,td) { padding:12px; white-space:normal; border-color:var(--collection-line); }
+.guide-type-table { container-type:inline-size; min-width:0; }
+.guide-modal .chart-table { display:table; table-layout:fixed; min-width:0; width:100%; border-collapse:collapse; font:clamp(10px,3.3cqw,14px)/1.45 system-ui,sans-serif; overflow:visible; }
+.guide-modal .chart-table :is(th,td) { padding:clamp(3px,1cqw,10px); white-space:normal; overflow-wrap:anywhere; border-color:var(--collection-line); font-size:inherit; line-height:1.45; letter-spacing:0; }
+.guide-modal .chart-table th:nth-child(-n+3) { width:22%; }
+.guide-modal .chart-table th:last-child { width:34%; }
 .guide-modal .chart-table th { background:var(--collection-soft); color:var(--collection-ink); }
-.guide-modal .chart-table td:last-child { font:13px/1.5 system-ui,sans-serif !important; color:var(--collection-muted) !important; }
-.guide-modal .chart-table .type-badge { font:650 12px/1.4 system-ui,sans-serif; white-space:nowrap; }
+.guide-modal .chart-table td:last-child { font:inherit; color:var(--collection-muted); }
+.guide-modal .chart-table .type-badge { display:inline-block; max-width:100%; padding:clamp(2px,.8cqw,6px); font:650 .9em/1.4 system-ui,sans-serif; white-space:normal; overflow-wrap:anywhere; }
+.guide-modal .chart-table .event-sprite { width:1.1em; height:1.1em; min-width:1.1em; }
 .guide-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:10px; padding-top:12px; border-top:1px solid var(--collection-line); }
 .modal.probabilities-modal { max-width:800px; }
 .probabilities-modal #spm-saga-sel { max-width:100%; font:14px/1.5 system-ui,sans-serif !important; background:var(--collection-surface) !important; color:var(--collection-ink); border:1px solid var(--collection-line) !important; }

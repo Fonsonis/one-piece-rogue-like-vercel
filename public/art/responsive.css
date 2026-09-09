@@ -1,4 +1,34 @@
 /* Viewport-based play surfaces. Long collections scroll inside their own panel. */
+/* Every island event shares the visible viewport, even after browser zoom. */
+html:has(#island-carousel) { overflow:hidden; overscroll-behavior:none; -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+body:has(#island-carousel) { touch-action:manipulation; }
+#island-carousel { min-width:0; touch-action:manipulation; }
+#island-carousel .carousel-page { min-width:0; overflow-x:hidden; }
+body:has(#island-carousel) .overlay {
+  inset:auto; left:var(--game-view-left,0px); top:var(--game-view-top,0px);
+  width:var(--game-view-width,100vw); height:var(--game-view-height,100dvh);
+  min-width:0; max-width:none; max-height:none; overflow:hidden;
+  padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left));
+  overscroll-behavior:contain; touch-action:manipulation;
+}
+body:has(#island-carousel) .overlay .modal {
+  min-width:0; max-height:100% !important; overflow-y:auto; overflow-x:hidden;
+  overflow-wrap:anywhere; overscroll-behavior:contain;
+}
+body:has(#island-carousel) .overlay .btn { min-width:0; max-width:100%; white-space:normal; overflow-wrap:anywhere; }
+body:has(#island-carousel) .overlay .actions { flex-shrink:0; bottom:0; }
+body:has(#island-carousel) .overlay .settings-auto-content { max-height:100%; display:flex; }
+body:has(#island-carousel) .toast { max-width:calc(var(--game-view-width,100vw) - 24px); white-space:normal; overflow-wrap:anywhere; }
+@media(pointer:coarse) {
+  #app:has(#island-carousel) {
+    position:fixed; left:var(--game-view-left,0px); top:var(--game-view-top,0px);
+    width:var(--game-view-width,100vw); height:var(--game-view-height,100dvh);
+    max-width:none; min-width:0; margin:0; overflow:hidden;
+  }
+  #app:has(#island-carousel) > .topbar { flex-wrap:wrap; }
+  #app:has(#island-carousel) .floating-controls { flex-wrap:wrap; max-width:100%; }
+  body:has(#island-carousel) .overlay :is(input,select,textarea) { font-size:16px !important; }
+}
 .map-heading { display:flex; align-items:center; gap:8px; padding:6px 8px; background:#173746e8; color:#fff; flex:none; z-index:5; }
 .map-title { position:static; padding:0; flex:1; min-width:0; background:none; font-size:9px; line-height:1.5; text-align:left; }
 .map-tools { flex:none; }.map-tools .btn { min-height:40px; }
