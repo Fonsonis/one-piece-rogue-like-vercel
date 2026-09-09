@@ -150,6 +150,7 @@ function pauseAutoForChoice(message) {
 function autoCanSpend(price) {return !!run && run.berries-price >= (autoSettings.reserveBerries || 0);}
 function advanceAutoNode(r,i) {
   if(!autoMode || !run)return;
+  resolveAutoLoot(run);
   if(hasPendingLoot(run)) {
     pauseAutoForChoice('🎒 Guarda o deja los objetos pendientes para continuar.');
     screenMap(2);
@@ -286,7 +287,7 @@ function pickAutoNode(reach) {
   return pick(reach);
 }
 
-function showAutoSettingsModal() {
+function showAutoSettingsModal(settingsHost = null, onClose = null) {
   if(document.querySelector('.auto-config-overlay'))return;
   const wasAuto=autoMode, activeBattle=battle && !battle.over ? battle : null;
   const wasWaiting=activeBattle?.waiting;
@@ -339,7 +340,13 @@ function showAutoSettingsModal() {
     </div>
     <footer class="auto-footer"><button class="btn gray" id="auto-save-only">Guardar y pausar</button><button class="btn green" id="auto-apply-start">Guardar y activar</button></footer>
   </div>`;
-  document.body.appendChild(ov);
+  if (settingsHost) {
+    settingsHost.classList.add('auto-config-overlay');
+    ov.className = 'settings-auto-content';
+    settingsHost.replaceChildren(ov);
+    ov.querySelector('.auto-header small').textContent = 'AJUSTES / MODO AUTOMÁTICO';
+    ov.querySelector('#auto-title').textContent = 'Modo automático';
+  } else document.body.appendChild(ov);
   PORT_SHOP_STOCK.forEach(id=>ov.querySelector(`#auto-priority-${id}`).setAttribute('aria-label',`Prioridad de ${ITEMS[id].name}`));
   let closed=false;
   const close=(mode,save)=>{
@@ -360,12 +367,14 @@ function showAutoSettingsModal() {
       if(activeBattle && battle===activeBattle)battle.speed=autoSpeed;
     }
     ov.remove();autoMode=mode;
+    if (onClose) { if(activeBattle && battle===activeBattle)refreshControls(); onClose(); return; }
     if(activeBattle && battle===activeBattle && !battle.over) {refreshControls();if(!wasWaiting)resumeBattle();}
     else if(run)screenMap();
   };
   ov.querySelector('#auto-apply-start').onclick=()=>close(true,true);
   ov.querySelector('#auto-save-only').onclick=()=>close(false,true);
   ov.querySelector('#auto-apply-close').onclick=()=>close(wasAuto,false);
+  if (settingsHost) settingsHost.onclick = e => { if (e.target === settingsHost) close(wasAuto,false); };
   ov.addEventListener('keydown',e=>{
     if(e.key==='Escape'){e.preventDefault();close(wasAuto,false);}
     if(e.key==='Tab') {
@@ -1051,6 +1060,7 @@ function topbar(showBerries = false, showAuto = showBerries, showSpeed = false, 
       <button class="btn small gray" id="btn-settings" title="Ajustes de juego">⚙️ AJUSTES</button>
       ${showSpeed ? `<button class="btn small gray" id="btn-map-speed" title="Velocidad de combate: x1, x2 o x4" aria-label="Velocidad de combate x${combatSpeed}" aria-live="polite">⏩ x${combatSpeed}</button>` : ''}
       <button class="btn small green" id="btn-save" title="Guardar partida como JSON" aria-label="Guardar partida como JSON">💾</button>
+      ${showBerries && showAuto && run && !showFlee ? '<button class="btn small red" id="btn-abandon" title="Abandonar el viaje">🏳️ ABANDONAR</button>' : ''}
       ${showFlee ? '<button class="btn small red" data-ctl="run">🏃 HUIR</button>' : ''}
     </div>
   </div>${islandRepeatStatusHTML()}`;
@@ -1098,6 +1108,7 @@ function showSettingsModal() {
   const wasWaiting = settingsBattle?.waiting;
   const settingsRun = run;
   const onMap = !!document.getElementById?.('island-carousel');
+  if (onMap) { clearTimeout(autoTimer); autoTimer = null; }
   if (settingsBattle) pauseBattle();
 
   ov.innerHTML = `
@@ -1109,6 +1120,7 @@ function showSettingsModal() {
         ${mobileColumnsControl()}
         <p>El aspecto y las columnas se guardan en este dispositivo.</p>
       </div>
+      <fieldset class="bag-auto-settings"><legend>🤖 Modo automático</legend><p>Configura la ruta, encuentros, compras y uso de objetos. Si la mochila está llena, guarda lo que quepa y deja el excedente.</p><button class="btn blue" id="setting-auto-config">Configurar modo automático</button></fieldset>
       <fieldset class="bag-auto-settings">
         <legend>🎒 Uso automático de la mochila</legend>
         <label><input type="checkbox" id="setting-bag-auto" ${bagAuto.enabled ? 'checked' : ''}> Usar objetos automáticamente</label>
@@ -1202,6 +1214,7 @@ function showSettingsModal() {
     else if (!settingsBattle && onMap && run === settingsRun) screenMap(2);
   };
   ov.querySelector('#btn-save-settings').onclick = close;
+  ov.querySelector('#setting-auto-config').onclick = () => showAutoSettingsModal(ov, close);
   ov.onclick = e => { if (e.target === ov) close(); };
 }
 
@@ -1725,7 +1738,7 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
   currentAchCategory = initialCategory;
   const previousFocus = document.activeElement;
   const visibleStaticList = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS, ISLAND_DIFF_ACHIEVEMENTS).filter(isVisibleAch);
-  let query = '', state = 'all', page = 0, filtersOpen = false;
+  let query = '', state = 'all', sort = 'ready', page = 0, filtersOpen = false;
   const pageSize = 20, number = value => Number(value).toLocaleString('es');
   const describe = (a, progressive) => {
     const tier = progressive ? getClaimedProgTier(a) : 0;
@@ -1757,13 +1770,15 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
       (currentAchCategory==='all' || (currentAchCategory==='prog'?progressive:!progressive&&a.cat===currentAchCategory)) &&
       (currentAchSaga==='all' || (currentAchSaga==='global'?!a.sagaId:a.sagaId===currentAchSaga)) &&
       (state==='all'||state===status) && (!q || `${a.title} ${a.desc}`.toLocaleLowerCase('es').includes(q))
-    ).sort((a,b)=>Number(b.ready)-Number(a.ready));
+    ).sort((a,b)=>sort === 'ready' ? Number(b.ready)-Number(a.ready) :
+      (sort === 'progress-desc' ? -1 : 1) * (Math.min(1,a.value/a.goal)-Math.min(1,b.value/b.goal)));
     const pages = Math.max(1,Math.ceil(items.length/pageSize));page=Math.min(page,pages-1);
     const {totalCompleted,totalAchievements} = getAchievementsInfo();
     return `<header class="collection-header"><div><span class="collection-eyebrow">Tu aventura</span><h2 id="ach-title" tabindex="-1">Logros de pirata</h2></div><button class="btn gray collection-close" id="ach-close" aria-label="Cerrar logros">Cerrar <span aria-hidden="true">×</span></button></header>
       <div class="collection-summary"><div><strong>${number(totalCompleted)} <small>/ ${number(totalAchievements)}</small></strong><span>Objetivos completados</span></div><button class="collection-summary-action" id="ach-show-ready"><strong>${number(readyCount)}</strong><span>Por reclamar →</span></button></div>
       <div class="collection-search"><label for="ach-search">Buscar logro<input id="ach-search" type="search" placeholder="Nombre, isla u objetivo" value="${collectionText(query)}"></label><label for="ach-state">Estado<select id="ach-state">${[['all','Todos'],['ready','Por reclamar'],['progress','En progreso'],['claimed','Completados']].map(([v,l])=>`<option value="${v}" ${state===v?'selected':''}>${l}</option>`).join('')}</select></label></div>
-      <details class="collection-extra" ${filtersOpen?'open':''}><summary>Filtrar por tipo y saga${currentAchCategory!=='all'||currentAchSaga!=='all'?' · activos':''}</summary><div class="collection-filter-grid">
+      <details class="collection-extra" ${filtersOpen?'open':''}><summary>Filtros${currentAchCategory!=='all'||currentAchSaga!=='all'||sort!=='ready'?' · activos':''}</summary><div class="collection-filter-grid">
+        <label for="ach-sort">Ordenar por<select id="ach-sort">${[['ready','Por reclamar primero'],['progress-desc','% completado: mayor a menor'],['progress-asc','% completado: menor a mayor']].map(([v,l])=>`<option value="${v}" ${sort===v?'selected':''}>${l}</option>`).join('')}</select></label>
         <label for="ach-category">Tipo de logro<select id="ach-category">${[['all','Todos los tipos'],['prog','Progresivos'],['sagas','Sagas'],['islas','Islas'],['desafios','Desafíos']].map(([v,l])=>`<option value="${v}" ${currentAchCategory===v?'selected':''}>${l}</option>`).join('')}</select></label>
         <label for="ach-saga">Saga<select id="ach-saga">${[['all','Todas las sagas'],['global','Globales'],...SAGAS.map(s=>[s.id,s.name])].map(([v,l])=>`<option value="${v}" ${currentAchSaga===v?'selected':''}>${l}</option>`).join('')}</select></label>
       </div></details>
@@ -1792,9 +1807,9 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
   const bindEvents=()=>{
     ov.querySelector('#ach-close').onclick=close;
     ov.querySelector('#ach-search').oninput=e=>{query=e.target.value;page=0;refresh('#ach-search',0,e.target.selectionStart);};
-    for(const [id,update] of [['ach-state',v=>state=v],['ach-category',v=>currentAchCategory=v],['ach-saga',v=>currentAchSaga=v]])ov.querySelector('#'+id).onchange=e=>{update(e.target.value);page=0;refresh('#'+id);};
+    for(const [id,update] of [['ach-sort',v=>sort=v],['ach-state',v=>state=v],['ach-category',v=>currentAchCategory=v],['ach-saga',v=>currentAchSaga=v]])ov.querySelector('#'+id).onchange=e=>{update(e.target.value);page=0;refresh('#'+id);};
     ov.querySelector('#ach-show-ready').onclick=()=>{state='ready';query='';currentAchCategory='all';currentAchSaga='all';page=0;refresh('#ach-state');};
-    ov.querySelector('#ach-reset').onclick=()=>{query='';state='all';currentAchCategory='all';currentAchSaga='all';page=0;refresh('#ach-search');};
+    ov.querySelector('#ach-reset').onclick=()=>{query='';state='all';sort='ready';currentAchCategory='all';currentAchSaga='all';page=0;refresh('#ach-search');};
     ov.querySelectorAll('[data-ach-page]').forEach(btn=>btn.onclick=()=>{page+=Number(btn.dataset.achPage);refresh('.collection-list');});
     ov.querySelectorAll('[data-claim],[data-claim-prog]').forEach(btn=>btn.onclick=()=>{
       const progressive=!!btn.dataset.claimProg,id=btn.dataset.claimProg||btn.dataset.claim;
@@ -2384,13 +2399,13 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
         </select>
       </div>
       <div class="tabs" style="margin-bottom:10px;flex-wrap:wrap;gap:4px;">
-        <div class="tab ${currentProbTab === 'wild' ? 'active' : ''}" id="spm-tab-wild" style="font-size:8px;padding:4px 6px;">🏴‍☠️ SALVAJES</div>
-        <div class="tab ${currentProbTab === 'boss' ? 'active' : ''}" id="spm-tab-boss" style="font-size:8px;padding:4px 6px;">💀 JEFES</div>
-        <div class="tab ${currentProbTab === 'items' ? 'active' : ''}" id="spm-tab-items" style="font-size:8px;padding:4px 6px;">🎁 OBJETOS</div>
-        <div class="tab ${currentProbTab === 'events' ? 'active' : ''}" id="spm-tab-events" style="font-size:8px;padding:4px 6px;">❓ MISTERIO</div>
-        <div class="tab ${currentProbTab === 'gacha' ? 'active' : ''}" id="spm-tab-gacha" style="font-size:8px;padding:4px 6px;">🎰 MERCADO</div>
+        <button type="button" class="tab ${currentProbTab === 'wild' ? 'active' : ''}" id="spm-tab-wild" style="font-size:8px;padding:4px 6px;">🏴‍☠️ SALVAJES</button>
+        <button type="button" class="tab ${currentProbTab === 'boss' ? 'active' : ''}" id="spm-tab-boss" style="font-size:8px;padding:4px 6px;">💀 JEFES</button>
+        <button type="button" class="tab ${currentProbTab === 'items' ? 'active' : ''}" id="spm-tab-items" style="font-size:8px;padding:4px 6px;">🎁 OBJETOS</button>
+        <button type="button" class="tab ${currentProbTab === 'events' ? 'active' : ''}" id="spm-tab-events" style="font-size:8px;padding:4px 6px;">❓ MISTERIO</button>
+        <button type="button" class="tab ${currentProbTab === 'gacha' ? 'active' : ''}" id="spm-tab-gacha" style="font-size:8px;padding:4px 6px;">🎰 MERCADO</button>
       </div>
-      ${tabHTML}
+      <div class="probabilities-content">${tabHTML}</div>
       <div class="actions" style="margin-top:12px;"><button class="btn gray" id="spm-close">CERRAR</button></div>
     `;
   };
@@ -2400,8 +2415,8 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
 
   const ov = document.createElement('div');
   ov.id = 'saga-prob-overlay';
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="max-width:620px;">${renderModalContent()}</div>`;
+  ov.className = 'overlay collection-overlay';
+  ov.innerHTML = `<div class="modal collection-modal probabilities-modal" role="dialog" aria-modal="true" aria-label="Probabilidades de las sagas">${renderModalContent()}</div>`;
   document.body.appendChild(ov);
 
   const bindEvents = () => {
@@ -2519,7 +2534,7 @@ function screenSagas(focusSaga, previousScroll) {
       </div>
     </div>
 
-    <div class="world-nav"><label for="world-jump">SAGAS</label><select id="world-jump" aria-label="Explorar una saga">${SAGAS.map((s,i) => `<option value="${i}" ${i === (focusSaga || 0) ? 'selected' : ''}>${sagaUnlocked(i) ? '' : '🔒 '}${s.name}</option>`).join('')}</select><button class="btn small gray" id="world-to-start">↓ INICIO</button></div>
+    <div class="world-nav"><details class="world-saga-picker" id="world-saga-picker"><summary id="world-jump">🧭 Sagas · ${SAGAS[focusSaga || 0].name}</summary><div class="world-saga-options">${SAGAS.map((s,i) => `<button type="button" data-jump-saga="${i}" aria-pressed="${i === (focusSaga || 0)}">${sagaUnlocked(i) ? '' : '🔒 '}${s.name}</button>`).join('')}</div></details><button class="btn small gray" id="world-to-start">↓ INICIO</button></div>
     </div>
     <div class="world-ocean-frame">
     <div class="world-sea" aria-hidden="true"></div>
@@ -2989,8 +3004,12 @@ function worldSagaHTML(sagaIdx) {
 function worldStopTop(chart,stop) {
   return stop.getBoundingClientRect ? chart.scrollTop + stop.getBoundingClientRect().top - chart.getBoundingClientRect().top : stop.offsetTop;
 }
+function updateWorldSagaPicker(index) {
+  $('#world-jump').textContent = '🧭 Sagas · ' + SAGAS[index].name;
+  document.querySelectorAll('[data-jump-saga]').forEach(button => button.setAttribute('aria-pressed', String(Number(button.dataset.jumpSaga) === index)));
+}
 function scrollWorldStart(chart) {
-  $('#world-jump').value = '0';
+  updateWorldSagaPicker(0);
   // On short phones, keep the first island in view rather than only its saga footer.
   const first = $('#world-island-0-0');
   chart.scrollTop = Math.min(chart.scrollHeight - chart.clientHeight, worldStopTop(chart,first) - 16);
@@ -3002,7 +3021,7 @@ function bindWorldMapNavigation(focusSaga, previousScroll) {
   if (previousScroll != null) chart.scrollTop = previousScroll;
   else if (recent && SAGAS[recent.saga]?.islands[recent.index] && (!Number.isInteger(focusSaga) || focusSaga === recent.saga)) {
     const target = $(`#world-island-${recent.saga}-${recent.index}`);
-    $('#world-jump').value = String(recent.saga);
+    updateWorldSagaPicker(recent.saga);
     chart.scrollTop = worldStopTop(chart,target) - chart.clientHeight / 2 + target.offsetHeight / 2;
   }
   else if (Number.isInteger(focusSaga)) {
@@ -3012,10 +3031,14 @@ function bindWorldMapNavigation(focusSaga, previousScroll) {
     chart.scrollTop = worldStopTop(chart,target) - chart.clientHeight / 2 + target.offsetHeight / 2;
   } else scrollWorldStart(chart);
   $('#world-to-start').onclick = () => scrollWorldStart(chart);
-  $('#world-jump').onchange = e => {
-    const target = $(`#world-island-${e.target.value}-0`);
+  document.querySelectorAll('[data-jump-saga]').forEach(button => button.onclick = () => {
+    const index = Number(button.dataset.jumpSaga);
+    const target = $(`#world-island-${index}-0`);
     chart.scrollTop = worldStopTop(chart,target) - 16;
-  };
+    updateWorldSagaPicker(index);
+    $('#world-saga-picker').open = false;
+    $('#world-jump').focus();
+  });
   worldNavigator = globalThis.WorldVoyage?.mount(chart, {
     initialId:worldShipLocation || (run && !run.islandComplete ? `${SAGAS[run.saga]?.id}-${run.islandIdx}` : recent && SAGAS[recent.saga]?.islands[recent.index] ? `${SAGAS[recent.saga].id}-${recent.index}` : null),
     onTravel:() => updateWorldArrival(true),
@@ -3218,6 +3241,7 @@ function screenStarter(sagaIdx, islandIdx = 0) {
       <p style="font-size:8.5px;color:#555;margin-bottom:12px;">Toca para elegir · Mantén pulsado para reordenar.</p>
       
       <div id="starter-slots-container"></div>
+      <section class="team-synergy-summary" aria-label="Sinergias del equipo"><h3>Sinergias activas</h3><div id="starter-synergies" aria-live="polite"></div><button class="btn small gray" id="starter-synergy-info">Ver sinergias y tipos</button></section>
       ${renderPresetsBar()}
 
       <div class="starter-launch-actions" style="text-align:center;margin-top:16px;">
@@ -3367,6 +3391,9 @@ function screenStarter(sagaIdx, islandIdx = 0) {
     if (heading) heading.textContent = `🏴‍☠️ Configuración de la Banda (${picked.filter(Boolean).length}/${maxSlots})`;
     const slotsContainer = $('#starter-slots-container');
     if (slotsContainer) slotsContainer.innerHTML = renderSlotsGrid();
+    const previewTeam = picked.filter(Boolean).map(id => applyUpgrades(makeChar(id, startLvlOf(id))));
+    $('#starter-synergies').innerHTML = activeSynergiesHTML(previewTeam);
+    $('#starter-synergy-info').onclick = () => showSynergyModal(previewTeam);
     const presetBarCont = document.querySelector('.preset-bar');
     if (presetBarCont) presetBarCont.outerHTML = renderPresetsBar();
     const lpCont = $('#starter-logpose-info');
@@ -3596,10 +3623,23 @@ function receiveBackpackItem(owner, id, count = 1) {
   if (!stored) {
     owner.pendingLoot ||= {};
     owner.pendingLoot[id] = (owner.pendingLoot[id] || 0) + count;
-    autoMode = false;
-    clearTimeout(autoTimer); autoTimer = null;
+    if (autoMode) resolveAutoLoot(owner);
+    else { clearTimeout(autoTimer); autoTimer = null; }
   }
   return stored;
+}
+function resolveAutoLoot(owner) {
+  if (!autoMode || !hasPendingLoot(owner)) return;
+  const left = [];
+  for (const [id, count] of Object.entries(owner.pendingLoot || {})) {
+    if (!ITEMS[id] || count <= 0) continue;
+    let remaining = count;
+    while (remaining > 0 && addBackpackItem(owner, id)) remaining--;
+    if (remaining) left.push(`${ITEMS[id].name} ×${remaining}`);
+    delete owner.pendingLoot[id];
+  }
+  if (left.length) toast(`🤖 Mochila llena: se deja ${left.join(', ')}.`);
+  saveBackpack(owner);
 }
 function prepareBackpack(owner) {
   if (!owner) return;
@@ -3911,6 +3951,7 @@ function screenMap(activePageIdx = 0) {
   if(run?.islandRepeat && !run.team.some(f=>f.hp>0))return gameOver();
   playMusic('combat');
   runAutoItems(false);
+  resolveAutoLoot(run);
   if (autoMode && hasPendingLoot(run)) {
     pauseAutoForChoice('🎒 Guarda o deja los objetos pendientes para continuar.');
     activePageIdx = 2;
@@ -3990,7 +4031,7 @@ function screenMap(activePageIdx = 0) {
             <div style="font-size:7.5px;color:#666;margin-top:8px;">¡El orden importa! Combaten de arriba a abajo. Arrastra (o toca ≡ y luego el destino) para reordenar · toca para ver la ficha.</div>
             <h3 style="margin-top:12px;">SINERGIAS DE TRIPULACIÓN <button class="btn small gray" id="btn-syn-info" style="font-size:7px;padding:2px 6px;">ℹ️ VER TODAS</button>
               <button class="btn small gray" id="btn-chart-info" style="font-size:7px;padding:2px 6px;">📊 TIPOS</button></h3>
-            <div class="syn-chips">${synChipsHTML(run.team)}</div>
+            <div class="team-synergy-summary">${activeSynergiesHTML(run.team)}</div>
           </div>
         </div>
 
@@ -4004,27 +4045,7 @@ function screenMap(activePageIdx = 0) {
                 `<div class="badge-slot ${run.badges.includes(i) ? '' : 'empty'}" title="${isl.name}">${run.badges.includes(i) ? '🏅' : '·'}</div>`
               ).join('')}
             </div>
-            <h3 style="margin-top:14px;">🤖 MODO AUTOMÁTICO</h3>
-            ${autoMode ? `
-              <div class="auto-mode-box" style="margin-top:6px;background:rgba(217,83,79,0.15);padding:8px;border-radius:6px;border:1px solid var(--red);text-align:center;">
-                <button class="btn red small" id="btn-stop-auto" style="width:100%;font-size:9px;font-weight:bold;padding:6px 8px;">
-                  🛑 PARAR MODO AUTO
-                </button>
-                <button class="btn gray small" id="btn-config-auto" style="width:100%;font-size:7.5px;margin-top:4px;padding:3px 6px;">
-                  ⚙️ Opciones del Auto
-                </button>
-              </div>
-            ` : `
-              <div class="auto-mode-box" style="margin-top:6px;background:rgba(0,0,0,0.35);padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);text-align:center;">
-                <button class="btn gold small" id="btn-toggle-auto" style="width:100%;font-size:8.5px;font-weight:bold;padding:5px 8px;">
-                  🤖 MODO AUTO
-                </button>
-                <div style="font-size:7px;color:#aaa;margin-top:4px;">Toca para activar u opciones</div>
-              </div>
-            `}
-            <div style="display:flex;gap:8px;margin-top:14px;">
-              <button class="btn red small" id="btn-abandon" style="flex:1;">ABANDONAR</button>
-            </div>
+
           </div>
         </div>
       </div>
@@ -4209,19 +4230,16 @@ function screenMap(activePageIdx = 0) {
   bindBackpack($('#map-backpack'), run, false, refreshMapBackpack);
   $('#btn-restart-island').onclick = confirmRestartIsland;
   $('#btn-abandon').onclick = () => {
+    const journey = run, wasAuto = autoMode;
+    pauseAutoForChoice();
     modalConfirm('🏳️ ¿Abandonar el viaje?',
       'Se perderá todo el progreso de esta aventura.<br>La Fama, los veteranos y la Dex se conservan.',
-      () => { clearRun(); screenHome(); });
+      () => { clearRun(); screenHome(); },
+      () => { if (run === journey) { autoMode = wasAuto; screenMap(); } });
   };
   $('#btn-syn-info').onclick = () => showSynergyModal(run.team);
   $('#btn-chart-info').onclick = () => showTypeChartModal(run.team);
 
-  const stopAutoBtn = $('#btn-stop-auto');
-  if (stopAutoBtn) stopAutoBtn.onclick = stopAutoMode;
-  const configAutoBtn = $('#btn-config-auto');
-  if (configAutoBtn) configAutoBtn.onclick = showAutoSettingsModal;
-  const toggleAutoBtn = $('#btn-toggle-auto');
-  if (toggleAutoBtn) toggleAutoBtn.onclick = showAutoSettingsModal;
 
   if (autoMode && run) {
     if (reach.length > 0) {
@@ -4480,6 +4498,7 @@ function pickWildEnemy(pool) {
 
 // ============ ENTRAR EN NODO ============
 function enterNode(r, i) {
+  resolveAutoLoot(run);
   if (hasPendingLoot(run)) {
     if (autoMode) pauseAutoForChoice();
     toast('🎒 Guarda o deja los objetos pendientes antes de continuar.'); screenMap(2); return;
@@ -4536,7 +4555,7 @@ function enterNode(r, i) {
       const stored = receiveBackpackItem(run,id);
       trackItemCollected(1);
       saveRun();
-      modalInfo('🎁 ¡Objeto encontrado!', `<div class="reward-list">${ITEMS[id].emoji} <b>${ITEMS[id].name}</b><br><small>${ITEMS[id].desc}</small>${stored ? '' : '<br>🎒 Elige dónde guardar el objeto en la mochila.'}</div>`, () => screenMap(stored ? 0 : 2));
+      modalInfo('🎁 ¡Objeto encontrado!', `<div class="reward-list">${ITEMS[id].emoji} <b>${ITEMS[id].name}</b><br><small>${ITEMS[id].desc}</small>${stored ? '' : hasPendingLoot(run) ? '<br>🎒 Elige dónde guardar el objeto en la mochila.' : '<br>🤖 Mochila llena: objeto dejado.'}</div>`, () => screenMap(hasPendingLoot(run) ? 2 : 0));
       break;
     }
     case 'mystery': trackStat('mystery_visit', 1); doMystery(island); break;
@@ -4572,7 +4591,7 @@ function doMystery(island) {
     case 'item': {
       const id = pick(['carne', 'cartel', 'carnereal', 'carteldorado']);
       const stored = receiveBackpackItem(run,id); saveRun();
-      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS[id].emoji} <b>${ITEMS[id].name}</b>${stored ? '' : '<br>🎒 Elige dónde guardar el objeto en la mochila.'}</div>`, () => screenMap(stored ? 0 : 2));
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS[id].emoji} <b>${ITEMS[id].name}</b>${stored ? '' : hasPendingLoot(run) ? '<br>🎒 Elige dónde guardar el objeto en la mochila.' : '<br>🤖 Mochila llena: objeto dejado.'}</div>`, () => screenMap(hasPendingLoot(run) ? 2 : 0));
       break;
     }
     case 'battle': {
@@ -4629,7 +4648,7 @@ function doMystery(island) {
       const stored = receiveBackpackItem(run,'fruta_diablo');
       trackItemCollected(1);
       saveRun();
-      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS['fruta_diablo'].emoji} <b>${ITEMS['fruta_diablo'].name}</b>${stored ? ' añadida a tu mochila.' : '<br>🎒 Elige dónde guardar el objeto en la mochila.'}</div>`, () => screenMap(stored ? 0 : 2));
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS['fruta_diablo'].emoji} <b>${ITEMS['fruta_diablo'].name}</b>${stored ? ' añadida a tu mochila.' : hasPendingLoot(run) ? '<br>🎒 Elige dónde guardar el objeto en la mochila.' : '<br>🤖 Mochila llena: objeto dejado.'}</div>`, () => screenMap(hasPendingLoot(run) ? 2 : 0));
       break;
     }
   }
@@ -5725,6 +5744,14 @@ function synChipsHTML(team) {
   ).join('');
 }
 
+function activeSynergiesHTML(team) {
+  const active = teamSynergies(team);
+  if (!active.length) return '<p class="synergy-empty">Sin sinergias activas. Reúne 2 nakamas con el mismo tag para activar el nivel I.</p>';
+  return '<div class="active-synergy-grid">' + active.map(({t,tier}) =>
+    `<article class="active-synergy-card"><header><b>${synEmoji(t)} ${t}</b><span>Nivel ${tier === 2 ? 'II' : 'I'} · ${synergyCount(team,t)} nakamas</span></header><p>${tier === 2 ? SYNERGIES[t].d2 : SYNERGIES[t].d1}</p>${synergyBoost(team,t)>1 ? '<strong>★ 6/6 · Bonus numéricos ×1,4</strong>' : ''}</article>`
+  ).join('') + '</div>';
+}
+
 // ---------- Tags de naturaleza ----------
 const hasFruta = f => fighterTypes(f).includes('Fruta');
 // HAKI: tipo propio o concedido por la sinergia Haki del equipo (nivel I+)
@@ -5740,22 +5767,22 @@ function nakamaStatMult(team) {
 // Modal informativo con todas las sinergias y el estado del equipo actual
 function showSynergyModal(team) {
   const ov = document.createElement('div');
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="display:flex;flex-direction:column;max-height:85vh;max-width:580px;position:relative;overflow:hidden;padding-bottom:0;">
+  ov.className = 'overlay collection-overlay';
+  ov.innerHTML = `<div class="modal collection-modal guide-modal" role="dialog" aria-modal="true" aria-label="Guía de sinergias y tipos">
     <h2 style="flex-shrink:0;">🧩 Sinergias de equipo</h2>
     <p style="font-size:8px;text-align:center;margin-bottom:10px;flex-shrink:0;">2 nakamas vivos del mismo tag: nivel I. 3 o más: nivel II.
     Con 6/6 del mismo tag, sus bonus numéricos aumentan un 40 % (por ejemplo, 25 % → 35 %). Los efectos absolutos se mantienen.</p>
-    <div style="overflow-y:auto;flex:1;padding-right:4px;margin-bottom:6px;">
+    <div class="collection-list guide-content">
       ${Object.keys(SYNERGIES).map(t => {
     const tier = team ? synergyTier(team, t) : 0;
     const s = SYNERGIES[t];
-    return `<div class="sheet-section" style="${tier ? 'background:#fff8e0;' : ''}">
-            <b>${synEmoji(t)} ${t} — ${s.name} ${tier ? `<span style="color:var(--accent);">— ACTIVA ${tier === 2 ? 'Ⅱ' : 'Ⅰ'}</span>` : ''}</b>
+    return `<div class="sheet-section synergy-guide-card ${tier ? 'is-active' : ''}">
+            <b>${synEmoji(t)} ${t} — ${s.name}${team ? ` · ${synergyCount(team,t)} nakamas` : ''} ${tier ? `<span style="color:var(--accent);">— ACTIVA ${tier === 2 ? 'Ⅱ' : 'Ⅰ'}</span>` : ''}</b>
             <p>Ⅰ: ${s.d1}<br>Ⅱ: ${s.d2}<br><b>6/6:</b> ${t === 'Nakama' ? 'Bonus de estadísticas +14 % si no repiten tipo primario; la protección conserva 1 PS.' : 'Bonus numéricos ×1,4; sin duplicar inmunidades ni efectos garantizados.'}${team && synergyBoost(team,t)>1 ? ' ★ ACTIVO' : ''}</p>
           </div>`;
   }).join('')}
     </div>
-    <div class="actions" style="background:var(--paper);padding:10px 18px;margin-left:-18px;margin-right:-18px;border-top:2px solid var(--ink);box-shadow:0 -4px 12px rgba(0,0,0,0.18);z-index:20;display:flex;gap:10px;justify-content:center;flex-shrink:0;">
+    <div class="actions guide-actions">
       <button class="btn blue" id="syn-chart">📊 TABLA DE DEBILIDADES</button>
       <button class="btn gray" id="syn-close">✖️ CERRAR</button>
     </div>
@@ -5780,11 +5807,12 @@ function showTypeChartModal(team) {
     </tr>`;
   }).join('');
   const ov = document.createElement('div');
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="display:flex;flex-direction:column;max-height:85vh;max-width:560px;position:relative;overflow:hidden;padding-bottom:0;">
+  ov.className = 'overlay collection-overlay';
+  ov.innerHTML = `<div class="modal collection-modal guide-modal" role="dialog" aria-modal="true" aria-label="Guía de sinergias y tipos">
     <h2 style="flex-shrink:0;">📊 Tabla de debilidades</h2>
-    <div style="overflow-y:auto;flex:1;padding-right:4px;margin-bottom:6px;">
-      <div style="overflow-x:auto;">
+    <p class="guide-table-hint">Desliza la tabla horizontalmente para consultar todos los efectos.</p>
+    <div class="collection-list guide-content">
+      <div style="overflow-x:auto;" tabindex="0" role="region" aria-label="Tabla de tipos y efectos, desplazamiento horizontal">
         <table class="chart-table">
           <tr><th>Atacante</th><th>+25% fuerte contra</th><th>-25% débil contra</th><th>Efecto especial</th></tr>
           ${rows}
@@ -5810,7 +5838,7 @@ function showTypeChartModal(team) {
         por ronda</b> hasta anularse. Desde la ronda 30 ambos activos sufren desgaste creciente, incluso si esquivan. Si ambos bandos caen a la vez, pierdes el combate.</p>
       </div>
     </div>
-    <div class="actions" style="background:var(--paper);padding:10px 18px;margin-left:-18px;margin-right:-18px;border-top:2px solid var(--ink);box-shadow:0 -4px 12px rgba(0,0,0,0.18);z-index:20;display:flex;gap:10px;justify-content:center;flex-shrink:0;">
+    <div class="actions guide-actions">
       <button class="btn blue" id="tc-syn">🧩 SINERGIAS</button>
       <button class="btn gray" id="tc-close">✖️ CERRAR</button>
     </div>
@@ -7173,45 +7201,71 @@ function screenTowerIntro() {
   const start50 = !!(meta.global && meta.global.tower_start50);
   const startFloor = start50 ? 50 : 1;
   const startLvl = start50 ? 65 : 15;
+  const previews = Object.fromEntries(pool.map(id => [id, applyUpgrades(makeChar(id, startLvl))]));
   render(`
     ${topbar(false)}
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
-    <div class="panel">
+    <div class="panel tower-selection">
       <h2>🗼 Torre Marine ${start50 ? '<span style="color:var(--gold);font-size:12px;">(Piso 50)</span>' : ''}</h2>
       <p>Combates automáticos infinitos contra oleadas cada vez más fuertes.
       Elige a <b>3 nakamas desbloqueados</b> (salen a Nv.${startLvl}, con sus mejoras del Barco)
       y recibe 3 Platos de Sanji. ${start50 ? '<b>¡Inicias tu ascenso directamente en el Piso 50!</b>' : '¿Hasta qué piso llegarás?'}</p>
       <p style="margin-top:10px;">Récord actual: <b>${meta.towerRecord}</b> pisos</p>
-      <div class="pick-grid" style="margin-top:12px;">
+      <div class="tower-selection-bar"><div id="tower-picked" aria-live="polite"></div><div id="tower-synergies"></div></div>
+      <label class="tower-search" for="tower-search">Buscar nakama<input type="search" id="tower-search" placeholder="Nombre o tipo"></label>
+      <p id="tower-results" role="status">${pool.length} nakamas disponibles</p>
+      <div class="tower-roster">
         ${pool.map(id => {
-    const c = CHARS[id];
-    return `<div class="pick-row" data-tower="${id}">
-            <span class="emoji">${charIcon(id, 22)}</span>
-            <div class="info"><b>${c.name}</b> ${'⭐'.repeat(c.rareza)}<br><small>${c.types.join(' / ')}</small></div>
-            <span class="tower-check" style="font-size:12px;"></span>
-          </div>`;
+    const f = previews[id], c = CHARS[f.id];
+    return `<button type="button" class="tower-card" data-tower="${id}" aria-pressed="false">
+            <span class="emoji">${charIcon(f.id, 64)}</span>
+            <b>${c.name}</b><span class="tower-rarity">${'⭐'.repeat(c.rareza)} · Nv. ${startLvl}</span>
+            <span class="type-badges">${typeBadges(fighterTypes(f))}</span>
+            <span class="tower-stats">♥ ${f.maxhp} PS · ⚔ ${f.atk} ATQ</span>
+            <span class="tower-check">Añadir al equipo</span>
+          </button>`;
   }).join('')}
       </div>
-      <div class="actions" style="text-align:center;margin-top:14px;">
+      <div class="actions tower-launch" style="text-align:center;margin-top:14px;">
         <button class="btn blue" id="btn-start" disabled>ELIGE 3 NAKAMAS (0/3)</button>
       </div>
     </div>
   `);
   $('#btn-back').onclick = screenHome;
   const startBtn = $('#btn-start');
+  const updateSelection = () => {
+    document.querySelectorAll('[data-tower]').forEach(r => {
+      const selected = picked.includes(r.dataset.tower);
+      r.setAttribute('aria-pressed', String(selected));
+      r.disabled = !selected && picked.length === 3;
+      r.querySelector('.tower-check').textContent = selected ? '✓ Seleccionado · Quitar' : 'Añadir al equipo';
+    });
+    $('#tower-picked').innerHTML = `<b>Tu equipo · ${picked.length}/3</b><div class="tower-picked-slots">${[0,1,2].map(i => picked[i] ? `<button class="btn gray" data-tower-remove="${picked[i]}">${charIcon(previews[picked[i]].id,32)} ${CHARS[previews[picked[i]].id].name} ×</button>` : `<span class="tower-empty-slot">${i+1}. Elige un nakama</span>`).join('')}</div>`;
+    $('#tower-picked').querySelectorAll('[data-tower-remove]').forEach(button => button.onclick = () => {picked.splice(picked.indexOf(button.dataset.towerRemove),1);updateSelection();});
+    $('#tower-synergies').innerHTML = activeSynergiesHTML(picked.map(id => previews[id]));
+    startBtn.disabled = picked.length !== 3;
+    startBtn.textContent = picked.length === 3 ? '¡SUBIR A LA TORRE!' : `ELIGE 3 NAKAMAS (${picked.length}/3)`;
+  };
+  $('#tower-search').oninput = e => {
+    const query = e.target.value.trim().toLocaleLowerCase('es');
+    let visible = 0;
+    document.querySelectorAll('[data-tower]').forEach(card => {
+      const f = previews[card.dataset.tower];
+      card.hidden = !`${CHARS[f.id].name} ${fighterTypes(f).join(' ')}`.toLocaleLowerCase('es').includes(query);
+      if (!card.hidden) visible++;
+    });
+    $('#tower-results').textContent = visible ? `${visible} nakamas disponibles` : 'No hay nakamas con esta búsqueda.';
+  };
   document.querySelectorAll('[data-tower]').forEach(el => {
     el.onclick = () => {
       const id = el.dataset.tower;
       const i = picked.indexOf(id);
       if (i >= 0) picked.splice(i, 1);
       else if (picked.length < 3) picked.push(id);
-      document.querySelectorAll('[data-tower]').forEach(r => {
-        r.querySelector('.tower-check').textContent = picked.includes(r.dataset.tower) ? '✅' : '';
-      });
-      startBtn.disabled = picked.length !== 3;
-      startBtn.textContent = picked.length === 3 ? '¡SUBIR A LA TORRE!' : `ELIGE 3 NAKAMAS (${picked.length}/3)`;
+      updateSelection();
     };
   });
+  updateSelection();
   startBtn.onclick = () => {
     if (picked.length !== 3) return;
     tower = { floor: startFloor, team: picked.map(id => applyUpgrades(makeChar(id, startLvl))), items: { bocadillo: 3, sake: 1 } };

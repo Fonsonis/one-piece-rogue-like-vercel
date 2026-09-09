@@ -72,13 +72,13 @@ test('invalid counts, empty/duplicate/locked teams and locked islands cannot sta
  assert.equal(h.exec(`startIslandRepeats(0,['luffy'],0,1)`),true);
  h.exec('run.team[0].hp=0;gameOver();');assert.equal(h.exec('run.islandRepeat.completed'),1);assert.equal(h.exec('autoMode'),false);
 });
-test('repetitions allow configured recruitment and preserve full-bag pauses without discarding loot',()=>{
+test('repetitions allow configured recruitment and leave excess loot without pausing',()=>{
  const {h}=setup();h.exec(`startIslandRepeats(0,['luffy'],0,2);let joined=null;addToTeam(makeChar('zoro',5),ok=>joined=ok);`);
  assert.equal(h.exec('joined'),true);assert.equal(h.exec('run.team.length'),2);assert.deepEqual(Array.from(h.exec('run.startingTeam')),['luffy']);
  h.exec(`run.items={carne:27};prepareBackpack(run);`);
- assert.equal(h.exec(`receiveBackpackItem(run,'sake')`),false);assert.equal(h.exec('autoMode'),false);assert.equal(h.exec('run.pendingLoot.sake'),1);
+ assert.equal(h.exec(`receiveBackpackItem(run,'sake')`),false);assert.equal(h.exec('autoMode'),true);assert.equal(h.exec('hasPendingLoot(run)'),false);
  assert.equal(h.exec('run.items.carne'),27);assert.equal(h.exec('run.islandRepeat.completed'),0);
- h.exec('cancelIslandRepeats();autoMode=true;');assert.equal(h.exec(`receiveBackpackItem(run,'sake')`),false);assert.equal(h.exec('autoMode'),false);
+ h.exec('cancelIslandRepeats();autoMode=true;');assert.equal(h.exec(`receiveBackpackItem(run,'sake')`),false);assert.equal(h.exec('autoMode'),true);
 });
 test('the existing automatic configuration, including event pauses and speed, remains authoritative',()=>{
  const {h}=setup();h.exec(`autoSettings=normalizeAutoSettings({speed:'x1',pauseEvents:['marine'],wildAction:'manual',specialAction:'gacha',crossoverAction:'manual',reserveBerries:1234});meta.settings.autoConfig={...autoSettings};const config=JSON.stringify(autoSettings),savedConfig=JSON.stringify(meta.settings.autoConfig);startIslandRepeats(0,['luffy'],0,2);run.map.rows[0][0].type='marine';let entered=false;enterNode=()=>entered=true;advanceAutoNode(0,0);`);

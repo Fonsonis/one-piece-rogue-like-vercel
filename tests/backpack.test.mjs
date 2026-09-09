@@ -60,9 +60,9 @@ test('nine slots pack three identical items together; large food keeps its footp
   assert.match(html,/×2/);
 });
 
-test('full bags save pending loot, stop auto travel, and can collect after space is released', () => {
+test('manual play saves pending loot and can collect after space is released', () => {
   const h = setup();
-  h.exec('run.items={carne:27};autoMode=true;receiveBackpackItem(run,"sake");saveRun()');
+  h.exec('run.items={carne:27};autoMode=false;receiveBackpackItem(run,"sake");saveRun()');
   assert.equal(h.exec('autoMode'),false);
   assert.equal(h.exec('run.items.sake || 0'),0);
   assert.equal(h.exec('run.pendingLoot.sake'),1);

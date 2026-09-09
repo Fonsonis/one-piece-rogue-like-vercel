@@ -3,15 +3,36 @@ import assert from 'node:assert/strict';
 import {combatHarness} from './balance-harness.mjs';
 function setup(){const h=combatHarness();h.exec("screenMap=()=>{};storyMode='classic';selectedDiff=1;startRun(0,['luffy']);run.items={};run.bagLayout={};run.pendingLoot={};");return h;}
 
-test('pending loot pauses automatic progression and cancels its timer instead of refreshing forever',()=>{
+test('automatic progression stores pending loot and advances without pausing',()=>{
  const h=setup();
  h.ctx.document.querySelector=()=>null;
- h.exec(`run.pendingLoot={cartel:1};autoMode=true;let redraws=0;screenMap=page=>{if(page===2)redraws++;};
- scheduleAutoStep(()=>{throw Error('stale auto step');},750);advanceAutoNode(0,0);`);
- assert.equal(h.exec('autoMode'),false);assert.equal(h.exec('autoTimer'),null);
- assert.equal(h.exec('redraws'),1);assert.equal(h.pending(),0);
- h.exec('advanceAutoNode(0,0);');assert.equal(h.exec('redraws'),1);
- assert.equal(h.exec('run.pendingLoot.cartel'),1);
+ h.exec(`run.pendingLoot={cartel:1};autoMode=true;let entered=0;enterNode=()=>entered++;advanceAutoNode(0,0);`);
+ assert.equal(h.exec('autoMode'),true);
+ assert.equal(h.exec('entered'),1);
+ assert.equal(h.exec('hasPendingLoot(run)'),false);
+ assert.equal(h.exec('run.items.cartel'),1);
+});
+
+test('auto keeps the units that fit, leaves excess and preserves both bags and saved state',()=>{
+ const h=setup();
+ h.exec('run.items={carne:26,cartel:2};prepareBackpack(run);autoMode=true;receiveBackpackItem(run,"carne",3);');
+ assert.equal(h.exec('run.items.carne'),27);
+ assert.equal(h.exec('run.items.cartel'),2);
+ assert.equal(h.exec('hasPendingLoot(run)'),false);
+ assert.equal(h.exec('autoMode'),true);
+ assert.equal(h.exec('planBackpack(run).missing.length'),0);
+ h.exec('receiveBackpackItem(run,"cartel",2);saveRun();loadedSave=GameSaveStorage.parse(JSON.stringify(GameSaveStorage.payload(meta,run)));validateGameSave(loadedSave);loadRun();');
+ assert.equal(h.exec('run.items.cartel'),4);
+ assert.equal(h.exec('run.items.carne'),27);
+ assert.equal(h.exec('hasPendingLoot(run)'),false);
+});
+
+test('auto leaves a large object when its shape cannot fit without replacing stored items',()=>{
+ const h=setup();
+ h.exec('run.items={sake:3};prepareBackpack(run);autoMode=true;const before=JSON.stringify({items:run.items,layout:run.bagLayout});receiveBackpackItem(run,"sake");');
+ assert.equal(h.exec('JSON.stringify({items:run.items,layout:run.bagLayout})'),h.exec('before'));
+ assert.equal(h.exec('hasPendingLoot(run)'),false);
+ assert.equal(h.exec('autoMode'),true);
 });
 
 test('rectangular footprints reject row wrapping, bottom overflow and overlap',()=>{
@@ -70,7 +91,7 @@ test('automatic placement rotates to use a vertical gap and reorganizes fragment
 
 test('items that cannot fit remain pending and failed placement does not rearrange or lose inventory',()=>{
  const h=setup();
- h.exec('run.items={sake:3};prepareBackpack(run);autoMode=true;const before=JSON.stringify({items:run.items,layout:run.bagLayout});');
+ h.exec('run.items={sake:3};prepareBackpack(run);autoMode=false;const before=JSON.stringify({items:run.items,layout:run.bagLayout});');
  // Two 2x2 pieces cannot fit in a 3x3 bag even though eight cells are below capacity.
  assert.equal(h.exec('receiveBackpackItem(run,"sake")'),false);
  assert.equal(h.exec('JSON.stringify({items:run.items,layout:run.bagLayout})===before'),true);
