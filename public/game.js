@@ -116,6 +116,7 @@ const AUTO_DEFAULTS = () => ({
   specialAction:'manual', chainItem:'risk', chainFail:'fight', crossoverAction:'fight',
   revive:true, useUltimates:true, healItems:['carne','carnereal','bocadillo'],
   reserveBerries:0, pauseEvents:[],
+  fullTeamAction:'keep', fullBagAction:'leave',
   shopItems:[{id:'carne',qty:3},{id:'sake',qty:2},{id:'cartel',qty:2}]
 });
 function normalizeAutoSettings(value) {
@@ -130,6 +131,8 @@ function normalizeAutoSettings(value) {
     chainItem:choice('chainItem',['risk','cartel','carteldorado','cartelbuster']),
     chainFail:choice('chainFail',['fight','pay','manual']),
     crossoverAction:choice('crossoverAction',['fight','leave','manual']),
+    fullTeamAction:choice('fullTeamAction',['keep','higherLevel','manual']),
+    fullBagAction:choice('fullBagAction',['leave','manual']),
     revive:typeof v.revive==='boolean'?v.revive:d.revive,
     useUltimates:typeof v.useUltimates==='boolean'?v.useUltimates:d.useUltimates,
     healItems:Array.isArray(v.healItems)?['carne','carnereal','bocadillo'].filter(id=>v.healItems.includes(id)):d.healItems,
@@ -320,8 +323,12 @@ function showAutoSettingsModal(settingsHost = null, onClose = null) {
         <label for="auto-special-action">Crossguild</label>${select('auto-special-action',cfg.specialAction,[['manual','Pausar para elegir o jugar'],['gacha','Jugar carteles si puedo pagarlos'],['leave','Marcharme sin comprar']])}
         <p>El catálogo se elige manualmente. Si no alcanza para los carteles o Nuzlocke lo impide, se marcha.</p>
         <label for="auto-crossover">Camino alternativo · Crossover</label>${select('auto-crossover',cfg.crossoverAction,[['fight','Explorar y aceptar el duelo'],['leave','Retirarme y completar la saga'],['manual','Pausar y decidir yo']])}
+        <label for="auto-full-team">Si el equipo está lleno</label>${select('auto-full-team',cfg.fullTeamAction,[['keep','Conservar el equipo y dejar al nuevo'],['higherLevel','Sustituir al de menor nivel si el nuevo lo supera'],['manual','Pausar y decidir yo']])}
+        <p>Los personajes repetidos se fusionan. En caso de empate de nivel, se conserva el equipo.</p>
       </section>
       <section class="auto-section"><h3>🎒 Uso automático de la mochila</h3>
+        <label for="auto-full-bag">Si no cabe el objeto recogido</label>${select('auto-full-bag',cfg.fullBagAction,[['leave','Guardar lo que quepa y dejar el resto'],['manual','Pausar y decidir yo']])}
+        <p>La opción automática conserva los objetos que ya llevas y se aplica a ambas mochilas.</p>
         ${check('auto-bag-enabled','Usar objetos automáticamente',bagAuto.enabled)}
         <p>Comparte estas preferencias con Ajustes. Funciona también con el avance automático pausado.</p>
         <label for="auto-bag-where">Dónde usar objetos</label>${select('auto-bag-where',bagAuto.where,[['both','Isla y combate'],['map','Solo en la isla'],['combat','Solo en combate']])}
@@ -356,6 +363,7 @@ function showAutoSettingsModal(settingsHost = null, onClose = null) {
       const on=id=>ov.querySelector(`#${id}`).checked;
       autoSettings=normalizeAutoSettings({speed:val('auto-speed-sel'),nodePriority:val('auto-node-sel'),wildAction:val('auto-wild-sel'),
         specialAction:val('auto-special-action'),chainItem:val('auto-chain-item'),chainFail:val('auto-chain-fail'),crossoverAction:val('auto-crossover'),
+        fullTeamAction:val('auto-full-team'),fullBagAction:val('auto-full-bag'),
         healThreshold:+val('auto-heal-sel'),revive:on('auto-revive'),useUltimates:on('auto-ultimates'),reserveBerries:val('auto-reserve'),
         healItems:['carne','carnereal','bocadillo'].filter(id=>on(`auto-heal-${id}`)),pauseEvents:routes.filter(([id])=>on(`auto-pause-${id}`)).map(([id])=>id),
         shopItems:PORT_SHOP_STOCK.map(id=>({id,qty:+ov.querySelector(`[data-auto-stock="${id}"]`).value,priority:+val(`auto-priority-${id}`)})).sort((a,b)=>a.priority-b.priority)
@@ -3678,6 +3686,10 @@ function receiveBackpackItem(owner, id, count = 1) {
 }
 function resolveAutoLoot(owner) {
   if (!autoMode || !hasPendingLoot(owner)) return;
+  if (autoSettings.fullBagAction === 'manual') {
+    pauseAutoForChoice('🎒 Mochila llena: guarda o deja el objeto.');
+    return;
+  }
   const left = [];
   for (const [id, count] of Object.entries(owner.pendingLoot || {})) {
     if (!ITEMS[id] || count <= 0) continue;
@@ -4964,6 +4976,18 @@ function addToTeam(f, done) {
     done && done(true);
     return;
   }
+  if (autoMode && autoSettings.fullTeamAction !== 'manual') {
+    const lowest = run.team.reduce((index, member, i) => member.lvl < run.team[index].lvl ? i : index, 0);
+    const replace = autoSettings.fullTeamAction === 'higherLevel' && f.lvl > run.team[lowest].lvl;
+    if (replace) {
+      const out = run.team[lowest];
+      run.team[lowest] = f;
+      saveRun();
+      toast(`🤖 ${charName(f)} (Nv${f.lvl}) sustituye a ${charName(out)} (Nv${out.lvl}).`);
+    } else toast(`🤖 Equipo lleno: se conserva la banda y se deja marchar a ${charName(f)}.`);
+    done && done(replace);
+    return;
+  }
   if(autoMode)pauseAutoForChoice('Banda llena: elige a quién sustituir.');
   const ov = document.createElement('div');
   ov.className = 'overlay';
@@ -5002,7 +5026,7 @@ function addToTeam(f, done) {
 
 // ============ FICHA DE PERSONAJE ============
 // Muestra las características reales del personaje en la saga (nivel, fusiones y barco).
-function showCharModal(fOrId) {
+function showCharModal(fOrId, existingOverlay = null) {
   const isLive = typeof fOrId === 'object';
   const previewId = !isLive && !BASE_OF[fOrId] ? evolutionFormAt(fOrId, startLvlOf(fOrId)) : fOrId;
   const f = isLive ? migrateFighter(fOrId, !!battle?.eTeam.includes(fOrId)) : applyUpgrades(makeChar(previewId, startLvlOf(fOrId), false, true));
@@ -5032,9 +5056,10 @@ function showCharModal(fOrId) {
   const canAffordUpg = (meta.logPoses || 0) >= upgCost;
   const isMaxLvl = f.lvl >= cap;
 
-  const ov = document.createElement('div');
+  const ov = existingOverlay || document.createElement('div');
+  const closeSheet = existingOverlay?.querySelector('#sheet-close')?.onclick || (() => ov.remove());
   ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal char-sheet">
+  ov.innerHTML = `<div class="modal char-sheet" role="dialog" aria-modal="true" aria-label="Ficha de ${collectionText(c.name)}">
     <h2><span style="font-size:26px;vertical-align:middle;">${charIcon(f.id, 34)}</span> ${c.name}${rarityTag}${fusionTag} <small>Nv.${f.lvl}</small></h2>
     <div class="char-sheet-hero" style="text-align:center;padding:12px;margin:8px 0 12px;background:radial-gradient(ellipse at center, rgba(232, 200, 50, 0.22) 0%, rgba(0,0,0,0.35) 75%);border:2px solid var(--gold);border-radius:8px;position:relative;">
       <div class="char-sheet-sprite" data-character="${f.id}" style="display:inline-block;filter:drop-shadow(3px 5px 8px rgba(0,0,0,0.6));">
@@ -5097,7 +5122,20 @@ function showCharModal(fOrId) {
       <button class="btn gray" id="sheet-close" style="width:100%;">CERRAR</button>
     </div>
   </div>`;
-  document.body.appendChild(ov);
+  if (!existingOverlay) document.body.appendChild(ov);
+  const upgradeBtn = ov.querySelector('#sheet-upg-btn');
+  if (upgradeBtn) {
+    let upgrading = false;
+    upgradeBtn.onclick = () => {
+      if (upgrading || upgradeBtn.disabled) return;
+      upgrading = true;
+      if (!upgradeCharLvl(f.id)) { upgrading = false; return; }
+      const scrollTop = ov.querySelector('.modal').scrollTop;
+      showCharModal(fOrId, ov);
+      ov.querySelector('.modal').scrollTop = scrollTop;
+      (ov.querySelector('#sheet-upg-btn:not(:disabled)') || ov.querySelector('#sheet-close')).focus?.({preventScroll:true});
+    };
+  }
   const dismissBtn = ov.querySelector('#sheet-dismiss-btn');
   if (dismissBtn) {
     dismissBtn.onclick = () => {
@@ -5121,8 +5159,8 @@ function showCharModal(fOrId) {
       );
     };
   }
-  ov.querySelector('#sheet-close').onclick = () => ov.remove();
-  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.querySelector('#sheet-close').onclick = closeSheet;
+  if (!existingOverlay) ov.onclick = e => { if (e.target === ov) closeSheet(); };
 }
 
 // ============ EVENTO: CROSSGUILD ============
@@ -5956,10 +5994,17 @@ function getUltimateMove(f) {
   return ownMoves.sort((a,b) => b.power * b.acc - a.power * a.acc)[0] || MOVES.punetazo;
 }
 
+function enemyUltimatesEnabled(b = battle) {
+  const marineford = SAGAS.findIndex(s => s.id === 'marineford');
+  return !!b && !b.tower && !!run && marineford >= 0 && run.saga >= marineford;
+}
+
 function useUltimate(f) {
   const b = battle;
   if (!b || b.over || !f || f.hp <= 0) return;
-  const enemy = b.curE;
+  const isEnemy = b.eTeam.includes(f);
+  if (isEnemy && !enemyUltimatesEnabled(b)) return;
+  const enemy = isEnemy ? b.curP : b.curE;
   if (!enemy || enemy.hp <= 0) return;
   if (f.lvl < 20) return toast(`🔒 Ultimate de ${charName(f)} desbloqueable a Nv20.`);
   if ((f.ultCharge || 0) < 100) return toast(`⚡ Ultimate de ${charName(f)} al ${Math.floor(f.ultCharge || 0)}% (golpea para cargar).`);
@@ -5967,7 +6012,7 @@ function useUltimate(f) {
   f.ultCharge = 0;
   const ultMv = getUltimateMove(f);
   log(`💥 <b>¡DEFINITIVA DE ${charName(f).toUpperCase()}!</b> Desata <b>${ultMv.name}</b> 💥`);
-  attackWith(f, enemy, ultMv, 'enemy');
+  attackWith(f, enemy, ultMv, isEnemy ? 'player' : 'enemy');
   refreshHPCards();
 }
 
@@ -6043,7 +6088,7 @@ function fighterCardHTML(f, side, idx, active) {
   const isUltReady = isUltUnlocked && (f.ultCharge || 0) >= 100;
   const ultPct = isUltUnlocked ? clamp(f.ultCharge || 0, 0, 100) : 0;
 
-  const ultBarHTML = side === 'p' ? `
+  const ultBarHTML = (side === 'p' || enemyUltimatesEnabled()) ? `
     <div class="ult-bar-wrap ${isUltUnlocked ? '' : 'locked'}" title="${isUltUnlocked ? 'Ultimate (' + Math.floor(ultPct) + '%)' : 'Desbloquea Ultimate a Nv20'}">
       ${isUltUnlocked ? `<div class="ult-bar" style="width:${ultPct}%"></div>` : '<div class="ult-bar-text">🔒 ULTI A NV20</div>'}
     </div>` : '';
@@ -6504,7 +6549,7 @@ function attackWith(att, dfd, mv, targetSide) {
   if (dmg > 0) dfd.st.receivedHit = true;
   if (passiveRule(att).slow) dfd.st.slow = 2;
   // Recarga de Ultimate al golpear al enemigo (para personajes de nivel base >= 20)
-  if (att && att.lvl >= 20 && b.pTeam.includes(att)) {
+  if (att && att.lvl >= 20 && (b.pTeam.includes(att) || (enemyUltimatesEnabled(b) && b.eTeam.includes(att)))) {
     att.ultCharge = Math.min(100, (att.ultCharge || 0) + 34);
   }
   let txt = `${attName} usa <b>${mv.name}</b>. `;
@@ -6588,7 +6633,10 @@ function runRound() {
       // Preserve this round's turn order; a manual relay changes its actors, not its number of attacks.
       const att = side === 'enemy' ? b.curP : b.curE;
       const dfd = side === 'enemy' ? b.curE : b.curP;
-      if (att.hp > 0 && dfd.hp > 0) attackWith(att, dfd, chooseMove(att, dfd), side);
+      if (att.hp > 0 && dfd.hp > 0) {
+        if (side === 'player' && enemyUltimatesEnabled(b) && att.lvl >= 20 && (att.ultCharge || 0) >= 100) useUltimate(att);
+        else attackWith(att, dfd, chooseMove(att, dfd), side);
+      }
       b.pendingStep = step;
       b.timer = setTimeout(step, 900 / battle.speed);
     } else {
@@ -7008,7 +7056,7 @@ function doCrossoverEvent(island) {
   // el aire dimensional reconforta: la banda consciente recupera un 50% de PS
   run.team.forEach(f => { if (f.hp > 0) f.hp = Math.min(f.maxhp, f.hp + Math.floor(f.maxhp * 0.5)); });
   saveRun();
-  const lvl = island.bossLvl[island.bossLvl.length - 1] + 1;
+  const lvl = island.bossLvl[island.bossLvl.length - 1] + 50;
   const bossId = pick(s.bosses);
   const escorts = s.bosses.filter(id => id !== bossId)
     .sort(() => Math.random() - 0.5)
