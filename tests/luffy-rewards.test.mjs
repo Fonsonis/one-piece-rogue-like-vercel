@@ -2,17 +2,17 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {combatHarness} from './balance-harness.mjs';
 
-test('Luffy keeps his base stats and evolves at 20/35/70/100 with matching stars and signatures',()=>{
+test('Luffy keeps his base stats and evolves at 20/25/70/100 with matching stars and signatures',()=>{
  const h=combatHarness();
  h.exec('maxStartLvlCap=()=>100;meta.charUpgrades={luffy:95};');
  assert.deepEqual(Array.from(h.exec('CHARS.luffy.base')),[24,12,8,10,7,10]);
- for(const [lvl,id,stars,ult] of [[5,'luffy',1,'gatlinggoma'],[19,'luffy',1,'gatlinggoma'],[20,'luffy2',2,'jetgatling'],[34,'luffy2',2,'jetgatling'],[35,'luffy3',3,'elephantgatling'],[69,'luffy3',3,'elephantgatling'],[70,'luffy4',4,'kingkonggun'],[99,'luffy4',4,'kingkonggun'],[100,'luffy5',5,'bajranggun']]){
+ for(const [lvl,id,stars,ult] of [[5,'luffy',1,'gatlinggoma'],[19,'luffy',1,'gatlinggoma'],[20,'luffy2',2,'jetgatling'],[24,'luffy2',2,'jetgatling'],[25,'luffy3',3,'elephantgatling'],[69,'luffy3',3,'elephantgatling'],[70,'luffy4',4,'kingkonggun'],[99,'luffy4',4,'kingkonggun'],[100,'luffy5',5,'bajranggun']]){
   assert.equal(h.exec(`makeChar('luffy',${lvl}).id`),id);
   assert.equal(h.exec(`CHARS[makeChar('luffy',${lvl}).id].rareza`),stars);
   assert.equal(h.exec(`getUltimateMove(makeChar('luffy',${lvl}))===MOVES.${ult}`),true);
   assert.equal(h.exec(`baseFormOf('${id}')`),'luffy');
  }
- for(const lvl of [20,35,70,100]) {
+ for(const lvl of [20,25,70,100]) {
   assert.equal(h.exec(`(()=>{const f=applyUpgrades(makeChar('luffy',${lvl-1}));f.hp=1;gainXP(f,xpForLevel(f.lvl));return f.id===evolutionFormAt('luffy',${lvl})&&f.lvl===${lvl}&&f.moves.length<=2&&f.maxhp===makeChar('luffy',${lvl}).maxhp;})()`),true);
  }
  assert.equal(h.exec(`(()=>{const f=makeChar('luffy',100);gainXP(f,999999);return f.id==='luffy5'&&f.lvl===100&&xpBarHTML(f).includes('Nivel máximo');})()`),true);
@@ -34,7 +34,7 @@ test('old Luffy saves migrate once, preserving HP deficit, KO, XP, boosts, fusio
    const once=JSON.stringify(f);migrateFighter(f);
    const save=GameSaveStorage.payload(meta,{saga:0,islandIdx:0,mode:'classic',team:[f],map:genMap(SAGAS[0].islands[0]),items:{},berries:300,badges:[],pos:null});
    validateGameSave(GameSaveStorage.parse(JSON.stringify(save)));
-   return JSON.stringify(f)===once&&f.moves.length===2;
+   return JSON.stringify(f)===once&&JSON.stringify(f.moves)===JSON.stringify(expected.moves);
   })()`),true,`${lvl}/${dead}`);
  }
 });

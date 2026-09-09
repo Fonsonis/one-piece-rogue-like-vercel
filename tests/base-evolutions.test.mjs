@@ -67,7 +67,8 @@ test('buying the threshold level unlocks a high-level journey fighter without he
  assert.equal(h.exec('f.id'),'luffy2');assert.equal(h.exec('f.lvl'),60);
  assert.equal(h.exec('f.hp'),0);assert.equal(h.exec('f.xp'),99);
  assert.equal(h.exec('f.maxhp===makeChar("luffy",60).maxhp+9 && f.atk===makeChar("luffy",60).atk+7'),true);
- assert.equal(h.exec('f.moves.includes("hakiarm")'),true);
+ assert.equal(h.exec('f.moves.includes("jetpistol")'),true);
+ assert.equal(h.exec('f.moves.includes("hakiarm")'),false);
 });
 
 test('enemy forms and explicit catalog previews are independent of permanent player level',()=>{
