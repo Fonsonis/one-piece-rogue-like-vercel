@@ -3980,6 +3980,7 @@ function screenMap(activePageIdx = 0) {
                     <span class="emoji">${charIcon(f.id, 36)}</span>
                     <div class="info">${idx + 1}. <b>${charName(f)}</b> ${rarityTag}${fusionTag}<br>Nv${f.lvl}
                       ${typeBadges(fighterTypes(f))}
+                      <div class="hp-nums">PS: ${f.hp}/${f.maxhp}</div>
                       <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>${xpBarHTML(f)}
                     </div>
                     ${run.team.length > 1 ? `<span class="btn-dismiss-slot" data-dismiss-idx="${idx}" title="Expulsar de la banda" style="color:#e74c3c;font-size:11px;cursor:pointer;padding:2px 4px;margin-left:auto;opacity:0.75;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.75">🗑️</span>` : ''}
@@ -4115,6 +4116,7 @@ function screenMap(activePageIdx = 0) {
         <span class="emoji">${charIcon(f.id, 36)}</span>
         <div class="info">${idx + 1}. <b>${charName(f)}</b> ${rarityTag}${fusionTag}<br>Nv${f.lvl}
           ${typeBadges(fighterTypes(f))}
+          <div class="hp-nums">PS: ${f.hp}/${f.maxhp}</div>
           <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>${xpBarHTML(f)}
         </div>
         ${run.team.length > 1 ? `<span class="btn-dismiss-slot" data-dismiss-idx="${idx}" title="Expulsar de la banda" style="color:#e74c3c;font-size:11px;cursor:pointer;padding:2px 4px;margin-left:auto;opacity:0.75;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.75">🗑️</span>` : ''}
