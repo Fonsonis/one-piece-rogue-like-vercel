@@ -5,7 +5,7 @@ import fs from 'node:fs';
 
 function setup() {
  const h=combatHarness(),nodes=new Map();
- const node=s=>{if(!nodes.has(s))nodes.set(s,{scrollTop:0,scrollHeight:16000,clientHeight:500,offsetTop:15400,offsetHeight:195,classList:{add(){},remove(){}}});return nodes.get(s);};
+ const node=s=>{if(!nodes.has(s))nodes.set(s,{dataset:{},scrollTop:0,scrollHeight:16000,clientHeight:500,offsetTop:15400,offsetHeight:195,classList:{add(){},remove(){}}});return nodes.get(s);};
  h.ctx.document.querySelector=node;
  h.ctx.document.querySelectorAll=()=>[];
  h.exec(`let html='';render=s=>html=s;storyMode='classic';selectedDiff=1;run=null;meta.sagaDiffWins={};meta.islandProgress={};`);
@@ -26,6 +26,32 @@ test('one chart renders every saga and island in reverse order, preserving modes
  assert.ok(html.indexOf('id="world-saga-7"')<html.indexOf('RED LINE · NUEVO MUNDO'));
  assert.ok(html.indexOf('RED LINE · NUEVO MUNDO')<html.indexOf('id="world-saga-6"'));
  for(const id of ['tab-classic','tab-nuz','btn-diff-trigger','btn-saga-probs-all'])assert.ok(html.includes(`id="${id}"`));
+});
+
+test('mode and difficulty changes keep the chosen saga instead of restoring the last completed island',()=>{
+ const {h,node}=setup();
+ const difficulties=[1,2,3].map(id=>({dataset:{diff:String(id)}}));
+ h.ctx.document.querySelectorAll=selector=>selector==='.diff-dropdown-item'?difficulties:[];
+ h.exec("meta.lastCompletedIsland={saga:0,index:0,mode:'classic',diff:1};screenSagas();");
+ node('#tab-nuz').onclick();
+ assert.equal(h.exec('storyMode'),'nuzlocke');
+ difficulties[1].onclick({stopPropagation(){}});
+ assert.equal(h.exec('selectedDiff'),2);
+ assert.equal(h.exec('storyMode'),'nuzlocke');
+ h.exec('updateWorldSagaPicker(2)');node('#world-map').scrollTop=4321;
+ node('#tab-classic').onclick();
+ assert.equal(h.exec('storyMode'),'classic');
+ assert.equal(h.exec('selectedDiff'),2);
+ assert.equal(node('#world-jump').dataset.saga,'2');
+ assert.equal(node('#world-map').scrollTop,4321);
+ difficulties[2].onclick({stopPropagation(){}});
+ assert.equal(h.exec('selectedDiff'),3);
+ assert.equal(node('#world-jump').dataset.saga,'2');
+ node('#world-to-start').onclick();
+ assert.equal(node('#world-jump').dataset.saga,'0');
+ h.exec('screenSagas()');
+ assert.equal(h.exec('storyMode'),'classic');
+ assert.equal(h.exec('selectedDiff'),1,'initial navigation still restores the last completed island');
 });
 
 test('unified chart enforces saga, sequential difficulty and mode-specific island locks',()=>{

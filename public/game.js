@@ -2561,8 +2561,8 @@ function screenSagas(focusSaga, previousScroll) {
   `);
 
   $('#btn-back').onclick = () => { screenHome(); };
-  $('#tab-classic').onclick = () => { storyMode = 'classic'; screenSagas(Number($('#world-jump').value), $('#world-map').scrollTop); };
-  $('#tab-nuz').onclick = () => { storyMode = 'nuzlocke'; screenSagas(Number($('#world-jump').value), $('#world-map').scrollTop); };
+  $('#tab-classic').onclick = () => { storyMode = 'classic'; screenSagas(Number($('#world-jump').dataset.saga), $('#world-map').scrollTop); };
+  $('#tab-nuz').onclick = () => { storyMode = 'nuzlocke'; screenSagas(Number($('#world-jump').dataset.saga), $('#world-map').scrollTop); };
 
   const diffTrigger = $('#btn-diff-trigger');
   const diffMenu = $('#diff-dropdown-menu');
@@ -2585,7 +2585,7 @@ function screenSagas(focusSaga, previousScroll) {
     item.onclick = e => {
       e.stopPropagation();
       selectedDiff = +item.dataset.diff;
-      screenSagas(Number($('#world-jump').value), $('#world-map').scrollTop);
+      screenSagas(Number($('#world-jump').dataset.saga), $('#world-map').scrollTop);
     };
   });
 
@@ -3020,6 +3020,7 @@ function worldStopTop(chart,stop) {
   return stop.getBoundingClientRect ? chart.scrollTop + stop.getBoundingClientRect().top - chart.getBoundingClientRect().top : stop.offsetTop;
 }
 function updateWorldSagaPicker(index) {
+  $('#world-jump').dataset.saga = String(index);
   $('#world-jump').textContent = '🧭 Sagas · ' + SAGAS[index].name;
   document.querySelectorAll('[data-jump-saga]').forEach(button => button.setAttribute('aria-pressed', String(Number(button.dataset.jumpSaga) === index)));
 }
@@ -3033,6 +3034,7 @@ function scrollWorldStart(chart) {
 function bindWorldMapNavigation(focusSaga, previousScroll) {
   const chart = $('#world-map');
   const recent = meta.lastCompletedIsland;
+  updateWorldSagaPicker(Number.isInteger(focusSaga) ? focusSaga : recent && SAGAS[recent.saga]?.islands[recent.index] ? recent.saga : 0);
   if (previousScroll != null) chart.scrollTop = previousScroll;
   else if (recent && SAGAS[recent.saga]?.islands[recent.index] && (!Number.isInteger(focusSaga) || focusSaga === recent.saga)) {
     const target = $(`#world-island-${recent.saga}-${recent.index}`);
