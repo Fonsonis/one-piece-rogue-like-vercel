@@ -1060,7 +1060,7 @@ function topbar(showBerries = false, showAuto = showBerries, showSpeed = false, 
       <button class="btn small gray" id="btn-settings" title="Ajustes de juego">⚙️ AJUSTES</button>
       ${showSpeed ? `<button class="btn small gray" id="btn-map-speed" title="Velocidad de combate: x1, x2 o x4" aria-label="Velocidad de combate x${combatSpeed}" aria-live="polite">⏩ x${combatSpeed}</button>` : ''}
       <button class="btn small green" id="btn-save" title="Guardar partida como JSON" aria-label="Guardar partida como JSON">💾</button>
-      ${showBerries && showAuto && run && !showFlee ? '<button class="btn small red" id="btn-abandon" title="Abandonar el viaje">🏳️ ABANDONAR</button>' : ''}
+      ${showBerries && showAuto && run && !showFlee ? '<button class="btn small red" id="btn-abandon" title="Abandonar el viaje" aria-label="Abandonar el viaje"><span aria-hidden="true">🏳️</span></button>' : ''}
       ${showFlee ? '<button class="btn small red" data-ctl="run">🏃 HUIR</button>' : ''}
     </div>
   </div>${islandRepeatStatusHTML()}`;
@@ -5803,19 +5803,18 @@ function showTypeChartModal(team) {
       <td><span class="type-badge" style="background:${TYPES[atk].color}">${TYPES[atk].emoji} ${atk.toUpperCase()}</span></td>
       <td style="color:var(--green);">${strong || '—'}</td>
       <td style="color:var(--red);">${weak || '—'}</td>
-      <td style="font-size:7px;color:#666;">${note || ''}</td>
+      <td>${note || '—'}</td>
     </tr>`;
   }).join('');
   const ov = document.createElement('div');
   ov.className = 'overlay collection-overlay';
   ov.innerHTML = `<div class="modal collection-modal guide-modal" role="dialog" aria-modal="true" aria-label="Guía de sinergias y tipos">
     <h2 style="flex-shrink:0;">📊 Tabla de debilidades</h2>
-    <p class="guide-table-hint">Desliza la tabla horizontalmente para consultar todos los efectos.</p>
     <div class="collection-list guide-content">
-      <div style="overflow-x:auto;" tabindex="0" role="region" aria-label="Tabla de tipos y efectos, desplazamiento horizontal">
-        <table class="chart-table">
-          <tr><th>Atacante</th><th>+25% fuerte contra</th><th>-25% débil contra</th><th>Efecto especial</th></tr>
-          ${rows}
+      <div class="guide-type-table">
+        <table class="chart-table" aria-label="Tabla de debilidades y efectos especiales">
+          <thead><tr><th scope="col">Atacante</th><th scope="col">+25%<br>Fuerte contra</th><th scope="col">−25%<br>Débil contra</th><th scope="col">Efecto especial</th></tr></thead>
+          <tbody>${rows}</tbody>
         </table>
       </div>
       <div class="sheet-section" style="margin-top:10px;">
