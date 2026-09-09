@@ -73,6 +73,7 @@ test('all five market stops preserve rolls, pity and award stars or duplicate co
   assert.equal(draws,2);assert.ok(cards.every(c=>c.disabled));assert.equal(joined.length,0);
   const reward=duplicate ? ({3:50,4:500,5:1000}[shown.rarity]||shown.rarity) : shown.rarity;
   assert.equal(h.exec('meta.logPoses'),10+reward);
+  assert.equal(h.exec('run.rewards.logPoses'),reward);
   assert.equal(saved.at(-1),10+reward);
   assert.match(shown.rewardText,new RegExp(`^\\+${reward} Log Pose`));
   shown.onComplete();shown.onComplete();assert.equal(joined.length,1);assert.equal(joined[0].lvl,20);

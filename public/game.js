@@ -632,6 +632,17 @@ function gainFame(n) {
 
 // ---------- Estado de la partida ----------
 let run = null; // partida actual (historia)
+function trackJourneyRewards(fame = 0, logPoses = 0) {
+  if (!run) return;
+  run.rewards ||= {fame:0, logPoses:0, partial:true};
+  run.rewards.fame += fame;
+  run.rewards.logPoses += logPoses;
+}
+function journeyRewardsHTML(journey = run) {
+  const rewards = journey?.rewards;
+  const amount = value => Number.isFinite(value) && value >= 0 ? value.toLocaleString('es') : '0';
+  return `<div class="reward-list" aria-label="Recompensas conseguidas"><b>Conseguido en esta aventura</b><br>⭐ Fama: <strong>${amount(rewards?.fame)}</strong><br>🧭 Log Poses: <strong>${amount(rewards?.logPoses)}</strong>${!rewards || rewards.partial ? '<br><small>Solo se cuentan las recompensas registradas desde esta actualización.</small>' : ''}</div>`;
+}
 function saveRun() {
   ensureStartingTeam(run);
   prepareBackpack(run);
@@ -3561,6 +3572,7 @@ function showIslandRepeatCheckpoint(continueAuto = false) {
     <h2>${finished?'🏁 Serie completada':'🤖 Intento completado'}</h2><p>${SAGAS[journey.saga].islands[journey.islandIdx].name}</p>
     <p class="repeat-progress"><strong>${repeat.completed} / ${repeat.total}</strong> intentos</p>
     <p>${repeat.wins} victorias · ${repeat.losses} derrotas</p><p>Último resultado: ${repeat.result==='win'?'victoria':'derrota'}. El progreso permanente se conserva.</p>
+    ${journeyRewardsHTML(journey)}
     ${finished?'':`<p>${autoMode?'El siguiente intento comienza automáticamente.':'Serie pausada. Continúa cuando quieras.'}</p><button class="btn green" id="repeat-next">Continuar serie</button>`}
     <button class="btn gray" id="repeat-finish">${finished?'Volver a las islas':'Cancelar repeticiones'}</button></section>`);
   const next=()=>{
@@ -3965,6 +3977,7 @@ function startRun(sagaIdx, starterIds, islandIdx = 0, islandRepeat = null) {
     saga: sagaIdx, mode: storyMode, diff: selectedDiff || 1,
     islandIdx, mapIdx:0, campaignVersion:1, islandComplete:false,
     startingTeam: starterIds.map(baseFormOf),
+    rewards: {fame:0, logPoses:0},
     team: starterIds.map(id => applyUpgrades(makeChar(id, startLvlOf(id)))),
     items,
     berries,
@@ -5343,6 +5356,7 @@ function renderSpecialGacha(lvl) {
       resolved = true;
       const c = CHARS[prizeId];
       const reward = duplicatePosterReward(prizeId) || c.rareza;
+      trackJourneyRewards(0, reward);
       meta.logPoses = (meta.logPoses || 0) + reward;
       saveMeta();
       face.innerHTML = `${charIcon(prizeId, 28)}<br><span>${c.name}</span>`;
@@ -6671,11 +6685,13 @@ function afterRound() {
     if (run && !b.tower) {
       if (b.opts.boss) {
         const fame = bossFameReward(run.diff);
+        trackJourneyRewards(fame);
         gainFame(fame);
         b.bossFameEarned = (b.bossFameEarned || 0) + fame;
         log(`🏅 ${charName(defeated)}: +${fame} ⭐ Fama`);
       }
       const logPosesWon = enemyLogPoseReward(defeated, b.opts, run.saga || 0);
+      trackJourneyRewards(0, logPosesWon);
       meta.logPoses = (meta.logPoses || 0) + logPosesWon;
       saveMeta();
       log(`🧭 ¡Consigues ${logPosesWon} Log Pose! (Total: ${meta.logPoses})`);
@@ -6895,6 +6911,7 @@ function endBattle(victory, fled, recruited) {
   }
   if (notes.length) toast(notes.join(' · '));
   if (victory && opts.crossover) {
+    trackJourneyRewards(30);
     gainFame(30);
     saveRun();
     return crossoverReward(opts.crossover);
@@ -6929,9 +6946,10 @@ function endBattle(victory, fled, recruited) {
     storyMode = run.mode; selectedDiff = run.diff || 1;
     autoMode = false;
     if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+    const rewardsHTML = journeyRewardsHTML();
     clearRun();
     modalInfo('🏅 ¡Emblema conseguido!',
-      `<div class="reward-list">¡Has completado ${saga.islands[islandIdx].name}!<br>+${bossFame} ⭐ Fama<br><br>Desbloqueada: <b>${saga.islands[islandIdx+1].name}</b> 🧭<br>Elige la siguiente isla y prepara tu equipo.${newVets.length ? `<br><br><small>🏅 Nakamas permanentes:<br>${newVets.map(id => `${charIcon(id, 16)} ${CHARS[id].name}`).join(' · ')}</small>` : ''
+      `${rewardsHTML}<div class="reward-list">¡Has completado ${saga.islands[islandIdx].name}!<br>+${bossFame} ⭐ Fama<br><br>Desbloqueada: <b>${saga.islands[islandIdx+1].name}</b> 🧭<br>Elige la siguiente isla y prepara tu equipo.${newVets.length ? `<br><br><small>🏅 Nakamas permanentes:<br>${newVets.map(id => `${charIcon(id, 16)} ${CHARS[id].name}`).join(' · ')}</small>` : ''
       }</div>`,
       () => screenIslands(sagaIdx));
     return;
@@ -7171,6 +7189,7 @@ function sagaComplete() {
     rewardMessage = `<div style="color:var(--accent);font-size:8px;margin-top:6px;">⚠️ Ya habías conquistado esta saga en Dificultad ${dObj.name}. Recompensa reducida: +${fameWon} ⭐ Fama.<br>¡Cambia a otra dificultad para ganar la recompensa completa!</div>`;
   }
 
+  trackJourneyRewards(fameWon);
   gainFame(fameWon);
 
   // Guarda la banda completa (incluyendo legendarios/jefes) en meta.roster
@@ -7178,6 +7197,7 @@ function sagaComplete() {
   saveMeta();
   if(finishIslandRepeat('win',continueRepeat))return;
   const team = run.team;
+  const rewardsHTML = journeyRewardsHTML();
   clearRun();
   render(`
     ${topbar(false)}
@@ -7188,6 +7208,7 @@ function sagaComplete() {
       <span style="font-size:30px;">${team.map(f => charIcon(f.id, 38)).join(' ')}</span><br><br>
       ${team.map(f => `${charName(f)}${f.stars ? ` ⭐${f.stars}` : ''} Nv${f.lvl}`).join(' · ')}<br><br>
       ${rewardMessage}</p>
+      ${rewardsHTML}
       <p style="font-size:9px;color:#666;margin-bottom:14px;">Tus nakamas ${addedLegendaries.length ? '(¡incluyendo legendarios!) ' : ''}quedan disponibles como veteranos para próximas aventuras.<br></p>
       <button class="btn green" id="btn-fin">VOLVER AL PUERTO</button>
     </div>
@@ -7204,8 +7225,10 @@ function gameOver() {
   const retry = islandRetrySpec(run);
   const wasNuz = run && run.mode === 'nuzlocke';
   const consuelo = run ? run.badges.length * 10 : 0;
+  trackJourneyRewards(consuelo);
   if (consuelo) gainFame(consuelo);
   if(finishIslandRepeat('loss',continueRepeat))return;
+  const rewardsHTML = journeyRewardsHTML();
   clearRun();
   render(`
     ${topbar(false)}
@@ -7214,6 +7237,7 @@ function gameOver() {
       <p style="margin:14px 0;">Toda tu banda ha sido derrotada.<br>
       ${wasNuz ? 'Las reglas Nuzlocke no perdonan...' : 'El mar es implacable, pero siempre puedes volver a zarpar.'}
       ${consuelo ? `<br><br>Tu hazaña no se olvida: +${consuelo} ⭐ Fama` : ''}</p>
+      ${rewardsHTML}
       <div class="actions" style="flex-wrap:wrap;justify-content:center;">
         ${retry ? '<button class="btn green" id="btn-retry-island">🔄 VOLVER A INTENTAR</button>' : ''}
         <button class="btn red" id="btn-fin">VOLVER AL PUERTO</button>
