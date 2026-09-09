@@ -1868,7 +1868,9 @@ function showLogPoseGachaModal() {
       <h2>🎰 Mercado de Carteles</h2>
       <p style="font-size:8.5px;text-align:center;margin-bottom:6px;line-height:1.8;">
         Gasta tus Log Poses para destapar carteles de SE BUSCA de tus sagas desbloqueadas.<br>
-        ¡Pueden tocarte reclutas de 1⭐ hasta 5⭐ legendarios!
+        ¡Pueden tocarte reclutas de 1⭐ hasta 5⭐ legendarios!<br>
+        Duplicados: 3⭐ → 50 🧭 · 4⭐ → 500 🧭 · 5⭐ → 1000 🧭.<br>
+        Con 500 estrellas acumuladas, el siguiente premio es un legendario nuevo de las sagas seleccionadas; si ya tienes todos, recibes 1000 🧭.
       </p>
       <div style="font-size:10px;text-align:center;margin-bottom:6px;color:var(--gold);font-weight:bold;background:rgba(255,215,0,0.1);padding:6px;border-radius:6px;border:1px solid var(--gold);">
         🧭 Saldo: <b>${meta.logPoses} Log Poses</b>
@@ -1945,8 +1947,22 @@ function showLogPoseGachaModal() {
   ov.onclick = e => { if (e.target === ov) ov.remove(); };
 }
 
+function duplicatePosterReward(id) {
+  return isNakamaUnlocked(id) ? ({3:50,4:500,5:1000}[CHARS[id].rareza] || 0) : 0;
+}
+
 function startLogPoseGacha(activeSagas) {
   meta.starPity = meta.starPity || 0;
+  const activePirates = [...new Set(activeSagas.flatMap(s => sagaBasePirateIds(s.id)))];
+  const guaranteed = meta.starPity >= 500;
+  const newLegendaries = activePirates.filter(id => CHARS[id].rareza === 5 && !isNakamaUnlocked(id));
+  if (guaranteed && !newLegendaries.length) {
+    meta.logPoses = (meta.logPoses || 0) + 1000;
+    meta.starPity = 0;
+    saveMeta();
+    modalInfo('🧭 Compensación de legendario', 'No quedan legendarios nuevos en las sagas seleccionadas. Recibes <b>1000 Log Poses</b> en lugar de un personaje duplicado.', () => screenHome());
+    return;
+  }
   const weights = [41.5, 30, 21, 7, 0.5];
   let roll = Math.random() * 100, stopIdx = 4;
   if (meta.starPity >= 500) {
@@ -1958,10 +1974,8 @@ function startLogPoseGacha(activeSagas) {
     }
   }
 
-  const activeSagaIds = activeSagas.map(s => s.id);
-  const activePirates = activeSagaIds.flatMap(sId => sagaBasePirateIds(sId));
   const targetRarity = stopIdx + 1;
-  let pool = activePirates.filter(id => CHARS[id] && CHARS[id].rareza === targetRarity);
+  let pool = guaranteed ? newLegendaries : activePirates.filter(id => CHARS[id] && CHARS[id].rareza === targetRarity);
 
   if (!pool.length) {
     for (let d = 1; d <= 4; d++) {
@@ -2013,19 +2027,24 @@ function startLogPoseGacha(activeSagas) {
   };
 
   const flip = i => {
+    if (i !== current) return;
     const face = ov.querySelector(`#pf-${i}`);
     const el = ov.querySelector(`[data-p="${i}"]`);
     if (i === stopIdx) {
+      current = -1;
       const c = CHARS[prizeId];
+      const duplicateReward = duplicatePosterReward(prizeId);
+      meta.logPoses = (meta.logPoses || 0) + duplicateReward;
       face.innerHTML = `${charIcon(prizeId, 28)}<br><span>${c.name}</span>`;
       el.classList.add('hit'); el.classList.remove('next');
       registerRecruit(prizeId);
       const b = baseFormOf(prizeId);
-      if (!meta.roster.includes(b)) { meta.roster.push(b); saveMeta(); }
+      if (!meta.roster.includes(b)) meta.roster.push(b);
+      saveMeta();
       ov.querySelectorAll('.poster').forEach(p => { p.onclick = null; });
       setTimeout(() => {
         ov.remove();
-        modalInfo('🎉 ¡Nuevo personaje reclutado!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(prizeId, 44)}</span><br><b>${c.name}</b> ${'⭐'.repeat(c.rareza)}<br><small style="color:var(--gold);">${c.types.join(' / ')}</small><br><br><span style="font-size:9px;color:var(--green);">¡Añadido a tu Dex e Inventario de Tripulación!</span></div>`, () => screenHome());
+        modalInfo(duplicateReward ? '🧭 Personaje duplicado' : '🎉 ¡Nuevo personaje reclutado!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(prizeId, 44)}</span><br><b>${c.name}</b> ${'⭐'.repeat(c.rareza)}<br><small style="color:var(--gold);">${c.types.join(' / ')}</small><br><br><span style="font-size:9px;color:var(--green);">${duplicateReward ? `Duplicado: +${duplicateReward} Log Poses` : '¡Añadido a tu Dex e Inventario de Tripulación!'}</span></div>`, () => screenHome());
       }, 1400);
     } else {
       face.innerHTML = `💨<br><span>VACÍO</span>`;
@@ -5247,7 +5266,7 @@ function renderSpecialCatalog(lvl) {
   });
 }
 
-function revealSpecialRecruit(ov, prizeId, lvl) {
+function revealSpecialRecruit(ov, prizeId, lvl, reward = CHARS[prizeId].rareza) {
   let completed = false;
   const complete = () => {
     if (completed || !ov.isConnected) return;
@@ -5258,7 +5277,7 @@ function revealSpecialRecruit(ov, prizeId, lvl) {
   try {
     if (typeof MarketReveal !== 'undefined') {
       MarketReveal.show({host:ov, name:CHARS[prizeId].name, rarity:CHARS[prizeId].rareza,
-        rewardText:`+${CHARS[prizeId].rareza} Log Pose${CHARS[prizeId].rareza === 1 ? '' : 's'}`,
+        rewardText:`+${reward} Log Pose${reward === 1 ? '' : 's'}`,
         portraitHTML:charIcon(prizeId, 140), onComplete:complete});
       if(autoMode){
         const advance=()=>{if(!ov.isConnected)return;const button=ov.querySelector('.mr-continue');if(button)button.click();if(ov.isConnected)scheduleAutoStep(advance,700);};
@@ -5267,7 +5286,7 @@ function revealSpecialRecruit(ov, prizeId, lvl) {
       return;
     }
   } catch (_) { /* A cosmetic failure must not prevent recruitment. */ }
-  toast(`🧭 +${CHARS[prizeId].rareza} Log Poses del cartel premiado`);
+  toast(`🧭 +${reward} Log Poses del cartel premiado`);
   setTimeout(complete, 1400);
 }
 
@@ -5295,7 +5314,7 @@ function renderSpecialGacha(lvl) {
   ov.className = 'overlay market-cartels';
   ov.innerHTML = `<div class="modal">
     <h2>🎰 Los 5 carteles de SE BUSCA</h2>
-    <p style="font-size:8px;text-align:center;margin-bottom:6px;">Destapa los carteles en orden. ¡En uno de ellos está tu recluta! El cartel premiado también da 1 Log Pose por cada estrella del personaje obtenido.</p>
+    <p style="font-size:8px;text-align:center;margin-bottom:6px;">Destapa los carteles en orden. ¡En uno de ellos está tu recluta! El cartel premiado también da 1 Log Pose por estrella. Si ya tienes al personaje en tu inventario, los de 3⭐ dan 50, los de 4⭐ dan 500 y los de 5⭐ dan 1000 Log Poses.</p>
     <div style="font-size:9px;text-align:center;margin-bottom:10px;color:#f39c12;">
       ⭐ Estrellas acumuladas (Pity): <b>${meta.starPity} / 1000</b>
     </div>
@@ -5323,13 +5342,14 @@ function renderSpecialGacha(lvl) {
     if (i === stopIdx) {
       resolved = true;
       const c = CHARS[prizeId];
-      meta.logPoses = (meta.logPoses || 0) + c.rareza;
+      const reward = duplicatePosterReward(prizeId) || c.rareza;
+      meta.logPoses = (meta.logPoses || 0) + reward;
       saveMeta();
       face.innerHTML = `${charIcon(prizeId, 28)}<br><span>${c.name}</span>`;
       el.classList.add('hit'); el.classList.remove('next');
       registerDex(prizeId);
       ov.querySelectorAll('.poster').forEach(p => { p.onclick = null; p.disabled = true; });
-      revealSpecialRecruit(ov, prizeId, lvl);
+      revealSpecialRecruit(ov, prizeId, lvl, reward);
     } else {
       face.innerHTML = `💨<br><span>VACÍO</span>`;
       el.classList.add('empty');
