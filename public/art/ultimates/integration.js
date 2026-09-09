@@ -15,8 +15,9 @@
   useUltimate=function(f) {
     // Capture before calling the engine: damage can evolve a fighter or refresh cards.
     const before=safe(()=>{
-      const b=battle;if(!b||b.over||!f||f.hp<=0||f.lvl<20||(f.ultCharge||0)<100||!b.curE||b.curE.hp<=0)return null;
-      return {b,f,enemy:b.curE,hp:b.curE.hp,profile:profileFor(f)};
+      const b=battle;if(!b||b.over||!f||f.hp<=0||f.lvl<20||(f.ultCharge||0)<100)return null;
+      const enemy=b.eTeam.includes(f)?b.curP:b.curE;if(!enemy||enemy.hp<=0)return null;
+      return {b,f,enemy,hp:enemy.hp,profile:profileFor(f)};
     });
     const result=originalUltimate.apply(this,arguments);
     if(before&&f.ultCharge<100)safe(()=>{

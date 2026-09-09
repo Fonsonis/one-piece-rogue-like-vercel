@@ -5970,10 +5970,17 @@ function getUltimateMove(f) {
   return ownMoves.sort((a,b) => b.power * b.acc - a.power * a.acc)[0] || MOVES.punetazo;
 }
 
+function enemyUltimatesEnabled(b = battle) {
+  const marineford = SAGAS.findIndex(s => s.id === 'marineford');
+  return !!b && !b.tower && !!run && marineford >= 0 && run.saga >= marineford;
+}
+
 function useUltimate(f) {
   const b = battle;
   if (!b || b.over || !f || f.hp <= 0) return;
-  const enemy = b.curE;
+  const isEnemy = b.eTeam.includes(f);
+  if (isEnemy && !enemyUltimatesEnabled(b)) return;
+  const enemy = isEnemy ? b.curP : b.curE;
   if (!enemy || enemy.hp <= 0) return;
   if (f.lvl < 20) return toast(`🔒 Ultimate de ${charName(f)} desbloqueable a Nv20.`);
   if ((f.ultCharge || 0) < 100) return toast(`⚡ Ultimate de ${charName(f)} al ${Math.floor(f.ultCharge || 0)}% (golpea para cargar).`);
@@ -5981,7 +5988,7 @@ function useUltimate(f) {
   f.ultCharge = 0;
   const ultMv = getUltimateMove(f);
   log(`💥 <b>¡DEFINITIVA DE ${charName(f).toUpperCase()}!</b> Desata <b>${ultMv.name}</b> 💥`);
-  attackWith(f, enemy, ultMv, 'enemy');
+  attackWith(f, enemy, ultMv, isEnemy ? 'player' : 'enemy');
   refreshHPCards();
 }
 
@@ -6057,7 +6064,7 @@ function fighterCardHTML(f, side, idx, active) {
   const isUltReady = isUltUnlocked && (f.ultCharge || 0) >= 100;
   const ultPct = isUltUnlocked ? clamp(f.ultCharge || 0, 0, 100) : 0;
 
-  const ultBarHTML = side === 'p' ? `
+  const ultBarHTML = (side === 'p' || enemyUltimatesEnabled()) ? `
     <div class="ult-bar-wrap ${isUltUnlocked ? '' : 'locked'}" title="${isUltUnlocked ? 'Ultimate (' + Math.floor(ultPct) + '%)' : 'Desbloquea Ultimate a Nv20'}">
       ${isUltUnlocked ? `<div class="ult-bar" style="width:${ultPct}%"></div>` : '<div class="ult-bar-text">🔒 ULTI A NV20</div>'}
     </div>` : '';
@@ -6518,7 +6525,7 @@ function attackWith(att, dfd, mv, targetSide) {
   if (dmg > 0) dfd.st.receivedHit = true;
   if (passiveRule(att).slow) dfd.st.slow = 2;
   // Recarga de Ultimate al golpear al enemigo (para personajes de nivel base >= 20)
-  if (att && att.lvl >= 20 && b.pTeam.includes(att)) {
+  if (att && att.lvl >= 20 && (b.pTeam.includes(att) || (enemyUltimatesEnabled(b) && b.eTeam.includes(att)))) {
     att.ultCharge = Math.min(100, (att.ultCharge || 0) + 34);
   }
   let txt = `${attName} usa <b>${mv.name}</b>. `;
@@ -6602,7 +6609,10 @@ function runRound() {
       // Preserve this round's turn order; a manual relay changes its actors, not its number of attacks.
       const att = side === 'enemy' ? b.curP : b.curE;
       const dfd = side === 'enemy' ? b.curE : b.curP;
-      if (att.hp > 0 && dfd.hp > 0) attackWith(att, dfd, chooseMove(att, dfd), side);
+      if (att.hp > 0 && dfd.hp > 0) {
+        if (side === 'player' && enemyUltimatesEnabled(b) && att.lvl >= 20 && (att.ultCharge || 0) >= 100) useUltimate(att);
+        else attackWith(att, dfd, chooseMove(att, dfd), side);
+      }
       b.pendingStep = step;
       b.timer = setTimeout(step, 900 / battle.speed);
     } else {
