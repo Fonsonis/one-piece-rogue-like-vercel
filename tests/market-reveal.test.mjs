@@ -51,9 +51,9 @@ test('the reveal displays the Log Pose reward when ready, including reduced moti
  }
 });
 
-test('all five market stops in every saga preserve rolls, pity and award actual stars once',()=>{
+test('all five market stops preserve rolls, pity and award stars or duplicate compensation once',()=>{
  const rolls=[.1,.5,.8,.97,.999];
- for(let saga=0;saga<11;saga++)for(let stop=0;stop<5;stop++){
+ for(const duplicate of [false,true])for(let saga=0;saga<11;saga++)for(let stop=0;stop<5;stop++){
   const h=combatHarness();let draws=0,shown;const joined=[];
   const node=()=>({innerHTML:'',disabled:true,onclick:null,focus(){},classList:{add(){},remove(){},toggle(){}}});
   const cards=Array.from({length:5},node),faces=Array.from({length:5},node);
@@ -62,7 +62,8 @@ test('all five market stops in every saga preserve rolls, pity and award actual 
   h.ctx.Math.random=()=>++draws===1?rolls[stop]:.123;
   h.ctx.MarketReveal={show:args=>{shown=args;}};h.ctx.specialJoin=(id,lvl)=>joined.push({id,lvl});
   const saved=[];h.ctx.saveMeta=()=>saved.push(h.exec('meta.logPoses'));
-  h.exec(`run={saga:${saga},berries:1234};meta.starPity=0;meta.logPoses=10;renderSpecialGacha(20);`);
+  h.exec(`meta.roster=${duplicate ? 'Object.keys(CHARS).filter(id=>!BASE_OF[id])' : '[]'};
+  run={saga:${saga},berries:1234};meta.starPity=0;meta.logPoses=10;renderSpecialGacha(20);`);
   assert.equal(draws,2);assert.equal(h.exec('run.berries'),1234);
   for(let i=0;i<=stop;i++){
    assert.equal(h.exec('meta.logPoses'),10);
@@ -70,12 +71,13 @@ test('all five market stops in every saga preserve rolls, pity and award actual 
    const click=cards[i].onclick;click();click();
   }
   assert.equal(draws,2);assert.ok(cards.every(c=>c.disabled));assert.equal(joined.length,0);
-  assert.equal(h.exec('meta.logPoses'),10+shown.rarity);
-  assert.equal(saved.at(-1),10+shown.rarity);
-  assert.match(shown.rewardText,new RegExp(`^\\+${shown.rarity} Log Pose`));
+  const reward=duplicate ? ({3:50,4:500,5:1000}[shown.rarity]||shown.rarity) : shown.rarity;
+  assert.equal(h.exec('meta.logPoses'),10+reward);
+  assert.equal(saved.at(-1),10+reward);
+  assert.match(shown.rewardText,new RegExp(`^\\+${reward} Log Pose`));
   shown.onComplete();shown.onComplete();assert.equal(joined.length,1);assert.equal(joined[0].lvl,20);
   const rarity=h.exec(`CHARS[${JSON.stringify(joined[0].id)}].rareza`);
-  assert.equal(h.exec('meta.logPoses'),10+rarity);
+  assert.equal(h.exec('meta.logPoses'),10+reward);
   assert.equal(shown.rarity,rarity);assert.equal(h.exec('meta.starPity'),stop===4||rarity===5?0:stop+1);
  }
 });
