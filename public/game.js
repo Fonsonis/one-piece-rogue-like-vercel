@@ -982,6 +982,21 @@ function cycleTopbarAuto() {
 }
 
 // ---------- Render raíz ----------
+// Mobile browser zoom, toolbars and keyboards can shrink the visible viewport
+// without changing the layout viewport used by fixed event overlays.
+function syncGameViewport() {
+  const viewport = globalThis.visualViewport;
+  const style = document.documentElement?.style;
+  if (!viewport || !style) return;
+  style.setProperty('--game-view-width', `${viewport.width}px`);
+  style.setProperty('--game-view-height', `${viewport.height}px`);
+  style.setProperty('--game-view-left', `${viewport.offsetLeft}px`);
+  style.setProperty('--game-view-top', `${viewport.offsetTop}px`);
+}
+globalThis.visualViewport?.addEventListener('resize', syncGameViewport);
+globalThis.visualViewport?.addEventListener('scroll', syncGameViewport);
+syncGameViewport();
+
 function render(html) {
   worldNavigator?.destroy();
   worldNavigator = null;
