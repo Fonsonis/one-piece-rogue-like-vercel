@@ -7311,11 +7311,14 @@ function screenTowerIntro() {
 }
 
 function towerNextBattle() {
+  let highestSaga = 0;
+  SAGAS.forEach((_, i) => { if (sagaUnlocked(i)) highestSaga = i; });
+  const availableSagas = new Set(SAGAS.slice(0, highestSaga + 1).map(s => s.id));
   // sin formas evolucionadas ni personajes del crossover (solo salen en su evento)
-  const pool = Object.keys(CHARS).filter(id => !BASE_OF[id] && CHARS[id].saga !== 'crossover');
+  const pool = Object.keys(CHARS).filter(id => !BASE_OF[id] && availableSagas.has(CHARS[id].saga));
   const lvl = 13 + tower.floor * 2;
   const isBossFloor = tower.floor % 5 === 0;
-  const bossIds = Object.keys(CHARS).filter(id => CHARS[id].boss && CHARS[id].saga !== 'crossover');
+  const bossIds = Object.keys(CHARS).filter(id => CHARS[id].boss && availableSagas.has(CHARS[id].saga));
   const id = isBossFloor ? pick(bossIds) : pick(pool);
   const enemy = makeChar(id, lvl + (isBossFloor ? 2 : 0), false, true);
   startBattle([enemy], {
