@@ -29,7 +29,7 @@
     const m={pose:t<.08||t>.94?0:t<.27||t>.76?1:2,travel:0,lift:0,angle:0,stretch:0,scale:1,echoes:0,alpha:1};
     if(reduced){m.pose=2;return m;}
     if(p.id==='luffy5'){
-      // Hold the raised knee, then accelerate the articulated leg into the stomp.
+      // The new atlas authors the raised knee and planted giant foot as complete poses.
       const grow=ease(between(t,.08,.32)), home=ease(between(t,.78,.98));
       const rise=ease(between(t,.28,.43)), slam=between(t,.52,.62)**3;
       m.scale=1+1.25*grow*(1-home);
@@ -37,10 +37,35 @@
       const raised=rise*(1-slam)*(1-home);
       m.lift=.2*raised;
       m.angle=-.06*raised;
-      m.pose=t>=.08&&t<.94?1:0;
-      m.legBend=raised;
-      m.footScale=1+.65*grow*(1-home);
+      m.pose=t<.08||t>.94?0:t<.55?1:2;
       return m;
+    }
+    if(p.id==='luffy'){
+      // Load the rubber arms, drive both palms forward, then recoil to guard.
+      m.travel=.85*ease(between(t,.3,.44))*returnHome;
+      if(t<.3)m.travel=-.09*Math.sin(Math.PI*between(t,.08,.3));
+      m.angle=-.07*envelope;return m;
+    }
+    if(p.id==='luffy2'){
+      // Jet Whip is a low, fast sweep rather than repeated punches.
+      m.pose=t<.08||t>.9?0:t<.34?1:2;
+      m.travel=.92*ease(between(t,.34,.44))*(1-ease(between(t,.64,.9)));
+      m.lift=.08*envelope;m.angle=-.13*envelope;
+      m.echoes=t>=.34&&t<.64?2:0;return m;
+    }
+    if(p.id==='luffy3'){
+      // Hold the inflated fist overhead before the descending hammer impact.
+      m.pose=t<.08||t>.94?0:t<.49?1:2;
+      m.travel=.9*ease(between(t,.36,.55))*returnHome;
+      m.lift=.12*ease(between(t,.2,.4))*(1-ease(between(t,.49,.58)))*returnHome;
+      m.angle=t<.49?-.11*Math.sin(Math.PI*between(t,.08,.49)):.07*envelope;return m;
+    }
+    if(p.id==='luffy4'){
+      // Snakeman stays grounded and changes tempo as its zigzag arm lashes out.
+      m.pose=t<.08||t>.94?0:t<.37?1:2;
+      m.travel=.86*ease(between(t,.37,.46))*returnHome;
+      m.angle=.035*Math.sin(between(t,.37,.73)*Math.PI*4)*returnHome;
+      m.echoes=t>.37&&t<.73?2:0;return m;
     }
     const moving=t>=.27&&t<=.76;
     const beat=attack*Math.min(6,p.count), pulse=Math.sin(Math.PI*(beat%1));
@@ -91,13 +116,11 @@
     const end=defender?.x??target*width;
     const distance=Math.max(0,Math.abs(end-origin)-size*.28);
     let x=origin+dir*distance*m.travel, y=floor-m.lift*size;
-    // Only these authored atlases have a horizontal, unobstructed rubber arm.
-    const rubber=['luffy','luffy2','luffy5'].includes(p.id)&&m.pose===2?m.stretch:0;
-    const drawActor=(image,state,px,py,sz,alpha=1,arm=0,direction=dir)=>{
-      const unit=(image.naturalHeight||192), ratio=unit/192;
+    const drawActor=(image,state,px,py,sz,alpha=1,direction=dir)=>{
+      const unit=(image.naturalHeight||192);
       // Bound the rotated, extended cell, including transparent margins, for both fighters.
       const angle=state.angle||0,scale=state.scale||1,cos=Math.cos(angle),sin=Math.sin(angle);
-      const corners=[[-.5,-.9375],[.5+arm,-.9375],[-.5,.0625],[.5+arm,.0625]];
+      const corners=[[-.5,-.9375],[.5,-.9375],[-.5,.0625],[.5,.0625]];
       const xs=corners.map(([x,y])=>(x*cos-y*sin)*scale*direction),ys=corners.map(([x,y])=>(x*sin+y*cos)*scale);
       const minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
       sz=Math.min(sz,(width-4)/(maxX-minX),(height-4)/(maxY-minY));
@@ -106,32 +129,8 @@
       ctx.save();ctx.globalAlpha=alpha;ctx.translate(px,py);ctx.scale(direction,1);ctx.rotate(state.angle||0);
       ctx.scale(state.scale||1,state.scale||1);ctx.imageSmoothingEnabled=false;
       const originX=-sz*.5,originY=-sz*.9375,frame=state.pose*unit;
-      if(arm>0){
-        // Keep the torso and fist intact; lengthen only the straight forearm strip.
-        const split=112,tip=120,k=sz/192,extra=arm*sz;
-        ctx.drawImage(image,frame,0,split*ratio,unit,originX,originY,split*k,sz);
-        ctx.drawImage(image,frame+split*ratio,0,(tip-split)*ratio,unit,originX+split*k,originY,(tip-split)*k+extra,sz);
-        ctx.drawImage(image,frame+tip*ratio,0,(192-tip)*ratio,unit,originX+tip*k+extra,originY,(192-tip)*k,sz);
-      }else if(state.footScale>1&&state.pose===1){
-        // A hip → knee → ankle chain keeps the leg attached throughout the swing.
-        // Sample the planted windup pose; overlapping joints hide crop seams.
-        const k=sz/192,bend=state.legBend||0;
-        const slice=(sx,sy,w,h,dx,dy)=>ctx.drawImage(image,frame+sx*ratio,sy*ratio,w*ratio,h*ratio,dx,dy,w,h);
-        ctx.save();ctx.translate(originX,originY);ctx.scale(k,k);
-        // Back leg and sash retain their authored position.
-        slice(0,142,107,50,0,142);
-        ctx.save();ctx.translate(112,145);ctx.rotate(-1.65*bend);
-        slice(107,139,31,21,-5,-6);
-        ctx.translate(11,12);ctx.rotate(.95*bend);
-        slice(117,155,19,21,-6,-2);
-        ctx.translate(0,17);ctx.rotate(.7*bend);
-        ctx.scale(state.footScale,state.footScale);
-        slice(116,172,24,9,-7,-2);
-        ctx.restore();
-        // Draw the waist over the hip joint so there is never a floating limb.
-        slice(0,0,192,145,0,0);
-        ctx.restore();
-      }else ctx.drawImage(image,frame,0,unit,unit,originX,originY,sz,sz);
+      // Preserve complete authored limbs, including Snakeman's zigzag and Nika's foot.
+      ctx.drawImage(image,frame,0,unit,unit,originX,originY,sz,sz);
       ctx.restore();
     };
     if(defender?.image){
@@ -139,16 +138,16 @@
       const reaction=hit&&!reduced?Math.sin(Math.PI*between(t,stomp?.62:.43,.82)):0;
       const ds=defender.size;
       drawActor(defender.image,{pose:reaction>0?3:0,angle:-reaction*.09},
-        defender.x+dir*reaction*ds*(stomp?.12:.035),defender.y-(stomp?reaction*ds*.12:0),ds,1,0,-dir);
+        defender.x+dir*reaction*ds*(stomp?.12:.035),defender.y-(stomp?reaction*ds*.12:0),ds,1,-dir);
     }
     // Afterimages repeat actual attack cells, never substitute geometric effects.
     for(let i=m.echoes;i>0;i--){
       const past=choreography(p,Math.max(.27,t-i*.027));
       const ex=x-dir*Math.min(size*.12*i,Math.abs(m.travel)*distance*.2);
-      drawActor(sprite,past,ex,y+i*size*.008,size,.12/i,0);
+      drawActor(sprite,past,ex,y+i*size*.008,size,.12/i);
     }
     ctx.save();
-    drawActor(sprite,m,x,y,size,m.alpha,rubber);
+    drawActor(sprite,m,x,y,size,m.alpha);
     ctx.restore();
   }
 
@@ -162,13 +161,14 @@
       if(state.value)sprite.style.setProperty('visibility',state.value,state.priority);else sprite.style.removeProperty('visibility');};
   }
 
-  function play({profile,source,target=source,owner=source,valid=()=>true,speed=1,hit=true,preview=false}) {
+  function play({profile,source,target=source,owner=source,valid=()=>true,speed=1,hit=true,preview=false,basic=false}) {
     if(!source?.isConnected||!target?.isConnected)return null;
     active.get(owner)?.cancel();while(active.size>=2)active.values().next().value.cancel();
     const reduced=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches||false;
     const duration=reduced?650:(preview?2100:Math.max(850,1650/Math.max(1,speed)));
     const el=document.createElement('div');el.className='ultimate-scene';el.setAttribute('aria-hidden','true');
     el.dataset.character=profile.id;el.dataset.family=profile.family;el.dataset.motion=profile.motion;
+    el.dataset.presentation=basic?'attack':'ultimate';
     el.style.setProperty('--ultimate-color',profile.color);
     const canvas=document.createElement('canvas');el.appendChild(canvas);
     const cutin=document.createElement('div');cutin.className='ultimate-cutin';
@@ -217,8 +217,8 @@
           const from=preview ? .22:clamp((actor.x)/width),to=preview ? .78:clamp((b.left+b.width/2-left)/width);
           if(preview){actor.size=Math.min(actor.size,width*.56,height*.92);actor.x=width*.3;actor.y=height*.93;}
           drawFrame(ctx,profile,reduced ? .58:progress,{width,height,source:from,target:to,hit,reduced,sprite,actor,defender});
-          title.style.opacity=String(Math.min(1,progress/.08,clamp((.42-progress)/.1)));
-          cutin.style.opacity=String(reduced?0:clamp(progress/.06)*clamp((.32-progress)/.08));
+          title.style.opacity=String(basic?0:Math.min(1,progress/.08,clamp((.42-progress)/.1)));
+          cutin.style.opacity=String(reduced||basic?0:clamp(progress/.06)*clamp((.32-progress)/.08));
           cutin.style.transform=`translateX(${(1-ease(progress/.14))*(from<to?-22:22)}px)`;
           cutin.style.left=from<to?'0':'auto';cutin.style.right=from<to?'auto':'0';
           el.dataset.phase=progress<.27?'prepare':progress<.76?'attack':'return';

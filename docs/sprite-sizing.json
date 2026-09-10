@@ -2,36 +2,36 @@
   "luffy": {
     "ratio": 1,
     "guardBounds": [
-      48,
-      98,
-      113,
+      47,
+      55,
+      145,
       180
     ],
     "portraitBounds": [
-      33,
+      34,
       18,
       158,
       176
     ],
-    "atlasScale": 1.5609756097560976,
+    "atlasScale": 1.024,
     "portraitScale": 0.8354430379746836
   },
   "luffy2": {
     "ratio": 1,
     "guardBounds": [
-      51,
-      106,
-      123,
+      47,
+      88,
+      146,
       180
     ],
     "portraitBounds": [
-      19,
-      18,
-      173,
+      13,
+      22,
+      179,
       176
     ],
-    "atlasScale": 1.7297297297297298,
-    "portraitScale": 0.8354430379746836
+    "atlasScale": 1.391304347826087,
+    "portraitScale": 0.8571428571428571
   },
   "zoro": {
     "ratio": 1,
@@ -1090,18 +1090,18 @@
   "lucci": {
     "ratio": 1,
     "guardBounds": [
-      68,
-      79,
-      160,
+      47,
+      24,
+      146,
       180
     ],
     "portraitBounds": [
-      24,
+      46,
       18,
-      168,
+      146,
       176
     ],
-    "atlasScale": 1.2673267326732673,
+    "atlasScale": 0.8205128205128205,
     "portraitScale": 0.8354430379746836
   },
   "bonney": {
@@ -1737,17 +1737,17 @@
     "ratio": 1,
     "guardBounds": [
       51,
-      57,
+      61,
       142,
       180
     ],
     "portraitBounds": [
-      37,
+      36,
       18,
-      154,
+      157,
       176
     ],
-    "atlasScale": 1.0406504065040652,
+    "atlasScale": 1.0756302521008403,
     "portraitScale": 0.8354430379746836
   },
   "pell": {
@@ -2025,19 +2025,19 @@
   "merrychristmas": {
     "ratio": 1,
     "guardBounds": [
-      26,
-      69,
-      167,
+      39,
+      24,
+      153,
       180
     ],
     "portraitBounds": [
-      13,
-      45,
-      179,
+      39,
+      18,
+      154,
       176
     ],
-    "atlasScale": 1.099290780141844,
-    "portraitScale": 0.9518072289156626
+    "atlasScale": 0.8205128205128205,
+    "portraitScale": 0.8354430379746836
   },
   "bentham": {
     "ratio": 1,
@@ -2841,18 +2841,18 @@
   "jabra": {
     "ratio": 1,
     "guardBounds": [
-      46,
-      72,
-      147,
+      38,
+      45,
+      155,
       180
     ],
     "portraitBounds": [
-      22,
+      28,
       18,
-      170,
+      165,
       176
     ],
-    "atlasScale": 1.1851851851851851,
+    "atlasScale": 0.9481481481481482,
     "portraitScale": 0.8354430379746836
   },
   "kumadori": {
@@ -3113,35 +3113,35 @@
   "sandersonia": {
     "ratio": 1,
     "guardBounds": [
-      43,
-      65,
-      150,
+      47,
+      24,
+      146,
       180
     ],
     "portraitBounds": [
-      22,
+      46,
       18,
-      169,
+      146,
       176
     ],
-    "atlasScale": 1.1130434782608696,
+    "atlasScale": 0.8205128205128205,
     "portraitScale": 0.8354430379746836
   },
   "marigold": {
     "ratio": 1,
     "guardBounds": [
-      44,
-      68,
-      148,
+      48,
+      50,
+      144,
       180
     ],
     "portraitBounds": [
-      22,
+      38,
       18,
-      169,
+      155,
       176
     ],
-    "atlasScale": 1.1428571428571428,
+    "atlasScale": 0.9846153846153847,
     "portraitScale": 0.8354430379746836
   },
   "gloriosa": {
@@ -3691,19 +3691,19 @@
   "minotauros": {
     "ratio": 1,
     "guardBounds": [
-      21,
-      41,
-      172,
+      32,
+      45,
+      160,
       180
     ],
     "portraitBounds": [
-      13,
-      23,
-      179,
+      21,
+      18,
+      171,
       176
     ],
-    "atlasScale": 0.920863309352518,
-    "portraitScale": 0.8627450980392157
+    "atlasScale": 0.9481481481481482,
+    "portraitScale": 0.8354430379746836
   },
   "momonga": {
     "ratio": 1,
@@ -3725,19 +3725,19 @@
   "onigumo": {
     "ratio": 1,
     "guardBounds": [
-      23,
-      46,
-      169,
+      45,
+      57,
+      148,
       180
     ],
     "portraitBounds": [
-      13,
-      24,
-      179,
+      30,
+      18,
+      162,
       176
     ],
-    "atlasScale": 0.9552238805970149,
-    "portraitScale": 0.868421052631579
+    "atlasScale": 1.0406504065040652,
+    "portraitScale": 0.8354430379746836
   },
   "doberman": {
     "ratio": 1,
@@ -6394,18 +6394,18 @@
   "pageone": {
     "ratio": 1,
     "guardBounds": [
-      48,
-      78,
-      144,
+      45,
+      34,
+      148,
       180
     ],
     "portraitBounds": [
-      21,
+      41,
       18,
-      170,
+      152,
       176
     ],
-    "atlasScale": 1.2549019607843137,
+    "atlasScale": 0.8767123287671232,
     "portraitScale": 0.8354430379746836
   },
   "whoswho": {
@@ -7329,9 +7329,808 @@
   "luffy3": {
     "ratio": 1,
     "guardBounds": [
+      33,
+      62,
+      160,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      22,
+      179,
+      176
+    ],
+    "atlasScale": 1.0847457627118644,
+    "portraitScale": 0.8571428571428571
+  },
+  "luffy4": {
+    "ratio": 1.2,
+    "guardBounds": [
+      48,
+      61,
+      144,
+      180
+    ],
+    "portraitBounds": [
+      33,
+      18,
+      160,
+      176
+    ],
+    "atlasScale": 1.2907563025210083,
+    "portraitScale": 1.0025316455696203
+  },
+  "luffy5": {
+    "ratio": 1,
+    "guardBounds": [
+      41,
+      40,
+      151,
+      180
+    ],
+    "portraitBounds": [
+      34,
+      18,
+      158,
+      176
+    ],
+    "atlasScale": 0.9142857142857143,
+    "portraitScale": 0.8354430379746836
+  },
+  "lucci-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      33,
+      89,
+      159,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      56,
+      179,
+      176
+    ],
+    "atlasScale": 1.476923076923077,
+    "portraitScale": 1.155
+  },
+  "lucci-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      40,
+      50,
+      153,
+      180
+    ],
+    "portraitBounds": [
+      28,
+      18,
+      165,
+      176
+    ],
+    "atlasScale": 1.0830769230769233,
+    "portraitScale": 0.918987341772152
+  },
+  "lucci-awakened": {
+    "ratio": 1.1,
+    "guardBounds": [
       51,
-      79,
+      66,
       142,
+      180
+    ],
+    "portraitBounds": [
+      33,
+      18,
+      159,
+      176
+    ],
+    "atlasScale": 1.2350877192982457,
+    "portraitScale": 0.918987341772152
+  },
+  "chopper-animal": {
+    "ratio": 0.735,
+    "guardBounds": [
+      39,
+      42,
+      153,
+      180
+    ],
+    "portraitBounds": [
+      31,
+      18,
+      162,
+      176
+    ],
+    "atlasScale": 0.6817391304347826,
+    "portraitScale": 0.6140506329113924
+  },
+  "chopper-hybrid": {
+    "ratio": 0.77,
+    "guardBounds": [
+      46,
+      51,
+      147,
+      180
+    ],
+    "portraitBounds": [
+      34,
+      18,
+      158,
+      176
+    ],
+    "atlasScale": 0.764031007751938,
+    "portraitScale": 0.6432911392405063
+  },
+  "chopper-monster": {
+    "ratio": 0.9099999999999999,
+    "guardBounds": [
+      39,
+      48,
+      154,
+      180
+    ],
+    "portraitBounds": [
+      27,
+      18,
+      165,
+      176
+    ],
+    "atlasScale": 0.8824242424242423,
+    "portraitScale": 0.760253164556962
+  },
+  "kaido-animal": {
+    "ratio": 1.26,
+    "guardBounds": [
+      41,
+      44,
+      151,
+      180
+    ],
+    "portraitBounds": [
+      32,
+      18,
+      160,
+      176
+    ],
+    "atlasScale": 1.1858823529411764,
+    "portraitScale": 1.0526582278481011
+  },
+  "kaido-hybrid": {
+    "ratio": 1.32,
+    "guardBounds": [
+      37,
+      51,
+      155,
+      180
+    ],
+    "portraitBounds": [
+      24,
+      18,
+      169,
+      176
+    ],
+    "atlasScale": 1.3097674418604652,
+    "portraitScale": 1.1027848101265822
+  },
+  "yamato-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      39,
+      98,
+      154,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      58,
+      179,
+      176
+    ],
+    "atlasScale": 1.6390243902439026,
+    "portraitScale": 1.1745762711864407
+  },
+  "yamato-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      47,
+      51,
+      146,
+      180
+    ],
+    "portraitBounds": [
+      36,
+      18,
+      157,
+      176
+    ],
+    "atlasScale": 1.0914728682170542,
+    "portraitScale": 0.918987341772152
+  },
+  "king-animal": {
+    "ratio": 1.26,
+    "guardBounds": [
+      19,
+      58,
+      174,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      45,
+      179,
+      176
+    ],
+    "atlasScale": 1.3219672131147542,
+    "portraitScale": 1.269618320610687
+  },
+  "king-hybrid": {
+    "ratio": 1.32,
+    "guardBounds": [
+      56,
+      49,
+      137,
+      180
+    ],
+    "portraitBounds": [
+      47,
+      18,
+      145,
+      176
+    ],
+    "atlasScale": 1.2897709923664122,
+    "portraitScale": 1.1027848101265822
+  },
+  "queen-animal": {
+    "ratio": 1.26,
+    "guardBounds": [
+      31,
+      74,
+      161,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      41,
+      179,
+      176
+    ],
+    "atlasScale": 1.5215094339622641,
+    "portraitScale": 1.232
+  },
+  "queen-hybrid": {
+    "ratio": 1.32,
+    "guardBounds": [
+      40,
+      42,
+      152,
+      180
+    ],
+    "portraitBounds": [
+      32,
+      18,
+      160,
+      176
+    ],
+    "atlasScale": 1.2243478260869565,
+    "portraitScale": 1.1027848101265822
+  },
+  "marco-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      23,
+      35,
+      169,
+      180
+    ],
+    "portraitBounds": [
+      17,
+      18,
+      176,
+      176
+    ],
+    "atlasScale": 0.926896551724138,
+    "portraitScale": 0.8772151898734177
+  },
+  "marco-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      40,
+      58,
+      152,
+      180
+    ],
+    "portraitBounds": [
+      24,
+      18,
+      169,
+      176
+    ],
+    "atlasScale": 1.1540983606557378,
+    "portraitScale": 0.918987341772152
+  },
+  "chaka-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      26,
+      59,
+      167,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      34,
+      179,
+      176
+    ],
+    "atlasScale": 1.1107438016528925,
+    "portraitScale": 0.9760563380281689
+  },
+  "chaka-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      50,
+      59,
+      143,
+      180
+    ],
+    "portraitBounds": [
+      36,
+      18,
+      157,
+      176
+    ],
+    "atlasScale": 1.1636363636363638,
+    "portraitScale": 0.918987341772152
+  },
+  "pell-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      33,
+      54,
+      160,
+      180
+    ],
+    "portraitBounds": [
+      17,
+      18,
+      176,
+      176
+    ],
+    "atlasScale": 1.0666666666666667,
+    "portraitScale": 0.8772151898734177
+  },
+  "pell-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      46,
+      55,
+      147,
+      180
+    ],
+    "portraitBounds": [
+      32,
+      18,
+      160,
+      176
+    ],
+    "atlasScale": 1.1264,
+    "portraitScale": 0.918987341772152
+  },
+  "dalton-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      22,
+      69,
+      171,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      52,
+      179,
+      176
+    ],
+    "atlasScale": 1.2108108108108109,
+    "portraitScale": 1.117741935483871
+  },
+  "dalton-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      36,
+      57,
+      157,
+      180
+    ],
+    "portraitBounds": [
+      19,
+      18,
+      174,
+      176
+    ],
+    "atlasScale": 1.1447154471544716,
+    "portraitScale": 0.918987341772152
+  },
+  "merrychristmas-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      30,
+      86,
+      162,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      58,
+      179,
+      176
+    ],
+    "atlasScale": 1.4297872340425533,
+    "portraitScale": 1.1745762711864407
+  },
+  "merrychristmas-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      45,
+      57,
+      148,
+      180
+    ],
+    "portraitBounds": [
+      30,
+      18,
+      162,
+      176
+    ],
+    "atlasScale": 1.1447154471544716,
+    "portraitScale": 0.918987341772152
+  },
+  "kaku-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      29,
+      24,
+      163,
+      180
+    ],
+    "portraitBounds": [
+      28,
+      18,
+      164,
+      176
+    ],
+    "atlasScale": 0.8615384615384616,
+    "portraitScale": 0.8772151898734177
+  },
+  "kaku-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      38,
+      24,
+      155,
+      180
+    ],
+    "portraitBounds": [
+      37,
+      18,
+      156,
+      176
+    ],
+    "atlasScale": 0.9025641025641027,
+    "portraitScale": 0.918987341772152
+  },
+  "kaku-awakened": {
+    "ratio": 1.1,
+    "guardBounds": [
+      48,
+      31,
+      144,
+      180
+    ],
+    "portraitBounds": [
+      45,
+      18,
+      147,
+      176
+    ],
+    "atlasScale": 0.9449664429530202,
+    "portraitScale": 0.918987341772152
+  },
+  "jabra-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      31,
+      89,
+      162,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      61,
+      179,
+      176
+    ],
+    "atlasScale": 1.476923076923077,
+    "portraitScale": 1.2052173913043478
+  },
+  "jabra-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      31,
+      43,
+      162,
+      180
+    ],
+    "portraitBounds": [
+      21,
+      18,
+      172,
+      176
+    ],
+    "atlasScale": 1.0277372262773723,
+    "portraitScale": 0.918987341772152
+  },
+  "sandersonia-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      38,
+      69,
+      155,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      19,
+      179,
+      176
+    ],
+    "atlasScale": 1.2108108108108109,
+    "portraitScale": 0.8828025477707006
+  },
+  "sandersonia-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      46,
+      36,
+      147,
+      180
+    ],
+    "portraitBounds": [
+      41,
+      18,
+      152,
+      176
+    ],
+    "atlasScale": 0.9777777777777779,
+    "portraitScale": 0.918987341772152
+  },
+  "marigold-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      36,
+      36,
+      157,
+      180
+    ],
+    "portraitBounds": [
+      30,
+      18,
+      163,
+      176
+    ],
+    "atlasScale": 0.9333333333333333,
+    "portraitScale": 0.8772151898734177
+  },
+  "marigold-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      41,
+      61,
+      151,
+      180
+    ],
+    "portraitBounds": [
+      23,
+      18,
+      169,
+      176
+    ],
+    "atlasScale": 1.1831932773109244,
+    "portraitScale": 0.918987341772152
+  },
+  "sengoku-animal": {
+    "ratio": 1.26,
+    "guardBounds": [
+      36,
+      43,
+      157,
+      180
+    ],
+    "portraitBounds": [
+      26,
+      18,
+      166,
+      176
+    ],
+    "atlasScale": 1.1772262773722628,
+    "portraitScale": 1.0526582278481011
+  },
+  "momonosuke-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      38,
+      47,
+      154,
+      180
+    ],
+    "portraitBounds": [
+      27,
+      18,
+      165,
+      176
+    ],
+    "atlasScale": 1.0105263157894737,
+    "portraitScale": 0.8772151898734177
+  },
+  "drake-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      34,
+      73,
+      158,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      33,
+      179,
+      176
+    ],
+    "atlasScale": 1.2560747663551401,
+    "portraitScale": 0.9692307692307692
+  },
+  "drake-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      30,
+      71,
+      162,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      39,
+      179,
+      176
+    ],
+    "atlasScale": 1.2917431192660551,
+    "portraitScale": 1.0598540145985402
+  },
+  "orochi-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      27,
+      38,
+      165,
+      180
+    ],
+    "portraitBounds": [
+      19,
+      18,
+      173,
+      176
+    ],
+    "atlasScale": 0.9464788732394367,
+    "portraitScale": 0.8772151898734177
+  },
+  "orochi-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      39,
+      45,
+      154,
+      180
+    ],
+    "portraitBounds": [
+      29,
+      18,
+      164,
+      176
+    ],
+    "atlasScale": 1.042962962962963,
+    "portraitScale": 0.918987341772152
+  },
+  "jack-animal": {
+    "ratio": 1.26,
+    "guardBounds": [
+      21,
+      64,
+      172,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      48,
+      179,
+      176
+    ],
+    "atlasScale": 1.390344827586207,
+    "portraitScale": 1.299375
+  },
+  "jack-hybrid": {
+    "ratio": 1.32,
+    "guardBounds": [
+      36,
+      59,
+      157,
+      180
+    ],
+    "portraitBounds": [
+      17,
+      18,
+      175,
+      176
+    ],
+    "atlasScale": 1.3963636363636365,
+    "portraitScale": 1.1027848101265822
+  },
+  "ulti-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      29,
+      51,
+      163,
+      180
+    ],
+    "portraitBounds": [
+      14,
+      18,
+      178,
+      176
+    ],
+    "atlasScale": 1.041860465116279,
+    "portraitScale": 0.8772151898734177
+  },
+  "ulti-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      37,
+      44,
+      156,
+      180
+    ],
+    "portraitBounds": [
+      27,
+      18,
+      165,
+      176
+    ],
+    "atlasScale": 1.035294117647059,
+    "portraitScale": 0.918987341772152
+  },
+  "pageone-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      28,
+      81,
+      164,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      55,
+      179,
+      176
+    ],
+    "atlasScale": 1.3575757575757577,
+    "portraitScale": 1.1454545454545455
+  },
+  "pageone-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      37,
+      49,
+      155,
       180
     ],
     "portraitBounds": [
@@ -7340,41 +8139,313 @@
       167,
       176
     ],
-    "atlasScale": 1.2673267326732673,
-    "portraitScale": 0.8354430379746836
+    "atlasScale": 1.0748091603053436,
+    "portraitScale": 0.918987341772152
   },
-  "luffy4": {
-    "ratio": 1.2,
+  "whoswho-animal": {
+    "ratio": 1.05,
     "guardBounds": [
-      54,
-      71,
-      139,
+      23,
+      90,
+      169,
       180
     ],
     "portraitBounds": [
-      35,
-      18,
-      158,
+      13,
+      74,
+      179,
       176
     ],
-    "atlasScale": 1.4091743119266054,
-    "portraitScale": 1.0025316455696203
+    "atlasScale": 1.4933333333333334,
+    "portraitScale": 1.3588235294117645
   },
-  "luffy5": {
-    "ratio": 1,
+  "whoswho-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      41,
+      52,
+      151,
+      180
+    ],
+    "portraitBounds": [
+      28,
+      18,
+      164,
+      176
+    ],
+    "atlasScale": 1.1,
+    "portraitScale": 0.918987341772152
+  },
+  "sasaki-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      23,
+      73,
+      169,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      54,
+      179,
+      176
+    ],
+    "atlasScale": 1.2560747663551401,
+    "portraitScale": 1.1360655737704917
+  },
+  "sasaki-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      33,
+      47,
+      160,
+      180
+    ],
+    "portraitBounds": [
+      21,
+      18,
+      172,
+      176
+    ],
+    "atlasScale": 1.0586466165413535,
+    "portraitScale": 0.918987341772152
+  },
+  "blackmaria-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      36,
+      85,
+      157,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      46,
+      179,
+      176
+    ],
+    "atlasScale": 1.4147368421052633,
+    "portraitScale": 1.066153846153846
+  },
+  "blackmaria-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      33,
+      24,
+      160,
+      180
+    ],
+    "portraitBounds": [
+      32,
+      18,
+      161,
+      176
+    ],
+    "atlasScale": 0.9025641025641027,
+    "portraitScale": 0.918987341772152
+  },
+  "devon-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      22,
+      47,
+      171,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      28,
+      179,
+      176
+    ],
+    "atlasScale": 1.0105263157894737,
+    "portraitScale": 0.9364864864864865
+  },
+  "devon-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      40,
+      47,
+      153,
+      180
+    ],
+    "portraitBounds": [
+      29,
+      18,
+      163,
+      176
+    ],
+    "atlasScale": 1.0586466165413535,
+    "portraitScale": 0.918987341772152
+  },
+  "stronger-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      36,
+      29,
+      156,
+      180
+    ],
+    "portraitBounds": [
+      33,
+      18,
+      159,
+      176
+    ],
+    "atlasScale": 0.890066225165563,
+    "portraitScale": 0.8772151898734177
+  },
+  "onigumo-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      35,
+      34,
+      158,
+      180
+    ],
+    "portraitBounds": [
+      30,
+      18,
+      163,
+      176
+    ],
+    "atlasScale": 0.9643835616438357,
+    "portraitScale": 0.918987341772152
+  },
+  "pierre-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      31,
+      42,
+      161,
+      180
+    ],
+    "portraitBounds": [
+      22,
+      18,
+      171,
+      176
+    ],
+    "atlasScale": 0.9739130434782609,
+    "portraitScale": 0.8772151898734177
+  },
+  "pierre-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      24,
+      24,
+      168,
+      180
+    ],
+    "portraitBounds": [
+      23,
+      18,
+      169,
+      176
+    ],
+    "atlasScale": 0.9025641025641027,
+    "portraitScale": 0.918987341772152
+  },
+  "pekoms-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      17,
+      71,
+      175,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      61,
+      179,
+      176
+    ],
+    "atlasScale": 1.2330275229357799,
+    "portraitScale": 1.2052173913043478
+  },
+  "pekoms-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      33,
+      50,
+      160,
+      180
+    ],
+    "portraitBounds": [
+      19,
+      18,
+      173,
+      176
+    ],
+    "atlasScale": 1.0830769230769233,
+    "portraitScale": 0.918987341772152
+  },
+  "morgans-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      34,
+      55,
+      158,
+      180
+    ],
+    "portraitBounds": [
+      18,
+      18,
+      175,
+      176
+    ],
+    "atlasScale": 1.0752000000000002,
+    "portraitScale": 0.8772151898734177
+  },
+  "morgans-hybrid": {
+    "ratio": 1.1,
+    "guardBounds": [
+      41,
+      24,
+      152,
+      180
+    ],
+    "portraitBounds": [
+      40,
+      18,
+      152,
+      176
+    ],
+    "atlasScale": 0.9025641025641027,
+    "portraitScale": 0.918987341772152
+  },
+  "tamago-animal": {
+    "ratio": 1.05,
+    "guardBounds": [
+      59,
+      24,
+      133,
+      180
+    ],
+    "portraitBounds": [
+      59,
+      18,
+      134,
+      176
+    ],
+    "atlasScale": 0.8615384615384616,
+    "portraitScale": 0.8772151898734177
+  },
+  "tamago-hybrid": {
+    "ratio": 1.1,
     "guardBounds": [
       49,
-      75,
+      24,
       144,
       180
     ],
     "portraitBounds": [
-      25,
+      48,
       18,
-      168,
+      144,
       176
     ],
-    "atlasScale": 1.2190476190476192,
-    "portraitScale": 0.8354430379746836
+    "atlasScale": 0.9025641025641027,
+    "portraitScale": 0.918987341772152
   }
 }

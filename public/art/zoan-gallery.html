@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Transformaciones · Grand Line Like</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#0c1824;color:#e8edf1;font:16px system-ui,sans-serif}main{max-width:1360px;margin:auto;padding:44px 24px}a{color:#70dccd}header{border-bottom:1px solid #304354;padding-bottom:24px;margin-bottom:28px}.eyebrow{color:#d5b467;font-size:12px;letter-spacing:.2em;text-transform:uppercase}h1{font-size:clamp(30px,5vw,52px);margin:8px 0 14px}p{color:#aabac7;line-height:1.6;max-width:850px}.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:end;margin:24px 0}label{display:grid;gap:7px;font-size:13px;color:#aabac7}input,select,button{font:inherit;border:1px solid #3c5366;border-radius:8px;background:#142638;color:#f4f6f8;padding:10px 14px}button{cursor:pointer}button[aria-pressed="true"]{border-color:#70dccd;color:#70dccd}input{width:min(320px,80vw)}section{margin:34px 0}h2{font-size:21px;margin-bottom:14px}.forms{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;max-width:1160px}.card{border:1px solid #304354;border-radius:12px;overflow:hidden;background:#142231}.stage{height:194px;display:grid;place-items:center;background:radial-gradient(ellipse at bottom,#243c47 0%,#162735 65%);overflow:hidden}.sprite{display:block;width:192px;height:192px;background-repeat:no-repeat;background-size:400% 100%;background-position:0 0;image-rendering:pixelated}.card h3{font-size:14px;margin:14px 14px 7px;line-height:1.5}.level{margin:0 14px 16px;color:#77d7c7;font-size:12px}.playing .sprite{animation:poses 1.7s steps(1,end) infinite}@keyframes poses{0%,100%{background-position:0 0}25%{background-position:33.333333% 0}50%{background-position:66.666667% 0}75%{background-position:100% 0}}footer{margin-top:40px;border-top:1px solid #304354;padding-top:18px;color:#aabac7;font-size:13px}#empty{padding:30px 0}@media(prefers-reduced-motion:reduce){.playing .sprite{animation:none}}@media(max-width:480px){main{padding:28px 14px}.forms{grid-template-columns:repeat(2,minmax(0,1fr))}.stage{height:160px}.sprite{transform:scale(.82)}h3{overflow-wrap:anywhere}}
+</style>
+<main>
+<header><span class="eyebrow">Grand Line Like · Archivo de la tripulación</span><h1>El poder de transformarse.</h1><p>Zoan: animal al 20, híbrida al 25 y despertar al 40, cuando existe. Luffy: Gear 2 al 20, Gear 3 al 25, Gear 4 al 40 y Gear 5 al 50. Cada desbloqueo requiere tanto nivel base como nivel en partida.</p><a href="/gear5-preview.html">Ver los cinco ataques de Luffy ↗</a> · <a href="/">Volver al juego ↗</a></header>
+<div class="controls"><label>Buscar personaje<input id="search" type="search" placeholder="Kaido, Kaku, Marco…"></label><label>Pose<select id="pose"><option value="0">Guardia</option><option value="1">Preparación</option><option value="2">Ataque</option><option value="3">Daño</option></select></label><button id="animate" aria-pressed="false">Animar cuatro poses</button></div>
+<div id="gallery"></div><p id="empty" hidden>No hay personajes con ese nombre.</p>
+<footer>Chopper comienza en Brain Point y obtiene Walk Point, Heavy Point y Monster Point (forma especial al 40). Tamago sigue su ciclo de pollito y gallo. Morgans comienza con su aspecto híbrido habitual. Minotauros ya es una bestia despertada; no se añaden formas anteriores desconocidas.</footer>
+</main>
+<script src="/data.js"></script>
+<script>
+const gallery=document.getElementById('gallery'),search=document.getElementById('search'),pose=document.getElementById('pose'),animate=document.getElementById('animate');
+const groups=['luffy',...Object.keys(ZOAN_FORMS),'minotauros'];
+function render(){
+ gallery.replaceChildren();
+ const q=search.value.trim().toLocaleLowerCase('es');
+ for(const base of groups){
+  if(!CHARS[base].name.toLocaleLowerCase('es').includes(q))continue;
+  const section=document.createElement('section'),title=document.createElement('h2'),row=document.createElement('div');
+  title.textContent=CHARS[base].name;row.className='forms';section.append(title,row);
+  let id=base,level=null;
+  while(id){
+   const c=CHARS[id],card=document.createElement('article'),stage=document.createElement('div'),sprite=document.createElement('span'),name=document.createElement('h3'),caption=document.createElement('p');
+   card.className='card';stage.className='stage';sprite.className='sprite';sprite.style.backgroundImage=`url('/art/characters/${c.spriteId||id}.png')`;sprite.style.backgroundPosition=`${Number(pose.value)*100/3}% 0`;sprite.setAttribute('role','img');sprite.setAttribute('aria-label',c.name);sprite.dataset.character=id;
+   name.textContent=c.name;caption.className='level';caption.textContent=level?`Nivel base ${level} · Nivel de partida ${level}`:base==='minotauros'?'Forma despertada conocida':'Forma inicial';stage.append(sprite);card.append(stage,name,caption);row.append(card);
+   level=c.evo?.lvl;id=c.evo?.to;
+  }
+  gallery.append(section);
+ }
+ document.getElementById('empty').hidden=gallery.childElementCount>0;
+}
+search.addEventListener('input',render);pose.addEventListener('change',()=>{gallery.classList.remove('playing');animate.setAttribute('aria-pressed','false');render();});animate.addEventListener('click',()=>{const active=gallery.classList.toggle('playing');animate.setAttribute('aria-pressed',String(active));});render();
+</script>
+</html>

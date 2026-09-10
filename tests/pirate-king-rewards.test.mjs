@@ -13,7 +13,7 @@ function setup(saga=0, diff=5, mode='classic') {
 
 test('every saga offers its own base legendary and no retired character can appear',()=>{
   const h=setup();
-  assert.equal(h.exec('Object.keys(CHARS).length'),434);
+  assert.equal(h.exec('Object.keys(CHARS).length'),497);
   assert.equal(h.exec(`SAGAS.every(s=>pirateKingLegendaryPool(s.id).length>0&&pirateKingLegendaryPool(s.id).every(id=>CHARS[id].rareza===5&&CHARS[id].saga===s.id&&!BASE_OF[id]))`),true);
   assert.equal(h.exec(`['naruto','narutokurama','goku','gojo','saitama'].every(id=>!CHARS[id]&&!PASSIVES[id])`),true);
   assert.equal(h.exec(`SAGAS.every(s=>s.islands.every(i=>genMap(i).rows.flat().every(n=>n.type!=='crossover')))`),true);
