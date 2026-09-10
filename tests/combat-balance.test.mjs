@@ -34,7 +34,7 @@ test('every character and move is valid; every directed matchup has a damaging c
   }
   return pairs;
  })()`);
- assert.equal(result,460*460);
+ assert.equal(result,h.exec('Object.keys(CHARS).length ** 2'));
 });
 
 test('all 460 mirrors at four levels and 920 seeded mixed encounters terminate',()=>{

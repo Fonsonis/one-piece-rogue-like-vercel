@@ -6,6 +6,7 @@
   const between=(t,a,b)=>clamp((t-a)/(b-a));
 
   function loadSprite(id) {
+    id = typeof CHARS !== 'undefined' ? CHARS[id]?.spriteId || id : id;
     if(!/^[a-zA-Z0-9_-]+$/.test(id))return Promise.resolve(null);
     if(atlases.has(id))return atlases.get(id);
     const pending=new Promise(resolve=>{
@@ -44,6 +45,11 @@
     const moving=t>=.27&&t<=.76;
     const beat=attack*Math.min(6,p.count), pulse=Math.sin(Math.PI*(beat%1));
     switch(p.motion) {
+      case 'kurama':
+        m.pose=t<.12||t>.92?0:t<.48?1:2;
+        m.travel=-.035*Math.sin(Math.PI*between(t,.48,.8));
+        m.lift=.025*Math.sin(Math.PI*between(t,.08,.92));
+        break;
       case 'barrage': case 'jet':
         m.travel=reach*(p.motion==='jet'?.65:.28);m.stretch=moving?pulse*.42:0;
         if(moving)m.pose=beat%1<.2?1:2;
@@ -133,9 +139,10 @@
       }else ctx.drawImage(image,frame,0,unit,unit,originX,originY,sz,sz);
       ctx.restore();
     };
+    if(p.motion==='kurama')drawKurama(ctx,t,{width,height,origin,floor,end,size,dir,reduced,tails:true});
     if(defender?.image){
       const stomp=p.id==='luffy5';
-      const reaction=hit&&!reduced?Math.sin(Math.PI*between(t,stomp?.62:.43,.82)):0;
+      const reaction=hit&&!reduced?Math.sin(Math.PI*between(t,stomp?.62:p.motion==='kurama'?.7:.43,.82)):0;
       const ds=defender.size;
       drawActor(defender.image,{pose:reaction>0?3:0,angle:-reaction*.09},
         defender.x+dir*reaction*ds*(stomp?.12:.035),defender.y-(stomp?reaction*ds*.12:0),ds,1,0,-dir);
@@ -146,7 +153,50 @@
       const ex=x-dir*Math.min(size*.12*i,Math.abs(m.travel)*distance*.2);
       drawActor(sprite,past,ex,y+i*size*.008,size,.12/i,0);
     }
+    ctx.save();
+    if(p.motion==='kurama')ctx.filter='sepia(1) saturate(2.8) hue-rotate(350deg) brightness(1.2)';
     drawActor(sprite,m,x,y,size,m.alpha,rubber);
+    ctx.restore();
+    if(p.motion==='kurama')drawKurama(ctx,t,{width,height,origin,floor,end,size,dir,reduced,tails:false});
+  }
+
+  function drawKurama(ctx,t,{width,height,origin,floor,end,size,dir,reduced,tails}) {
+    const unit=Math.min(size*.32,height*.3,width*.18),pixel=Math.max(2,Math.floor(unit/16));
+    const cx=Math.max(unit,Math.min(width-unit,origin)),cy=Math.max(unit,Math.min(height-unit,floor-size*.34));
+    const fade=reduced?.65:Math.sin(Math.PI*between(t,.02,.98));
+    const dot=(x,y,r,color,alpha=1)=>{
+      ctx.fillStyle=color;ctx.globalAlpha=fade*alpha;
+      const edge=Math.max(1,Math.min(r,width-4,height-4));
+      ctx.fillRect(Math.max(2,Math.min(width-2-edge,x-edge/2)),Math.max(2,Math.min(height-2-edge,y-edge/2)),edge,edge);
+    };
+    ctx.save();
+    // Nine tapered chakra tails fan out from Naruto's cloak.
+    if(tails)for(let tail=0;tail<9;tail++){
+      const angle=-Math.PI*.85+tail*Math.PI*1.7/8;
+      for(let step=0;step<26;step++){
+        const q=step/25,swirl=reduced?0:Math.sin(t*Math.PI*2+tail*.5+q*3)*q*.12;
+        const tx=cx-dir*(Math.cos(angle+swirl)*q*unit*1.8+unit*.15);
+        const ty=cy+Math.sin(angle+swirl)*q*unit*1.7;
+        dot(tx,ty,pixel*(2.5-1.8*q),'#ff951c',.8);
+        dot(tx,ty,pixel*(1.5-q),'#ffdc65');
+      }
+    }
+    if(tails){ctx.restore();return;}
+    const charge=ease(between(t,.12,.46)),flight=reduced?0:ease(between(t,.48,.7));
+    const start=cx+dir*unit*.65,bx=start+(end-start)*flight,by=cy-unit*.15;
+    const radius=unit*(reduced?.27:(.12+.3*charge)*(1-between(t,.7,.76)));
+    if(t<.76||reduced)for(let y=-radius;y<=radius;y+=pixel)for(let x=-radius;x<=radius;x+=pixel){
+      const d=Math.hypot(x,y)/Math.max(1,radius);if(d>1)continue;
+      dot(bx+x,by+y,pixel,d>.78?'#ce8cff':d>.62?'#803bb1':'#241531');
+    }
+    if(!reduced&&t>=.7&&t<.96){
+      const burst=between(t,.7,.96),r=unit*(.3+burst*1.5);
+      for(let i=0;i<40;i++){
+        const a=i*Math.PI*2/40;
+        dot(end+Math.cos(a)*r,by+Math.sin(a)*r,pixel*(2-burst),'#ffe79b',1-burst);
+      }
+    }
+    ctx.restore();
   }
 
   // Reference counts allow two previews to share a sprite without restoring it early.
@@ -169,7 +219,8 @@
     el.style.setProperty('--ultimate-color',profile.color);
     const canvas=document.createElement('canvas');el.appendChild(canvas);
     const cutin=document.createElement('div');cutin.className='ultimate-cutin';
-    const portrait=document.createElement('img');portrait.alt='';portrait.src='/art/portraits/'+profile.id+'.png';portrait.onerror=()=>cutin.remove();
+    const portraitId=typeof CHARS !== 'undefined' ? CHARS[profile.id]?.spriteId || profile.id : profile.id;
+    const portrait=document.createElement('img');portrait.alt='';portrait.src='/art/portraits/'+portraitId+'.png';portrait.onerror=()=>cutin.remove();
     cutin.appendChild(portrait);el.appendChild(cutin);
     const title=document.createElement('div');title.className='ultimate-technique';
     const name=document.createElement('span');name.textContent=profile.name;

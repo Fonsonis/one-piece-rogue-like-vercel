@@ -430,7 +430,7 @@
 .battle-layout [data-character="joyboy"]{--motion-fit-x:1.11063502;--motion-fit-y:1.43283582;--motion-floor:0.01575463;--motion-center:0.00000000}
 .battle-layout [data-character="lili"]{--motion-fit-x:0.91081594;--motion-fit-y:1.43199644;--motion-floor:0.01562500;--motion-center:0.00000000}
 .battle-layout [data-character="emeth"]{--motion-fit-x:1.21646421;--motion-fit-y:1.43283582;--motion-floor:0.01591810;--motion-center:0.00000000}
-.battle-layout [data-character="naruto"]{--motion-fit-x:0.98062698;--motion-fit-y:1.43230506;--motion-floor:0.01562500;--motion-center:0.00000000}
+.battle-layout :is([data-character="naruto"],[data-character="narutokurama"]){--motion-fit-x:0.98062698;--motion-fit-y:1.43230506;--motion-floor:0.01562500;--motion-center:0.00000000}
 .battle-layout [data-character="sasuke"]{--motion-fit-x:1.01825769;--motion-fit-y:1.43258345;--motion-floor:0.01562500;--motion-center:0.00000000}
 .battle-layout [data-character="kakashi"]{--motion-fit-x:0.79778393;--motion-fit-y:1.40323524;--motion-floor:0.01562500;--motion-center:0.00000000}
 .battle-layout [data-character="madara"]{--motion-fit-x:0.87860473;--motion-fit-y:1.43177137;--motion-floor:0.01562500;--motion-center:-0.00314465}
