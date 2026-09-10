@@ -24,7 +24,7 @@
   group('luffy','rubber','gatling',{count:7});
   group('luffy2','rubber','jet',{count:10,color:'#ff8a91'});
   group('luffy3','rubber','giant',{count:1});
-  group('luffy4','rubber','kong',{count:3,color:'#d96065',accent:'#ffceb5'});
+  group('luffy4','rubber','snakeman',{count:3,color:'#d96065',accent:'#ffceb5'});
   group('luffy5 joyboy','sun','dawn',{count:5});
   group('zoro','slash','three-swords',{count:3});
   group('zoro2','slash','ashura',{count:9,color:'#ae85e0'});
@@ -157,7 +157,7 @@
   const hash = text => {let h=2166136261;for(const ch of text){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return h>>>0;};
   function spriteMotion(family,motif) {
     if(motif==='kick')return 'kick';
-    if(family==='rubber')return ({gatling:'barrage',jet:'jet',giant:'heavy',kong:'bound'})[motif]||'barrage';
+    if(family==='rubber')return ({gatling:'barrage',jet:'jet',giant:'heavy',kong:'bound',snakeman:'serpentine'})[motif]||'barrage';
     if(family==='sun')return 'dawn';
     if(family==='slash')return 'sword';
     if(['shot','laser'].includes(family))return 'ranged';

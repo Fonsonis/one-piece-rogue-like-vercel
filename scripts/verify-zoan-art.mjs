@@ -4,8 +4,9 @@ import {createRequire} from 'node:module';
 import {createHash} from 'node:crypto';
 const require=createRequire(import.meta.url);
 const sharp=require(process.env.SHARP_MODULE||'sharp');
-const report=JSON.parse(fs.readFileSync('docs/zoan-art-import.json'));
-const prompts=JSON.parse(fs.readFileSync('docs/zoan-art-prompts.json'));
+const prefix=process.argv.includes('--luffy')?'luffy-animation':'zoan-art';
+const report=JSON.parse(fs.readFileSync(`docs/${prefix}-import.json`));
+const prompts=JSON.parse(fs.readFileSync(`docs/${prefix}-prompts.json`));
 const manifest=JSON.parse(fs.readFileSync('public/art/manifest.json'));
 assert.equal(Object.keys(report).length,Object.keys(prompts.assets).length);
 const cards=[];
@@ -30,6 +31,6 @@ for(const [id,entry] of Object.entries(report)){
 fs.mkdirSync('outputs/zoan',{recursive:true});
 for(let offset=0;offset<cards.length;offset+=36){
   const page=cards.slice(offset,offset+36);
-  await sharp({create:{width:1152,height:Math.ceil(page.length/6)*220,channels:4,background:'#111e30'}}).composite(page.map((input,i)=>({input,left:(i%6)*192,top:Math.floor(i/6)*220}))).png().toFile(`outputs/zoan/atlas-review-${offset/36+1}.png`);
+  await sharp({create:{width:1152,height:Math.ceil(page.length/6)*220,channels:4,background:'#111e30'}}).composite(page.map((input,i)=>({input,left:(i%6)*192,top:Math.floor(i/6)*220}))).png().toFile(`outputs/zoan/${prefix}-review-${offset/36+1}.png`);
 }
 console.log(`Verified ${cards.length} atlases, ${cards.length*4} distinct transparent poses and manifest hashes.`);

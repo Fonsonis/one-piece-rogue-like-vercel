@@ -5,8 +5,10 @@ import {createRequire} from 'node:module';
 import {createHash} from 'node:crypto';
 const require = createRequire(import.meta.url);
 const sharp = require(process.env.SHARP_MODULE || 'sharp');
-const spec = JSON.parse(fs.readFileSync('docs/zoan-art-prompts.json'));
-const ratios = JSON.parse(fs.readFileSync('docs/zoan-art-ratios.json'));
+const luffyMode=process.argv.includes('--luffy');
+const prefix=luffyMode?'luffy-animation':'zoan-art';
+const spec = JSON.parse(fs.readFileSync(`docs/${prefix}-prompts.json`));
+const ratios = JSON.parse(fs.readFileSync(`docs/${prefix}-ratios.json`));
 const manifest = JSON.parse(fs.readFileSync('public/art/manifest.json'));
 const sizing = JSON.parse(fs.readFileSync('docs/sprite-sizing.json'));
 let css = fs.readFileSync('public/art/sprite-sizes.css','utf8');
@@ -46,11 +48,11 @@ function separatePoses(data,width,height) {
   for(let p=0;p<labels.length;p++)if(labels[p]>=0){const out=buffers[owners[labels[p]]];data.copy(out,p*4,p*4,p*4+4);}
   return buffers;
 }
-const requested=process.argv.slice(2);
+const requested=process.argv.slice(2).filter(arg=>arg!=='--luffy');
 for(const sourceId of Object.keys(spec.assets)) {
   if(requested.length&&!requested.includes(sourceId))continue;
   const id=sourceId==='minotauros-awakened'?'minotauros':sourceId.endsWith('-human')?sourceId.slice(0,-6):sourceId;
-  const source=`docs/zoan-art-sources/${sourceId}.png`;
+  const source=`docs/${prefix}-sources/${sourceId}.png`;
   if(!fs.existsSync(source)){console.log('Pending',id);continue;}
   const {data,info}=await sharp(source).ensureAlpha().raw().toBuffer({resolveWithObject:true});
   const {width,height}=info;
@@ -66,10 +68,10 @@ for(const sourceId of Object.keys(spec.assets)) {
     layers.push({input,left:i*192+Math.round((192-w)/2),top:180-h});
   }
   const atlas=await sharp({create:{width:768,height:192,channels:4,background:'#00000000'}}).composite(layers).png().toBuffer();
-  if(id!==sourceId){
-    fs.mkdirSync('docs/zoan-art-sources/previous',{recursive:true});
+  if(id!==sourceId||luffyMode){
+    fs.mkdirSync(`docs/${prefix}-sources/previous`,{recursive:true});
     for(const folder of ['characters','portraits']){
-      const backup=`docs/zoan-art-sources/previous/${id}-${folder}.png`;
+      const backup=`docs/${prefix}-sources/previous/${id}-${folder}.png`;
       if(!fs.existsSync(backup))fs.copyFileSync(`public/art/${folder}/${id}.png`,backup);
     }
   }
@@ -94,6 +96,6 @@ for(const sourceId of Object.keys(spec.assets)) {
 fs.writeFileSync('public/art/manifest.json',JSON.stringify(manifest)+'\n');
 fs.writeFileSync('docs/sprite-sizing.json',JSON.stringify(sizing,null,2)+'\n');
 fs.writeFileSync('public/art/sprite-sizes.css',css);
-const reportPath='docs/zoan-art-import.json';
+const reportPath=`docs/${prefix}-import.json`;
 const previous=fs.existsSync(reportPath)?JSON.parse(fs.readFileSync(reportPath)):{};
 fs.writeFileSync(reportPath,JSON.stringify({...previous,...report},null,2)+'\n');

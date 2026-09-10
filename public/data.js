@@ -77,7 +77,7 @@ const MOVES = {
   bazookagoma:   { name: 'Bazooka de Goma',     type: 'Golpe',   power: 70, acc: 0.9 },
   gatlinggoma:   { name: 'Gatling de Goma',     type: 'Golpe',   power: 90, acc: 0.85 },
   jetpistol:     { name: 'Jet Pistol',          type: 'Golpe',   power: 110, acc: 0.9 },
-  kingkonggun:   { name: 'King Kong Gun',       type: 'Golpe',   power: 140, acc: 0.8 },
+  kingkonggun:   { name: 'Black Mamba',         type: 'Golpe',   power: 140, acc: 0.8 }, // Legacy id retained for saves.
   colliershoot:  { name: 'Collier Shoot',       type: 'Golpe',   power: 65, acc: 0.95 },
   mutonshoot:    { name: 'Mouton Shot',         type: 'Golpe',   power: 85, acc: 0.9 },
   cabezazo:      { name: 'Cabezazo',            type: 'Golpe',   power: 55, acc: 0.95 },
@@ -151,7 +151,7 @@ const MOVES = {
   gigantpistol:  { name: 'Gigant Pistol', type: 'Golpe', power: 100, acc: 0.9 },
   elephantgun:   { name: 'Elephant Gun', type: 'Haki', power: 110, acc: 0.9 },
   elephantgatling: { name: 'Elephant Gatling', type: 'Haki', power: 125, acc: 0.85 },
-  konggun:       { name: 'Kong Gun', type: 'Haki', power: 115, acc: 0.9 },
+  konggun:       { name: 'Jet Culverin', type: 'Haki', power: 115, acc: 0.9 }, // Legacy id retained for saves.
   culverin:      { name: 'Culverin', type: 'Haki', power: 110, acc: 0.95 },
   dawnwhip:      { name: 'Dawn Whip', type: 'Fruta', power: 120, acc: 0.9 },
   stargun:       { name: 'White Star Gun', type: 'Haki', power: 135, acc: 0.85 },
@@ -209,11 +209,11 @@ const CHARS = {
     desc: 'Gear Third: huesos inflados y puños gigantes. Gear Fourth al nivel 40.',
   },
   luffy4: {
-    name: 'Luffy Gear 4', emoji: '👒', types: ['Golpe', 'Fruta', 'Haki'],
+    name: 'Luffy Gear 4 · Snakeman', emoji: '👒', types: ['Golpe', 'Fruta', 'Haki'],
     base: [39, 23, 15, 19], rareza: 4,
     learnset: [[40, 'konggun'], [40, 'hakiarm'], [44, 'culverin'], [48, 'kingkonggun']],
     evo: { lvl: EVOLUTION_LEVELS.gear5, to: 'luffy5' }, ultimate: 'kingkonggun',
-    desc: 'Boundman: músculos inflados y Haki de Armadura. Gear Fifth al nivel 50.',
+    desc: 'Snakeman: cuerpo ágil, brazos de Haki y puñetazos que cambian de dirección. Gear Fifth al nivel 50.',
   },
   luffy5: {
     name: 'Luffy Gear 5', emoji: '☀️', types: ['Golpe', 'Fruta', 'Haki'],

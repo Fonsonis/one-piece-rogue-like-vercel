@@ -38,12 +38,18 @@
     return index < 0 ? null : document.getElementById(`fc-${ally ? 'p' : 'e'}-${index}`);
   }
 
-  function animateSprite(sprite, kind, speed = 1, ultimate = false) {
+  function animateSprite(sprite, kind, speed = 1, ultimate = false, targetHost = null) {
     if (!sprite || !sprite.animate || !sprite.isConnected) return;
     const previous = motions.get(sprite);
     if (previous) previous.cancel();
-    const duration = reducedMotion.matches ? 1 : (ultimate ? 600 : 480) / speed;
-    const frames = kind === 'hurt' ? [
+    const luffyAttack=kind==='attack'&&/^luffy[2-5]?$/.test(sprite.dataset.character)&&globalThis.UltimateFX;
+    if(luffyAttack&&sprite.dataset.character==='luffy5'){
+      const source=sprite.closest('.fcard-sprite,.char-sheet-sprite')||sprite;
+      globalThis.UltimateFX.play({profile:globalThis.UltimateArtProfiles.resolve('luffy5',CHARS.luffy5),source,target:targetHost||source,owner:sprite,speed,preview:!targetHost,basic:true});
+      return;
+    }
+    const duration = reducedMotion.matches ? 1 : (luffyAttack ? sprite.dataset.character==='luffy5'?1300:850 : ultimate ? 600 : 480) / speed;
+    let frames = kind === 'hurt' ? [
       { backgroundPosition: '100% 0', transform: 'translateX(0) rotate(0deg)', offset: 0 },
       { backgroundPosition: '100% 0', transform: 'translateX(-9px) rotate(-8deg)', offset: .24 },
       { backgroundPosition: '100% 0', transform: 'translateX(-4px) rotate(-3deg)', offset: .62, easing: 'steps(1,end)' },
@@ -55,6 +61,15 @@
       { backgroundPosition: '66.666667% 0', transform: 'translateX(6px) scale(1)', offset: .69, easing: 'steps(1,end)' },
       { backgroundPosition: '0% 0', transform: 'translateX(0) scale(1)', offset: 1 }
     ];
+    if(luffyAttack){
+      const id=sprite.dataset.character;
+      const profile=globalThis.UltimateArtProfiles.resolve(id,CHARS[id]);
+      const times=[0,.08,.16,.25,.27,.3,.32,.34,.36,.37,.4,.43,.44,.48,.49,.52,.55,.58,.62,.64,.69,.73,.76,.78,.85,.9,.94,.95,1];
+      frames=times.map(offset=>{
+        const m=globalThis.UltimateFX.choreography(profile,offset,reducedMotion.matches);
+        return {offset,backgroundPosition:`${m.pose*100/3}% 0`,transform:`translate(${m.travel*32}px,${-m.lift*64}px) rotate(${m.angle}rad) scale(${m.scale})`};
+      });
+    }
     sprite.dataset.motion = kind;
     // Step between atlas cells; interpolating their positions slices adjacent poses.
     const poses = sprite.animate(frames.map(({backgroundPosition,offset}) => ({backgroundPosition,offset,easing:'steps(1,end)'})), {duration});
@@ -94,7 +109,7 @@
     const target = cardFor(defender);
     const speed = Math.max(1, Number(battle?.speed) || 1);
     const healing = attacker.hp > oldSelfHP;
-    animateSprite(source?.querySelector('.dex-sprite'), 'attack', speed, ultimate);
+    animateSprite(source?.querySelector('.dex-sprite'), 'attack', speed, ultimate, target?.querySelector('.fcard-sprite'));
     if (healing) burst(source?.querySelector('.fcard-sprite'), move.type, ultimate, true);
     if (defender.hp < oldHP) {
       animateSprite(target?.querySelector('.dex-sprite'), 'hurt', speed);

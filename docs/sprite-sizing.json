@@ -2,36 +2,36 @@
   "luffy": {
     "ratio": 1,
     "guardBounds": [
-      48,
-      98,
-      113,
+      47,
+      55,
+      145,
       180
     ],
     "portraitBounds": [
-      33,
+      34,
       18,
       158,
       176
     ],
-    "atlasScale": 1.5609756097560976,
+    "atlasScale": 1.024,
     "portraitScale": 0.8354430379746836
   },
   "luffy2": {
     "ratio": 1,
     "guardBounds": [
-      51,
-      106,
-      123,
+      47,
+      88,
+      146,
       180
     ],
     "portraitBounds": [
-      19,
-      18,
-      173,
+      13,
+      22,
+      179,
       176
     ],
-    "atlasScale": 1.7297297297297298,
-    "portraitScale": 0.8354430379746836
+    "atlasScale": 1.391304347826087,
+    "portraitScale": 0.8571428571428571
   },
   "zoro": {
     "ratio": 1,
@@ -7329,52 +7329,52 @@
   "luffy3": {
     "ratio": 1,
     "guardBounds": [
-      51,
-      79,
-      142,
+      33,
+      62,
+      160,
       180
     ],
     "portraitBounds": [
-      25,
-      18,
-      167,
+      13,
+      22,
+      179,
       176
     ],
-    "atlasScale": 1.2673267326732673,
-    "portraitScale": 0.8354430379746836
+    "atlasScale": 1.0847457627118644,
+    "portraitScale": 0.8571428571428571
   },
   "luffy4": {
     "ratio": 1.2,
     "guardBounds": [
-      54,
-      71,
-      139,
+      48,
+      61,
+      144,
       180
     ],
     "portraitBounds": [
-      35,
+      33,
       18,
-      158,
+      160,
       176
     ],
-    "atlasScale": 1.4091743119266054,
+    "atlasScale": 1.2907563025210083,
     "portraitScale": 1.0025316455696203
   },
   "luffy5": {
     "ratio": 1,
     "guardBounds": [
-      49,
-      75,
-      144,
+      41,
+      40,
+      151,
       180
     ],
     "portraitBounds": [
-      25,
+      34,
       18,
-      168,
+      158,
       176
     ],
-    "atlasScale": 1.2190476190476192,
+    "atlasScale": 0.9142857142857143,
     "portraitScale": 0.8354430379746836
   },
   "lucci-animal": {

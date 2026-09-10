@@ -1,6 +1,6 @@
 /* All four poses plus conservative +/-13deg recoil, 8% stretch, 15px lunge and shadows. */
-[data-character="luffy"]{--motion-fit-x:0.55594461;--motion-fit-y:0.87300503;--motion-floor:0.22848463;--motion-center:0.28001426}
-[data-character="luffy2"]{--motion-fit-x:0.53324625;--motion-fit-y:0.88245687;--motion-floor:0.25122621;--motion-center:0.27834263}
+[data-character="luffy"]{--motion-fit-x:0.69513459;--motion-fit-y:1.04555029;--motion-floor:0.15093805;--motion-center:0.00000000}
+[data-character="luffy2"]{--motion-fit-x:0.54940950;--motion-fit-y:0.97402029;--motion-floor:0.19857751;--motion-center:-0.00362319}
 [data-character="zoro"]{--motion-fit-x:0.61421950;--motion-fit-y:0.89076395;--motion-floor:0.18559578;--motion-center:0.19142729}
 [data-character="zoro2"]{--motion-fit-x:0.57385874;--motion-fit-y:0.86442474;--motion-floor:0.19414020;--motion-center:0.12529631}
 [data-character="nami"]{--motion-fit-x:0.54507900;--motion-fit-y:0.85455880;--motion-floor:0.24509197;--motion-center:0.25357970}
@@ -430,9 +430,9 @@
 [data-character="joyboy"]{--motion-fit-x:0.72427215;--motion-fit-y:1.06217346;--motion-floor:0.14589900;--motion-center:0.00000000}
 [data-character="lili"]{--motion-fit-x:0.60638906;--motion-fit-y:0.98530503;--motion-floor:0.17493854;--motion-center:0.00000000}
 [data-character="emeth"]{--motion-fit-x:0.77886705;--motion-fit-y:1.05328041;--motion-floor:0.13485300;--motion-center:0.00000000}
-[data-character="luffy3"]{--motion-fit-x:0.61079273;--motion-fit-y:1.00758956;--motion-floor:0.18089397;--motion-center:-0.00330033}
-[data-character="luffy4"]{--motion-fit-x:0.52560878;--motion-fit-y:0.81446770;--motion-floor:0.19911215;--motion-center:-0.00366972}
-[data-character="luffy5"]{--motion-fit-x:0.60603197;--motion-fit-y:0.97438737;--motion-floor:0.17469325;--motion-center:-0.00317460}
+[data-character="luffy3"]{--motion-fit-x:0.69150743;--motion-fit-y:0.83606622;--motion-floor:0.15607162;--motion-center:-0.00282486}
+[data-character="luffy4"]{--motion-fit-x:0.55496461;--motion-fit-y:0.84742075;--motion-floor:0.18553640;--motion-center:0.00000000}
+[data-character="luffy5"]{--motion-fit-x:0.76013753;--motion-fit-y:1.06406598;--motion-floor:0.13670808;--motion-center:0.00000000}
 [data-character="lucci-animal"]{--motion-fit-x:0.52726419;--motion-fit-y:0.90569096;--motion-floor:0.20968228;--motion-center:-0.00000000}
 [data-character="lucci-hybrid"]{--motion-fit-x:0.65095371;--motion-fit-y:0.96032355;--motion-floor:0.15860034;--motion-center:-0.00282051}
 [data-character="lucci-awakened"]{--motion-fit-x:0.58714640;--motion-fit-y:0.91186085;--motion-floor:0.17831617;--motion-center:-0.00660103}

@@ -20,7 +20,7 @@ Berries por victoria: piratas 80–160 (antes 40–110), patrullas Marine 240–
 
 El límite sube de 99 a 100. Las formas comparten mejoras, pasiva y fusiones bajo Luffy. La evolución por EXP, el inicio con niveles comprados, el inventario y las fusiones resuelven la cadena completa. El Dex conserva la forma explícita que se consulta. Los guardados anteriores se migran una vez, ajustando únicamente diferencias de stats base y técnicas: conservan EXP, bonificaciones, fusiones, KO y daño recibido.
 
-Gear 3 utiliza Gigant Pistol/Elephant Gun y Elephant Gatling; Gear 4 Kong Gun/Culverin y King Kong Gun; Gear 5 Dawn Whip/White Star Gun y Bajrang Gun. Dos movimientos regulares como máximo.
+Gear 3 utiliza Gigant Pistol/Elephant Gun y Elephant Gatling; Gear 4 Snakeman usa Jet Culverin/Culverin y Black Mamba; Gear 5 Dawn Whip/White Star Gun y Bajrang Gun. Dos movimientos regulares como máximo. Las hojas actuales y sus coreografías se documentan en [Animaciones originales de Luffy](luffy-animations.md).
 
 ## Arte
 
