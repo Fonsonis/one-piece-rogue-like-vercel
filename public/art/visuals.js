@@ -21,7 +21,8 @@
       return originalIcon.apply(this, arguments);
     }
     const size = Number.isFinite(Number(px)) ? Math.max(12, Math.min(256, Number(px))) : 26;
-    return `<span class="dex-sprite" role="img" aria-label="${escape(CHARS[id].name)}" data-character="${id}" style="--sprite-size:${size}px;--sprite-atlas:url('/art/characters/${id}.png');--sprite-portrait:url('/art/portraits/${id}.png')"></span>`;
+    const spriteId = CHARS[id].spriteId || id;
+    return `<span class="dex-sprite" role="img" aria-label="${escape(CHARS[id].name)}" data-character="${id}" style="--sprite-size:${size}px;--sprite-atlas:url('/art/characters/${spriteId}.png');--sprite-portrait:url('/art/portraits/${spriteId}.png')"></span>`;
   };
 
   function safe(present) {

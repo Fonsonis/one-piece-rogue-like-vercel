@@ -133,6 +133,19 @@ test('Gear 5 grows, raises its foot, stomps and returns to its original size',()
  assert.equal(choreo(p,.48,true).scale,1);
 });
 
+test('Kurama has nine chakra tails, a Bijudama launch and a static reduced-motion version',()=>{
+ const h=artHarness(),draw=h.exec('UltimateFX.drawFrame'),recording=canvasRecorder();
+ const p=h.exec("UltimateArtProfiles.resolve('narutokurama',CHARS.narutokurama,MOVES.bijudama,'naruto')");
+ assert.equal(p.motion,'kurama');assert.equal(p.count,9);
+ const sprite={naturalHeight:192,naturalWidth:768};
+ const spec={width:390,height:220,source:.2,target:.8,sprite};
+ const phases=[.3,.6,.8].map(t=>{draw(recording.ctx,p,t,spec);return recording.drain();});
+ assert.equal(new Set(phases).size,3);
+ assert.ok(phases.every(phase=>phase.includes('fillRect')));
+ draw(recording.ctx,p,.3,{...spec,reduced:true});const first=recording.drain();
+ draw(recording.ctx,p,.8,{...spec,reduced:true});assert.equal(recording.drain(),first);
+});
+
 test('loaded sprite replaces the original, and cancellation always restores its visibility',async()=>{
  const h=lifecycle(),spec={profile:h.profile,source:h.source,target:h.target};
  const handle=h.play(spec);assert.equal(h.sprite.style.getPropertyValue('visibility'),'');
@@ -149,7 +162,7 @@ test('rotated cells, extended arms and enemy reactions stay inside narrow viewpo
  for(const [width,height] of [[260,80],[320,200],[844,210]]){
   let matrix=[1,0,0,1,0,0],stack=[];
   const multiply=n=>{const [a,b,c,d,e,f]=matrix,[g,j,k,l,m,o]=n;matrix=[a*g+c*j,b*g+d*j,a*k+c*l,b*k+d*l,a*m+c*o+e,b*m+d*o+f];};
-  const ctx={clearRect(){},save(){stack.push([...matrix]);},restore(){matrix=stack.pop();},translate(x,y){multiply([1,0,0,1,x,y]);},scale(x,y){multiply([x,0,0,y,0,0]);},rotate(a){multiply([Math.cos(a),Math.sin(a),-Math.sin(a),Math.cos(a),0,0]);},drawImage(image,sx,sy,sw,sh,x,y,w,h){
+  const ctx={clearRect(){},fillRect(x,y,w,h){assert.ok(x>=0&&y>=0&&x+w<=width&&y+h<=height,'Chakra stays in viewport');},save(){stack.push([...matrix]);},restore(){matrix=stack.pop();},translate(x,y){multiply([1,0,0,1,x,y]);},scale(x,y){multiply([x,0,0,y,0,0]);},rotate(a){multiply([Math.cos(a),Math.sin(a),-Math.sin(a),Math.cos(a),0,0]);},drawImage(image,sx,sy,sw,sh,x,y,w,h){
    const [a,b,c,d,e,f]=matrix;
    for(const [px,py] of [[x,y],[x+w,y],[x,y+h],[x+w,y+h]]){const xx=a*px+c*py+e,yy=b*px+d*py+f;assert.ok(xx>=-1e-6&&xx<=width+1e-6,`horizontal clip ${xx}/${width}`);assert.ok(yy>=-1e-6&&yy<=height+1e-6,`vertical clip ${yy}/${height}`);}
   }};

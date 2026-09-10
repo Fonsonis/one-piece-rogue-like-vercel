@@ -1153,6 +1153,7 @@ defineGenChars('egghead', [
 defineGenChars('crossover', [
   // Naruto
   ['naruto', 'Naruto Uzumaki', '🍥', 4, ['Viento', 'Haki'], ''],
+  ['narutokurama', 'Naruto Modo Kurama', '🦊', 5, ['Viento', 'Haki'], ''],
   ['sasuke', 'Sasuke Uchiha', '🦅', 4, ['Rayo', 'Fuego'], ''],
   ['kakashi', 'Kakashi Hatake', '🐺', 4, ['Rayo', 'Corte'], ''],
   ['madara', 'Madara Uchiha', '🌒', 5, ['Fuego', 'Oscuridad'], 'b'],
@@ -1183,6 +1184,15 @@ defineGenChars('crossover', [
   ['garou', 'Garou', '🐺', 4, ['Golpe', 'Oscuridad'], ''],
   ['tatsumaki', 'Tatsumaki', '🌪️', 4, ['Viento', 'Haki'], ''],
 ]);
+
+CHARS.naruto.evo = {lvl:25, to:'narutokurama'};
+CHARS.naruto.desc = 'Ninja de Konoha. Desbloquea el Modo Kurama al nivel base 25.';
+CHARS.narutokurama.spriteId = 'naruto';
+CHARS.narutokurama.desc = 'Naruto y Kurama unen sus fuerzas y liberan el chakra del Nueve Colas.';
+MOVES.kuramarasengan = {name:'Rasengan de Kurama', type:'Viento', power:100, acc:.95};
+MOVES.bijudama = {name:'Bijūdama', type:'Haki', power:150, acc:.9};
+CHARS.narutokurama.learnset = [[1,CHARS.naruto.learnset[0][1]], [25,'kuramarasengan'], [40,'bijudama']];
+CHARS.narutokurama.ultimate = 'bijudama';
 
 // Series del evento: jefes posibles (bosses) y los 3 reclutas predefinidos (rewards)
 const CROSSOVER_SERIES = {

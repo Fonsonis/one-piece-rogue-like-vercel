@@ -102,7 +102,7 @@ test('Dex discovery rules are preserved and every known character resolves to it
     meta.dex=[]; meta.recruited=[]; meta.roster=[];
     const unseen=dexCardHTML('luffy');
     meta.dex=['luffy'];
-    return {unseen,seen:dexCardHTML('luffy'),icons:Object.keys(CHARS).map(id=>({id,html:charIcon(id,46)}))};
+    return {unseen,seen:dexCardHTML('luffy'),icons:Object.keys(CHARS).map(id=>({id:CHARS[id].spriteId || id,html:charIcon(id,46)}))};
   })()`, ctx);
   assert.ok(!result.unseen.includes('art/characters/'));
   assert.ok(result.unseen.includes('❔'));
@@ -117,7 +117,7 @@ test('Dex discovery rules are preserved and every known character resolves to it
 test('complete Dex art coverage has four distinct transparent frames per character', () => {
   const manifest = JSON.parse(fs.readFileSync('public/art/manifest.json','utf8'));
   const ctx=vm.createContext({}); vm.runInContext(data,ctx);
-  const ids=Array.from(vm.runInContext('Object.keys(CHARS)',ctx)).sort();
+  const ids=[...new Set(vm.runInContext('Object.entries(CHARS).map(([id,c])=>c.spriteId || id)',ctx))].sort();
   assert.deepEqual(Object.keys(manifest.characters).sort(),ids);
   const hashes = new Set();
   for(const id of ids) {

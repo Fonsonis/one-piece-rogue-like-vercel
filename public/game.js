@@ -5939,6 +5939,7 @@ function showTypeChartModal(team) {
 }
 
 const CROSSOVER_ULTIMATES = {
+  narutokurama: MOVES.bijudama,
   naruto: { name: 'Rasengan Shuriken', type: 'Viento', power: 140, acc: 0.9 },
   sasuke: { name: 'Kirin', type: 'Rayo', power: 140, acc: 0.9 },
   kakashi: { name: 'Raikiri', type: 'Rayo', power: 135, acc: 0.95 },
@@ -7129,7 +7130,7 @@ function crossoverReward(key) {
     const c5Series = s.bosses.filter(id => CHARS[id] && (CHARS[id].rareza === 5 || CHARS[id].boss));
     let pending5 = c5Series.filter(id => !meta.roster.includes(id));
     if (!pending5.length) {
-      const c5All = Object.keys(CHARS).filter(id => CHARS[id].saga === 'crossover' && (CHARS[id].rareza === 5 || CHARS[id].boss));
+    const c5All = Object.keys(CHARS).filter(id => !BASE_OF[id] && CHARS[id].saga === 'crossover' && (CHARS[id].rareza === 5 || CHARS[id].boss));
       pending5 = c5All.filter(id => !meta.roster.includes(id));
     }
     if (!pending5.length) pending5 = s.bosses;

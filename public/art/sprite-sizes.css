@@ -430,7 +430,7 @@
 .dex-sprite[data-character="joyboy"]{--atlas-scale:0.9481;--portrait-scale:0.8354;--atlas-shift:0.0000;--portrait-shift:0.0000}
 .dex-sprite[data-character="lili"]{--atlas-scale:1.1636;--portrait-scale:0.8354;--atlas-shift:0.0000;--portrait-shift:0.0000}
 .dex-sprite[data-character="emeth"]{--atlas-scale:0.8828;--portrait-scale:0.8354;--atlas-shift:0.0000;--portrait-shift:0.0022}
-.dex-sprite[data-character="naruto"]{--atlas-scale:1.1034;--portrait-scale:0.8354;--atlas-shift:0.0000;--portrait-shift:0.0022}
+.dex-sprite:is([data-character="naruto"],[data-character="narutokurama"]){--atlas-scale:1.1034;--portrait-scale:0.8354;--atlas-shift:0.0000;--portrait-shift:0.0022}
 .dex-sprite[data-character="sasuke"]{--atlas-scale:1.0492;--portrait-scale:0.8354;--atlas-shift:0.0000;--portrait-shift:0.0000}
 .dex-sprite[data-character="kakashi"]{--atlas-scale:1.3333;--portrait-scale:0.8354;--atlas-shift:0.0000;--portrait-shift:0.0000}
 .dex-sprite[data-character="madara"]{--atlas-scale:1.2075;--portrait-scale:0.8354;--atlas-shift:-0.0031;--portrait-shift:0.0000}

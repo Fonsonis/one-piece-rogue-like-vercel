@@ -97,6 +97,7 @@
   group('shiki','gravity','levitate');group('emeth','metal','ancient',{color:'#a8d5cc'});
   // Crossovers keep their own visual language, never a One Piece fruit by type.
   group('naruto','wind','rasenshuriken',{color:'#74d6ff',count:4});
+  group('narutokurama','bomb','bijudama',{color:'#ffbd32',accent:'#fff0a6',count:9});
   group('sasuke','electricBeast','kirin',{color:'#aacfff'});group('kakashi','lightning','raikiri',{color:'#8dcaff'});
   group('madara tatsumaki','meteor','meteor',{color:'#c2a4ed'});group('orochimaru','poison','serpents',{count:8});
   group('itadori','impact','black-flash',{color:'#ed596e',accent:'#ffe2de'});group('yuta','ghost','rika');
@@ -171,6 +172,7 @@
   const typeFamily={Golpe:'impact',Corte:'slash',Disparo:'shot',Fuego:'flame',Rayo:'lightning',Hielo:'ice',Agua:'water',Tierra:'quake',Viento:'wind',Veneno:'poison',Oscuridad:'dark',Haki:'impact',Fruta:'impact'};
   const hash = text => {let h=2166136261;for(const ch of text){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return h>>>0;};
   function spriteMotion(family,motif) {
+    if(motif==='bijudama')return 'kurama';
     if(motif==='kick')return 'kick';
     if(family==='rubber')return ({gatling:'barrage',jet:'jet',giant:'heavy',kong:'bound'})[motif]||'barrage';
     if(family==='sun')return 'dawn';
