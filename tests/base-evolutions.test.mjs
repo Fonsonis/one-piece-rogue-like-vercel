@@ -6,7 +6,7 @@ test('every evolution requires both permanent and journey levels at its exact th
  const h=combatHarness();
  h.exec('maxStartLvlCap=()=>100;');
  const chains=JSON.parse(h.exec('JSON.stringify(Object.entries(CHARS).filter(([,c])=>c.evo).map(([id,c])=>[id,baseFormOf(id),c.evo.lvl,c.evo.to]))'));
- assert.equal(chains.length,9);
+ assert.equal(chains.length,8);
  for(const [id,base,level,to] of chains){
   h.exec(`meta.charUpgrades={${base}:${level-6}};`);
   assert.equal(h.exec(`makeChar('${to}',100).id`),id,`${to} locked one permanent level before threshold`);

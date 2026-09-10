@@ -95,22 +95,6 @@
   group('saturn','silk','omen',{color:'#dd789c',count:8});group('mars','phoenix','ominous',{color:'#c693d1',accent:'#eeceab'});
   group('warcury','beast','tusks');group('jupeter','sand','maw');group('im xebec','dark','sovereign',{color:'#ba647e'});
   group('shiki','gravity','levitate');group('emeth','metal','ancient',{color:'#a8d5cc'});
-  // Crossovers keep their own visual language, never a One Piece fruit by type.
-  group('naruto','wind','rasenshuriken',{color:'#74d6ff',count:4});
-  group('narutokurama','bomb','bijudama',{color:'#ffbd32',accent:'#fff0a6',count:9});
-  group('sasuke','electricBeast','kirin',{color:'#aacfff'});group('kakashi','lightning','raikiri',{color:'#8dcaff'});
-  group('madara tatsumaki','meteor','meteor',{color:'#c2a4ed'});group('orochimaru','poison','serpents',{count:8});
-  group('itadori','impact','black-flash',{color:'#ed596e',accent:'#ffe2de'});group('yuta','ghost','rika');
-  group('gojo','dark','infinity',{color:'#8ab8fa',accent:'#e7cafa'});group('sukuna','slash','shrine',{color:'#ed9c91',count:12});
-  group('tanjiro','dragon','fire-dance');group('zenitsu','lightning','thunderclap',{count:1});
-  group('inosuke','slash','fangs',{count:2});group('nezuko','flame','blood',{color:'#f78bc0'});
-  group('kibutsuji','silk','blood-whips',{color:'#e67c9b'});
-  group('goku gohan cell','laser','kamehameha',{color:'#69beff',accent:'#e7fbff'});
-  group('vegeta','laser','final-flash',{color:'#ffdf78'});group('genos','laser','incineration',{color:'#ffb56a'});
-  group('gokuui','impact','instinct',{color:'#c7e4ff',count:7});group('jiren saitama','impact','serious',{color:'#ffe8b8',count:1});
-  group('frieza','dark','supernova',{color:'#d090e8'});group('zenosama','sun','erasure',{color:'#c7b9ff'});
-  group('garou','water','flowing-fist',{color:'#87bfff'});
-
   // Supporting cast: weapon silhouettes and restrained martial/support motifs.
   group('coby fullbody kingdew laog','impact','boxing',{count:3});
   group('piratanovato merry boodle genzo woopslap kohza iceburg chimney gonbe lola kumashi risky dadan magra domino brownbeard mocha orlumbus columbus cosette chiffon bobbin moscato bavarois toko otsuru2 speed gazelleman jaki goki atlas mjosgard bakkin sengoku2','impact','resolve');
@@ -172,7 +156,6 @@
   const typeFamily={Golpe:'impact',Corte:'slash',Disparo:'shot',Fuego:'flame',Rayo:'lightning',Hielo:'ice',Agua:'water',Tierra:'quake',Viento:'wind',Veneno:'poison',Oscuridad:'dark',Haki:'impact',Fruta:'impact'};
   const hash = text => {let h=2166136261;for(const ch of text){h^=ch.charCodeAt(0);h=Math.imul(h,16777619);}return h>>>0;};
   function spriteMotion(family,motif) {
-    if(motif==='bijudama')return 'kurama';
     if(motif==='kick')return 'kick';
     if(family==='rubber')return ({gatling:'barrage',jet:'jet',giant:'heavy',kong:'bound'})[motif]||'barrage';
     if(family==='sun')return 'dawn';

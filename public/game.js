@@ -110,10 +110,10 @@ try {
 let autoMode = false;
 let autoTimer = null;
 const PORT_SHOP_STOCK = ['carne','carnereal','bocadillo','sake','bebida_ataque','bebida_defensa','cartel','carteldorado','cartelbuster'];
-const AUTO_ROUTE_KEYS = ['random','wild','marine','item','mystery','shop','rest','special','boss','crossover','battle'];
+const AUTO_ROUTE_KEYS = ['random','wild','marine','item','mystery','shop','rest','special','boss','battle'];
 const AUTO_DEFAULTS = () => ({
   speed:'x2', healThreshold:50, nodePriority:'random', wildAction:'fight',
-  specialAction:'manual', chainItem:'risk', chainFail:'fight', crossoverAction:'fight',
+  specialAction:'manual', chainItem:'risk', chainFail:'fight',
   revive:true, useUltimates:true, healItems:['carne','carnereal','bocadillo'],
   reserveBerries:0, pauseEvents:[],
   fullTeamAction:'keep', fullBagAction:'leave',
@@ -130,14 +130,13 @@ function normalizeAutoSettings(value) {
     specialAction:choice('specialAction',['manual','gacha','leave']),
     chainItem:choice('chainItem',['risk','cartel','carteldorado','cartelbuster']),
     chainFail:choice('chainFail',['fight','pay','manual']),
-    crossoverAction:choice('crossoverAction',['fight','leave','manual']),
     fullTeamAction:choice('fullTeamAction',['keep','higherLevel','manual']),
     fullBagAction:choice('fullBagAction',['leave','manual']),
     revive:typeof v.revive==='boolean'?v.revive:d.revive,
     useUltimates:typeof v.useUltimates==='boolean'?v.useUltimates:d.useUltimates,
     healItems:Array.isArray(v.healItems)?['carne','carnereal','bocadillo'].filter(id=>v.healItems.includes(id)):d.healItems,
     reserveBerries:integer(v.reserveBerries,0,999999),
-    pauseEvents:Array.isArray(v.pauseEvents)?['wild','marine','item','mystery','shop','rest','special','boss','crossover'].filter(id=>v.pauseEvents.includes(id)):[],
+    pauseEvents:Array.isArray(v.pauseEvents)?['wild','marine','item','mystery','shop','rest','special','boss'].filter(id=>v.pauseEvents.includes(id)):[],
     shopItems:Array.isArray(v.shopItems)?v.shopItems.filter(t=>t&&PORT_SHOP_STOCK.includes(t.id)).map(t=>({id:t.id,qty:integer(t.qty,0,99)})):d.shopItems
   };
 }
@@ -322,7 +321,6 @@ function showAutoSettingsModal(settingsHost = null, onClose = null) {
         <p>Si no tienes el cartel elegido, arriesga. Si no puedes pagar los 3 carteles, combate.</p>
         <label for="auto-special-action">Crossguild</label>${select('auto-special-action',cfg.specialAction,[['manual','Pausar para elegir o jugar'],['gacha','Jugar carteles si puedo pagarlos'],['leave','Marcharme sin comprar']])}
         <p>El catálogo se elige manualmente. Si no alcanza para los carteles o Nuzlocke lo impide, se marcha.</p>
-        <label for="auto-crossover">Camino alternativo · Crossover</label>${select('auto-crossover',cfg.crossoverAction,[['fight','Explorar y aceptar el duelo'],['leave','Retirarme y completar la saga'],['manual','Pausar y decidir yo']])}
         <label for="auto-full-team">Si el equipo está lleno</label>${select('auto-full-team',cfg.fullTeamAction,[['keep','Conservar el equipo y dejar al nuevo'],['higherLevel','Sustituir al de menor nivel si el nuevo lo supera'],['manual','Pausar y decidir yo']])}
         <p>Los personajes repetidos se fusionan. En caso de empate de nivel, se conserva el equipo.</p>
       </section>
@@ -362,7 +360,7 @@ function showAutoSettingsModal(settingsHost = null, onClose = null) {
       const val=id=>ov.querySelector(`#${id}`).value;
       const on=id=>ov.querySelector(`#${id}`).checked;
       autoSettings=normalizeAutoSettings({speed:val('auto-speed-sel'),nodePriority:val('auto-node-sel'),wildAction:val('auto-wild-sel'),
-        specialAction:val('auto-special-action'),chainItem:val('auto-chain-item'),chainFail:val('auto-chain-fail'),crossoverAction:val('auto-crossover'),
+        specialAction:val('auto-special-action'),chainItem:val('auto-chain-item'),chainFail:val('auto-chain-fail'),
         fullTeamAction:val('auto-full-team'),fullBagAction:val('auto-full-bag'),
         healThreshold:+val('auto-heal-sel'),revive:on('auto-revive'),useUltimates:on('auto-ultimates'),reserveBerries:val('auto-reserve'),
         healItems:['carne','carnereal','bocadillo'].filter(id=>on(`auto-heal-${id}`)),pauseEvents:routes.filter(([id])=>on(`auto-pause-${id}`)).map(([id])=>id),
@@ -411,6 +409,7 @@ const META_DEFAULTS = () => ({
   fame: 0, upgrades: {}, accXp: 0, global: {}, defeated: [],
   sagaClears: {}, // id base -> nº de sagas conquistadas con ese nakama en la banda
   sagaDiffWins: {}, // sagaId -> { diffLevel: true }
+  pirateKingRewards: {}, // sagaId -> 'pending' o ID del legendario elegido
   islandProgress: {}, // saga:mode:difficulty -> completed island indices
   teamPresets: { 1: [], 2: [], 3: [] },
   stats: { kills: 0, items: 0 },
@@ -445,6 +444,7 @@ function loadMeta() {
         [id,id==='sake' ? autoSettings.revive : autoSettings.healItems.includes(id)]))};
   }
   migrateLegacyIslandWins(meta);
+  preparePirateKingRewards(meta);
   if (!meta.totalIslands) {
     const totalWins = Object.values(meta.wins || {}).reduce((a, b) => a + b, 0) +
       Object.values(meta.nuzWins || {}).reduce((a, b) => a + b, 0);
@@ -542,6 +542,7 @@ function importSaveFile(file) {
       validateGameSave(data);
       const nextMeta = Object.assign(META_DEFAULTS(), data.meta);
       migrateLegacyIslandWins(nextMeta);
+      preparePirateKingRewards(nextMeta);
       nextMeta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 }, nextMeta.settings);
       if (!nextMeta.roster.includes('luffy')) nextMeta.roster.push('luffy');
       const nextRun = data.run || null;
@@ -564,7 +565,7 @@ function importSaveFile(file) {
       autoMode = false;
       clearTimeout(autoTimer);
       toast('📂 Partida cargada y guardada en este dispositivo');
-      screenHome();
+      if (!finishRetiredJourney()) screenHome();
     } catch (e) {
       toast('❌ No se pudo cargar: archivo inválido o guardado local no disponible. Tu partida anterior se conserva.');
     }
@@ -572,6 +573,10 @@ function importSaveFile(file) {
   reader.readAsText(file);
 }
 function validateGameSave(data) {
+  for (const [sagaId, value] of Object.entries(data.meta.pirateKingRewards || {})) {
+    if (!SAGAS.some(s => s.id === sagaId) || !data.meta.sagaDiffWins?.[sagaId]?.[5] ||
+        (value !== 'pending' && !pirateKingLegendaryPool(sagaId).includes(value))) throw new Error('Recompensa de Rey Pirata inválida.');
+  }
   if (Object.keys(data.meta.sagaStats || {}).some(id => !SAGAS.some(s => s.id === id))) throw new Error('Contadores de saga incompatibles.');
   for (const key of ['dex', 'recruited', 'roster', 'defeated']) {
     if (data.meta[key]?.some(id => !CHARS[id])) throw new Error('Personaje desconocido.');
@@ -840,7 +845,6 @@ const NODE_TYPES = {
   rest: { emoji: '⛺', label: 'Campamento' },
   special: { emoji: '🌟', label: 'Crossguild' },
   boss: { emoji: '💀', label: 'Jefe' },
-  crossover: { emoji: '🌀', label: 'Camino alternativo' },
   travel: { emoji: '🧭', label: 'Siguiente mapa' },
 };
 
@@ -888,13 +892,6 @@ function genMap(island) {
       }
     }
     prevRow = row;
-  }
-  // Camino alternativo (crossover): en la última isla de la saga aparece un
-  // nodo aparentemente sin salida, con una única conexión desde el jefe final.
-  if (island.final) {
-    const bossR = map.rows.length - 1;
-    map.rows.push([{ r: bossR + 1, i: 0, type: 'crossover', done: false }]);
-    map.edges.push([bossR, 0, bossR + 1, 0]);
   }
   return map;
 }
@@ -1287,9 +1284,6 @@ function showNodeConfirmModal(r, i) {
     case 'travel':
       detailsText = 'Continúa al siguiente mapa de esta isla con tu banda, objetos y PS actuales. El jefe espera al final del último mapa.';
       break;
-    case 'crossover':
-      detailsText = 'Un portal dimensional te traslada a un evento alternativo fuera de la historia principal.';
-      break;
     default:
       detailsText = 'Avanza hacia este nodo para descubrir qué aventuras te esperan.';
       break;
@@ -1653,11 +1647,6 @@ const STATIC_ACHIEVEMENTS = [
   { id: 'straw_hats', title: 'Los 10 Sombrero de Paja', emoji: '🏴‍☠️', desc: 'Desbloquea o recluta a los 10 nakamas principales.', goal: 10, check: () => STRAW_HAT_MEMBERS.filter(id => isNakamaUnlocked(id)).length, fame: 250, cat: 'desafios' },
   { id: 'saga_full', title: 'Compendio de Saga', emoji: '📜', desc: 'Completa al 100% los personajes de 1 saga en la Dex.', goal: 100, check: () => bestSagaDexProgress(), fame: 200, cat: 'desafios' },
   { id: 'dex_full', title: 'Leyenda Viviente', emoji: '📖', desc: 'Consigue a todos los personajes del juego en la Dex.', goal: Object.keys(CHARS).length, check: () => (meta.dex ? meta.dex.length : 0), fame: 1000, cat: 'desafios' },
-  { id: 'tri_naruto', title: 'Trío Shinobi', emoji: '🍥', desc: 'Registra a Naruto, Sasuke y Kakashi en la Dex.', goal: 3, check: () => countInDex(['naruto', 'sasuke', 'kakashi']), fame: 150, cat: 'desafios' },
-  { id: 'tri_jjk', title: 'Trío Hechicero', emoji: '👹', desc: 'Registra a Itadori, Yuta y Gojo en la Dex.', goal: 3, check: () => countInDex(['itadori', 'yuta', 'gojo']), fame: 150, cat: 'desafios' },
-  { id: 'tri_kimetsu', title: 'Trío Cazador', emoji: '🩸', desc: 'Registra a Tanjiro, Zenitsu e Inosuke en la Dex.', goal: 3, check: () => countInDex(['tanjiro', 'zenitsu', 'inosuke']), fame: 150, cat: 'desafios' },
-  { id: 'tri_db', title: 'Trío Saiyan', emoji: '🐉', desc: 'Registra a Goku, Vegeta y Gohan en la Dex.', goal: 3, check: () => countInDex(['goku', 'vegeta', 'gohan']), fame: 150, cat: 'desafios' },
-  { id: 'tri_opm', title: 'Trío Héroes OPM', emoji: '👊', desc: 'Registra a Genos, Garou y Tatsumaki en la Dex.', goal: 3, check: () => countInDex(['genos', 'garou', 'tatsumaki']), fame: 150, cat: 'desafios' },
 ];
 
 const SAGA_DIFF_ACHIEVEMENTS = SAGA_DEFS.flatMap(s =>
@@ -1721,12 +1710,7 @@ function getAchievementsInfo() {
   return { totalCompleted, totalAchievements, hasUnclaimedAch };
 }
 
-function isVisibleAch(a) {
-  if (a.id.startsWith('tri_') || a.isCrossover) {
-    return a.check() >= a.goal;
-  }
-  return true;
-}
+function isVisibleAch(a) { return true; }
 
 function claimAchievement(id, progressive = false) {
   if (progressive) {
@@ -2106,6 +2090,7 @@ function screenHome() {
     <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? 'Doble salto · 25 fama cada 1.000 m' : '🔒 Se desbloquea al nivel 1 de cuenta'}</small></span></button>
     <button class="local-menu-button" id="btn-local"><span aria-hidden="true">⚔️</span><span><strong>MULTIJUGADOR LOCAL</strong><small>Duelo · Torneo · Alianza contra un yonko · Conexión por QR</small></span></button>
     <div style="text-align:center;margin:12px 0"><button class="btn gray small" id="btn-offline">⬇ Preparar juego sin internet</button></div>
+    ${pendingPirateKingRewards().length ? `<div class="panel"><button class="btn gold" id="btn-king-rewards">👑 ELEGIR LEGENDARIO · ${pendingPirateKingRewards().length} recompensa(s) de Rey Pirata</button></div>` : ''}
     <div class="home-main-buttons">
       <button class="btn blue small" id="btn-dex">
         <span>📖 Dex</span>
@@ -2157,6 +2142,7 @@ function screenHome() {
     catch (e) { toast('No se pudo abrir el modo local. Recarga el juego e inténtalo de nuevo.'); }
     finally { btn.disabled = false; }
   };
+  $('#btn-king-rewards')?.addEventListener('click', () => showPirateKingReward(pendingPirateKingRewards()[0], screenHome));
   $('#btn-offline').onclick = async () => {
     try { const { prepareOffline } = await import('./local/offline.mjs'); await prepareOffline(); }
     catch (e) { toast(e.message || 'No se pudo preparar la copia sin conexión.'); }
@@ -4633,7 +4619,6 @@ function enterNode(r, i) {
     }
     case 'mystery': trackStat('mystery_visit', 1); doMystery(island); break;
     case 'special': trackStat('special_visit', 1); doSpecialPirate(island); break;
-    case 'crossover': doCrossoverEvent(island); break;
     case 'shop': screenShop(); break;
     case 'rest': {
       trackStat('rest_visit', 1);
@@ -5699,32 +5684,6 @@ const PASSIVES = {
   jupeter: { name:'Devorador Terrestre', desc:'+20% de defensa física y especial.', defense:1.20 },
   im: { name:'Sombra del Trono', desc:'+25% de daño de Oscuridad y Haki. Interpretación para el juego.', types:{Oscuridad:1.25,Haki:1.25} },
   xebec: { name:'Furia Salvaje', desc:'+25% de ataque.', attack:1.25 },
-  naruto: { name:'Modo Senjutsu', desc:'+15% de daño de Viento y de velocidad.', types:{Viento:1.15}, speed:1.15 },
-  sasuke: { name:'Sharingan', desc:'+15 puntos de crítico y +15% de daño de Rayo.', critical:.15, types:{Rayo:1.15} },
-  kakashi: { name:'Ninja Copia', desc:'+15 puntos de evasión y +15% de velocidad.', evasion:.15, speed:1.15 },
-  itadori: { name:'Puño Divergente', desc:'+15% de daño físico.', physical:1.15 },
-  yuta: { name:'Energía Maldita', desc:'+15% de daño especial.', special:1.15 },
-  gojo: { name:'Infinito', desc:'Esquiva el primer ataque del combate.', dodge:1 },
-  tanjiro: { name:'Danza del Dios del Fuego', desc:'+15% de daño de Fuego y Agua.', types:{Fuego:1.15,Agua:1.15} },
-  zenitsu: { name:'Respiración del Rayo', desc:'+30% de velocidad y +15 puntos de crítico.', speed:1.30, critical:.15 },
-  inosuke: { name:'Asalto de la Bestia', desc:'+15% de daño físico.', physical:1.15 },
-  nezuko: { name:'Sangre Ardiente', desc:'+15% de daño de Fuego y -10% de daño recibido.', types:{Fuego:1.15}, reduction:.9 },
-  goku: { name:'Super Saiyan', desc:'+20% de ataque con menos del 70% de PS.', lowAttack:1.20, threshold:.70 },
-  vegeta: { name:'Orgullo Saiyan', desc:'+15% de ataque y +10 puntos de crítico.', attack:1.15, critical:.10 },
-  gohan: { name:'Ira Desatada', desc:'+20% de ataque tras recibir un golpe en combate.', hitAttack:1.20 },
-  genos: { name:'Incineración', desc:'+20% de daño de Fuego y Rayo.', types:{Fuego:1.20,Rayo:1.20} },
-  garou: { name:'Cazador de Héroes', desc:'+15% de ataque y +10 puntos de evasión.', attack:1.15, evasion:.10 },
-  tatsumaki: { name:'Telequinesis', desc:'+20% de daño especial.', special:1.20 },
-  orochimaru: { name:'Sustitución de Serpiente', desc:'Recupera un 5% de sus PS por ronda; el Clímax reduce la curación.', regen:.05 },
-  madara: { name:'Susanoo Definitivo', desc:'+25% de defensa física y especial.', defense:1.25 },
-  sukuna: { name:'Corte Desmantelar', desc:'+20% de daño de Corte.' },
-  kibutsuji: { name:'Biokinesis Demoniaca', desc:'Cura al aliado activo un 5% de PS por ronda; el Clímax reduce la curación.' },
-  gokuui: { name:'Doctrina del Egoísta', desc:'+25 puntos de evasión y +20% de velocidad.', evasion:.25, speed:1.20 },
-  jiren: { name:'Fuerza Absoluta', desc:'+25% de ataque y defensa.', attack:1.25, defense:1.25 },
-  cell: { name:'Células Perfectas', desc:'Recupera un 5% de sus PS por ronda; el Clímax reduce la curación.', regen:.05 },
-  frieza: { name:'Emperador del Universo', desc:'+20% de daño contra rivales con menos del 50% de PS.' },
-  zenosama: { name:'Borrado Divino', desc:'+25% de daño de ataques.' },
-  saitama: { name:'Entrenamiento Serio', desc:'+35% de daño físico y +0,50 al multiplicador de daño crítico.' },
 };
 const passiveRule = f => PASSIVES[f.id] || PASSIVES[baseFormOf(f.id)] || {};
 function passiveInfo(f) {
@@ -5950,42 +5909,11 @@ function showTypeChartModal(team) {
   ov.onclick = e => { if (e.target === ov) ov.remove(); };
 }
 
-const CROSSOVER_ULTIMATES = {
-  narutokurama: MOVES.bijudama,
-  naruto: { name: 'Rasengan Shuriken', type: 'Viento', power: 140, acc: 0.9 },
-  sasuke: { name: 'Kirin', type: 'Rayo', power: 140, acc: 0.9 },
-  kakashi: { name: 'Raikiri', type: 'Rayo', power: 135, acc: 0.95 },
-  itadori: { name: 'Kokusen (Destello Negro)', type: 'Golpe', power: 145, acc: 0.85 },
-  yuta: { name: 'Amor Puro (Rika)', type: 'Corte', power: 140, acc: 0.9 },
-  gojo: { name: 'Vacío Inconmensurable', type: 'Oscuridad', power: 150, acc: 0.85 },
-  tanjiro: { name: 'Danza del Dios del Fuego', type: 'Fuego', power: 140, acc: 0.9 },
-  zenitsu: { name: 'Respiración del Rayo: 7ª Postura', type: 'Rayo', power: 145, acc: 0.9 },
-  inosuke: { name: 'Colmillo Desgarrador', type: 'Corte', power: 135, acc: 0.9 },
-  nezuko: { name: 'Explosión de Sangre', type: 'Fuego', power: 135, acc: 0.9 },
-  goku: { name: 'Kamehameha x10', type: 'Golpe', power: 145, acc: 0.85 },
-  vegeta: { name: 'Final Flash', type: 'Rayo', power: 145, acc: 0.85 },
-  gohan: { name: 'Kamehameha Padre e Hijo', type: 'Golpe', power: 150, acc: 0.85 },
-  gokuui: { name: 'Doctrina Suprema', type: 'Haki', power: 160, acc: 0.9 },
-  jiren: { name: 'Impacto de Poder', type: 'Golpe', power: 155, acc: 0.85 },
-  cell: { name: 'Kamehameha Solar', type: 'Rayo', power: 150, acc: 0.85 },
-  frieza: { name: 'Supernova', type: 'Oscuridad', power: 150, acc: 0.85 },
-  zenosama: { name: 'Borrado Divino', type: 'Oscuridad', power: 180, acc: 0.95 },
-  saitama: { name: 'Puñetazo Serio', type: 'Golpe', power: 200, acc: 0.95 },
-  genos: { name: 'Cañón de Incineración', type: 'Fuego', power: 140, acc: 0.85 },
-  garou: { name: 'Puño de Liberación del Agua', type: 'Golpe', power: 145, acc: 0.85 },
-  tatsumaki: { name: 'Meteoro Psíquico', type: 'Viento', power: 145, acc: 0.85 },
-  madara: { name: 'Tengai Shinsei', type: 'Tierra', power: 155, acc: 0.85 },
-  orochimaru: { name: 'Técnica de la Serpiente de 8 Cabezas', type: 'Veneno', power: 140, acc: 0.9 },
-  sukuna: { name: 'Expansión de Dominio: Santuario Malévolo', type: 'Corte', power: 160, acc: 0.9 },
-  kibutsuji: { name: 'Látigos de Sangre Demoniaca', type: 'Veneno', power: 155, acc: 0.9 },
-};
 
 function getUltimateMove(f) {
   if (!f) return MOVES.punetazo;
   const base = baseFormOf(f.id);
 
-  if (CROSSOVER_ULTIMATES[f.id]) return CROSSOVER_ULTIMATES[f.id];
-  if (CROSSOVER_ULTIMATES[base]) return CROSSOVER_ULTIMATES[base];
 
   const c = CHARS[f.id] || CHARS[base];
   if (!c) return MOVES.punetazo;
@@ -6387,7 +6315,6 @@ function critChanceFor(att) {
 function critDmgFor(att) {
   let m = BASE_CRIT_DMG;
   if (isP(att, 'oden')) m += 0.20;
-  if (isP(att, 'saitama')) m += 0.50;
   const tC = synergyTier(teamOf(att), 'Corte');
   if (tC) m += synergyBonus(teamOf(att), 'Corte', .15, .35);
   return m;
@@ -6426,7 +6353,6 @@ function calcDamage(att, dfd, mv, crit, variance) {
   if (isP(att, 'garp') && phys) defStat *= 0.70;
   if (isP(dfd, 'kaido')) defStat *= 1.20;
   if (teamOf(dfd).some(x => x.hp > 0 && isP(x, 'shanks'))) atkStat *= 0.85;
-  if (isP(att, 'frieza') && dfd.hp < dfd.maxhp * 0.5) atkStat *= 1.20;
   // Veneno: daño neutral que ignora el 20% de la defensa
   if (mv.type === 'Veneno') defStat *= 0.8;
   // Golpe Ⅱ: los ataques físicos rompen un 15% de la DEF rival
@@ -6470,9 +6396,6 @@ function calcDamage(att, dfd, mv, crit, variance) {
   if (isP(dfd, 'kaido')) dmg *= 0.85;
   if (isP(att, 'teach') && hasFruta(dfd)) dmg *= 1.25;
   if (isP(att, 'akainu') && mv.type === 'Fuego') dmg *= 1.20;
-  if (isP(att, 'saitama') && phys) dmg *= 1.35;
-  if (isP(att, 'sukuna') && mv.type === 'Corte') dmg *= 1.20;
-  if (isP(att, 'zenosama')) dmg *= 1.25;
   // Pasiva Sanji: reduce el daño recibido un 15%
   if (isP(dfd, 'sanji')) dmg *= 0.85;
   // Regla núcleo de tags: sin HAKI contra un usuario FRUTA, -50% de daño
@@ -6706,7 +6629,6 @@ function afterRound() {
     const drain = Math.min(foe.hp, Math.floor(foe.maxhp * (passiveRule(act).drain || 0)));
     let heal = passiveRule(act).regen || 0;
     if (team.some(x => x.hp > 0 && isP(x,'marco'))) heal += .06;
-    if (team.some(x => x.hp > 0 && isP(x,'kibutsuji'))) heal += .05;
     if (team.some(x => x.hp > 0 && isP(x,'ryokugyu'))) heal += .05;
     const water = synergyTier(team,'Agua');
     if (water) heal += synergyBonus(team, 'Agua', .04, .08);
@@ -7003,12 +6925,6 @@ function endBattle(victory, fled, recruited) {
     notes.push(`+${berriesHTML(b)}`);
   }
   if (notes.length) toast(notes.join(' · '));
-  if (victory && opts.crossover) {
-    trackJourneyRewards(30);
-    gainFame(30);
-    saveRun();
-    return crossoverReward(opts.crossover);
-  }
   if (victory && opts.boss) {
     if (run.islandComplete) return screenMap();
     run.islandComplete = true;
@@ -7028,10 +6944,6 @@ function endBattle(victory, fled, recruited) {
     run.team.forEach(f => { f.hp = f.maxhp; });
     if (run.islandIdx >= saga.islands.length - 1) {
       saveRun();
-      const diffLevel = (run && run.diff) || 1;
-      if (diffLevel === 5) {
-        return offerCrossoverPath(newVets, bossFame);
-      }
       return sagaComplete();
     }
     if(finishIslandRepeat('win'))return;
@@ -7051,194 +6963,72 @@ function endBattle(victory, fled, recruited) {
   screenMap();
 }
 
-// ============ EVENTO: CROSSOVER DE ANIME (SOLO REY PIRATA) ============
-// Tras el combate del jefe final en Dificultad Rey Pirata se abre un camino alternativo
-// con un rival reforzado (+50% Daño y Defensa). Al vencerlo, eliges 1 de 3 personajes de 4⭐
-// (o un Boss de 5⭐ si ya tienes todos los de 4⭐).
-function offerCrossoverPath(newVets, bossFame) {
-  const rows = run.map.rows;
-  const last = rows[rows.length - 1];
-  if (!(last && last[0] && last[0].type === 'crossover')) {
-    const bossR = rows.length - 1;
-    rows.push([{ r: bossR + 1, i: 0, type: 'crossover', done: false }]);
-    run.map.edges.push([bossR, 0, bossR + 1, 0]);
-    saveRun();
-  }
-  const ov = document.createElement('div');
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal">
-    <h2>🏅 ¡Último emblema conseguido!</h2>
-    <p style="font-size:9px;text-align:center;line-height:1.9;margin-bottom:10px;">
-      Has vencido a los últimos jefes de la saga. +${bossFame} ⭐ Fama<br>
-      ${newVets && newVets.length ? `<small>🏅 Veteranos desbloqueados: ${newVets.map(id => CHARS[id].name).join(' · ')}</small><br>` : ''}
-      <br>Pero al recoger el emblema en Dificultad Rey Pirata, el aire vibra... Un <b>camino alternativo</b> 🌀
-      aparece donde antes no había salida.<br><br>
-      Puedes explorarlo (te espera un rival de otro mundo, <b>mucho más fuerte (+50% stats)</b>...
-      ¡y una recompensa Crossover!) o zarpar y conquistar la saga sin arriesgarte.</p>
-    <div class="actions" style="flex-direction:column;align-items:stretch;">
-      <button class="btn gold" id="cx-explore">🌀 EXPLORAR EL CAMINO</button>
-      <button class="btn green" id="cx-finish">🏴‍☠️ CONQUISTAR LA SAGA</button>
-    </div>
-  </div>`;
-  document.body.appendChild(ov);
-  if (autoMode) {
-    scheduleAutoStep(() => {
-      if(autoSettings.crossoverAction==='manual'){pauseAutoForChoice('Decide si quieres explorar el camino alternativo.');return;}
-      const btn = ov.querySelector(autoSettings.crossoverAction==='leave'?'#cx-finish':'#cx-explore');
-      if (btn && document.body.contains(ov)) btn.click();
-    }, 700);
-  }
-  ov.querySelector('#cx-explore').onclick = () => { ov.remove(); screenMap(); };
-  ov.querySelector('#cx-finish').onclick = () => { ov.remove(); sagaComplete(); };
+function pirateKingLegendaryPool(sagaId) {
+  return Object.keys(CHARS).filter(id => CHARS[id].saga === sagaId && CHARS[id].rareza === 5 && !BASE_OF[id]);
 }
-
-function doCrossoverEvent(island) {
-  const keys = Object.keys(CROSSOVER_SERIES);
-  let uncompleted = keys.filter(k => CROSSOVER_SERIES[k].rewards.some(id => !meta.recruited.includes(id) && !meta.roster.includes(id)));
-  if (!uncompleted.length) uncompleted = keys;
-  const key = pick(uncompleted);
-  const s = CROSSOVER_SERIES[key];
-  // el aire dimensional reconforta: la banda consciente recupera un 50% de PS
-  run.team.forEach(f => { if (f.hp > 0) f.hp = Math.min(f.maxhp, f.hp + Math.floor(f.maxhp * 0.5)); });
-  saveRun();
-  const lvl = island.bossLvl[island.bossLvl.length - 1] + 50;
-  const bossId = pick(s.bosses);
-  const escorts = s.bosses.filter(id => id !== bossId)
-    .sort(() => Math.random() - 0.5)
-    .slice(0, rnd(0, 2));
-  const enemies = escorts.map(id => makeChar(id, Math.max(5, lvl - 2), false, true));
-  const boss = makeChar(bossId, lvl, false, true);
-  // el jefe del crossover recibe +50% en Daño y Defensa
-  ['atk', 'def', 'spatk', 'spdef'].forEach(k => { boss[k] = Math.floor(boss[k] * (1 + CROSSOVER_BOOST)); });
-  enemies.push(boss);
-  const ov = document.createElement('div');
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal">
-    <h2>🌀 Grieta dimensional</h2>
-    <div class="special-card">
-      <div class="big-emoji">${CHARS[bossId].emoji}</div>
-      <div class="char-name">${CHARS[bossId].name} <small>Nv${lvl}</small></div>
-      <div class="special-stars">${s.emoji} ${s.name}</div>
-    </div>
-    <p style="font-size:9px;text-align:center;line-height:1.9;margin-bottom:10px;">
-      El camino sin salida era una grieta entre mundos:<br>
-      ¡personajes de <b>${s.name}</b> ${s.emoji} han cruzado a este mar!<br><br>
-      Su líder llega reforzado: <b>+${Math.round(CROSSOVER_BOOST * 100)}% de Daño y Defensa</b>.<br>
-      Si lo derrotas, podrás reclutar a <b>1 héroe de 4⭐</b> (o Boss 5⭐ si los tienes todos).<br>
-      <small>(Tu banda ha recuperado un 50% de PS con el aire dimensional.)</small></p>
-    <div class="actions" style="flex-direction:column;align-items:stretch;">
-      <button class="btn red" id="cx-fight">⚔️ ACEPTAR EL DUELO</button>
-      <button class="btn gray" id="cx-leave">🌊 RETIRARSE Y CONQUISTAR LA SAGA</button>
-    </div>
-  </div>`;
-  document.body.appendChild(ov);
-  if (autoMode) {
-    scheduleAutoStep(() => {
-      if(autoSettings.crossoverAction==='manual'){pauseAutoForChoice('Decide si aceptas el duelo crossover.');return;}
-      const btn = ov.querySelector(autoSettings.crossoverAction==='leave'?'#cx-leave':'#cx-fight');
-      if (btn && document.body.contains(ov)) btn.click();
-    }, 700);
-  }
-  ov.querySelector('#cx-fight').onclick = () => {
-    ov.remove();
-    startBattle(enemies, {
-      wild: false, crossover: key,
-      intro: `🌀 ¡${CHARS[bossId].name} bloquea el camino entre mundos!`,
-    });
-  };
-  ov.querySelector('#cx-leave').onclick = () => { ov.remove(); sagaComplete(); };
+function finishRetiredJourney() {
+  if (!run?.retiredFinalReward || !run.islandComplete || run.islandIdx !== SAGAS[run.saga]?.islands.length - 1) return false;
+  delete run.retiredFinalReward; sagaComplete(); return true;
 }
-
-// Recompensa del crossover: pantalla para elegir 1 de 3 personajes (4⭐ o 5⭐ Boss si tiene todos de 4⭐)
-function crossoverReward(key) {
-  const s = CROSSOVER_SERIES[key];
-  const island = SAGAS[run.saga].islands[run.islandIdx];
-  const lvl = island.bossLvl[island.bossLvl.length - 1];
-
-  const c4Series = s.rewards.filter(id => CHARS[id] && CHARS[id].rareza === 4);
-  let pending4 = c4Series.filter(id => !meta.roster.includes(id));
-
-  if (!pending4.length) {
-    const c4All = Object.keys(CHARS).filter(id => CHARS[id].saga === 'crossover' && CHARS[id].rareza === 4);
-    pending4 = c4All.filter(id => !meta.roster.includes(id));
+function preparePirateKingRewards(progress) {
+  progress.pirateKingRewards ||= {};
+  for (const saga of SAGAS) if (progress.sagaDiffWins?.[saga.id]?.[5] && !Object.hasOwn(progress.pirateKingRewards, saga.id)) {
+    progress.pirateKingRewards[saga.id] = 'pending';
   }
-
-  let pool = [];
-  let isBossReward = false;
-
-  if (pending4.length > 0) {
-    const shuffled = [...pending4].sort(() => Math.random() - 0.5);
-    pool = shuffled.slice(0, Math.min(3, shuffled.length));
-  } else {
-    isBossReward = true;
-    const c5Series = s.bosses.filter(id => CHARS[id] && (CHARS[id].rareza === 5 || CHARS[id].boss));
-    let pending5 = c5Series.filter(id => !meta.roster.includes(id));
-    if (!pending5.length) {
-    const c5All = Object.keys(CHARS).filter(id => !BASE_OF[id] && CHARS[id].saga === 'crossover' && (CHARS[id].rareza === 5 || CHARS[id].boss));
-      pending5 = c5All.filter(id => !meta.roster.includes(id));
+}
+function pendingPirateKingRewards() {
+  return SAGAS.map(s => s.id).filter(id => meta.pirateKingRewards?.[id] === 'pending');
+}
+function claimPirateKingReward(sagaId, id) {
+  if (meta.pirateKingRewards?.[sagaId] !== 'pending' || !pirateKingLegendaryPool(sagaId).includes(id)) return false;
+  const before = { roster: meta.roster, recruited: meta.recruited, dex: meta.dex, pirateKingRewards: meta.pirateKingRewards };
+  for (const key of ['roster','recruited','dex']) meta[key] = [...new Set([...(meta[key] || []), id])];
+  meta.pirateKingRewards = { ...meta.pirateKingRewards, [sagaId]: id };
+  if (saveMeta() === false) { Object.assign(meta, before); return false; }
+  return true;
+}
+function showPirateKingReward(sagaId, done = () => {}) {
+  if (meta.pirateKingRewards?.[sagaId] !== 'pending' || document.querySelector('#pirate-king-reward')) return;
+  autoMode = false; clearTimeout(autoTimer); autoTimer = null;
+  const saga = SAGAS.find(s => s.id === sagaId), pool = pirateKingLegendaryPool(sagaId);
+  const ov = document.createElement('div'); ov.className = 'overlay'; ov.id = 'pirate-king-reward';
+  ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true'); ov.setAttribute('aria-labelledby','king-reward-title');
+  ov.innerHTML = `<div class="modal"><h2 id="king-reward-title">👑 Legendario de ${saga.name}</h2>
+    <p>Has conquistado esta saga en Rey Pirata. Elige un legendario para tu cuenta. Esta recompensa solo se concede una vez por saga, compartida entre Clásico y Nuzlocke.</p>
+    <div class="pick-grid">${pool.map(id => `<button class="pick-row" data-legendary="${id}"><span class="emoji">${charIcon(id,64)}</span><span class="info"><b>${CHARS[id].name}</b><br>⭐⭐⭐⭐⭐<br>${meta.roster.includes(id) ? 'Ya en tu cuenta · no añade otra copia' : 'Desbloquear para tu cuenta'}</span></button>`).join('')}</div>
+    <p id="king-reward-status" role="status"></p><button class="btn gray" id="king-reward-later">Elegir más tarde</button></div>`;
+  document.body.appendChild(ov);
+  const previousFocus = document.activeElement, previousInert = app.inert;
+  app.inert = true;
+  let closed = false;
+  const onKey = event => {
+    if (event.key === 'Escape') { event.preventDefault(); close(); }
+    if (event.key === 'Tab') {
+      const buttons = [...ov.querySelectorAll('button')], first = buttons[0], last = buttons.at(-1);
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
     }
-    if (!pending5.length) pending5 = s.bosses;
-    const shuffled = [...pending5].sort(() => Math.random() - 0.5);
-    pool = shuffled.slice(0, Math.min(3, shuffled.length));
-  }
-
-  const ov = document.createElement('div');
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal">
-    <h2>🎁 RECOMPENSA DE CROSSOVER ${isBossReward ? '(5⭐ BOSS)' : '(4⭐)'}</h2>
-    <p style="font-size:9px;text-align:center;line-height:1.9;margin-bottom:10px;">
-      ${isBossReward
-      ? `🔥 ¡Victoria en el duelo de <b>${s.name}</b>! Ya tienes todos los personajes de 4⭐.<br>Elige a 1 <b>Boss Crossover de 5⭐</b> (+30 ⭐ Fama):`
-      : `🌀 ¡Victoria en el duelo de <b>${s.name}</b> ${s.emoji}!<br>Elige a 1 personaje Crossover (4⭐) para tu banda (+30 ⭐ Fama):`}
-    </p>
-    <div class="pick-grid">
-      ${pool.map(id => {
-        const c = CHARS[id];
-        return `<div class="pick-row" data-pick="${id}">
-          <span class="emoji">${c.emoji}</span>
-          <div class="info"><b>${c.name}</b> ${'⭐'.repeat(c.rareza)} · Nv${lvl}<br><small style="color:var(--accent);">${c.types.join(' / ')}</small></div>
-          <span style="font-size:8px;color:var(--green);font-weight:bold;">RECLUTAR</span>
-        </div>`;
-      }).join('')}
-    </div>
-  </div>`;
-  document.body.appendChild(ov);
-  if (autoMode) {
-    scheduleAutoStep(() => {
-      const picks = ov.querySelectorAll('[data-pick]');
-      if (picks.length && document.body.contains(ov)) {
-        const p = pick([...picks]);
-        p.click();
+  };
+  const close = () => {
+    if (closed) return; closed = true;
+    document.removeEventListener('keydown', onKey); app.inert = previousInert; ov.remove(); done();
+    if (previousFocus?.isConnected) previousFocus.focus();
+  };
+  document.addEventListener('keydown', onKey);
+  ov.querySelector('#king-reward-later').onclick = close;
+  ov.querySelectorAll('[data-legendary]').forEach(button => {
+    button.onclick = () => {
+      if (!claimPirateKingReward(sagaId, button.dataset.legendary)) {
+        ov.querySelector('#king-reward-status').textContent = 'No se pudo guardar la elección. La recompensa sigue pendiente.'; return;
       }
-    }, 700);
-  }
-
-  ov.querySelectorAll('[data-pick]').forEach(el => {
-    el.onclick = () => {
-      const id = el.dataset.pick;
-      ov.remove();
-      if (!meta.roster.includes(id)) meta.roster.push(id);
-      if (!meta.recruited.includes(id)) meta.recruited.push(id);
-      if (!meta.dex.includes(id)) meta.dex.push(id);
-      saveMeta();
-      const recLvl = Math.max(1, Math.floor(lvl * 0.85));
-      const f = applyUpgrades(makeChar(id, recLvl));
-      addToTeam(f, ok => {
-        if (ok) {
-          modalInfo('🎉 ¡Nuevo nakama legendario!',
-            `<div class="reward-list"><span style="font-size:34px;">${CHARS[id].emoji}</span><br><b>${CHARS[id].name}</b> (${CHARS[id].rareza}⭐) Nv${recLvl} se une a tu banda<br>y queda desbloqueado como veterano.</div>`,
-            sagaComplete);
-        } else {
-          modalInfo('🌊 Se desvanece',
-            '<div class="reward-list">El héroe regresa a su mundo con un saludo...</div>',
-            sagaComplete);
-        }
-      });
+      toast(`👑 ${CHARS[button.dataset.legendary].name} está en tu inventario.`); close();
     };
   });
+  ov.querySelector('[data-legendary]')?.focus();
 }
 
 function sagaComplete() {
+  if (!run || ((run.diff || 1) === 5 && (!run.islandComplete || run.islandIdx !== SAGAS[run.saga]?.islands.length - 1))) return;
   if(run?.islandRepeat?.result)return showIslandRepeatCheckpoint(autoMode);
   const continueRepeat=autoMode;
   autoMode = false;
@@ -7269,6 +7059,10 @@ function sagaComplete() {
 
   const isFirstDiffWin = !meta.sagaDiffWins[saga.id][diffLevel];
   meta.sagaDiffWins[saga.id][diffLevel] = true;
+  if (diffLevel === 5 && isFirstDiffWin && run.islandIdx === saga.islands.length - 1 && run.islandComplete) {
+    meta.pirateKingRewards ||= {};
+    if (!Object.hasOwn(meta.pirateKingRewards, saga.id)) meta.pirateKingRewards[saga.id] = 'pending';
+  }
 
   const baseFame = 500;
   let fameWon = 0;
@@ -7288,7 +7082,11 @@ function sagaComplete() {
   // Guarda la banda completa (incluyendo legendarios/jefes) en meta.roster
   const addedLegendaries = unlockRoster(true);
   saveMeta();
-  if(finishIslandRepeat('win',continueRepeat))return;
+  const legendaryPending = meta.pirateKingRewards?.[saga.id] === 'pending';
+  if(finishIslandRepeat('win',continueRepeat && !legendaryPending)) {
+    if (legendaryPending) showPirateKingReward(saga.id);
+    return;
+  }
   const team = run.team;
   const rewardsHTML = journeyRewardsHTML();
   clearRun();
@@ -7307,6 +7105,7 @@ function sagaComplete() {
     </div>
   `);
   $('#btn-fin').onclick = screenHome;
+  if (legendaryPending) showPirateKingReward(saga.id);
 }
 
 function gameOver() {
@@ -7431,7 +7230,7 @@ function towerNextBattle() {
   let highestSaga = 0;
   SAGAS.forEach((_, i) => { if (sagaUnlocked(i)) highestSaga = i; });
   const availableSagas = new Set(SAGAS.slice(0, highestSaga + 1).map(s => s.id));
-  // sin formas evolucionadas ni personajes del crossover (solo salen en su evento)
+  // sin formas evolucionadas; solo personajes de las sagas desbloqueadas
   const pool = Object.keys(CHARS).filter(id => !BASE_OF[id] && availableSagas.has(CHARS[id].saga));
   const lvl = 13 + tower.floor * 2;
   const isBossFloor = tower.floor % 5 === 0;
@@ -7566,7 +7365,7 @@ let shipBuyLock = 0;
 let shipSearchQ = '';
 const shipTraining = { selected: null, saga: '', teamOnly: false, page: 0 };
 function groupUpgradeRoster(ids) {
-  const groups = [...SAGAS.map(s => ({id:s.id,name:s.name})), {id:'crossover',name:'CROSSOVER'}, {id:'other',name:'OTROS'}];
+  const groups = [...SAGAS.map(s => ({id:s.id,name:s.name})), {id:'other',name:'OTROS'}];
   const known = new Set(groups.map(g => g.id));
   return groups.map(g => ({...g,ids:ids.filter(id => {
     const saga = CHARS[id]?.saga;
@@ -7968,7 +7767,7 @@ function dexCardHTML(id) {
 function screenDex() {
   playMusic('menu');
   const all = Object.keys(CHARS);
-  const sagaOpts = [...SAGAS.map(s => ({ id: s.id, name: s.name })), { id: 'crossover', name: 'CROSSOVER' }];
+  const sagaOpts = [...SAGAS.map(s => ({ id: s.id, name: s.name }))];
   render(`
     ${topbar(false)}
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
@@ -7983,7 +7782,6 @@ function screenDex() {
   // Orden original: agrupado por saga, respetando el orden de definición
   const sagaOrder = {};
   SAGAS.forEach((s, i) => { sagaOrder[s.id] = i; });
-  sagaOrder.crossover = SAGAS.length;
   const update = () => {
     let ids = filterSortChars(all, dexView);
     if (dexView.sort === 'default') {
@@ -8139,5 +7937,5 @@ try {
   run = null;
   loadMeta();
 }
-screenHome();
+if (!finishRetiredJourney()) screenHome();
 if (saveReadError) toast('⚠️ No se pudo leer la partida local. La copia anterior se ha conservado; puedes importar un JSON.');

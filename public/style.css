@@ -1144,3 +1144,10 @@ button, .mode-card, .saga-row, .map-node, .team-slot, .dex-card, .poster, .item-
 .cloud-connecting { text-align:center; color:white; padding:25vh 1rem; line-height:2; text-shadow:2px 2px #252525; }
 button:focus-visible,[tabindex]:focus-visible {outline:3px solid #fff;outline-offset:3px;}
 @media(max-width:600px) { .logo { max-width: 75%; padding-right:0; font-size:14px; } }
+
+#pirate-king-reward .modal{max-height:calc(100dvh - 32px);overflow-y:auto}
+#pirate-king-reward p{font:14px/1.5 system-ui,sans-serif}
+#pirate-king-reward .pick-grid{display:grid;grid-template-columns:1fr;gap:8px}
+#pirate-king-reward .pick-row{display:flex;align-items:center;gap:14px;text-align:left;width:100%;font:13px/1.5 system-ui,sans-serif;padding:12px}
+#pirate-king-reward .pick-row .emoji{flex:none}
+#pirate-king-reward .pick-row .info{flex:1;min-width:0}

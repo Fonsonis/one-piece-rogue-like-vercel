@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import { createRequire } from 'node:module';
+const require=createRequire(import.meta.url);
+const {chromium}=require(process.env.LOCAL_PLAYWRIGHT_PATH||'playwright');
+const browser=await chromium.launch({headless:true,executablePath:process.env.LOCAL_CHROME_PATH||undefined});
+try {
+  const page=await browser.newPage({viewport:{width:390,height:844}}),errors=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.goto(process.env.LOCAL_TEST_URL||'http://127.0.0.1:4173');
+  await page.evaluate(()=>{
+    const old={...meta,fame:1234,logPoses:567,roster:['luffy','naruto'],dex:['luffy','narutokurama'],recruited:['goku'],charUpgrades:{naruto:25},teamPresets:{1:['luffy','naruto']},sagaDiffWins:{water7:{5:true},gyojin:{5:true}}};
+    delete old.pirateKingRewards;
+    localStorage.setItem(GameSaveStorage.KEY,JSON.stringify(GameSaveStorage.payload(old,null)));
+  });
+  await page.reload();
+  assert.equal(await page.evaluate(()=>meta.roster.includes('naruto')),false);
+  assert.equal(await page.evaluate(()=>Object.keys(CHARS).length),434);
+  await page.locator('#btn-king-rewards').click();
+  assert.equal(await page.locator('[data-legendary]').count(),1);
+  await page.locator('[data-legendary="lucci"]').click();
+  await page.reload();
+  assert.equal(await page.evaluate(()=>meta.pirateKingRewards.water7),'lucci');
+  assert.equal(await page.evaluate(()=>meta.roster.includes('lucci')),true);
+  assert.equal(await page.evaluate(()=>meta.fame),1234);
+  await page.locator('#btn-king-rewards').click();
+  await page.locator('#king-reward-later').click();
+  await page.reload();
+  await page.locator('#btn-king-rewards').click();
+  await page.locator('[data-legendary="jinbe"]').click();
+  await page.reload();
+  assert.equal(await page.locator('#btn-king-rewards').count(),0);
+  assert.equal(await page.evaluate(()=>meta.roster.includes('jinbe')),true);
+  await page.evaluate(()=>{
+    meta.sagaDiffWins.eastblue={4:true};storyMode='classic';selectedDiff=5;startRun(0,['luffy']);
+    run.islandIdx=SAGAS[0].islands.length-1;run.mapIdx=islandMapCount(SAGAS[0].islands.at(-1))-1;
+    run.map=genMap(SAGAS[0].islands.at(-1));battle={opts:{boss:true}};endBattle(true);
+  });
+  await page.locator('#pirate-king-reward').waitFor();
+  assert.deepEqual(await page.locator('[data-legendary]').evaluateAll(nodes=>nodes.map(n=>n.dataset.legendary).sort()),['mihawk','shanks']);
+  await page.screenshot({path:'outputs/pirate-king-choice-mobile.png'});
+  await page.locator('#king-reward-later').click();
+  await page.reload();
+  await page.locator('#btn-king-rewards').click();
+  await page.locator('[data-legendary="mihawk"]').click();
+  await page.reload();
+  assert.equal(await page.locator('#btn-king-rewards').count(),0);
+  assert.equal(await page.evaluate(()=>meta.pirateKingRewards.eastblue),'mihawk');
+  await page.locator('#btn-local').click();await page.locator('#local-create').click();
+  const options=await page.locator('[data-pick="0"] option').evaluateAll(nodes=>nodes.map(n=>n.value));
+  assert.equal(options.includes('mihawk'),true);assert.equal(options.includes('naruto'),false);
+  assert.deepEqual(errors,[]);
+  console.log('Legacy roster migration, retroactive saga choices, final-boss reward, postponement/reload, permanent unlocks and local multiplayer roster verified in browser.');
+} finally {await browser.close();}

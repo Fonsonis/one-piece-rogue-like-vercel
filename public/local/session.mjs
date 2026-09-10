@@ -1,4 +1,4 @@
-export const RULES = 'egghead-local-2';
+export const RULES = 'egghead-local-3';
 export const DEFAULT_TEAM = ['luffy', 'zoro', 'nami', 'sanji', 'usopp', 'chopper'];
 export const BOSSES = ['kaido', 'bigmom', 'shanks', 'teach', 'newgate'];
 const cleanName = name => String(name || 'Pirata').replace(/[\x00-\x1f<>]/g, '').trim().slice(0, 24) || 'Pirata';

@@ -1,10 +1,10 @@
 # Ultimates con el sprite del personaje
 
-Presentación para los 460 personajes: retrato con fondo y nombre de la técnica, seguido de una coreografía del atlas real. El corte, fuego, arma o puño son los dibujados en el PNG de ese personaje. El renderizador ya no construye puños, haces, aros ni partículas geométricas superpuestas.
+Presentación para los 434 personajes: retrato con fondo y nombre de la técnica, seguido de una coreografía del atlas real. El corte, fuego, arma o puño son los dibujados en el PNG de ese personaje. El renderizador ya no construye puños, haces, aros ni partículas geométricas superpuestas.
 
 ## Animación
 
-Se reutilizan las cuatro poses existentes (guardia, preparación, ataque y recuperación). No se han dibujado 460 atlas nuevos. La secuencia añade desplazamiento, impulso, recuperación y, según el estilo, repeticiones o estelas de las propias poses. Todas las muestras de textura permanecen dentro de una sola celda y se pintan sin suavizado.
+Se reutilizan las cuatro poses existentes (guardia, preparación, ataque y recuperación). No se han dibujado 434 atlas nuevos. La secuencia añade desplazamiento, impulso, recuperación y, según el estilo, repeticiones o estelas de las propias poses. Todas las muestras de textura permanecen dentro de una sola celda y se pintan sin suavizado.
 
 Los perfiles seleccionan una coreografía por arma/fruta: espadazo, patada elevada, disparo con retroceso, salto, vuelo, desplazamiento de Law, golpe pesado o canalización. Las cinco formas de Luffy tienen secuencias distintas: ráfaga, Jet, golpe de Gear 3, rebote de Gear 4 y salto elástico de Gear 5. En Luffy base, Gear 2 y Gear 5 se alarga sólo una franja horizontal del antebrazo del fotograma de ataque; torso y puño conservan sus píxeles. Gear 3 y Gear 4 usan directamente sus puños grandes dibujados.
 
@@ -22,7 +22,7 @@ La escena puede salir de las celdas: calcula el espacio de ambos sprites, añade
 
 `npm test` y `npm run lint`.
 
-- Cobertura de los 460 perfiles en ambos sentidos, cuatro momentos y tres tamaños de lienzo.
+- Cobertura de los 434 perfiles en ambos sentidos, cuatro momentos y tres tamaños de lienzo.
 - Equivalencia del motor con y sin ultimates visuales, incluidos fallos del renderizador.
 - Muestreo dentro de una única celda, ausencia de efectos geométricos y coreografías distintas para los cinco Gears.
 - Restauración de sprites, cancelación antes y después de cargar, límites de escenas, temporizadores, movimiento reducido y Canvas no disponible.

@@ -154,7 +154,7 @@
     return result;
   };
 
-  // A few legacy crossover/recruitment dialogs embed an emoji directly instead
+  // A few legacy recruitment dialogs embed an emoji directly instead
   // of calling charIcon. Replace only their illustration, retaining their nodes
   // and all existing click handlers. Never inspect or reveal unseen Dex cards.
   function decorateLegacyDialogs(root) {

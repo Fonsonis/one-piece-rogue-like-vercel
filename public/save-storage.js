@@ -11,7 +11,7 @@
     for (const key of ['dex', 'recruited', 'roster', 'defeated', 'relics']) {
       if (data.meta[key] !== undefined && (!Array.isArray(data.meta[key]) || data.meta[key].some(id => typeof id !== 'string'))) throw new Error('Progreso inválido.');
     }
-    for (const key of ['wins', 'nuzWins', 'upgrades', 'global', 'stats', 'settings', 'sagaClears', 'sagaDiffWins', 'teamPresets', 'charUpgrades', 'islandProgress', 'sagaStats']) {
+    for (const key of ['wins', 'nuzWins', 'upgrades', 'global', 'stats', 'settings', 'sagaClears', 'sagaDiffWins', 'teamPresets', 'charUpgrades', 'islandProgress', 'sagaStats', 'pirateKingRewards']) {
       if (data.meta[key] !== undefined && !record(data.meta[key])) throw new Error('Progreso inválido.');
     }
     for (const islands of Object.values(data.meta.islandProgress || {})) {
@@ -68,6 +68,40 @@
       }
     }
     inspect(data);
+    return migrateRetiredContent(data);
+  }
+  // IDs conservados solo para importar guardados anteriores a la retirada de estos personajes.
+  const retired = new Set(['naruto','narutokurama','sasuke','kakashi','madara','orochimaru','itadori','yuta','gojo','sukuna','tanjiro','zenitsu','inosuke','nezuko','kibutsuji','goku','vegeta','gohan','gokuui','jiren','cell','frieza','zenosama','saitama','genos','garou','tatsumaki']);
+  function migrateRetiredContent(data) {
+    const m = data.meta;
+    for (const key of ['dex','recruited','roster','defeated']) if (m[key]) m[key] = m[key].filter(id => !retired.has(id));
+    for (const key of ['charUpgrades','upgrades','sagaClears']) if (record(m[key])) for (const id of retired) delete m[key][id];
+    if (record(m.teamPresets)) for (const key of Object.keys(m.teamPresets)) {
+      if (Array.isArray(m.teamPresets[key])) m.teamPresets[key] = m.teamPresets[key].filter(id => !retired.has(id));
+    }
+    for (const id of ['tri_naruto','tri_jjk','tri_kimetsu','tri_db','tri_opm']) if (m.claimedAch) delete m.claimedAch[id];
+    const auto = m.settings?.autoConfig;
+    if (record(auto)) {
+      delete auto.crossoverAction;
+      if (auto.nodePriority === 'crossover') auto.nodePriority = 'random';
+      if (Array.isArray(auto.pauseEvents)) auto.pauseEvents = auto.pauseEvents.filter(id => id !== 'crossover');
+    }
+    const r = data.run;
+    if (!r) return data;
+    const previousTeamSize = r.team.length;
+    r.team = r.team.filter(f => !retired.has(f.id));
+    if (previousTeamSize && !r.team.length) { data.run = null; return data; }
+    if (r.startingTeam) {
+      r.startingTeam = r.startingTeam.filter(id => !retired.has(id));
+      if (!r.startingTeam.length) { delete r.startingTeam; delete r.islandRepeat; }
+    }
+    // El antiguo portal solo se añadía después del jefe, en la última fila.
+    let removedPortal = false;
+    while (r.map.rows.at(-1)?.every(n => n.type === 'crossover')) { r.map.rows.pop(); removedPortal = true; }
+    if (!r.map.rows.length) { data.run = null; return data; }
+    r.map.edges = r.map.edges.filter(e => r.map.rows[e[0]]?.[e[1]] && r.map.rows[e[2]]?.[e[3]]);
+    if (r.pos && !r.map.rows[r.pos[0]]?.[r.pos[1]]) r.pos = [r.map.rows.length - 1, 0];
+    if (removedPortal && r.islandComplete) r.retiredFinalReward = true;
     return data;
   }
   function parse(text) {

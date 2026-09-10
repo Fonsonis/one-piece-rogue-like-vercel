@@ -5,9 +5,8 @@ import {combatHarness} from './balance-harness.mjs';
 function setup(mode='classic', diff=1) {
   const h=combatHarness();
   h.exec(`screenMap=()=>{};screenIslands=()=>{};sagaComplete=()=>{};
-    let notice='', crossoverFame=0;
+    let notice='';
     modalInfo=(_title,html)=>{notice=html;};
-    offerCrossoverPath=(_vets,fame)=>{crossoverFame=fame;};
     storyMode='${mode}';selectedDiff=${diff};startRun(0,['luffy']);
     meta.fame=0;meta.accXp=0;
     startBattle([makeChar('buggy',5),makeChar('buggy',5),makeChar('arlong',5)],{boss:true});
@@ -31,7 +30,6 @@ test('each boss pays difficulty-scaled Fama and account XP once, including repea
       assert.equal(h.exec('meta.fame'),reward*3,'completion must not pay again');
       assert.equal(h.exec('meta.accXp'),reward*3);
       if(!finalBoss) assert.match(h.exec('notice'),new RegExp(`\\+${reward*3} ⭐ Fama`));
-      else if(i===4) assert.equal(h.exec('crossoverFame'),reward*3);
     }
   }
 });
@@ -51,7 +49,7 @@ test('two simultaneous boss kills pay immediately and remain saved after losing 
 });
 
 test('ordinary encounters, tower kills and losses with no boss kills do not pay boss Fama',()=>{
-  for(const kind of ['wild','marine','crossover','tower','loss']) {
+  for(const kind of ['wild','marine','tower','loss']) {
     const h=setup();
     h.exec(`battle.opts=${kind==='tower'||kind==='loss'?'{boss:true}':`{${kind}:true}`};
       battle.tower=${kind==='tower'};

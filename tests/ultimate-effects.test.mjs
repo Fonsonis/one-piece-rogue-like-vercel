@@ -133,18 +133,6 @@ test('Gear 5 grows, raises its foot, stomps and returns to its original size',()
  assert.equal(choreo(p,.48,true).scale,1);
 });
 
-test('Kurama has nine chakra tails, a Bijudama launch and a static reduced-motion version',()=>{
- const h=artHarness(),draw=h.exec('UltimateFX.drawFrame'),recording=canvasRecorder();
- const p=h.exec("UltimateArtProfiles.resolve('narutokurama',CHARS.narutokurama,MOVES.bijudama,'naruto')");
- assert.equal(p.motion,'kurama');assert.equal(p.count,9);
- const sprite={naturalHeight:192,naturalWidth:768};
- const spec={width:390,height:220,source:.2,target:.8,sprite};
- const phases=[.3,.6,.8].map(t=>{draw(recording.ctx,p,t,spec);return recording.drain();});
- assert.equal(new Set(phases).size,3);
- assert.ok(phases.every(phase=>phase.includes('fillRect')));
- draw(recording.ctx,p,.3,{...spec,reduced:true});const first=recording.drain();
- draw(recording.ctx,p,.8,{...spec,reduced:true});assert.equal(recording.drain(),first);
-});
 
 test('loaded sprite replaces the original, and cancellation always restores its visibility',async()=>{
  const h=lifecycle(),spec={profile:h.profile,source:h.source,target:h.target};

@@ -1,8 +1,16 @@
 # One Piece Rogue Like — edición estática para Vercel
 
-Juego fan de One Piece, sin ánimo de lucro. La edición Egghead actualiza el balance y la interfaz, conservando música, sprites, 457 personajes, 11 sagas, 57 islas, 140 logros y el minijuego Luffy Run de la versión mejorada.
+Juego fan de One Piece, sin ánimo de lucro. La edición Egghead actualiza el balance y la interfaz, conservando música, sprites, 434 personajes de One Piece, 11 sagas, 57 islas, logros y el minijuego Luffy Run de la versión mejorada.
 
 Todo se ejecuta en el navegador. No necesita Next.js, Cloudflare, cuentas, cookies de sesión, API, base de datos, Vercel Blob ni otro servicio de almacenamiento. Node.js solo prepara los archivos y las pruebas. Las dos bibliotecas QR se incluyen localmente y sus versiones están fijadas como dependencias de desarrollo.
+
+## Recompensa de Rey Pirata
+
+Al superar la última isla de una saga en dificultad **Rey Pirata**, su primera victoria concede la elección de un **legendario de cinco estrellas de esa misma saga**, que queda desbloqueado en el inventario permanente. Es una recompensa por saga y cuenta, compartida entre Clásico y Nuzlocke. No se repite al volver a completarla ni al cambiar de modo.
+
+La elección se guarda como pendiente hasta reclamarla. Puede posponerse y recuperarse desde **Elegir legendario** en el puerto, incluso tras recargar o importar el JSON. Las victorias antiguas en Rey Pirata también conceden una elección pendiente si aún no se ha reclamado. Elegir un personaje que ya está en la cuenta no genera otra copia. Lucci y Jinbe pasan a cinco estrellas para cubrir Water 7 y Gyojin, sin cambiar sus atributos ni técnicas.
+
+Se han retirado los 27 personajes crossover, sus eventos, filtros, logros y recursos individuales. Los guardados antiguos eliminan esas referencias, conservando monedas y progreso de One Piece. Si una banda solo contenía personajes retirados, se cierra ese viaje y se conserva la cuenta; los viajes con nakamas de One Piece continúan. El antiguo portal final desaparece y una victoria pendiente de cerrar completa la saga sin exigir aquel combate adicional.
 
 ## Multijugador local por QR
 
@@ -33,7 +41,7 @@ Las redes de invitados con aislamiento, VPN, restricciones de red local y cierto
 
 ### Abrir el juego sin internet
 
-En el menú, **Preparar juego sin internet → Descargar / actualizar** almacena los recursos (~94 MB) en ese navegador. Espera la confirmación de descarga completa. Después abre **la misma dirección**; para multijugador sigue haciendo falta una red local, aunque no tenga acceso a internet. Una copia descargada se sirve desde caché sin consultar servicios de fuentes externos. Las actualizaciones se descargan con el mismo botón; una descarga fallida conserva la copia anterior.
+En el menú, **Preparar juego sin internet → Descargar / actualizar** almacena los recursos (~92 MB) en ese navegador. Espera la confirmación de descarga completa. Después abre **la misma dirección**; para multijugador sigue haciendo falta una red local, aunque no tenga acceso a internet. Una copia descargada se sirve desde caché sin consultar servicios de fuentes externos. Las actualizaciones se descargan con el mismo botón; una descarga fallida conserva la copia anterior.
 
 El navegador puede desalojar los recursos por falta de espacio. Conserva una exportación JSON independiente del progreso. Esta función registra un service worker únicamente al solicitar la descarga; no precarga archivos ni sustituye el guardado sin pulsar el botón.
 
@@ -41,7 +49,7 @@ Detalles y pruebas: `public/local/`, `tests/local-multiplayer.test.mjs` y la pru
 
 ## Edición Egghead
 
-Buggy contra Buggy ya no bloquea la partida. Se revisan pasivas y técnicas, se añade EXP visible, se ajustan las escalas de los 457 sprites y se incorporan doce escenarios ilustrados. Se conservan estadísticas base, niveles de enemigos y curvas de progresión. Consulta [la revisión de balance](docs/combat-balance.md), [las 457 fichas](docs/character-balance.csv) y [la dirección visual](docs/art-direction.md).
+Buggy contra Buggy ya no bloquea la partida. Se revisan pasivas y técnicas, se añade EXP visible, se ajustan las escalas de los 434 sprites y se incorporan doce escenarios ilustrados. Se conservan estadísticas base, niveles de enemigos y curvas de progresión. Consulta [la revisión de balance](docs/combat-balance.md), [las 434 fichas](docs/character-balance.csv) y [la dirección visual](docs/art-direction.md).
 
 ## Jugar en local
 
@@ -118,7 +126,7 @@ npm test
 npm run lint
 ```
 
-Las pruebas verifican contenido del juego, los 457 atlas y retratos, 2.240 escenarios con/sin efectos visuales, Nuzlocke, Luffy Run, JSON local, recuperación, importaciones inválidas, almacenamiento bloqueado y copia exacta de todos los recursos al despliegue. También validan 208.849 emparejamientos y simulan 2.742 combates. Las pruebas no requieren red ni dependencias. Para reproducir la comparación con la revisión anterior: `node scripts/audit-balance.mjs 607b860`.
+Las pruebas verifican contenido del juego, los 434 atlas y retratos, escenarios con/sin efectos visuales, Nuzlocke, Luffy Run, JSON local, recuperación, importaciones inválidas, almacenamiento bloqueado y copia exacta de todos los recursos al despliegue. También validan 188.356 emparejamientos y simulan 2.604 combates. Las pruebas no requieren red ni dependencias. Para reproducir la comparación con la revisión anterior: `node scripts/audit-balance.mjs 607b860`.
 
 ## Estructura
 
