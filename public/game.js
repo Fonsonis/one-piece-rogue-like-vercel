@@ -5990,7 +5990,7 @@ function getUltimateMove(f) {
   const c = CHARS[f.id] || CHARS[base];
   if (!c) return MOVES.punetazo;
 
-  if (c.evo && startLvlOf(f.id) < c.evo.lvl && !battle?.eTeam.includes(f)) {
+  if (c.evo && !battle?.opts?.local && startLvlOf(f.id) < c.evo.lvl && !battle?.eTeam.includes(f)) {
     const lockedMoves = c.learnset.filter(([level]) => level >= c.evo.lvl).map(([,id]) => id);
     if (!c.ultimate || lockedMoves.includes(c.ultimate)) {
       const available = formMovesAt(f.id, f.lvl).map(id => MOVES[id]).filter(m => m?.power > 0);
@@ -6008,6 +6008,7 @@ function getUltimateMove(f) {
 }
 
 function enemyUltimatesEnabled(b = battle) {
+  if (b?.opts?.local) return true;
   const marineford = SAGAS.findIndex(s => s.id === 'marineford');
   return !!b && !b.tower && !!run && marineford >= 0 && run.saga >= marineford;
 }
@@ -6200,23 +6201,22 @@ function refreshReserves() {
   });
 }
 
-function renderBattle(logLines) {
+function battleLayoutHTML(logLines, labels = {}) {
   const b = battle;
   const eHead = b.opts.wild ? '🌊' : b.opts.boss ? '💀' : '⚓';
-  render(`
-    ${topbar(!b.tower, !b.tower, true, b.opts.wild && !b.tower)}
+  return `
     <div class="battle-layout">
       <div class="battle-main">
-        <div class="battle-cols" style="--scene:url('${b.tower ? '/art/scenes/marineford.webp' : (SAGAS[run?.saga || 0]?.img || '/art/scenes/eastblue.webp')}')">
+        <div class="battle-cols" style="--scene:url('${b.opts.local ? (b.opts.coop ? '/art/scenes/wano.webp' : '/art/scenes/eastblue.webp') : b.tower ? '/art/scenes/marineford.webp' : (SAGAS[run?.saga || 0]?.img || '/art/scenes/eastblue.webp')}')">
           <div class="battle-side" id="side-p">
-            <div class="side-head"><div class="trainer">🏴‍☠️</div>TU BANDA
+            <div class="side-head"><div class="trainer">🏴‍☠️</div>${labels.p || 'TU BANDA'}
               <div class="battle-team-count" id="count-p">${battleTeamCount('p')}</div>
               <div class="syn-chips" id="syn-p">${synChipsHTML(b.pTeam)}</div>
             </div>
             ${b.pTeam.map((f, i) => fighterCardHTML(f, 'p', i, b.curP)).join('')}
           </div>
           <div class="battle-side" id="side-e">
-            <div class="side-head"><div class="trainer">${eHead}</div>${b.opts.wild ? 'SALVAJE' : 'ENEMIGO'}
+            <div class="side-head"><div class="trainer">${eHead}</div>${labels.e || (b.opts.wild ? 'SALVAJE' : 'ENEMIGO')}
               <div class="battle-team-count" id="count-e">${battleTeamCount('e')}</div>
               <div class="syn-chips" id="syn-e">${synChipsHTML(b.eTeam)}</div>
             </div>
@@ -6229,9 +6229,14 @@ function renderBattle(logLines) {
           <section id="battle-backpack" aria-label="Mochila de combate"></section>
         </div>
       </div>
-      <div class="battle-sidebar" id="battle-controls">${controlsHTML()}</div>
+      <div class="battle-sidebar" id="battle-controls">${b.opts.local ? '' : controlsHTML()}</div>
     </div>
-  `);
+  `;
+}
+
+function renderBattle(logLines) {
+  const b = battle;
+  render(`${topbar(!b.tower, !b.tower, true, b.opts.wild && !b.tower)}${battleLayoutHTML(logLines)}`);
   bindControls();
   refreshReserves();
   // En combate: las cartas enemigas muestran su ficha; las cartas aliadas activan la Ultimate si está lista
@@ -6488,6 +6493,10 @@ function popDamage(who, text, color) {
   const active = side === 'e' ? battle.curE : battle.curP;
   const idx = team.indexOf(active);
   const card = $(`#fc-${side}-${idx}`);
+  popDamageCard(card, text, color);
+}
+
+function popDamageCard(card, text, color) {
   const sprite = card && card.querySelector('.fcard-sprite');
   if (!sprite) return;
   const rect = sprite.getBoundingClientRect();

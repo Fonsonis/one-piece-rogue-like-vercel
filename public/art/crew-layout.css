@@ -16,32 +16,32 @@ div:has(> #chk-music-toggle) { flex-direction:column; align-items:stretch!import
 /* Two active fighters share a wide stage; the whole crew stays within reach. */
 /* Keep the HUD geometry and interaction targets, but paint a single arena.
    Transparent borders preserve existing spacing in both themes. */
-#app .battle-layout .battle-cols { isolation:isolate; }
-#app .battle-layout .battle-side,
-#app .battle-layout .battle-side .fcard.active {
+:is(#app,#local-arena) .battle-layout .battle-cols { isolation:isolate; }
+:is(#app,#local-arena) .battle-layout .battle-side,
+:is(#app,#local-arena) .battle-layout .battle-side .fcard.active {
   background:transparent;
   border-color:transparent;
   box-shadow:none;
   overflow:visible;
   isolation:auto;
 }
-#app .battle-layout .fcard-sprite { overflow:visible; }
-#app .battle-layout :is(.side-head,.fcard-title,.fcard-hp,.fcard-meters,.fcard-stats-mini,.fcard-passive) {
+:is(#app,#local-arena) .battle-layout .fcard-sprite { overflow:visible; }
+:is(#app,#local-arena) .battle-layout :is(.side-head,.fcard-title,.fcard-hp,.fcard-meters,.fcard-stats-mini,.fcard-passive) {
   position:relative;
   z-index:5;
 }
-#app .battle-layout .fcard.active .fcard-sprite .sprite {
+:is(#app,#local-arena) .battle-layout .fcard.active .fcard-sprite .sprite {
   --sprite-size:min(clamp(140px,36vw,320px),calc((100cqh - 12px) * var(--motion-fit-y,1)));
 }
-#app .battle-layout :is(.fcard-hp,.fcard-meters) { background:var(--paper); }
-#app .battle-layout .fcard.ult-ready .fcard-title {
+:is(#app,#local-arena) .battle-layout :is(.fcard-hp,.fcard-meters) { background:var(--paper); }
+:is(#app,#local-arena) .battle-layout .fcard.ult-ready .fcard-title {
   box-shadow:inset 0 0 0 2px var(--gold);
 }
-#app .battle-layout .fcard-title .xp-progress { margin:4px 4px 0; }
-#app .battle-layout .fcard-title .xp-caption { font:8px/1.3 system-ui,sans-serif; }
-#app .battle-layout .fcard-meters { min-height:28px; padding:3px 5px 6px; }
-#app .battle-layout .ult-bar-wrap { height:16px; margin-top:0; }
-#app .battle-layout .ult-bar-text { font:8px/16px system-ui,sans-serif; }
+:is(#app,#local-arena) .battle-layout .fcard-title .xp-progress { margin:4px 4px 0; }
+:is(#app,#local-arena) .battle-layout .fcard-title .xp-caption { font:8px/1.3 system-ui,sans-serif; }
+:is(#app,#local-arena) .battle-layout .fcard-meters { min-height:28px; padding:3px 5px 6px; }
+:is(#app,#local-arena) .battle-layout .ult-bar-wrap { height:16px; margin-top:0; }
+:is(#app,#local-arena) .battle-layout .ult-bar-text { font:8px/16px system-ui,sans-serif; }
 #app:has(.battle-layout) { max-width:1600px; width:100%; }
 .battle-layout .side-head { display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap:6px; padding:4px; font-size:10px; }
 .battle-layout .side-head .trainer { font-size:18px; margin:0; }
@@ -92,9 +92,9 @@ div:has(> #chk-music-toggle) { flex-direction:column; align-items:stretch!import
   .battle-reserve b,.battle-reserve small { font-size:9px; }
 }
 /* Compact fighters, then crew, log and three distinct control rows on every screen. */
-#app .battle-layout { display:flex; flex-direction:column; overflow-y:auto; overscroll-behavior:contain; }
-#app .battle-layout .battle-main { display:flex; flex:none; height:auto; overflow:visible; }
-#app .battle-layout .battle-cols { flex:none; height:clamp(480px,58dvh,650px); }
+:is(#app,#local-arena) .battle-layout { display:flex; flex-direction:column; overflow-y:auto; overscroll-behavior:contain; }
+:is(#app,#local-arena) .battle-layout .battle-main { display:flex; flex:none; height:auto; overflow:visible; }
+:is(#app,#local-arena) .battle-layout .battle-cols { flex:none; height:clamp(480px,58dvh,650px); }
 .battle-layout .battle-team-count { flex:0 0 100%; font:600 12px/1.2 system-ui,sans-serif; }
 .battle-layout .side-head .syn-chips { flex-basis:100%; }
 .battle-layout .side-head { gap:3px 6px; }
@@ -106,13 +106,13 @@ div:has(> #chk-music-toggle) { flex-direction:column; align-items:stretch!import
 .battle-exit:empty { display:none; }
 .battle-no-items { font:12px/1.4 system-ui,sans-serif; padding:8px; text-align:center; width:100%; color:var(--ink); }
 @media(max-width:700px) {
-  #app .battle-layout .battle-cols { height:clamp(310px,calc(50vw + 140px),460px); }
+  :is(#app,#local-arena) .battle-layout .battle-cols { height:clamp(310px,calc(50vw + 140px),460px); }
   .battle-layout .battle-side { padding:2px; }
   .battle-layout .side-head { min-height:33px; }
   .battle-layout .battle-team-count { font-size:11px; }
   .battle-layout .fcard-title { min-height:34px; padding:3px 2px; }
   .battle-layout .fcard-passive { min-height:22px; }
-  #app .battle-layout .fcard-stats-mini { min-height:24px; display:flex; flex-wrap:wrap; align-items:center; align-content:center; justify-content:center; gap:3px 7px; font:10px/1.3 system-ui,sans-serif!important; }
+  :is(#app,#local-arena) .battle-layout .fcard-stats-mini { min-height:24px; display:flex; flex-wrap:wrap; align-items:center; align-content:center; justify-content:center; gap:3px 7px; font:10px/1.3 system-ui,sans-serif!important; }
   .battle-layout .fcard-stats-mini .combat-stat { display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
   .battle-layout .battle-sidebar .btn { min-height:44px; font-size:clamp(7px,1.8vw,10px); }
 }

@@ -116,7 +116,7 @@
     const oldSelfHP = attacker?.hp;
     const oldTeamHP = battle ? [...(battle.pTeam || []), ...(battle.eTeam || [])].map(f => [f, f.hp]) : [];
     const result = originalAttack.apply(this, arguments);
-    safe(() => presentAttack(attacker, defender, move, oldHP, oldSelfHP, oldTeamHP, ultimateDepth > 0));
+    if (!battle?.opts?.local) safe(() => presentAttack(attacker, defender, move, oldHP, oldSelfHP, oldTeamHP, ultimateDepth > 0));
     return result;
   };
 
@@ -125,6 +125,13 @@
     try { return originalUltimate.apply(this, arguments); }
     finally { ultimateDepth--; }
   };
+
+  // Reproduce el resultado autorizado por el anfitrión, sin volver a calcular daño ni azar.
+  globalThis.BattlePresentation = Object.freeze({
+    attack(attacker, defender, move, before, ultimate = false) {
+      safe(() => presentAttack(attacker, defender, move, before.get(defender), before.get(attacker), [...before], ultimate));
+    },
+  });
 
   showCharModal = function() {
     const result = originalSheet.apply(this, arguments);

@@ -53,7 +53,7 @@ export async function openLocal() {
       say(message); leave(); startScreen();
     } });
     session.visible = !document.hidden;
-    timer = setInterval(() => { try { session?.pulse(); } catch (error) { say(`Partida pausada: ${error.message}`); clearInterval(timer); } }, 1000);
+    timer = setInterval(() => { try { session?.pulse(); } catch (error) { say(`Partida pausada: ${error.message}`); clearInterval(timer); } }, 100);
     renderSession();
   }
   function renderSession() {
@@ -63,24 +63,28 @@ export async function openLocal() {
     const me = v.players.find(p => p.id === session.self);
     if (!me) { main.innerHTML = '<section class="local-intro"><h2>Únete a una sala</h2><p>Escanea la invitación y enseña el QR de respuesta al anfitrión.</p><button class="btn gray" id="local-back">Volver</button></section>'; main.querySelector('#local-back').onclick = () => { leave(); startScreen(); }; return; }
     const connected = v.players.filter(p => p.connected).length;
+    const arena = main.querySelector('#local-arena');
     main.innerHTML = `<div class="local-room-heading"><h2>${esc(MODE[v.mode])}</h2><span class="local-badge">${session.host ? 'ANFITRIÓN' : 'INVITADO'} · ${connected}/${v.players.length} conectados</span></div>
       ${v.paused && v.phase !== 'lobby' ? '<p class="local-warning" role="status">Partida pausada. El anfitrión y los jugadores activos deben mantener el juego visible y la conexión abierta. Si alguien recargó o cerró el juego, cread una nueva sala.</p>' : ''}
       ${v.phase === 'lobby' ? lobbyHTML(v, me) : gameHTML(v, me)}`;
     if (v.phase === 'lobby') bindLobby(v, me);
     else {
-      main.querySelectorAll('[data-ultimate]').forEach(button => { button.onclick = () => { session.ultimate(button.dataset.ultimate); button.disabled = true; button.textContent = 'Preparada para la próxima ronda'; }; });
+      const placeholder = main.querySelector('#local-arena');
+      if (arena && placeholder) placeholder.replaceWith(arena);
+      const focus = focusedMatch(v, me);
+      if (focus) globalThis.LocalBattleView.update(main.querySelector('#local-arena'), focus, session, playerName);
       main.querySelector('#local-next')?.addEventListener('click', handle(() => session.nextRound()));
       main.querySelector('#local-rematch')?.addEventListener('click', () => session.reset());
     }
   }
   const playerName = id => id === 'alliance' ? 'La alianza' : id === 'yonko' ? 'El yonko' : id === 'draw' ? 'Empate' : session.view.players.find(p => p.id === id)?.name || 'Pirata';
   function lobbyHTML(v, me) {
-    const options = engine.roster.map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+    const options = engine.roster.filter(c => session.roster.includes(c.id)).map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
     return `<section class="local-panel"><div class="local-config"><label class="local-field">Modo<select id="local-mode" ${session.host ? '' : 'disabled'}>${Object.entries(MODE).map(([id, name]) => `<option value="${id}" ${id === v.mode ? 'selected' : ''}>${name}</option>`).join('')}</select></label><label class="local-field">Nakamas por jugador<select id="local-size" ${session.host ? '' : 'disabled'}>${[1, 3, 6].map(n => `<option ${n === v.size ? 'selected' : ''}>${n}</option>`).join('')}</select></label>${v.mode === 'coop' ? `<label class="local-field">Yonko<select id="local-boss" ${session.host ? '' : 'disabled'}>${BOSSES.map(id => `<option value="${id}" ${id === v.boss ? 'selected' : ''}>${esc(engine.name(id))}</option>`).join('')}</select></label>` : ''}</div>
       <p class="local-fine">${v.mode === 'tournament' ? 'Eliminación directa · sorteo de cruces · pases de ronda para completar el cuadro · los empates se repiten.' : v.mode === 'coop' ? 'Cada jugador ataca con su nakama activo. El yonko responde a cada uno; sus PS escalan con jugadores y tamaño de equipos.' : 'Los ataques son automáticos. Tú decides cuándo lanzar la definitiva del nakama activo.'}</p>
       <div class="local-player-list">${v.players.map(p => `<div class="local-player"><span>${p.id === 'host' ? '👑' : '🏴‍☠️'} <b>${esc(p.name)}</b>${p.id === me.id ? ' (tú)' : ''}</span><span>${!p.connected ? 'Desconectado' : !p.visible ? 'En segundo plano' : p.ready ? '✓ Listo' : 'Eligiendo equipo'}</span>${session.host && p.id !== 'host' ? `<button class="btn gray small" data-remove="${p.id}" aria-label="Retirar a ${esc(p.name)}">Retirar</button>` : ''}</div>`).join('')}</div>
       ${session.host ? `<button class="btn blue" id="local-invite" ${v.players.length >= (v.mode === 'duel' ? 2 : 8) ? 'disabled' : ''}>＋ Invitar por QR</button>` : '<p class="local-fine">El anfitrión elige el modo y el tamaño de las tripulaciones.</p>'}</section>
-      <section class="local-panel"><h3>Tu equipo · nivel 30</h3><p class="local-fine">El orden determina quién entra en combate. Todos los personajes están disponibles para estas partidas amistosas.</p><div class="local-team-picker">${me.team.map((id, i) => `<label class="local-pick"><span>${engine.icon(id, 40)}</span><span>Nakama ${i + 1}<select aria-label="Nakama ${i + 1}" data-pick="${i}">${options}</select></span></label>`).join('')}</div><div class="local-actions"><button class="btn ${me.ready ? 'gray' : 'green'}" id="local-ready">${me.ready ? 'Dejar de estar listo' : 'Estoy listo'}</button>${session.host ? `<button class="btn gold" id="local-start" ${v.players.length < (v.mode === 'tournament' ? 3 : 2) || v.players.some(p => !p.ready || !p.connected || !p.visible) ? 'disabled' : ''}>Comenzar ${v.mode === 'tournament' ? 'torneo' : 'partida'}</button>` : ''}</div></section>`;
+      <section class="local-panel"><h3>Tu equipo · nivel 30</h3><p class="local-fine">Elige entre los personajes de tu cuenta y sus evoluciones desbloqueadas. El orden determina quién entra en combate.</p>${me.team.length < v.size ? `<p class="local-warning">Tienes ${session.roster.length} personajes disponibles. Necesitas ${v.size} para este equipo; el anfitrión puede reducir el tamaño.</p>` : ''}<div class="local-team-picker">${me.team.map((id, i) => `<label class="local-pick"><span>${engine.icon(id, 40)}</span><span>Nakama ${i + 1}<select aria-label="Nakama ${i + 1}" data-pick="${i}">${options}</select></span></label>`).join('')}</div><div class="local-actions"><button class="btn ${me.ready ? 'gray' : 'green'}" id="local-ready" ${me.team.length !== v.size ? 'disabled' : ''}>${me.ready ? 'Dejar de estar listo' : 'Estoy listo'}</button>${session.host ? `<button class="btn gold" id="local-start" ${v.players.length < (v.mode === 'tournament' ? 3 : 2) || v.players.some(p => !p.ready || !p.connected || !p.visible) ? 'disabled' : ''}>Comenzar ${v.mode === 'tournament' ? 'torneo' : 'partida'}</button>` : ''}</div></section>`;
   }
   function bindLobby(v, me) {
     main.querySelectorAll('[data-pick]').forEach(select => {
@@ -96,8 +100,9 @@ export async function openLocal() {
     main.querySelector('#local-invite')?.addEventListener('click', handle(invite));
     main.querySelectorAll('[data-remove]').forEach(button => { button.onclick = () => { const id = button.dataset.remove; session.remove(id); links.get(id)?.close(); links.delete(id); }; });
   }
-  function fighterHTML(f) {
-    return `<div class="local-fighter ${f.hp <= 0 ? 'local-ko' : ''} ${f.active ? 'local-active' : ''}">${engine.icon(f.id, 42)}<div><b>${esc(engine.name(f.id))}</b><small>${esc(playerName(f.owner))}${f.active ? ' · ACTIVO' : ''}</small><progress max="${f.maxhp}" value="${f.hp}" aria-label="Salud de ${esc(engine.name(f.id))}"></progress><small>${f.hp} / ${f.maxhp} PS · ⚡ ${Math.floor(f.ultCharge)}%</small></div></div>`;
+  function focusedMatch(v, me) {
+    const relevant = v.matches.filter(m => m.round === v.round && m.status !== 'replay' && m.battle);
+    return relevant.find(m => m.players.includes(me.id)) || relevant[0];
   }
   function gameHTML(v, me) {
     const relevant = v.matches.filter(m => m.round === v.round && m.status !== 'replay');
@@ -105,7 +110,7 @@ export async function openLocal() {
     const focus = own || relevant.find(m => m.battle);
     const result = v.phase === 'finished' ? `<div class="local-result" role="status"><span>🏆</span><h2>${v.champion === 'draw' ? '¡Empate!' : `¡${esc(playerName(v.champion))} gana!`}</h2><p>Partida amistosa completada.</p></div>` : '';
     const bracket = v.mode === 'tournament' ? `<section class="local-panel"><h3>Cuadro del torneo · ronda ${v.round}</h3><div class="local-bracket">${v.matches.map(m => `<div class="local-match ${m.status === 'playing' ? 'is-playing' : ''}"><small>Ronda ${m.round}${m.attempt > 1 ? ` · Repetición ${m.attempt}` : ''}</small><b>${m.players.map(id => esc(playerName(id))).join(' vs ')}</b><span>${m.status === 'bye' ? 'Pasa de ronda' : m.status === 'replay' ? 'Empate · se repite' : m.status === 'playing' ? 'En combate' : `Gana ${esc(playerName(m.winner))}`}</span></div>`).join('')}</div></section>` : '';
-    const battleHTML = focus ? `<section class="local-panel"><div class="local-room-heading"><h3>${own ? 'Tu combate' : 'Espectador'} · ronda ${focus.battle.round}</h3>${!focus.battle.over ? '<span class="local-badge">COMBATE AUTOMÁTICO</span>' : ''}</div><div class="local-battle-teams"><div>${focus.battle.pTeam.map(fighterHTML).join('')}</div><div>${focus.battle.eTeam.map(fighterHTML).join('')}</div></div><div class="local-log" aria-label="Registro del combate">${focus.battle.lines.slice(-6).map(line => `<p>${esc(line)}</p>`).join('')}</div>${own && !focus.battle.over ? `<button class="btn gold" data-ultimate="${focus.id}" ${v.paused || ![...focus.battle.pTeam, ...focus.battle.eTeam].some(f => f.owner === me.id && f.active && f.hp > 0 && f.ultCharge >= 100) ? 'disabled' : ''}>⚡ Lanzar definitiva</button><p class="local-fine">Se ejecuta en la próxima ronda. Carga al golpear.</p>` : ''}</section>` : '<section class="local-panel"><p>Has pasado de ronda. Espera a que terminen los otros combates.</p></section>';
+    const battleHTML = focus ? '<div id="local-arena"></div>' : '<section class="local-panel"><p>Has pasado de ronda. Espera a que terminen los otros combates.</p></section>';
     return `${result}${bracket}${battleHTML}${session.host && v.phase === 'round-end' ? '<button class="btn green" id="local-next">Comenzar siguiente ronda</button>' : ''}${session.host && v.phase === 'finished' ? '<button class="btn green" id="local-rematch">Volver a la sala · otra partida</button>' : ''}`;
   }
   function closePair(cancel = false) {

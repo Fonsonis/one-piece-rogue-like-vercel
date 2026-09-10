@@ -20,7 +20,7 @@
       return {b,f,enemy,hp:enemy.hp,profile:profileFor(f)};
     });
     const result=originalUltimate.apply(this,arguments);
-    if(before&&f.ultCharge<100)safe(()=>{
+    if(before&&!before.b.opts?.local&&f.ultCharge<100)safe(()=>{
       const {b,enemy,profile}=before;
       UltimateFX.play({profile,source:stageFor(b,f),target:stageFor(b,enemy),owner:b,
         speed:b.speed,hit:enemy.hp<before.hp,valid:()=>battle===b&&!document.querySelector('.overlay')});
