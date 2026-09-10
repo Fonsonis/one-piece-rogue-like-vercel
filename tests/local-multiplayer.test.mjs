@@ -15,6 +15,70 @@ function engine() {
 }
 const guestId = n => n.toString(16).padStart(32, '0');
 const player = (id, size = 1) => ({ id, team: ['luffy', 'zoro', 'nami', 'sanji', 'usopp', 'chopper'].slice(0, size) });
+
+test('account roster excludes seen and temporary recruits and follows unlocked evolutions', () => {
+  const { h, api } = engine();
+  h.exec(`meta.roster=[];meta.dex=['kaido'];meta.recruited=['shanks'];run={team:[makeChar('teach',30)]};`);
+  assert.deepEqual(Array.from(api.ownedRoster()), ['luffy']);
+  h.exec(`meta.roster=['luffy','zoro'];maxStartLvlCap=()=>100;meta.charUpgrades={luffy:25};`);
+  const expected = h.exec(`evolutionFormAt('luffy',startLvlOf('luffy'))`);
+  assert.deepEqual(Array.from(api.ownedRoster()), [expected, 'zoro']);
+  assert.equal(api.validTeam(['luffy', 'luffy2', 'zoro'], 3), false);
+});
+
+test('host enforces each peer inventory and incomplete teams cannot become ready', () => {
+  const { api } = engine();
+  const s = new LocalSession({ host: true, name: 'Host', engine: api });
+  s.addPeer(guestId(1), () => true);
+  s.receive(guestId(1), { type: 'hello', rules: RULES, name: 'Guest', roster: ['luffy','nami'] });
+  const guest = s.view.players[1];
+  s.receive(guest.id, { type: 'ready', ready: true });
+  assert.equal(guest.ready, false); assert.equal(guest.team.length, 2);
+  assert.equal(validView(JSON.parse(JSON.stringify(s.view)), api), true);
+  s.configure({ size: 1 });
+  s.receive(guest.id, { type: 'select', team: ['kaido'] });
+  assert.deepEqual(guest.team, ['luffy']);
+  s.receive(guest.id, { type: 'select', team: ['nami'] });
+  assert.deepEqual(guest.team, ['nami']);
+  s.receive(guest.id, { type: 'ready', ready: true }); assert.equal(guest.ready, true);
+  assert.throws(() => s.select(['kaido']), /cuenta/);
+  s.configure({ size: 6 }); assert.equal(guest.ready, false); assert.equal(guest.team.length, 2);
+});
+
+test('one attack per step, then residual effects, with the normal 900/1200 ms cadence', () => {
+  const { api } = engine(), b = api.create([player('host'), player(guestId(1))]);
+  b.pTeam[0].maxhp = b.pTeam[0].hp = b.eTeam[0].maxhp = b.eTeam[0].hp = 10000;
+  api.tick(b);
+  assert.equal(b.event.kind, 'attack'); assert.equal(b.event.source, 0);
+  assert.equal(b.eTeam[0].ultCharge, 0); assert.equal(b.round, 1); assert.equal(b.delay, 900);
+  api.tick(b);
+  assert.equal(b.event.source, 1); assert.equal(b.round, 1);
+  api.tick(b);
+  assert.equal(b.event, null); assert.equal(b.round, 2); assert.equal(b.delay, 1200);
+});
+
+test('each owner has one relay, preserving turn slots and isolating other crews', () => {
+  const { api } = engine(), b = api.create([player('host', 3), player(guestId(1), 3)]);
+  b.pTeam[0].hp = 55; api.tick(b);
+  assert.equal(api.command(b, guestId(1), 'relay', 1), true);
+  assert.equal(api.command(b, guestId(1), 'relay', 2), false);
+  api.tick(b); assert.equal(b.event.source, 4); // El turno enemigo lo toma su Zoro.
+  assert.equal(b.pTeam[0].id, 'luffy');
+  assert.equal(api.command(b, 'host', 'relay', 1), true);
+  assert.equal(api.snapshot(b).pTeam[1].active, true);
+  assert.equal(api.command(b, 'intruder', 'relay', 1), false);
+});
+
+test('a KO does not expose its reserve to residual damage before it enters combat', () => {
+  const { api } = engine(), b = api.create([player('host', 3), player(guestId(1), 3)]);
+  b.round = 31; b.localGuard.p = true; api.tick(b); b.pTeam[0].hp = 0; api.tick(b);
+  assert.equal(api.command(b, 'host', 'relay', 1), false);
+  assert.equal(api.command(b, 'host', 'ultimate'), false);
+  const reserveHP = b.pTeam[1].hp;
+  api.tick(b);
+  assert.equal(b.pTeam[1].hp, reserveHP);
+  assert.equal(api.snapshot(b).pTeam[1].active, true);
+});
 test('local combat supports 1/3/6 teams without changing story, meta, timers or storage', () => {
   const { h, api } = engine();
   h.exec(`run={mode:'nuzlocke',diff:5,team:[makeChar('brook',30)],items:{}};battle={sentinel:true};`);
@@ -36,7 +100,7 @@ test('both sides charge ultimates; commands belong to the active owner and consu
   assert.equal(api.command(b, guestId(2), 'ultimate'), false);
   assert.equal(api.command(b, guestId(1), 'ultimate'), true);
   assert.equal(api.command(b, guestId(1), 'ultimate'), false);
-  api.tick(b);
+  api.tick(b); api.tick(b);
   assert.ok(b.eTeam[0].ultCharge < 100);
 });
 test('co-op scales the yonko with players and crew sizes, and every active player participates', () => {
@@ -44,7 +108,8 @@ test('co-op scales the yonko with players and crew sizes, and every active playe
   const two = api.create([player('host'), player(guestId(1))], { mode: 'coop', boss: 'kaido' });
   const eight = api.create(Array.from({ length: 8 }, (_, i) => player(i ? guestId(i) : 'host', 6)), { mode: 'coop', boss: 'kaido' });
   assert.equal(eight.pTeam.length, 48); assert.ok(eight.eTeam[0].maxhp > two.eTeam[0].maxhp * 10);
-  api.tick(eight); assert.equal(eight.localActors.length, 9);
+  for (let i = 0; i < 17; i++) api.tick(eight);
+  assert.equal(eight.localActors.length, 9);
   assert.equal(new Set(eight.localActors.filter(f => f.owner !== 'yonko').map(f => f.owner)).size, 8);
   for (let i = 0; !two.over && i < 500; i++) api.tick(two);
   assert.ok(two.over);
@@ -59,10 +124,11 @@ test('brackets cover every player once and handle byes for 3–8 entrants', () =
 });
 function room(n = 2) {
   let time = 10000;
-  const { api } = engine();
+  const { api, h } = engine();
+  h.exec(`meta.roster=['luffy','zoro','nami','sanji','usopp','chopper'];`);
   const s = new LocalSession({ host: true, name: 'Host', engine: api, now: () => time });
   s.configure({ mode: n > 2 ? 'tournament' : 'duel', size: 1 });
-  for (let i = 1; i < n; i++) { s.addPeer(guestId(i), () => true); s.receive(guestId(i), { type: 'hello', rules: RULES, name: 'Pirata ' + i }); }
+  for (let i = 1; i < n; i++) { s.addPeer(guestId(i), () => true); s.receive(guestId(i), { type: 'hello', rules: RULES, name: 'Pirata ' + i, roster: Array.from(api.ownedRoster()) }); }
   const heartbeat = () => { for (let i = 1; i < n; i++) s.receive(guestId(i), { type: 'ping', visible: true }); };
   return { s, api, heartbeat, advance: (ms = 2500) => { time += ms; } };
 }
@@ -89,7 +155,7 @@ test('readiness, changed settings, malformed packets, pause and recovery are enf
   s.start(); advance(8000); s.pulse();
   assert.equal(s.view.paused, true); assert.equal(s.view.matches[0].battle.round, 1);
   heartbeat(); advance(10); s.pulse(); assert.equal(s.view.paused, false);
-  assert.ok(s.view.matches[0].battle.round > 1);
+  assert.equal(s.view.matches[0].battle.revision, 1); // Reanuda un ataque, sin ráfaga de turnos atrasados.
   s.receive(guestId(1), { type: 'ping', visible: false }); s.pulse(); assert.equal(s.view.paused, true);
 });
 const signal = { v: 1, type: 'offer', room: 'a'.repeat(32), link: 'b'.repeat(32), sdp: 'v=0\r\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\na=fingerprint:sha-256 AA:BB\r\na=ice-ufrag:test\r\na=candidate:1 1 udp 2122260223 192.168.1.10 50000 typ host\r\n' };

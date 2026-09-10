@@ -481,7 +481,7 @@ const CHARS = {
   },
   jinbe: {
     name: 'Jinbe', emoji: '🐋', types: ['Agua', 'Golpe'],
-    base: [33, 12, 11, 8], rareza: 4,
+    base: [33, 12, 11, 8], rareza: 5,
     learnset: [[1, 'karatepez'], [10, 'tiburonazo'], [22, 'buraikan']],
     desc: 'Caballero del Mar, maestro del karate gyojin.',
   },
@@ -603,7 +603,7 @@ const CHARS = {
   },
   lucci: {
     name: 'Rob Lucci', emoji: '🐆', types: ['Fruta', 'Haki'],
-    base: [26, 14, 11, 13], rareza: 4, boss: true,
+    base: [26, 14, 11, 13], rareza: 5, boss: true,
     learnset: [[1, 'garra'], [14, 'rokuogan']],
     desc: 'Asesino del CP0. El leopardo más letal del Gobierno.',
   },
@@ -1146,63 +1146,6 @@ defineGenChars('egghead', [
   ['joyboy','Joy Boy','☀️',5,['Golpe','Haki'],''], ['lili','Nefertari D. Lili','🏺',3,['Haki'],''],
   ['emeth','Emeth','🤖',4,['Golpe','Tierra'],''],
 ]);
-
-// ============ CROSSOVER DE ANIME ============
-// Personajes de otras series para el evento de crossover (camino alternativo
-// tras el jefe final de cada saga). No aparecen en islas, mercado ni Torre.
-defineGenChars('crossover', [
-  // Naruto
-  ['naruto', 'Naruto Uzumaki', '🍥', 4, ['Viento', 'Haki'], ''],
-  ['narutokurama', 'Naruto Modo Kurama', '🦊', 5, ['Viento', 'Haki'], ''],
-  ['sasuke', 'Sasuke Uchiha', '🦅', 4, ['Rayo', 'Fuego'], ''],
-  ['kakashi', 'Kakashi Hatake', '🐺', 4, ['Rayo', 'Corte'], ''],
-  ['madara', 'Madara Uchiha', '🌒', 5, ['Fuego', 'Oscuridad'], 'b'],
-  ['orochimaru', 'Orochimaru', '🐍', 4, ['Veneno', 'Oscuridad'], 'b'],
-  // Jujutsu Kaisen
-  ['itadori', 'Yuji Itadori', '👊', 4, ['Golpe', 'Oscuridad'], ''],
-  ['yuta', 'Yuta Okkotsu', '⚔️', 4, ['Corte', 'Haki'], ''],
-  ['gojo', 'Satoru Gojo', '🕶️', 4, ['Oscuridad', 'Haki'], ''],
-  ['sukuna', 'Ryomen Sukuna', '👹', 5, ['Corte', 'Oscuridad'], 'b'],
-  // Kimetsu no Yaiba
-  ['tanjiro', 'Tanjiro Kamado', '🌊', 4, ['Agua', 'Fuego'], ''],
-  ['zenitsu', 'Zenitsu Agatsuma', '⚡', 4, ['Rayo', 'Corte'], ''],
-  ['inosuke', 'Inosuke Hashibira', '🐗', 4, ['Corte', 'Golpe'], ''],
-  ['nezuko', 'Nezuko Kamado', '🎀', 4, ['Fuego', 'Oscuridad'], ''],
-  ['kibutsuji', 'Muzan Kibutsuji', '🩸', 5, ['Oscuridad', 'Veneno'], 'b'],
-  // Dragon Ball
-  ['goku', 'Goku', '🐒', 4, ['Golpe', 'Haki'], ''],
-  ['vegeta', 'Vegeta', '💥', 4, ['Golpe', 'Rayo'], ''],
-  ['gohan', 'Gohan', '🥋', 4, ['Golpe', 'Rayo'], ''],
-  ['gokuui', 'Goku Ultra Instinto', '✨', 5, ['Golpe', 'Haki'], 'b'],
-  ['jiren', 'Jiren', '👽', 5, ['Golpe', 'Haki'], 'b'],
-  ['cell', 'Cell', '🦗', 5, ['Veneno', 'Rayo'], 'b'],
-  ['frieza', 'Freezer', '❄️', 5, ['Hielo', 'Oscuridad'], 'b'],
-  ['zenosama', 'Zeno-sama', '🌌', 5, ['Oscuridad', 'Haki'], 'b'],
-  // One Punch Man
-  ['saitama', 'Saitama', '👨‍🦲', 5, ['Golpe', 'Haki'], 'b'],
-  ['genos', 'Genos', '🤖', 4, ['Fuego', 'Rayo'], ''],
-  ['garou', 'Garou', '🐺', 4, ['Golpe', 'Oscuridad'], ''],
-  ['tatsumaki', 'Tatsumaki', '🌪️', 4, ['Viento', 'Haki'], ''],
-]);
-
-CHARS.naruto.evo = {lvl:25, to:'narutokurama'};
-CHARS.naruto.desc = 'Ninja de Konoha. Desbloquea el Modo Kurama al nivel base 25.';
-CHARS.narutokurama.spriteId = 'naruto';
-CHARS.narutokurama.desc = 'Naruto y Kurama unen sus fuerzas y liberan el chakra del Nueve Colas.';
-MOVES.kuramarasengan = {name:'Rasengan de Kurama', type:'Viento', power:100, acc:.95};
-MOVES.bijudama = {name:'Bijūdama', type:'Haki', power:150, acc:.9};
-CHARS.narutokurama.learnset = [[1,CHARS.naruto.learnset[0][1]], [25,'kuramarasengan'], [40,'bijudama']];
-CHARS.narutokurama.ultimate = 'bijudama';
-
-// Series del evento: jefes posibles (bosses) y los 3 reclutas predefinidos (rewards)
-const CROSSOVER_SERIES = {
-  naruto:     { name: 'Naruto',           emoji: '🍥', bosses: ['madara', 'orochimaru'], rewards: ['naruto', 'sasuke', 'kakashi'] },
-  jjk:        { name: 'Jujutsu Kaisen',   emoji: '👹', bosses: ['sukuna'],               rewards: ['itadori', 'yuta', 'gojo'] },
-  kimetsu:    { name: 'Kimetsu no Yaiba', emoji: '🩸', bosses: ['kibutsuji'],            rewards: ['tanjiro', 'zenitsu', 'inosuke'] },
-  dragonball: { name: 'Dragon Ball',      emoji: '🐉', bosses: ['jiren', 'cell', 'frieza', 'gokuui', 'zenosama'], rewards: ['goku', 'vegeta', 'gohan'] },
-  onepunch:   { name: 'One Punch Man',    emoji: '👊', bosses: ['saitama'],              rewards: ['genos', 'garou', 'tatsumaki'] },
-};
-const CROSSOVER_BOOST = 0.5; // el jefe del crossover recibe +50% de Daño y Defensa
 
 // Cualquier personaje sin saga (formas evolucionadas, etc.) hereda la de su base o East Blue
 for (const [id, c] of Object.entries(CHARS)) {

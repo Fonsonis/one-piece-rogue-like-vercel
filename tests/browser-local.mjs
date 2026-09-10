@@ -14,7 +14,9 @@ async function page(name, mobile = false) {
   const ctx = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1200, height: 850 }, permissions: ['camera'] }); contexts.push(ctx);
   const p = await ctx.newPage();
   p.on('pageerror', e => errors.push(name + ': ' + e.message));
-  await p.goto(base); await p.locator('#btn-local').click(); await p.locator('#local-name').fill(name); return p;
+  await p.goto(base);
+  await p.evaluate(() => { meta.roster = ['luffy','zoro','nami','sanji','usopp','chopper']; });
+  await p.locator('#btn-local').click(); await p.locator('#local-name').fill(name); return p;
 }
 async function imageFrames(p) {
   await p.locator('#pair-output').waitFor({ state: 'attached' });
@@ -48,13 +50,20 @@ try {
   await host.locator('#local-size').selectOption('1');
   const guest = await page('Nakama', true);
   await connect(host, guest, true);
+  assert.equal(await guest.locator('[data-pick="0"] option').count(), 6);
+  assert.equal(await guest.locator('[data-pick="0"] option[value="kaido"]').count(), 0);
+  await guest.locator('[data-pick="0"]').selectOption('zoro');
   checks.push('Real QR images decoded in both directions and WebRTC data channel connected without ICE services');
   console.log(checks.at(-1));
   await host.screenshot({ path: 'outputs/local-lobby-mobile.png', fullPage: true });
   assert.equal(await host.evaluate(() => document.querySelector('.local-game').scrollWidth <= innerWidth), true);
   await host.locator('#local-ready').click(); await guest.locator('#local-ready').click();
   await host.locator('#local-start').click();
-  await guest.waitForFunction(() => document.querySelector('.local-log')?.textContent.includes('usa'), { timeout: 20000 });
+  await guest.waitForFunction(() => document.querySelector('#battle-log')?.textContent.includes('usa'), null, { timeout: 20000 });
+  assert.equal(await guest.locator('#side-p .fcard.active .fcard-sprite').getAttribute('data-character'), 'zoro');
+  assert.equal(await host.locator('#side-p .fcard.active .fcard-sprite').getAttribute('data-character'), 'luffy');
+  await guest.waitForFunction(() => !!document.querySelector('#local-arena [data-motion]'), null, { timeout: 10000 });
+  await host.waitForFunction(() => !!document.querySelector('#local-arena [data-motion]'), null, { timeout: 10000 });
   await host.screenshot({ path: 'outputs/local-duel-mobile.png' });
   await guest.waitForSelector('.local-result', { timeout: 180000 });
   assert.equal(await host.locator('.local-result h2').textContent(), await guest.locator('.local-result h2').textContent());
@@ -63,14 +72,14 @@ try {
   await host.locator('#local-rematch').click(); await host.locator('#local-mode').selectOption('coop');
   await host.locator('#local-size').selectOption('3');
   await host.locator('#local-ready').click(); await guest.locator('#local-ready').click(); await host.locator('#local-start').click();
-  await guest.locator('.local-log').waitFor();
-  assert.equal(await guest.locator('.local-fighter').count(), 7);
+  await guest.locator('#battle-log').waitFor();
+  assert.equal(await guest.locator('#local-arena .fcard').count(), 7);
   await contexts[1].setOffline(true); await host.waitForTimeout(3500);
   assert.equal(await host.locator('.local-warning').count(), 0);
   await guest.close();
   await host.locator('.local-warning').waitFor();
-  const paused = await host.locator('.local-panel h3').last().textContent();
-  await host.waitForTimeout(2500); assert.equal(await host.locator('.local-panel h3').last().textContent(), paused);
+  const paused = await host.locator('.local-turn').textContent();
+  await host.waitForTimeout(2500); assert.equal(await host.locator('.local-turn').textContent(), paused);
   checks.push('Co-op shows six allied nakamas and a scaled yonko; blocking HTTP preserves the channel; closing the peer pauses the host');
   console.log(checks.at(-1));
   // New session for an eight-player lobby, preserving distinct browser contexts.

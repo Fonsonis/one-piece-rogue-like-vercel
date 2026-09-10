@@ -168,7 +168,7 @@ test('upgrade saga groups cover every owned character once and in saga order',()
  const groups=JSON.parse(h.run('JSON.stringify(groupUpgradeRoster(Object.keys(CHARS)))'));
  const ids=groups.flatMap(g=>g.ids);
  assert.equal(ids.length,h.run('Object.keys(CHARS).length'));assert.equal(new Set(ids).size,ids.length);
- assert.equal(groups[0].id,'eastblue');assert.equal(groups.at(-1).id,'crossover');
+ assert.equal(groups[0].id,'eastblue');assert.equal(groups.at(-1).id,'egghead');
  assert.deepEqual(JSON.parse(h.run('JSON.stringify(groupUpgradeRoster([]))')),[]);
 });
 

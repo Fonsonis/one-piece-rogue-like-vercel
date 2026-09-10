@@ -37,7 +37,7 @@ test('every character and move is valid; every directed matchup has a damaging c
  assert.equal(result,h.exec('Object.keys(CHARS).length ** 2'));
 });
 
-test('all 460 mirrors at four levels and 920 seeded mixed encounters terminate',()=>{
+test('all character mirrors and seeded mixed encounters terminate',()=>{
  const h=combatHarness(); const ids=Array.from(h.exec('Object.keys(CHARS)'));
  let max=0,count=0;
  for(const level of [5,20,50,99])for(const id of ids){
@@ -51,7 +51,7 @@ test('all 460 mirrors at four levels and 920 seeded mixed encounters terminate',
 
 test('finite opening dodges, real support buffs, healing cooldown and climax',()=>{
  const h=combatHarness();
- h.duel('gojo','katakuri');
+ h.duel('enel','katakuri');
  assert.ok(h.exec('battle.pTeam[0].dodgeLeft===0 && battle.eTeam[0].dodgeLeft===0'));
  assert.ok(h.exec(`(()=>{
   const p=makeChar('chopper',20),e=makeChar('bandido',20);
@@ -67,7 +67,7 @@ test('finite opening dodges, real support buffs, healing cooldown and climax',()
 
 test('unlucky full teams terminate even when all attacks miss',()=>{
  const h=combatHarness();
- const team=['buggy','gojo','katakuri','marco','bigmom','brook'];
+ const team=['buggy','enel','katakuri','marco','bigmom','brook'];
  const r=h.duel(team,team,50,{forceMiss:true});
  assert.ok(r.outcome); assert.ok(r.rounds<70,JSON.stringify(r));
 });

@@ -1,8 +1,16 @@
 # One Piece Rogue Like — edición estática para Vercel
 
-Juego fan de One Piece, sin ánimo de lucro. La edición Egghead actualiza el balance y la interfaz, conservando música, sprites, 457 personajes, 11 sagas, 57 islas, 140 logros y el minijuego Luffy Run de la versión mejorada.
+Juego fan de One Piece, sin ánimo de lucro. La edición Egghead actualiza el balance y la interfaz, conservando música, sprites, 434 personajes de One Piece, 11 sagas, 57 islas, logros y el minijuego Luffy Run de la versión mejorada.
 
 Todo se ejecuta en el navegador. No necesita Next.js, Cloudflare, cuentas, cookies de sesión, API, base de datos, Vercel Blob ni otro servicio de almacenamiento. Node.js solo prepara los archivos y las pruebas. Las dos bibliotecas QR se incluyen localmente y sus versiones están fijadas como dependencias de desarrollo.
+
+## Recompensa de Rey Pirata
+
+Al superar la última isla de una saga en dificultad **Rey Pirata**, su primera victoria concede la elección de un **legendario de cinco estrellas de esa misma saga**, que queda desbloqueado en el inventario permanente. Es una recompensa por saga y cuenta, compartida entre Clásico y Nuzlocke. No se repite al volver a completarla ni al cambiar de modo.
+
+La elección se guarda como pendiente hasta reclamarla. Puede posponerse y recuperarse desde **Elegir legendario** en el puerto, incluso tras recargar o importar el JSON. Las victorias antiguas en Rey Pirata también conceden una elección pendiente si aún no se ha reclamado. Elegir un personaje que ya está en la cuenta no genera otra copia. Lucci y Jinbe pasan a cinco estrellas para cubrir Water 7 y Gyojin, sin cambiar sus atributos ni técnicas.
+
+Se han retirado los 27 personajes crossover, sus eventos, filtros, logros y recursos individuales. Los guardados antiguos eliminan esas referencias, conservando monedas y progreso de One Piece. Si una banda solo contenía personajes retirados, se cierra ese viaje y se conserva la cuenta; los viajes con nakamas de One Piece continúan. El antiguo portal final desaparece y una victoria pendiente de cerrar completa la saga sin exigir aquel combate adicional.
 
 ## Multijugador local por QR
 
@@ -12,7 +20,11 @@ Desde el menú principal, **Multijugador local** permite jugar con dispositivos 
 - **Torneo:** 3–8 jugadores, equipos de 1, 3 o 6, eliminación directa y sorteo inicial. Se asignan pases para completar el cuadro y los empates se repiten. Los cruces de una ronda se ejecutan en paralelo en el anfitrión; cada jugador ve su combate y los demás pueden observar. El anfitrión inicia cada ronda.
 - **Alianza contra un yonko:** 2–8 jugadores, equipos de 1, 3 o 6. Kaido, Big Mom, Shanks, Teach o Newgate. Cada jugador vivo actúa con su nakama activo y recibe una respuesta del jefe. PS del jefe = PS base a nivel 30 × jugadores × tamaño de equipo × 2,5; ATQ/ESP_ATQ = base × (1,25 + 0,12 × jugadores); defensas × 1,15. Es un balance inicial, sujeto a ajuste con partidas reales.
 
-Todos eligen del catálogo completo a nivel 30, sin mejoras permanentes. Los ataques se eligen automáticamente con las reglas originales; cada jugador puede ordenar la definitiva de su nakama activo para la siguiente ronda. La partida local no concede EXP, fama ni desbloqueos, y no modifica el viaje de historia ni su JSON. El anfitrión controla la simulación: son partidas amistosas, sin clasificación certificada.
+Cada jugador elige únicamente entre los personajes de su inventario permanente y sus evoluciones desbloqueadas, como en el selector de historia. Ver un personaje en la Dex o reclutarlo temporalmente no basta. Los equipos mantienen el nivel 30 común, sin mejoras permanentes. Si faltan personajes para el tamaño elegido, no se puede marcar listo; el anfitrión puede elegir equipos más pequeños.
+
+Los combates comparten escenario, cartas, reservas, sinergias y efectos de ataques y definitivas con el resto del juego. El anfitrión transmite cada ataque por separado: 900 ms entre acciones y 1.200 ms tras resolver la ronda, como el combate normal a velocidad ×1. Cada participante ve su banda a la izquierda, puede ordenar la definitiva de su activo para su próximo ataque y dispone de un relevo por combate. En cooperativo, el escenario muestra por turno al aliado que está luchando y al yonko; cada jugador mantiene sus propias reservas. Los invitados reproducen los resultados y animaciones sin volver a simular el daño.
+
+La partida local no concede EXP, fama ni desbloqueos, y no modifica el viaje de historia ni su JSON. El anfitrión valida las selecciones contra el inventario que comunica cada dispositivo al entrar. Al tratarse de guardados locales sin servidor, son partidas amistosas, sin verificación central del inventario ni clasificación certificada.
 
 ### Emparejar cada invitado
 
@@ -29,7 +41,7 @@ Las redes de invitados con aislamiento, VPN, restricciones de red local y cierto
 
 ### Abrir el juego sin internet
 
-En el menú, **Preparar juego sin internet → Descargar / actualizar** almacena los recursos (~94 MB) en ese navegador. Espera la confirmación de descarga completa. Después abre **la misma dirección**; para multijugador sigue haciendo falta una red local, aunque no tenga acceso a internet. Una copia descargada se sirve desde caché sin consultar servicios de fuentes externos. Las actualizaciones se descargan con el mismo botón; una descarga fallida conserva la copia anterior.
+En el menú, **Preparar juego sin internet → Descargar / actualizar** almacena los recursos (~92 MB) en ese navegador. Espera la confirmación de descarga completa. Después abre **la misma dirección**; para multijugador sigue haciendo falta una red local, aunque no tenga acceso a internet. Una copia descargada se sirve desde caché sin consultar servicios de fuentes externos. Las actualizaciones se descargan con el mismo botón; una descarga fallida conserva la copia anterior.
 
 El navegador puede desalojar los recursos por falta de espacio. Conserva una exportación JSON independiente del progreso. Esta función registra un service worker únicamente al solicitar la descarga; no precarga archivos ni sustituye el guardado sin pulsar el botón.
 
@@ -37,7 +49,7 @@ Detalles y pruebas: `public/local/`, `tests/local-multiplayer.test.mjs` y la pru
 
 ## Edición Egghead
 
-Buggy contra Buggy ya no bloquea la partida. Se revisan pasivas y técnicas, se añade EXP visible, se ajustan las escalas de los 457 sprites y se incorporan doce escenarios ilustrados. Se conservan estadísticas base, niveles de enemigos y curvas de progresión. Consulta [la revisión de balance](docs/combat-balance.md), [las 457 fichas](docs/character-balance.csv) y [la dirección visual](docs/art-direction.md).
+Buggy contra Buggy ya no bloquea la partida. Se revisan pasivas y técnicas, se añade EXP visible, se ajustan las escalas de los 434 sprites y se incorporan doce escenarios ilustrados. Se conservan estadísticas base, niveles de enemigos y curvas de progresión. Consulta [la revisión de balance](docs/combat-balance.md), [las 434 fichas](docs/character-balance.csv) y [la dirección visual](docs/art-direction.md).
 
 ## Jugar en local
 
@@ -114,7 +126,7 @@ npm test
 npm run lint
 ```
 
-Las pruebas verifican contenido del juego, los 457 atlas y retratos, 2.240 escenarios con/sin efectos visuales, Nuzlocke, Luffy Run, JSON local, recuperación, importaciones inválidas, almacenamiento bloqueado y copia exacta de todos los recursos al despliegue. También validan 208.849 emparejamientos y simulan 2.742 combates. Las pruebas no requieren red ni dependencias. Para reproducir la comparación con la revisión anterior: `node scripts/audit-balance.mjs 607b860`.
+Las pruebas verifican contenido del juego, los 434 atlas y retratos, escenarios con/sin efectos visuales, Nuzlocke, Luffy Run, JSON local, recuperación, importaciones inválidas, almacenamiento bloqueado y copia exacta de todos los recursos al despliegue. También validan 188.356 emparejamientos y simulan 2.604 combates. Las pruebas no requieren red ni dependencias. Para reproducir la comparación con la revisión anterior: `node scripts/audit-balance.mjs 607b860`.
 
 ## Estructura
 

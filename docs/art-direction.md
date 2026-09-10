@@ -10,9 +10,9 @@ Doce ilustraciones nuevas: un salón de Egghead para el menú y un paisaje propi
 
 ## Escala de personajes
 
-Se conservan los 457 atlas originales de cuatro poses (192 × 192 por celda). El escalado visual utiliza los límites transparentes medidos de cada personaje; no se redibujaron sus sprites. `public/art/sprite-sizes.css` aplica una escala común a todas las poses del personaje y centra su posición de guardia. Los pies comparten una línea de suelo. Se evita que una animación cambie accidentalmente el tamaño.
+Se conservan los 434 atlas originales de cuatro poses (192 × 192 por celda). El escalado visual utiliza los límites transparentes medidos de cada personaje; no se redibujaron sus sprites. `public/art/sprite-sizes.css` aplica una escala común a todas las poses del personaje y centra su posición de guardia. Los pies comparten una línea de suelo. Se evita que una animación cambie accidentalmente el tamaño.
 
-Altura de referencia: 128 unidades visibles para humano estándar, ×0,70 para Chopper/Chouchou, ×0,62 para pequeños Tontatta, ×1,20 para personajes grandes como Kaido, Big Mom, Kuma o Barbablanca, y ×1,40 para gigantes como Oars, Dorry, Brogy y Zunesha. Es una escala legible para cartas, no una reproducción de alturas reales en metros. Los personajes muy anchos también respetan un límite horizontal. Los retratos del Dex tienen su propia medición para compensar sus recortes previos. `sprite-sizing.json` registra las 457 mediciones y escalas.
+Altura de referencia: 128 unidades visibles para humano estándar, ×0,70 para Chopper/Chouchou, ×0,62 para pequeños Tontatta, ×1,20 para personajes grandes como Kaido, Big Mom, Kuma o Barbablanca, y ×1,40 para gigantes como Oars, Dorry, Brogy y Zunesha. Es una escala legible para cartas, no una reproducción de alturas reales en metros. Los personajes muy anchos también respetan un límite horizontal. Los retratos del Dex tienen su propia medición para compensar sus recortes previos. `sprite-sizing.json` registra las 434 mediciones y escalas.
 
 ## Presentación y verificación
 

@@ -38,10 +38,9 @@ test('finishing all maps is one attempt; ordinary fights and map travel do not c
  }
  h.exec('battle={opts:{boss:true}};endBattle(true);');assert.equal(h.exec('run.islandRepeat.completed'),1);
 });
-test('final island keeps optional crossover and normal saga rewards, without paying twice',()=>{
- const {h}=setup();h.exec(`selectedDiff=5;meta.sagaDiffWins.eastblue={5:true};let crossoverCalls=0;offerCrossoverPath=()=>crossoverCalls++;startIslandRepeats(0,['luffy'],SAGAS[0].islands.length-1,2);battle={opts:{boss:true}};endBattle(true);`);
- assert.equal(h.exec('crossoverCalls'),1);assert.equal(h.exec('run.islandRepeat.completed'),0);
- h.exec('sagaComplete();');assert.equal(h.exec('meta.wins.eastblue'),1);assert.equal(h.exec('run.islandRepeat.completed'),1);
+test('final island completes the saga and repeat once, without paying twice',()=>{
+ const {h}=setup();h.exec(`selectedDiff=5;meta.sagaDiffWins.eastblue={5:true};startIslandRepeats(0,['luffy'],SAGAS[0].islands.length-1,2);battle={opts:{boss:true}};endBattle(true);`);
+ assert.equal(h.exec('meta.wins.eastblue'),1);assert.equal(h.exec('run.islandRepeat.completed'),1);
  const fame=h.exec('meta.fame');assert.ok(fame>0);h.exec('sagaComplete();');assert.equal(h.exec('meta.fame'),fame);assert.equal(h.exec('meta.wins.eastblue'),1);
  advance(h);h.exec('battle={opts:{boss:true}};endBattle(true);sagaComplete();');assert.equal(h.exec('meta.wins.eastblue'),2);assert.equal(h.exec('meta.fame'),fame*2);assert.equal(h.exec('autoMode'),false);
 });
@@ -81,7 +80,7 @@ test('repetitions allow configured recruitment and leave excess loot without pau
  h.exec('cancelIslandRepeats();autoMode=true;');assert.equal(h.exec(`receiveBackpackItem(run,'sake')`),false);assert.equal(h.exec('autoMode'),true);
 });
 test('the existing automatic configuration, including event pauses and speed, remains authoritative',()=>{
- const {h}=setup();h.exec(`autoSettings=normalizeAutoSettings({speed:'x1',pauseEvents:['marine'],wildAction:'manual',specialAction:'gacha',crossoverAction:'manual',reserveBerries:1234});meta.settings.autoConfig={...autoSettings};const config=JSON.stringify(autoSettings),savedConfig=JSON.stringify(meta.settings.autoConfig);startIslandRepeats(0,['luffy'],0,2);run.map.rows[0][0].type='marine';let entered=false;enterNode=()=>entered=true;advanceAutoNode(0,0);`);
+ const {h}=setup();h.exec(`autoSettings=normalizeAutoSettings({speed:'x1',pauseEvents:['marine'],wildAction:'manual',specialAction:'gacha',reserveBerries:1234});meta.settings.autoConfig={...autoSettings};const config=JSON.stringify(autoSettings),savedConfig=JSON.stringify(meta.settings.autoConfig);startIslandRepeats(0,['luffy'],0,2);run.map.rows[0][0].type='marine';let entered=false;enterNode=()=>entered=true;advanceAutoNode(0,0);`);
  assert.equal(h.exec('entered'),false);assert.equal(h.exec('autoMode'),false);assert.equal(h.exec('run.islandRepeat.completed'),0);
  assert.equal(h.exec('JSON.stringify(autoSettings)'),h.exec('config'));assert.equal(h.exec('JSON.stringify(meta.settings.autoConfig)'),h.exec('savedConfig'));
  h.exec(`autoMode=true;run.team[0].hp=0;gameOver();`);advance(h);

@@ -20,19 +20,6 @@ function modalHarness() {
  return {h,overlays};
 }
 
-test('crossover leader is exactly 50 levels above each final island boss',()=>{
- const {h,overlays}=modalHarness();
- h.exec(`let encounter;startBattle=(enemies,opts)=>{encounter={enemies,opts};};
- run={team:[makeChar('luffy',5)],items:{},saga:0};`);
- for(let index=0;index<h.exec('SAGAS.length');index++){
-  h.exec(`run.saga=${index};doCrossoverEvent(SAGAS[${index}].islands.at(-1));`);
-  overlays.at(-1).querySelector('#cx-fight').onclick();
-  const expected=h.exec(`SAGAS[${index}].islands.at(-1).bossLvl.at(-1)+50`);
-  assert.equal(h.exec('encounter.enemies.at(-1).lvl'),expected);
-  assert.equal(h.exec('encounter.enemies.at(-1).atk===Math.floor(makeChar(encounter.enemies.at(-1).id,encounter.enemies.at(-1).lvl,false,true).atk*(1+CROSSOVER_BOOST))'),true);
-  assert.ok(h.exec('encounter.opts.crossover'));
- }
-});
 
 test('sheet upgrade spends the current cost, refreshes evolution and keeps its overlay and close callback',()=>{
  const {h,overlays}=modalHarness();
