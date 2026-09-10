@@ -3,12 +3,18 @@
   "version": "1.1.0",
   "private": true,
   "type": "module",
-  "engines": { "node": ">=22" },
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
-    "dev": "node scripts/serve-static.mjs",
+    "dev": "node scripts/prepare-offline.mjs && node scripts/serve-static.mjs",
     "build": "node scripts/build-static.mjs",
     "start": "node scripts/serve-static.mjs --production",
     "test": "npm run build && node --test tests/*.test.mjs",
-    "lint": "node --check public/game.js && node --check public/data.js && node --check public/save-storage.js && node --check public/art/visuals.js && node --check public/runner/ui.mjs && node --check public/runner/engine.mjs"
+    "lint": "node --check public/game.js && node --check public/data.js && node --check public/save-storage.js && node --check public/art/visuals.js && node --check public/runner/ui.mjs && node --check public/runner/engine.mjs && node --check public/local/combat.js && node --check public/local/connection.mjs && node --check public/local/session.mjs && node --check public/local/ui.mjs && node --check public/local/offline.mjs && node --check public/service-worker.js"
+  },
+  "devDependencies": {
+    "jsqr": "1.4.0",
+    "qrcode-generator": "2.0.4"
   }
 }

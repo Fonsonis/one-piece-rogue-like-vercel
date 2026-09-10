@@ -2,7 +2,38 @@
 
 Juego fan de One Piece, sin ánimo de lucro. La edición Egghead actualiza el balance y la interfaz, conservando música, sprites, 457 personajes, 11 sagas, 57 islas, 140 logros y el minijuego Luffy Run de la versión mejorada.
 
-Todo se ejecuta en el navegador. No necesita Next.js, Cloudflare, cuentas, cookies de sesión, API, base de datos, Vercel Blob ni otro servicio de almacenamiento. No tiene dependencias npm; Node.js solo se utiliza para preparar los archivos y probarlos.
+Todo se ejecuta en el navegador. No necesita Next.js, Cloudflare, cuentas, cookies de sesión, API, base de datos, Vercel Blob ni otro servicio de almacenamiento. Node.js solo prepara los archivos y las pruebas. Las dos bibliotecas QR se incluyen localmente y sus versiones están fijadas como dependencias de desarrollo.
+
+## Multijugador local por QR
+
+Desde el menú principal, **Multijugador local** permite jugar con dispositivos en la misma Wi-Fi o punto de acceso, sin servidor de salas, señalización externa, STUN ni TURN. WebRTC usa exclusivamente candidatos directos. El navegador del anfitrión coordina la sesión y resuelve el combate.
+
+- **Duelo PvP:** dos jugadores, con equipos de 1, 3 o 6 nakamas.
+- **Torneo:** 3–8 jugadores, equipos de 1, 3 o 6, eliminación directa y sorteo inicial. Se asignan pases para completar el cuadro y los empates se repiten. Los cruces de una ronda se ejecutan en paralelo en el anfitrión; cada jugador ve su combate y los demás pueden observar. El anfitrión inicia cada ronda.
+- **Alianza contra un yonko:** 2–8 jugadores, equipos de 1, 3 o 6. Kaido, Big Mom, Shanks, Teach o Newgate. Cada jugador vivo actúa con su nakama activo y recibe una respuesta del jefe. PS del jefe = PS base a nivel 30 × jugadores × tamaño de equipo × 2,5; ATQ/ESP_ATQ = base × (1,25 + 0,12 × jugadores); defensas × 1,15. Es un balance inicial, sujeto a ajuste con partidas reales.
+
+Todos eligen del catálogo completo a nivel 30, sin mejoras permanentes. Los ataques se eligen automáticamente con las reglas originales; cada jugador puede ordenar la definitiva de su nakama activo para la siguiente ronda. La partida local no concede EXP, fama ni desbloqueos, y no modifica el viaje de historia ni su JSON. El anfitrión controla la simulación: son partidas amistosas, sin clasificación certificada.
+
+### Emparejar cada invitado
+
+1. Ambos abren el juego por HTTPS, conectados a la misma red local. No funciona la cámara en una URL HTTP de la LAN; localhost sí sirve para desarrollo en un solo equipo.
+2. El anfitrión crea la sala, elige modo/tamaño y pulsa **Invitar por QR**.
+3. El invitado pulsa **Unirse por QR** y escanea **dentro del juego** la invitación.
+4. El invitado muestra su QR de respuesta y el anfitrión lo escanea. Son dos intercambios, no un enlace a una web.
+5. Si el código ocupa varias imágenes, se alternan automáticamente. Mantén la cámara apuntando hasta completar todas; también hay controles manuales y lectura de imágenes. Copiar/pegar el código completo es una alternativa.
+6. Repite para los demás invitados. Cada invitación admite una sola conexión. Todos eligen equipo y pulsan **Estoy listo**; el anfitrión comienza.
+
+Mantened las pantallas encendidas y el juego visible. La partida se pausa cuando falta un participante activo o el anfitrión está en segundo plano. Una interrupción breve se recupera si WebRTC mantiene el canal; cerrar, recargar o perder definitivamente el canal requiere crear otra sala. No hay migración de anfitrión ni recuperación de estas sesiones desde disco. En la sala se puede retirar a un invitado desconectado e invitarlo de nuevo.
+
+Las redes de invitados con aislamiento, VPN, restricciones de red local y ciertos puntos de acceso/navegadores pueden impedir la conexión. No se usa ningún servidor de retransmisión como alternativa. Verificado con navegadores aislados en un equipo; probar también entre móviles reales en la red objetivo antes de anunciar compatibilidad general.
+
+### Abrir el juego sin internet
+
+En el menú, **Preparar juego sin internet → Descargar / actualizar** almacena los recursos (~86 MB) en ese navegador. Espera la confirmación de descarga completa. Después abre **la misma dirección**; para multijugador sigue haciendo falta una red local, aunque no tenga acceso a internet. Una copia descargada se sirve desde caché sin consultar servicios de fuentes externos. Las actualizaciones se descargan con el mismo botón; una descarga fallida conserva la copia anterior.
+
+El navegador puede desalojar los recursos por falta de espacio. Conserva una exportación JSON independiente del progreso. Esta función registra un service worker únicamente al solicitar la descarga; no precarga archivos ni sustituye el guardado sin pulsar el botón.
+
+Detalles y pruebas: `public/local/`, `tests/local-multiplayer.test.mjs` y la prueba opcional de navegadores `tests/browser-local.mjs` (requiere Playwright y Chrome; rutas configurables con `LOCAL_PLAYWRIGHT_PATH`, `LOCAL_CHROME_PATH`, `LOCAL_TEST_URL`).
 
 ## Edición Egghead
 
