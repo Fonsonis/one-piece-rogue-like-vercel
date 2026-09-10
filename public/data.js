@@ -184,6 +184,7 @@ const MOVES = {
 
 // ============ PERSONAJES ============
 // base: [hp, atk, def, spd] a nivel 5 aprox
+const EVOLUTION_LEVELS = Object.freeze({animal:20, hybrid:25, awakened:40, gear4:40, gear5:50});
 const CHARS = {
   // --- Iniciales ---
   luffy: {
@@ -203,21 +204,21 @@ const CHARS = {
   luffy3: {
     name: 'Luffy Gear 3', emoji: '👒', types: ['Golpe', 'Fruta'],
     base: [34, 19, 12, 15], rareza: 3,
-    learnset: [[30, 'hakiarm'], [35, 'gigantpistol'], [45, 'elephantgun']],
-    evo: { lvl: 70, to: 'luffy4' }, ultimate: 'elephantgatling',
-    desc: 'Gear Third: huesos inflados y puños gigantes. Gear Fourth al nivel 70.',
+    learnset: [[25, 'gigantpistol'], [30, 'hakiarm'], [35, 'elephantgun']],
+    evo: { lvl: EVOLUTION_LEVELS.gear4, to: 'luffy4' }, ultimate: 'elephantgatling',
+    desc: 'Gear Third: huesos inflados y puños gigantes. Gear Fourth al nivel 40.',
   },
   luffy4: {
     name: 'Luffy Gear 4', emoji: '👒', types: ['Golpe', 'Fruta', 'Haki'],
     base: [39, 23, 15, 19], rareza: 4,
-    learnset: [[70, 'konggun'], [70, 'hakiarm'], [80, 'culverin'], [90, 'kingkonggun']],
-    evo: { lvl: 100, to: 'luffy5' }, ultimate: 'kingkonggun',
-    desc: 'Boundman: músculos inflados y Haki de Armadura. Gear Fifth al nivel 100.',
+    learnset: [[40, 'konggun'], [40, 'hakiarm'], [44, 'culverin'], [48, 'kingkonggun']],
+    evo: { lvl: EVOLUTION_LEVELS.gear5, to: 'luffy5' }, ultimate: 'kingkonggun',
+    desc: 'Boundman: músculos inflados y Haki de Armadura. Gear Fifth al nivel 50.',
   },
   luffy5: {
     name: 'Luffy Gear 5', emoji: '☀️', types: ['Golpe', 'Fruta', 'Haki'],
     base: [44, 27, 18, 23], rareza: 5,
-    learnset: [[100, 'dawnwhip'], [100, 'stargun']], ultimate: 'bajranggun',
+    learnset: [[50, 'dawnwhip'], [50, 'stargun']], ultimate: 'bajranggun',
     desc: 'El despertar de Nika: libertad, goma y los tambores de la liberación.',
   },
   zoro: {
@@ -250,27 +251,27 @@ const CHARS = {
   coby: {
     name: 'Coby', emoji: '🧢', types: ['Golpe'],
     base: [18, 8, 7, 8], rareza: 1,
-    learnset: [[1, 'punetazo'], [10, 'cabezazo'], [18, 'karatepez']],
-    evo: { lvl: 16, to: 'coby2' },
+    learnset: [[1, 'punetazo'], [10, 'cabezazo'], [20, 'karatepez']],
+    evo: { lvl: 20, to: 'coby2' },
     desc: 'Un chico miedoso que sueña con ser almirante.',
   },
   coby2: {
     name: 'Coby Marine', emoji: '⚓', types: ['Golpe', 'Haki'],
     base: [24, 12, 10, 11], rareza: 2,
-    learnset: [[16, 'karatepez'], [26, 'hakiarm']],
+    learnset: [[20, 'karatepez'], [26, 'hakiarm']],
     desc: 'Entrenado por la Marina. Ya no tiembla (casi).',
   },
   usopp: {
     name: 'Usopp', emoji: '🎯', types: ['Disparo'],
     base: [19, 10, 6, 11], rareza: 2,
     learnset: [[1, 'tirachinas'], [8, 'estrellafuego'], [15, 'estrellaplomo'], [24, 'kabuto']],
-    evo: { lvl: 22, to: 'usopp2' },
+    evo: { lvl: 20, to: 'usopp2' },
     desc: 'Francotirador mentiroso con 8000 seguidores.',
   },
   usopp2: {
     name: 'Sogeking', emoji: '🎭', types: ['Disparo', 'Fuego'],
     base: [25, 14, 8, 13], rareza: 3,
-    learnset: [[22, 'kabuto'], [30, 'estrellafuego']],
+    learnset: [[20, 'kabuto'], [30, 'estrellafuego']],
     desc: 'El rey de los francotiradores, venido de la isla de los tiradores.',
   },
   sanji: {
@@ -1238,6 +1239,76 @@ const BOSS_ALIASES = { kingbaum2: 'brulee', speed2: 'holdem' };
 
 // Las formas evolucionadas nunca aparecen como encuentros (sus movimientos
 // empiezan a nivel alto y saldrían sin ataques)
+// Formas mostradas de los usuarios Zoan del catálogo. No se inventan despertares.
+// Chopper ya comienza en Brain Point (híbrida); Heavy Point es su siguiente forma de combate.
+const ZOAN_FORMS = {
+  chopper: [['animal','Walk Point'],['hybrid','Heavy Point'],['monster','Monster Point']],
+  lucci: [['animal','Leopardo'],['hybrid','Leopardo híbrido'],['awakened','Leopardo despertado']],
+  kaku: [['animal','Jirafa'],['hybrid','Jirafa híbrida'],['awakened','Jirafa despertada']],
+  kaido: [['animal','Dragón azul'],['hybrid','Dragón híbrido']],
+  yamato: [['animal','Ōkuchi no Makami'],['hybrid','Makami híbrido']],
+  king: [['animal','Pteranodon'],['hybrid','Pteranodon híbrido']],
+  queen: [['animal','Brachiosaurus'],['hybrid','Brachiosaurus híbrido']],
+  marco: [['animal','Fénix'],['hybrid','Fénix híbrido']],
+  chaka: [['animal','Chacal'],['hybrid','Chacal híbrido']],
+  pell: [['animal','Halcón'],['hybrid','Halcón híbrido']],
+  dalton: [['animal','Bisonte'],['hybrid','Bisonte híbrido']],
+  merrychristmas: [['animal','Topo'],['hybrid','Topo híbrido']],
+  jabra: [['animal','Lobo'],['hybrid','Lobo híbrido']],
+  sandersonia: [['animal','Anaconda'],['hybrid','Anaconda híbrida']],
+  marigold: [['animal','Cobra real'],['hybrid','Cobra híbrida']],
+  sengoku: [['animal','Daibutsu']],
+  momonosuke: [['animal','Dragón rosa']],
+  drake: [['animal','Allosaurus'],['hybrid','Allosaurus híbrido']],
+  orochi: [['animal','Yamata no Orochi'],['hybrid','Orochi híbrido']],
+  jack: [['animal','Mamut'],['hybrid','Mamut híbrido']],
+  ulti: [['animal','Pachycephalosaurus'],['hybrid','Pachycephalosaurus híbrida']],
+  pageone: [['animal','Spinosaurus'],['hybrid','Spinosaurus híbrido']],
+  whoswho: [['animal','Tigre dientes de sable'],['hybrid','Tigre híbrido']],
+  sasaki: [['animal','Triceratops'],['hybrid','Triceratops híbrido']],
+  blackmaria: [['animal','Rosamygale'],['hybrid','Rosamygale híbrida']],
+  devon: [['animal','Zorro de nueve colas'],['hybrid','Zorro híbrido']],
+  stronger: [['animal','Pegaso']],
+  onigumo: [['hybrid','Transformación parcial de araña']],
+  pierre: [['animal','Caballo'],['hybrid','Pegaso moteado']],
+  pekoms: [['animal','Tortuga'],['hybrid','Caparazón defensivo']],
+  morgans: [['animal','Albatros'],['hybrid','Albatros híbrido']],
+  tamago: [['animal','Vizconde Hiyoko'],['hybrid','Conde Niwatori']],
+};
+const ZOAN_FORM_LEVELS = {...EVOLUTION_LEVELS, monster:40};
+for (const [baseId, forms] of Object.entries(ZOAN_FORMS)) {
+  const base = CHARS[baseId];
+  base.zoan = true;
+  let previous = base;
+  for (const [kind,label] of forms) {
+    const id = `${baseId}-${kind}`, lvl = ZOAN_FORM_LEVELS[kind];
+    const rank = kind === 'animal' ? 1 : kind === 'hybrid' ? 2 : 3;
+    const signature = base.ultimate || base.learnset.at(-1)[1];
+    // Each form owns its learnset and signature; later forms cannot leak through base-level grinding.
+    const moveId = `zoan_${baseId}_${kind}`;
+    MOVES[moveId] = {name:label, type:base.types[0], power:55 + rank * 10, acc:.95};
+    const special = kind === 'monster' ? 'monsterpoint' : signature;
+    CHARS[id] = {
+      ...base, name:`${base.name} · ${label}`, base:base.base.map((n,i)=>n + rank * (i === 0 ? 3 : 1)),
+      types:[...base.types], learnset:[[lvl,moveId],[lvl,special]],
+      ultimate:special, evo:undefined, generated:false, zoanBase:baseId, zoanForm:kind, formLevel:lvl,
+      desc:`${label}. ${baseId === 'tamago' ? 'Etapa del ciclo huevo, pollito y gallo; adaptada a la progresión por nivel.' : kind === 'monster' ? 'Forma especial mediante Rumble Ball.' : kind === 'awakened' ? 'Despertar Zoan confirmado.' : 'Transformación Zoan.'} Requiere nivel base y nivel en partida ${lvl}.`,
+    };
+    previous.evo = {lvl,to:id};
+    previous = CHARS[id];
+  }
+}
+// Minotauros solo se ha mostrado como bestia carcelera despertada: conservar su identidad,
+// sin inventar una forma humana ni un animal previo desbloqueable.
+CHARS.minotauros.zoan = true;
+CHARS.minotauros.zoanForm = 'awakened';
+CHARS.minotauros.desc = 'Bestia carcelera Zoan despertada de Impel Down. No se conocen sus formas anteriores.';
+// Monster Point se reserva para su forma, también al usar la definitiva en una partida de nivel alto.
+for (const id of ['chopper','chopper-animal','chopper-hybrid']) {
+  CHARS[id].learnset = CHARS[id].learnset.filter(([,m])=>m !== 'monsterpoint');
+  CHARS[id].ultimate = 'cabezazo';
+}
+SIGNATURE_MOVES.chopper = CHARS.chopper.ultimate;
 const EVOLVED_FORMS = new Set(Object.values(CHARS).filter(c => c.evo).map(c => c.evo.to));
 
 // ============ EXTENSIÓN DE STATS ============
@@ -1285,6 +1356,7 @@ const SAGA_FIXES = {
   oimo: 'egghead', kashi: 'egghead',
 };
 for (const [id, s] of Object.entries(SAGA_FIXES)) if (CHARS[id]) CHARS[id].saga = s;
+for (const c of Object.values(CHARS)) if (c.zoanBase) c.saga = CHARS[c.zoanBase].saga;
 // 'whitebeard2' era un duplicado sin nombre de Barbablanca: newgate ocupa su sitio
 delete CHARS.whitebeard2;
 

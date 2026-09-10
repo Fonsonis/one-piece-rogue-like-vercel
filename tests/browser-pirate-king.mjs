@@ -14,7 +14,7 @@ try {
   });
   await page.reload();
   assert.equal(await page.evaluate(()=>meta.roster.includes('naruto')),false);
-  assert.equal(await page.evaluate(()=>Object.keys(CHARS).length),434);
+  assert.equal(await page.evaluate(()=>Object.keys(CHARS).length),497);
   await page.locator('#btn-king-rewards').click();
   assert.equal(await page.locator('[data-legendary]').count(),1);
   await page.locator('[data-legendary="lucci"]').click();

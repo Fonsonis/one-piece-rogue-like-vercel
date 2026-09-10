@@ -1,6 +1,6 @@
 # Evoluciones por nivel base, Crossguild y Gear 3
 
-Todas las cadenas de evolución requieren alcanzar su umbral tanto en el nivel base comprado como en el nivel de partida. Luffy: 20/35/70/100; Zoro y Nami: 20; Coby: 16; Usopp: 22. Subir por EXP o fusionar no compra niveles base. La definitiva se sigue habilitando a nivel de partida 20, usando una técnica disponible para la forma actual.
+Todas las cadenas de evolución requieren alcanzar su umbral tanto en el nivel base comprado como en el nivel de partida. Luffy: 20/25/40/50; Zoro, Nami, Coby y Usopp: 20. Zoan: animal 20, híbrida 25 y despertar 40 cuando existe. Subir por EXP o fusionar no compra niveles base. La definitiva se sigue habilitando a nivel de partida 20, usando una técnica disponible para la forma actual.
 
 Reclutas, inicios de partida, Torre y guardados aplican la misma regla. Importar utiliza los niveles del perfil importado. La migración mantiene EXP, mejoras, fusiones y KO; ajusta la diferencia de estadísticas entre formas. Los enemigos y las consultas explícitas de formas en el Dex mantienen sus formas.
 

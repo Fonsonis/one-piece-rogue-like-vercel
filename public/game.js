@@ -29,7 +29,7 @@ function formMovesAt(id, lvl, exactForm = false, progress = meta) {
 function syncEvolution(f, progress = meta) {
   if (!CHARS[f.id] || !CHARS[baseFormOf(f.id)].evo) return f;
   const old = CHARS[f.id], nextId = evolutionFormAt(f.id, f.lvl, progress), next = CHARS[nextId];
-  if (f.id === nextId && f.evolutionRulesVersion === 1) return f;
+  if (f.id === nextId && f.evolutionRulesVersion === 2) return f;
   // Apply only the base-stat difference, preserving equipment, fusion and event bonuses.
   const deltaHP = hpAt(next.base[0], f.lvl) - hpAt(old.base[0], f.lvl);
   f.maxhp += deltaHP;
@@ -39,7 +39,7 @@ function syncEvolution(f, progress = meta) {
   });
   f.id = nextId;
   f.moves = formMovesAt(nextId, f.lvl, false, progress);
-  f.evolutionRulesVersion = 1;
+  f.evolutionRulesVersion = 2;
   return f;
 }
 
@@ -736,7 +736,7 @@ function makeChar(id, lvl, isEnemy = false, exactForm = false) {
     spd: Math.floor(statAt(c.base[5], lvl) * diffMult),
     atkBonus: 0, defBonus: 0, spatkBonus: 0, spdefBonus: 0,
     xp: 0, moves, ultCharge: 0, moveRulesVersion: 2,
-    ...(!isEnemy && !exactForm ? {evolutionRulesVersion:1} : {}),
+    ...(!isEnemy && !exactForm ? {evolutionRulesVersion:2} : {}),
   };
 }
 // Aplica las mejoras permanentes del Barco (solo a personajes del jugador)

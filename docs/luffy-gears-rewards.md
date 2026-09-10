@@ -14,9 +14,9 @@ Berries por victoria: piratas 80–160 (antes 40–110), patrullas Marine 240–
 |---|---|---|---|
 | Luffy | Inicial | 1 | 24/12/8/10/7/10 (sin cambios) |
 | Gear 2 | 20 | 2 | 30/16/10/14/9/15 (sin cambios) |
-| Gear 3 | 35 | 3 | 34/19/12/17/11/15 |
-| Gear 4 | 70 | 4 | 39/23/15/21/14/19 |
-| Gear 5 | 100 | 5 | 44/27/18/25/17/23 |
+| Gear 3 | 25 | 3 | 34/19/12/17/11/15 |
+| Gear 4 | 40 | 4 | 39/23/15/21/14/19 |
+| Gear 5 | 50 | 5 | 44/27/18/25/17/23 |
 
 El límite sube de 99 a 100. Las formas comparten mejoras, pasiva y fusiones bajo Luffy. La evolución por EXP, el inicio con niveles comprados, el inventario y las fusiones resuelven la cadena completa. El Dex conserva la forma explícita que se consulta. Los guardados anteriores se migran una vez, ajustando únicamente diferencias de stats base y técnicas: conservan EXP, bonificaciones, fusiones, KO y daño recibido.
 
