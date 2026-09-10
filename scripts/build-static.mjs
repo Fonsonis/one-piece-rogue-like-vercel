@@ -2,6 +2,7 @@ import { cpSync, copyFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import './prepare-offline.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
 const source = join(root, 'public');

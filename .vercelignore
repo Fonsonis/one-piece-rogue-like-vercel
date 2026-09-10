@@ -8,3 +8,7 @@ outputs
 dist
 tests
 docs
+work
+.claude
+.codex
+.agents

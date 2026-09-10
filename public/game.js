@@ -2104,6 +2104,8 @@ function screenHome() {
       </div>
     </div>
     <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? 'Doble salto · 25 fama cada 1.000 m' : '🔒 Se desbloquea al nivel 1 de cuenta'}</small></span></button>
+    <button class="local-menu-button" id="btn-local"><span aria-hidden="true">⚔️</span><span><strong>MULTIJUGADOR LOCAL</strong><small>Duelo · Torneo · Alianza contra un yonko · Conexión por QR</small></span></button>
+    <div style="text-align:center;margin:12px 0"><button class="btn gray small" id="btn-offline">⬇ Preparar juego sin internet</button></div>
     <div class="home-main-buttons">
       <button class="btn blue small" id="btn-dex">
         <span>📖 Dex</span>
@@ -2149,6 +2151,16 @@ function screenHome() {
     </div>
   `);
   $('#mode-story').onclick = () => run ? screenMap() : screenSagas();
+  $('#btn-local').onclick = async () => {
+    const btn = $('#btn-local'); btn.disabled = true;
+    try { const { openLocal } = await import('./local/ui.mjs'); await openLocal(); }
+    catch (e) { toast('No se pudo abrir el modo local. Recarga el juego e inténtalo de nuevo.'); }
+    finally { btn.disabled = false; }
+  };
+  $('#btn-offline').onclick = async () => {
+    try { const { prepareOffline } = await import('./local/offline.mjs'); await prepareOffline(); }
+    catch (e) { toast(e.message || 'No se pudo preparar la copia sin conexión.'); }
+  };
   if (towerUnlocked) $('#mode-tower').onclick = () => screenTowerIntro();
   if (challengeUnlocked) $('#mode-challenge').onclick = () => screenChallenges();
   $('#btn-runner').onclick = async () => {
@@ -6264,6 +6276,11 @@ function refreshControls() {
 }
 
 function log(msg) {
+  if (battle?.opts?.local) {
+    battle.lines.push(msg.replace(/<[^>]*>/g, ''));
+    battle.lines = battle.lines.slice(-12);
+    return;
+  }
   const el = $('#battle-log');
   if (!el) return;
   const follow = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
@@ -6287,6 +6304,7 @@ function keepActiveFightersVisible() {
 
 function refreshHPCards() {
   if (!battle) return;
+  if (battle.opts?.local) return;
   for (const side of ['p', 'e']) {
     const count = $(`#count-${side}`);
     if (count) count.textContent = battleTeamCount(side);
@@ -6463,6 +6481,7 @@ function calcDamage(att, dfd, mv, crit, variance) {
 }
 
 function popDamage(who, text, color) {
+  if (battle?.opts?.local) return;
   // localiza la carta activa del lado golpeado
   const side = who === 'enemy' ? 'e' : 'p';
   const team = side === 'e' ? battle.eTeam : battle.pTeam;
@@ -6550,7 +6569,7 @@ function attackWith(att, dfd, mv, targetSide) {
   if (dmg > 0) dfd.st.receivedHit = true;
   if (passiveRule(att).slow) dfd.st.slow = 2;
   // Recarga de Ultimate al golpear al enemigo (para personajes de nivel base >= 20)
-  if (att && att.lvl >= 20 && (b.pTeam.includes(att) || (enemyUltimatesEnabled(b) && b.eTeam.includes(att)))) {
+  if (att && att.lvl >= 20 && (b.opts?.local || b.pTeam.includes(att) || (enemyUltimatesEnabled(b) && b.eTeam.includes(att)))) {
     att.ultCharge = Math.min(100, (att.ultCharge || 0) + 34);
   }
   let txt = `${attName} usa <b>${mv.name}</b>. `;
@@ -6590,6 +6609,7 @@ function attackWith(att, dfd, mv, targetSide) {
 
 function scheduleRound(delay) {
   if (!battle || battle.over) return;
+  if (battle.opts?.local) return;
   clearTimeout(battle.timer);
   battle.timer = setTimeout(runRound, (delay == null ? 1200 : delay) / battle.speed);
 }
@@ -6650,8 +6670,9 @@ function runRound() {
 function afterRound() {
   const b = battle;
   if (!b || b.over) return;
+  const actors = b.opts?.local && b.localActors ? b.localActors : [b.curP, b.curE];
   // Daño residual de estados y expiración de contadores
-  for (const f of [b.curP, b.curE]) {
+  for (const f of actors) {
     if (!f || !f.st) continue;
     if (f.hp > 0 && f.st.burn) {
       const d = Math.max(1, Math.floor(f.maxhp * (f.st.burnRate || .03)));
@@ -6668,10 +6689,10 @@ function afterRound() {
     if (f.st.gust && --f.st.gust <= 0) { delete f.st.gust; delete f.st.gustBonus; }
   }
   // Resolución simultánea: nadie revive por drenaje ni ataca tras caer.
-  const actors = [b.curP, b.curE];
+  const targets = actors.map(act => b.pTeam.includes(act) ? b.curE : b.curP);
   const hpDelta = actors.map((act, i) => {
     if (!act || act.hp <= 0) return 0;
-    const team = teamOf(act), foe = actors[1-i];
+    const team = teamOf(act), foe = targets[i];
     if (!foe || foe.hp <= 0) return 0;
     const drain = Math.min(foe.hp, Math.floor(foe.maxhp * (passiveRule(act).drain || 0)));
     let heal = passiveRule(act).regen || 0;
@@ -6685,7 +6706,8 @@ function afterRound() {
   });
   actors.forEach((act,i) => {
     if (!act || act.hp <= 0) return;
-    act.hp = Math.max(0, Math.min(act.maxhp, act.hp + (hpDelta[i].heal || 0)) - (hpDelta[1-i].drain || 0));
+    const drained = actors.reduce((sum, other, j) => sum + (targets[j] === act ? hpDelta[j].drain || 0 : 0), 0);
+    act.hp = Math.max(0, Math.min(act.maxhp, act.hp + (hpDelta[i].heal || 0)) - drained);
     // Límite independiente de precisión, inmunidades y azar: desgaste de ambos activos.
     if (b.round >= 30 && act.hp > 0) {
       const fatigue = Math.max(1, Math.ceil(act.maxhp * Math.min(.5, .05 * (b.round - 29))));
@@ -6696,7 +6718,7 @@ function afterRound() {
   const checkRevive = f => {
     if (!f || f.hp > 0) return;
     const isPlayer = b.pTeam.includes(f) || (run && run.team && run.team.includes(f));
-    if (isPlayer && run && run.mode === 'nuzlocke' && !b.tower) return; // En Nuzlocke los aliados no sobreviven ni reviven
+    if (!b.opts?.local && isPlayer && run && run.mode === 'nuzlocke' && !b.tower) return; // En Nuzlocke los aliados no sobreviven ni reviven
     if (isP(f, 'brook') && !f.reviveUsed) {
       f.reviveUsed = true;
       f.hp = Math.max(1, Math.floor(f.maxhp * 0.2));
@@ -6705,11 +6727,12 @@ function afterRound() {
     }
     const guardTeam = teamOf(f).map(ally => ally === f ? {...ally, hp:1} : ally);
     if (synergyTier(guardTeam, 'Nakama') === 2) {
-      const used = isPlayer
+      const used = b.opts?.local ? b.localGuard[isPlayer ? 'p' : 'e'] : isPlayer
         ? (b.tower ? tower && tower.nakamaGuardUsed : run && run.nakamaGuardUsed)
         : b.eGuardUsed;
       if (!used) {
-        if (isPlayer) { if (b.tower && tower) tower.nakamaGuardUsed = true; else if (run) { run.nakamaGuardUsed = true; saveRun(); } }
+        if (b.opts?.local) b.localGuard[isPlayer ? 'p' : 'e'] = true;
+        else if (isPlayer) { if (b.tower && tower) tower.nakamaGuardUsed = true; else if (run) { run.nakamaGuardUsed = true; saveRun(); } }
         else b.eGuardUsed = true;
         f.hp = 1;
         log(`🏴‍☠️ ¡Espíritu de Tripulación! ${charName(f)} resiste con ${f.hp} PS.`);
@@ -6718,6 +6741,18 @@ function afterRound() {
   };
   [...b.pTeam, ...b.eTeam].forEach(checkRevive);
   const deadE = b.curE.hp <= 0, deadP = b.curP.hp <= 0;
+  // Las partidas locales nunca conceden EXP, modifican el viaje ni escriben el guardado.
+  if (b.opts?.local) {
+    b.curP = activeP(); b.curE = activeE();
+    if (!b.curP || !b.curE) {
+      b.over = true;
+      b.winner = b.curP ? 'p' : b.curE ? 'e' : 'draw';
+      log(b.winner === 'draw' ? '¡Empate!' : '¡Combate terminado!');
+    } else {
+      b.round++;
+    }
+    return;
+  }
   let changed = false;
 
   b.rewarded ||= new Set();
