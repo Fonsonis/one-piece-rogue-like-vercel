@@ -148,6 +148,14 @@ const MOVES = {
   ikoku:         { name: 'Ikoku',               type: 'Oscuridad', power: 130, acc: 0.8 },
   kamusarirojo:  { name: 'Kamusari Carmesí',    type: 'Haki',    power: 135, acc: 0.8 },
   blackhole:     { name: 'Black Hole',          type: 'Oscuridad', power: 125, acc: 0.85 },
+  gigantpistol:  { name: 'Gigant Pistol', type: 'Golpe', power: 100, acc: 0.9 },
+  elephantgun:   { name: 'Elephant Gun', type: 'Haki', power: 110, acc: 0.9 },
+  elephantgatling: { name: 'Elephant Gatling', type: 'Haki', power: 125, acc: 0.85 },
+  konggun:       { name: 'Kong Gun', type: 'Haki', power: 115, acc: 0.9 },
+  culverin:      { name: 'Culverin', type: 'Haki', power: 110, acc: 0.95 },
+  dawnwhip:      { name: 'Dawn Whip', type: 'Fruta', power: 120, acc: 0.9 },
+  stargun:       { name: 'White Star Gun', type: 'Haki', power: 135, acc: 0.85 },
+  bajranggun:    { name: 'Bajrang Gun', type: 'Haki', power: 150, acc: 0.85 },
   // --- Compendio: facciones ---
   shambles:      { name: 'Shambles',            type: 'Fruta',   power: 85, acc: 0.95 },
   gammaknife:    { name: 'Gamma Knife',         type: 'Fruta',   power: 110, acc: 0.85 },
@@ -180,16 +188,37 @@ const CHARS = {
   // --- Iniciales ---
   luffy: {
     name: 'Luffy', emoji: '👒', types: ['Golpe', 'Fruta'],
-    base: [24, 12, 8, 10], rareza: 3,
-    learnset: [[1, 'pistolagoma'], [8, 'bazookagoma'], [13, 'gatlinggoma'], [26, 'kingkonggun']],
-    evo: { lvl: 20, to: 'luffy2' },
+    base: [24, 12, 8, 10], rareza: 1,
+    learnset: [[1, 'pistolagoma'], [8, 'bazookagoma'], [13, 'gatlinggoma']],
+    evo: { lvl: 20, to: 'luffy2' }, ultimate: 'gatlinggoma',
     desc: 'Chico de goma que quiere ser Rey de los Piratas.',
   },
   luffy2: {
-    name: 'Luffy: Gears y Haki', emoji: '👒', types: ['Golpe', 'Fruta'],
-    base: [30, 16, 10, 15], rareza: 4,
-    learnset: [[20, 'jetpistol'], [30, 'hakiarm'], [38, 'kingkonggun']],
-    desc: 'Gear Second al nivel 20, Armadura al 30 y Gear Fourth al 38.',
+    name: 'Luffy Gear 2', emoji: '👒', types: ['Golpe', 'Fruta'],
+    base: [30, 16, 10, 15], rareza: 2,
+    learnset: [[13, 'gatlinggoma'], [20, 'jetpistol'], [30, 'hakiarm']],
+    evo: { lvl: 25, to: 'luffy3' }, ultimate: 'jetgatling',
+    desc: 'Gear Second: velocidad y vapor. Gear Third al nivel 25.',
+  },
+  luffy3: {
+    name: 'Luffy Gear 3', emoji: '👒', types: ['Golpe', 'Fruta'],
+    base: [34, 19, 12, 15], rareza: 3,
+    learnset: [[30, 'hakiarm'], [35, 'gigantpistol'], [45, 'elephantgun']],
+    evo: { lvl: 70, to: 'luffy4' }, ultimate: 'elephantgatling',
+    desc: 'Gear Third: huesos inflados y puños gigantes. Gear Fourth al nivel 70.',
+  },
+  luffy4: {
+    name: 'Luffy Gear 4', emoji: '👒', types: ['Golpe', 'Fruta', 'Haki'],
+    base: [39, 23, 15, 19], rareza: 4,
+    learnset: [[70, 'konggun'], [70, 'hakiarm'], [80, 'culverin'], [90, 'kingkonggun']],
+    evo: { lvl: 100, to: 'luffy5' }, ultimate: 'kingkonggun',
+    desc: 'Boundman: músculos inflados y Haki de Armadura. Gear Fifth al nivel 100.',
+  },
+  luffy5: {
+    name: 'Luffy Gear 5', emoji: '☀️', types: ['Golpe', 'Fruta', 'Haki'],
+    base: [44, 27, 18, 23], rareza: 5,
+    learnset: [[100, 'dawnwhip'], [100, 'stargun']], ultimate: 'bajranggun',
+    desc: 'El despertar de Nika: libertad, goma y los tambores de la liberación.',
   },
   zoro: {
     name: 'Zoro', emoji: '🗡️', types: ['Corte'],
@@ -636,16 +665,18 @@ const CHARS = {
 
 // ============ OBJETOS ============
 const ITEMS = {
-  carne:        { name: 'Carne',              emoji: '🍖', desc: 'Restaura 30 PS.', price: 100, kind: 'heal', val: 30 },
-  carnereal:    { name: 'Carne Real',         emoji: '🍗', desc: 'Restaura 80 PS.', price: 250, kind: 'heal', val: 80 },
-  bocadillo:    { name: 'Plato de Sanji',     emoji: '🍱', desc: 'Restaura todos los PS.', price: 500, kind: 'heal', val: 9999 },
-  sake:         { name: 'Sake de Binks',      emoji: '🍶', desc: 'Revive a un nakama con la mitad de PS.', price: 400, kind: 'revive', val: 0.5 },
-  cartel:       { name: 'Cartel de Recluta',  emoji: '📜', desc: 'Al tentar la suerte, rompe 1 cadena garantizada.', price: 150, kind: 'ball', val: 1 },
-  carteldorado: { name: 'Cartel Dorado',      emoji: '🏅', desc: 'Al tentar la suerte, rompe 2 cadenas garantizadas.', price: 350, kind: 'ball', val: 2 },
-  cartelbuster: { name: 'Buster Call',        emoji: '📯', desc: 'Rompe las 3 cadenas: reclutamiento garantizado.', price: 800, kind: 'ball', val: 3.5 },
-  proteina:     { name: 'Proteína de Franky', emoji: '🥤', desc: '+2 ATQ permanente al nakama activo.', price: 600, kind: 'boost', stat: 1 },
-  hierro:       { name: 'Placa de Hierro',    emoji: '🛡️', desc: '+2 DEF permanente al nakama activo.', price: 600, kind: 'boost', stat: 2 },
-  fruta_diablo: { name: 'Fruta del Diablo',   emoji: '🍈', desc: 'Concede un nuevo Tag/Sinergia elemental a 2 nakamas activos.', price: 1000, kind: 'fruta' },
+  carne:        { slotSize: 1, name: 'Carne',              emoji: '🍖', desc: 'Restaura 30 PS.', price: 100, kind: 'heal', val: 30 },
+  carnereal:    { slotSize: 2, name: 'Carne Real',         emoji: '🍗', desc: 'Restaura 80 PS.', price: 250, kind: 'heal', val: 80 },
+  bocadillo:    { slotSize: 3, name: 'Plato de Sanji',     emoji: '🍱', desc: 'Restaura todos los PS.', price: 500, kind: 'heal', val: 9999 },
+  sake:         { slotSize: 4, name: 'Sake de Binks',      emoji: '🍶', desc: 'Revive a un nakama con la mitad de PS.', price: 400, kind: 'revive', val: 0.5 },
+  bebida_ataque: { slotSize: 2, name: 'Bebida de Ataque', emoji: '🥤', desc: '+25% de ataque físico y especial al nakama activo hasta el final del combate. No se acumula.', price: 200, kind: 'battleBoost', stat: 'atk', val: 0.25 },
+  bebida_defensa: { slotSize: 2, name: 'Bebida de Defensa', emoji: '🧃', desc: '+25% de defensa física y especial al nakama activo hasta el final del combate. No se acumula.', price: 200, kind: 'battleBoost', stat: 'def', val: 0.25 },
+  cartel:       { slotSize: 1, name: 'Cartel de Recluta',  emoji: '📜', desc: 'Al tentar la suerte, rompe 1 cadena garantizada.', price: 150, kind: 'ball', val: 1 },
+  carteldorado: { slotSize: 1, name: 'Cartel Dorado',      emoji: '🏅', desc: 'Al tentar la suerte, rompe 2 cadenas garantizadas.', price: 350, kind: 'ball', val: 2 },
+  cartelbuster: { slotSize: 1, name: 'Buster Call',        emoji: '📯', desc: 'Rompe las 3 cadenas: reclutamiento garantizado.', price: 800, kind: 'ball', val: 3.5 },
+  proteina:     { slotSize: 1, name: 'Proteína de Franky', emoji: '🥤', desc: '+2 ATQ permanente al nakama activo.', price: 600, kind: 'boost', stat: 1 },
+  hierro:       { slotSize: 2, name: 'Placa de Hierro',    emoji: '🛡️', desc: '+2 DEF permanente al nakama activo.', price: 600, kind: 'boost', stat: 2 },
+  fruta_diablo: { slotSize: 2, name: 'Fruta del Diablo',   emoji: '🍈', desc: 'Concede un nuevo Tag/Sinergia elemental a 2 nakamas activos.', price: 1000, kind: 'fruta' },
 };
 
 // ============ SAGAS / ISLAS ============
@@ -1122,6 +1153,7 @@ defineGenChars('egghead', [
 defineGenChars('crossover', [
   // Naruto
   ['naruto', 'Naruto Uzumaki', '🍥', 4, ['Viento', 'Haki'], ''],
+  ['narutokurama', 'Naruto Modo Kurama', '🦊', 5, ['Viento', 'Haki'], ''],
   ['sasuke', 'Sasuke Uchiha', '🦅', 4, ['Rayo', 'Fuego'], ''],
   ['kakashi', 'Kakashi Hatake', '🐺', 4, ['Rayo', 'Corte'], ''],
   ['madara', 'Madara Uchiha', '🌒', 5, ['Fuego', 'Oscuridad'], 'b'],
@@ -1152,6 +1184,15 @@ defineGenChars('crossover', [
   ['garou', 'Garou', '🐺', 4, ['Golpe', 'Oscuridad'], ''],
   ['tatsumaki', 'Tatsumaki', '🌪️', 4, ['Viento', 'Haki'], ''],
 ]);
+
+CHARS.naruto.evo = {lvl:25, to:'narutokurama'};
+CHARS.naruto.desc = 'Ninja de Konoha. Desbloquea el Modo Kurama al nivel base 25.';
+CHARS.narutokurama.spriteId = 'naruto';
+CHARS.narutokurama.desc = 'Naruto y Kurama unen sus fuerzas y liberan el chakra del Nueve Colas.';
+MOVES.kuramarasengan = {name:'Rasengan de Kurama', type:'Viento', power:100, acc:.95};
+MOVES.bijudama = {name:'Bijūdama', type:'Haki', power:150, acc:.9};
+CHARS.narutokurama.learnset = [[1,CHARS.naruto.learnset[0][1]], [25,'kuramarasengan'], [40,'bijudama']];
+CHARS.narutokurama.ultimate = 'bijudama';
 
 // Series del evento: jefes posibles (bosses) y los 3 reclutas predefinidos (rewards)
 const CROSSOVER_SERIES = {

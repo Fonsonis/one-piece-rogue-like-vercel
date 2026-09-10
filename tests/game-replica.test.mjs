@@ -9,7 +9,7 @@ test('complete character database, all saga maps, moves, damage and Nuzlocke per
   vm.runInContext(fs.readFileSync('public/data.js','utf8'),ctx);
   vm.runInContext(fs.readFileSync('public/game.js','utf8').split('// ============ INICIO ============')[0],ctx);
   const stats=vm.runInContext(`(()=>{
-    if(Object.keys(CHARS).length!==457) throw Error('Missing characters');
+    if(Object.keys(CHARS).length!==461) throw Error('Missing characters');
     if(SAGAS.length!==11) throw Error('Missing sagas');
     for(const [id,c] of Object.entries(CHARS)) {
       const f=makeChar(id,5);
@@ -32,6 +32,6 @@ test('complete character database, all saga maps, moves, damage and Nuzlocke per
     loadRun();if(run.team[0].id!=='luffy') throw Error('Run restore failed');
     return {characters:Object.keys(CHARS).length,sagas:SAGAS.length,islands,achievements:getAchievementsInfo().totalAchievements};
   })()`,ctx);
-  assert.equal(stats.achievements,140);
+  assert.equal(stats.achievements,2403);
   console.log('Verified original game content:',stats);
 });

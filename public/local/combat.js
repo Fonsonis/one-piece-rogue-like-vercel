@@ -14,13 +14,13 @@ globalThis.LocalCombat = (() => {
   }
   function crew(player) {
     if (!validTeam(player.team, player.team.length)) throw new Error('Tripulación inválida.');
-    return player.team.map(id => ({ ...makeChar(id, 30), owner: player.id }));
+    return player.team.map(id => ({ ...makeChar(id, 30, false, true), owner: player.id }));
   }
   function create(players, options = {}) {
     if (players.length < 2 || players.length > 8) throw new Error('Se necesitan entre 2 y 8 jugadores.');
     const coop = options.mode === 'coop';
     const pTeam = coop ? players.flatMap(crew) : crew(players[0]);
-    const eTeam = coop ? [{ ...makeChar(options.boss || 'kaido', 30), owner: 'yonko' }] : crew(players[1]);
+    const eTeam = coop ? [{ ...makeChar(options.boss || 'kaido', 30, false, true), owner: 'yonko' }] : crew(players[1]);
     if (coop) {
       const strength = players.length * players[0].team.length;
       const boss = eTeam[0];

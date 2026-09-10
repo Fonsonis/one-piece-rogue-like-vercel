@@ -1,0 +1,4 @@
+import fs from 'node:fs';
+const catalog=JSON.parse(fs.readFileSync(new URL('../docs/world-location-catalog.json',import.meta.url),'utf8'));
+const display=Object.fromEntries(Object.entries(catalog).map(([key,rows])=>[key,rows.map(({artBrief,...row})=>row)]));
+fs.writeFileSync(new URL('../public/art/world-locations.js',import.meta.url),`/* Researched display metadata. Saga/index save keys and battle rules stay unchanged. */\n(()=>{\nconst catalog=${JSON.stringify(display,null,2)};\nfor(const saga of SAGAS){\n const places=catalog[saga.id];\n if(!places||places.length!==saga.islands.length)throw Error('World catalog mismatch: '+saga.id);\n saga.islands.forEach((island,index)=>{island.location=Object.freeze(places[index]);island.name=places[index].place+' · '+places[index].zone;});\n}\nglobalThis.WorldLocations=Object.freeze(catalog);\n})();\n`);

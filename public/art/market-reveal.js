@@ -10,12 +10,12 @@ const MarketReveal = (() => {
   ].map(Object.freeze);
   const escape = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const rarityOf = value => Math.max(1,Math.min(5,Math.floor(Number(value)||1)));
-  function show({host,name,rarity,portraitHTML,onComplete}) {
+  function show({host,name,rarity,portraitHTML,rewardText='',onComplete}) {
     const stars=rarityOf(rarity), tier=tiers[stars-1];
     const media=window.matchMedia('(prefers-reduced-motion: reduce)');
     host.classList.add('market-reveal-host');
     host.innerHTML=`<section class="modal market-reveal" data-rarity="${stars}" role="dialog" aria-modal="true" aria-label="Recluta de ${stars} estrellas" style="--reveal-color:${tier.color};--reveal-delay:${tier.delay}ms;--reveal-duration:${tier.duration}ms">
-      <header class="mr-heading"><span>MERCADO CLANDESTINO</span><p>${tier.hint}</p></header>
+      <header class="mr-heading"><span>CROSSGUILD</span><p>${tier.hint}</p></header>
       <div class="mr-scene">
         <div class="mr-effects" aria-hidden="true"><div class="mr-rays"></div><div class="mr-ring"></div><div class="mr-ring mr-ring-two"></div>
           <svg class="mr-haki" viewBox="0 0 500 380" preserveAspectRatio="none"><path d="M0 65 108 112 68 130 184 167 121 182 230 205M500 20 375 97 418 111 297 173 357 180 269 212M20 380 135 288 91 270 218 214M487 359 401 301 437 282 292 217"/></svg>
@@ -36,7 +36,7 @@ const MarketReveal = (() => {
     const skip=()=>{
       if(ended||ready)return;
       ready=true;clearTimeout(timer);panel.classList.add('mr-ready');
-      status.textContent=`${name} · ${stars} ${stars===1?'estrella':'estrellas'}`;
+      status.textContent=`${name} · ${stars} ${stars===1?'estrella':'estrellas'}${rewardText ? ` · ${rewardText}` : ''}`;
       button.textContent='CONTINUAR';
     };
     const cancel=()=>{if(ended)return;ended=true;cleanup();};

@@ -11,14 +11,39 @@
     for (const key of ['dex', 'recruited', 'roster', 'defeated', 'relics']) {
       if (data.meta[key] !== undefined && (!Array.isArray(data.meta[key]) || data.meta[key].some(id => typeof id !== 'string'))) throw new Error('Progreso inválido.');
     }
-    for (const key of ['wins', 'nuzWins', 'upgrades', 'global', 'stats', 'settings', 'sagaClears', 'sagaDiffWins', 'teamPresets', 'charUpgrades']) {
+    for (const key of ['wins', 'nuzWins', 'upgrades', 'global', 'stats', 'settings', 'sagaClears', 'sagaDiffWins', 'teamPresets', 'charUpgrades', 'islandProgress', 'sagaStats']) {
       if (data.meta[key] !== undefined && !record(data.meta[key])) throw new Error('Progreso inválido.');
     }
+    for (const islands of Object.values(data.meta.islandProgress || {})) {
+      if (!Array.isArray(islands) || islands.some(i=>!Number.isInteger(i) || i<0)) throw new Error('Progreso de islas inválido.');
+    }
+    for (const counters of Object.values(data.meta.sagaStats || {})) {
+      if (!record(counters) || Object.values(counters).some(n => !Number.isSafeInteger(n) || n < 0)) throw new Error('Contadores de saga inválidos.');
+    }
+    const bagTier = data.meta.global?.backpackTier;
+    if (bagTier !== undefined && (!Number.isInteger(bagTier) || bagTier < 0 || bagTier > 17)) throw new Error('Ampliación de mochila inválida.');
     for (const key of ['fame', 'accXp', 'towerRecord', 'runnerBest', 'logPoses', 'starPity', 'soloWins', 'totalIslands']) {
       if (data.meta[key] !== undefined && (!Number.isFinite(data.meta[key]) || data.meta[key] < 0)) throw new Error('Progreso inválido.');
     }
     if (data.run !== null && data.run !== undefined) {
       const r = data.run;
+      if (r?.backpackVersion !== undefined && r.backpackVersion !== 1) throw new Error('Mochila incompatible.');
+      if (r?.pendingLoot !== undefined && !record(r.pendingLoot)) throw new Error('Objetos pendientes inválidos.');
+      if (r?.bagLayout !== undefined && (!record(r.bagLayout) || Object.values(r.bagLayout).some(p=>!record(p) || !Number.isInteger(p.cell) || p.cell<0 || p.cell>=60 || typeof p.vertical!=='boolean'))) throw new Error('Distribución de mochila inválida.');
+      for (const inventory of [r?.items, r?.pendingLoot]) {
+        if (inventory && Object.values(inventory).some(n => !Number.isSafeInteger(n) || n < 0 || n > 100000)) throw new Error('Cantidad de objetos inválida.');
+      }
+      if (r?.startingTeam !== undefined && (!Array.isArray(r.startingTeam) || r.startingTeam.length < 1 || r.startingTeam.length > 6 || r.startingTeam.some(id => typeof id !== 'string'))) throw new Error('Equipo inicial inválido.');
+      if (r?.islandRepeat !== undefined) {
+        const repeat=r.islandRepeat;
+        if (!record(repeat) || !Number.isInteger(repeat.total) || repeat.total<1 || repeat.total>1000 ||
+            ['completed','wins','losses'].some(key=>!Number.isInteger(repeat[key]) || repeat[key]<0) ||
+            repeat.completed>repeat.total || repeat.wins+repeat.losses!==repeat.completed ||
+            ![null,'win','loss'].includes(repeat.result) || (repeat.result===null ? repeat.completed>=repeat.total : repeat.completed===0) ||
+            !r.startingTeam?.length || new Set(r.startingTeam).size!==r.startingTeam.length || ![1,2,3,4,5].includes(r.diff)) throw new Error('Repeticiones de isla inválidas.');
+      }
+      if (r?.mapIdx !== undefined && (!Number.isInteger(r.mapIdx) || r.mapIdx<0 || r.mapIdx>4)) throw new Error('Mapa de isla inválido.');
+      if (r?.campaignVersion !== undefined && r.campaignVersion !== 1) throw new Error('Campaña incompatible.');
       if (!record(r) || !Number.isInteger(r.saga) || !Number.isInteger(r.islandIdx) ||
           !['classic', 'nuzlocke'].includes(r.mode) || !Array.isArray(r.team) || !record(r.items) ||
           !Array.isArray(r.badges) || !Number.isFinite(r.berries) || !record(r.map) ||

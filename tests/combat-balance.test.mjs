@@ -34,10 +34,10 @@ test('every character and move is valid; every directed matchup has a damaging c
   }
   return pairs;
  })()`);
- assert.equal(result,457*457);
+ assert.equal(result,h.exec('Object.keys(CHARS).length ** 2'));
 });
 
-test('all 457 mirrors at four levels and 914 seeded mixed encounters terminate',()=>{
+test('all 460 mirrors at four levels and 920 seeded mixed encounters terminate',()=>{
  const h=combatHarness(); const ids=Array.from(h.exec('Object.keys(CHARS)'));
  let max=0,count=0;
  for(const level of [5,20,50,99])for(const id of ids){
@@ -74,15 +74,16 @@ test('unlucky full teams terminate even when all attacks miss',()=>{
 
 test('canonical signatures and learned Haki; XP and evolution keep two moves',()=>{
  const h=combatHarness();
+ h.exec('maxStartLvlCap=()=>100;meta.charUpgrades={luffy:25,zoro:15,nami:15,usopp:17,coby:11};');
  assert.ok(h.exec(`(()=>{
   const luffy=makeChar('luffy2',30),enel=makeChar('enel',30);
   battle={pTeam:[luffy],eTeam:[enel],curP:luffy,curE:enel,round:1};
   if(!hasHaki(luffy)||calcDamage(enel,luffy,MOVES.descarga,false,1).dmg!==0)return false;
-  for(const [id,m] of Object.entries(SIGNATURE_MOVES))if(CHARS[id]&&getUltimateMove(makeChar(id,35))!==MOVES[m])return false;
+  for(const [id,m] of Object.entries(SIGNATURE_MOVES))if(CHARS[id]&&getUltimateMove(makeChar(id,35,false,true))!==MOVES[m])return false;
   const f=makeChar('luffy',19);f.xp=xpForLevel(19)-1;gainXP(f,1);
   if(f.id!=='luffy2'||f.lvl!==20||f.xp!==0||f.moves.length!==2)return false;
   f.xp=xpForLevel(20)/2;
-  if(!xpBarHTML(f).includes('width:50%')||!xpBarHTML({...f,lvl:99}).includes('Nivel máximo'))return false;
+  if(!xpBarHTML(f).includes('width:50%')||!xpBarHTML({...f,lvl:100}).includes('Nivel máximo'))return false;
   return true;
  })()`));
 });
@@ -135,11 +136,11 @@ test('all advertised passive modifiers are applied and remain bounded',()=>{
 });
 
 
-test('two living nakamas can protect the first falling ally once per journey',()=>{
+test('three matching nakamas can protect the first falling ally once per journey',()=>{
  const h=combatHarness();
  assert.ok(h.exec(`(()=>{
   const p=makeChar('luffy',20),p2=makeChar('zoro',20),e=makeChar('bandido',20);
-  run={mode:'story',saga:0,team:[p,p2],items:{}};startBattle([e],{wild:true});
+  run={mode:'story',saga:0,team:[p,p2,makeChar('nami',20)],items:{}};startBattle([e],{wild:true});
   p.hp=0;afterRound();if(p.hp!==1||!run.nakamaGuardUsed)return false;
   p.hp=0;afterRound();return p.hp===0&&battle.curP===p2;
  })()`));

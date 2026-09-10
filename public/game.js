@@ -3,6 +3,7 @@
 
 const $ = sel => document.querySelector(sel);
 const app = $('#app');
+let worldNavigator = null, worldShipLocation = null, worldSelection = null;
 const rnd = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
@@ -11,6 +12,36 @@ const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const BASE_OF = {};
 for (const [id, c] of Object.entries(CHARS)) if (c.evo) BASE_OF[c.evo.to] = id;
 function baseFormOf(id) { while (BASE_OF[id]) id = BASE_OF[id]; return id; }
+
+// Las formas requieren tanto el nivel en partida como el nivel base permanente.
+function evolutionFormAt(id, lvl, progress = meta) {
+  const baseLevel = startLvlOf(id, progress);
+  let form = baseFormOf(id);
+  while (CHARS[form].evo && Math.min(lvl, baseLevel) >= CHARS[form].evo.lvl) form = CHARS[form].evo.to;
+  return form;
+}
+function formMovesAt(id, lvl, exactForm = false, progress = meta) {
+  const c = CHARS[id];
+  const limit = !exactForm && c.evo && startLvlOf(id, progress) < c.evo.lvl ? c.evo.lvl - 1 : lvl;
+  const moves = c.learnset.filter(([level]) => level <= Math.min(lvl, limit)).map(([,move]) => move).slice(-2);
+  return moves.length ? moves : [c.learnset[0][1]];
+}
+function syncEvolution(f, progress = meta) {
+  if (!CHARS[f.id] || !CHARS[baseFormOf(f.id)].evo) return f;
+  const old = CHARS[f.id], nextId = evolutionFormAt(f.id, f.lvl, progress), next = CHARS[nextId];
+  if (f.id === nextId && f.evolutionRulesVersion === 1) return f;
+  // Apply only the base-stat difference, preserving equipment, fusion and event bonuses.
+  const deltaHP = hpAt(next.base[0], f.lvl) - hpAt(old.base[0], f.lvl);
+  f.maxhp += deltaHP;
+  if (f.hp > 0) f.hp = clamp(f.hp + deltaHP, 1, f.maxhp);
+  ['atk','def','spatk','spdef','spd'].forEach((key,i) => {
+    f[key] += statAt(next.base[i+1], f.lvl) - statAt(old.base[i+1], f.lvl);
+  });
+  f.id = nextId;
+  f.moves = formMovesAt(nextId, f.lvl, false, progress);
+  f.evolutionRulesVersion = 1;
+  return f;
+}
 
 // ---------- Sprites de personajes ----------
 // Coloca cada PNG en la carpeta sprites/ con el nombre <id>.png (o mapeado en SPRITES) y añade el id aquí.
@@ -78,17 +109,63 @@ try {
 
 let autoMode = false;
 let autoTimer = null;
-let autoSettings = {
-  speed: 'x2', // 'x1' (normal, mitad) o 'x2' (rápida, actual)
-  healThreshold: 50, // 0 = desactivo, 25, 50, 75, 99
-  nodePriority: 'random', // 'random', 'item', 'battle', 'rest'
-  wildAction: 'fight', // 'fight', 'recruit', 'chains'
-  shopItems: [
-    { id: 'carne', qty: 3 },
-    { id: 'sake', qty: 2 },
-    { id: 'cartel', qty: 2 },
-  ],
-};
+const PORT_SHOP_STOCK = ['carne','carnereal','bocadillo','sake','bebida_ataque','bebida_defensa','cartel','carteldorado','cartelbuster'];
+const AUTO_ROUTE_KEYS = ['random','wild','marine','item','mystery','shop','rest','special','boss','crossover','battle'];
+const AUTO_DEFAULTS = () => ({
+  speed:'x2', healThreshold:50, nodePriority:'random', wildAction:'fight',
+  specialAction:'manual', chainItem:'risk', chainFail:'fight', crossoverAction:'fight',
+  revive:true, useUltimates:true, healItems:['carne','carnereal','bocadillo'],
+  reserveBerries:0, pauseEvents:[],
+  fullTeamAction:'keep', fullBagAction:'leave',
+  shopItems:[{id:'carne',qty:3},{id:'sake',qty:2},{id:'cartel',qty:2}]
+});
+function normalizeAutoSettings(value) {
+  const d = AUTO_DEFAULTS(), v = value && typeof value === 'object' ? value : {};
+  const choice = (key, allowed) => allowed.includes(v[key]) ? v[key] : d[key];
+  const integer = (value, fallback, max) => Number.isFinite(Number(value)) ? Math.min(max,Math.max(0,Math.floor(Number(value)))) : fallback;
+  return {...d,
+    speed:choice('speed',['x1','x2']), nodePriority:choice('nodePriority',AUTO_ROUTE_KEYS),
+    healThreshold:choice('healThreshold',[0,25,50,75,99]),
+    wildAction:choice('wildAction',['fight','recruit','chains','manual']),
+    specialAction:choice('specialAction',['manual','gacha','leave']),
+    chainItem:choice('chainItem',['risk','cartel','carteldorado','cartelbuster']),
+    chainFail:choice('chainFail',['fight','pay','manual']),
+    crossoverAction:choice('crossoverAction',['fight','leave','manual']),
+    fullTeamAction:choice('fullTeamAction',['keep','higherLevel','manual']),
+    fullBagAction:choice('fullBagAction',['leave','manual']),
+    revive:typeof v.revive==='boolean'?v.revive:d.revive,
+    useUltimates:typeof v.useUltimates==='boolean'?v.useUltimates:d.useUltimates,
+    healItems:Array.isArray(v.healItems)?['carne','carnereal','bocadillo'].filter(id=>v.healItems.includes(id)):d.healItems,
+    reserveBerries:integer(v.reserveBerries,0,999999),
+    pauseEvents:Array.isArray(v.pauseEvents)?['wild','marine','item','mystery','shop','rest','special','boss','crossover'].filter(id=>v.pauseEvents.includes(id)):[],
+    shopItems:Array.isArray(v.shopItems)?v.shopItems.filter(t=>t&&PORT_SHOP_STOCK.includes(t.id)).map(t=>({id:t.id,qty:integer(t.qty,0,99)})):d.shopItems
+  };
+}
+let autoSettings = AUTO_DEFAULTS();
+function pauseAutoForChoice(message) {
+  autoMode=false;
+  if(autoTimer) clearTimeout(autoTimer);
+  autoTimer=null;
+  const btn=$('#btn-topbar-auto');
+  if(btn) {btn.textContent='🤖 PAUSADO';btn.classList.remove('green');btn.classList.add('gray');}
+  if(message) toast(message);
+}
+function autoCanSpend(price) {return !!run && run.berries-price >= (autoSettings.reserveBerries || 0);}
+function advanceAutoNode(r,i) {
+  if(!autoMode || !run)return;
+  resolveAutoLoot(run);
+  if(hasPendingLoot(run)) {
+    pauseAutoForChoice('🎒 Guarda o deja los objetos pendientes para continuar.');
+    screenMap(2);
+    return;
+  }
+  if(autoSettings.pauseEvents?.includes(run.map.rows[r][i].type)) {
+    pauseAutoForChoice();screenMap();
+    toast(`🤖 Pausa antes de ${NODE_TYPES[run.map.rows[r][i].type].label}. Elige cuándo entrar.`);
+    return;
+  }
+  enterNode(r,i);
+}
 
 function stopAutoMode() {
   autoMode = false;
@@ -110,52 +187,61 @@ function scheduleAutoStep(fn, ms = 700) {
   }, ms * mult);
 }
 
-function runAutoItems() {
-  if (!autoMode || !autoSettings.healThreshold) return;
+function autoBackpackSettings() {
+  const saved = meta.settings?.autoBackpack || {};
+  return {
+    enabled: saved.enabled === true,
+    threshold: [0,25,50,75,99].includes(saved.threshold) ? saved.threshold : 50,
+    where: ['map','combat','both'].includes(saved.where) ? saved.where : 'both',
+    items: {carne:saved.items?.carne !== false, carnereal:saved.items?.carnereal !== false,
+      bocadillo:saved.items?.bocadillo === true, sake:saved.items?.sake === true}
+  };
+}
+function setAutoBackpackSettings(change) {
+  const current = autoBackpackSettings();
+  meta.settings ||= {};
+  meta.settings.autoBackpack = {...current,...change,items:{...current.items,...change.items}};
+  saveMeta();
+}
+function runAutoItems(refresh = true) {
+  const config = autoBackpackSettings();
+  if (!config.enabled) return false;
   const isCombat = typeof battle !== 'undefined' && battle && !battle.over;
-  const targetRun = isCombat ? { items: battle.items, team: battle.pTeam } : run;
-  if (!targetRun || !targetRun.items || !targetRun.team) return;
-  const isNuz = typeof run !== 'undefined' && run && run.mode === 'nuzlocke';
-  const thresh = autoSettings.healThreshold;
-
-  if (!isNuz && (targetRun.items.sake || 0) > 0) {
-    const dead = targetRun.team.find(f => f.hp <= 0);
-    if (dead) {
-      targetRun.items.sake--;
-      dead.hp = Math.floor(dead.maxhp * 0.5);
-      const msg = `🤖 Auto: ${charName(dead)} revivido con Sake 🍶`;
-      if (isCombat) log(msg); else toast(msg);
+  if (isCombat && battle.waiting) return false;
+  if ((isCombat && config.where === 'map') || (!isCombat && config.where === 'combat')) return false;
+  const owner = isCombat && battle.tower ? tower : run;
+  const team = isCombat ? battle.pTeam : owner?.team;
+  if (!owner?.items || !team) return false;
+  const isNuz = !(isCombat && battle.tower) && owner.mode === 'nuzlocke';
+  let changed = false, revived = null;
+  const consume = (id, fighter) => {
+    owner.items[id]--;
+    changed = true;
+    const message = `🎒 Auto: ${ITEMS[id].name} para ${charName(fighter)}.`;
+    if (isCombat) log(message); else toast(message);
+  };
+  if (config.items.sake && !isNuz && (owner.items.sake || 0) > 0) {
+    revived = team.find(f => f.hp <= 0);
+    if (revived) {
+      revived.hp = Math.max(1,Math.floor(revived.maxhp * ITEMS.sake.val));
+      consume('sake',revived);
     }
   }
-  for (const f of targetRun.team) {
-    if (f.hp > 0) {
-      const pct = (f.hp / f.maxhp) * 100;
-      if (pct <= thresh) {
-        if ((targetRun.items.carnereal || 0) > 0 && f.hp < f.maxhp * 0.5) {
-          targetRun.items.carnereal--;
-          f.hp = f.maxhp;
-          const msg = `🤖 Auto: Carne Real usada en ${charName(f)} 🥩`;
-          if (isCombat) log(msg); else toast(msg);
-        } else if ((targetRun.items.carne || 0) > 0) {
-          targetRun.items.carne--;
-          f.hp = Math.min(f.maxhp, f.hp + 40);
-          const msg = `🤖 Auto: Carne usada en ${charName(f)} 🍖`;
-          if (isCombat) log(msg); else toast(msg);
-        } else if ((targetRun.items.bocadillo || 0) > 0) {
-          targetRun.items.bocadillo--;
-          f.hp = Math.min(f.maxhp, f.hp + 25);
-          const msg = `🤖 Auto: Bocadillo usado en ${charName(f)} 🥪`;
-          if (isCombat) log(msg); else toast(msg);
-        }
-      }
-    }
+  for (const fighter of team) {
+    if (!config.threshold || fighter === revived || fighter.hp <= 0 || fighter.hp >= fighter.maxhp ||
+        (config.threshold !== 99 && fighter.hp / fighter.maxhp * 100 > config.threshold)) continue;
+    const healing = ['carne','carnereal','bocadillo'].filter(id=>config.items[id] && owner.items[id] > 0)
+      .sort((a,b)=>ITEMS[a].val-ITEMS[b].val);
+    const missing = fighter.maxhp-fighter.hp;
+    const id = healing.find(id=>ITEMS[id].val >= missing) || healing.at(-1);
+    if (!id) continue;
+    fighter.hp = Math.min(fighter.maxhp,fighter.hp + ITEMS[id].val);
+    consume(id,fighter);
   }
-  if (isCombat) {
-    refreshHPCards();
-    refreshControls();
-  } else if (typeof saveRun === 'function') {
-    saveRun();
-  }
+  if (!changed) return false;
+  if (owner === run) saveRun();
+  if (isCombat && refresh) { refreshHPCards(); refreshControls(); }
+  return true;
 }
 
 function pickAutoNode(reach) {
@@ -165,7 +251,34 @@ function pickAutoNode(reach) {
 
   const rows = run.map.rows;
   let matches = [];
-  if (pref === 'item') {
+  if (Object.hasOwn(NODE_TYPES, pref)) {
+    // Trace actual map connections back from unvisited events of the chosen type.
+    // This keeps earlier choices on a route to the nearest reachable event.
+    const distances = new Map(), incoming = new Map(), queue = [];
+    rows.forEach((row, r) => row.forEach((node, i) => {
+      if (node.type === pref && !node.done) {
+        const key = `${r},${i}`;
+        distances.set(key, 0);
+        queue.push(key);
+      }
+    }));
+    for (const [r, i, nextR, nextI] of run.map.edges || []) {
+      if (rows[r]?.[i]?.done || rows[nextR]?.[nextI]?.done) continue;
+      const key = `${nextR},${nextI}`;
+      if (!incoming.has(key)) incoming.set(key, []);
+      incoming.get(key).push(`${r},${i}`);
+    }
+    for (let idx = 0; idx < queue.length; idx++) {
+      const key = queue[idx];
+      for (const previous of incoming.get(key) || []) {
+        if (distances.has(previous)) continue;
+        distances.set(previous, distances.get(key) + 1);
+        queue.push(previous);
+      }
+    }
+    const nearest = Math.min(...reach.map(([r, i]) => distances.get(`${r},${i}`) ?? Infinity));
+    if (Number.isFinite(nearest)) matches = reach.filter(([r, i]) => distances.get(`${r},${i}`) === nearest);
+  } else if (pref === 'item') {
     matches = reach.filter(([r, i]) => ['item', 'mystery', 'shop'].includes(rows[r][i].type));
   } else if (pref === 'battle') {
     matches = reach.filter(([r, i]) => ['wild', 'marine', 'boss'].includes(rows[r][i].type));
@@ -177,138 +290,109 @@ function pickAutoNode(reach) {
   return pick(reach);
 }
 
-function showAutoSettingsModal() {
-  const ov = document.createElement('div');
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="max-width:440px;">
-    <h2>🤖 Opciones del Modo Automático</h2>
-    
-    <div style="display:flex;flex-direction:column;gap:12px;margin:14px 0;text-align:left;">
-      
-      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
-          ⚡ Velocidad del Modo Automático
-        </label>
-        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Elige el ritmo de avance en mapa y combate:</div>
-        <select id="auto-speed-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-          <option value="x2" ${autoSettings.speed === 'x2' || !autoSettings.speed ? 'selected' : ''}>⚡ Modo x2 (Rápido - Velocidad actual)</option>
-          <option value="x1" ${autoSettings.speed === 'x1' ? 'selected' : ''}>🚶 Modo x1 (Normal - Mitad de velocidad)</option>
-        </select>
-      </div>
-
-      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
-          🍖 Consumo Automático de Objetos
-        </label>
-        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Usar objetos de curación o Sake cuando el PS baje de:</div>
-        <select id="auto-heal-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-          <option value="0" ${autoSettings.healThreshold === 0 ? 'selected' : ''}>❌ Desactivado (no usar objetos)</option>
-          <option value="25" ${autoSettings.healThreshold === 25 ? 'selected' : ''}>❤️ Crítico: Menos del 25% de PS</option>
-          <option value="50" ${autoSettings.healThreshold === 50 ? 'selected' : ''}>🧡 Medio: Menos del 50% de PS</option>
-          <option value="75" ${autoSettings.healThreshold === 75 ? 'selected' : ''}>💛 Leve: Menos del 75% de PS</option>
-          <option value="99" ${autoSettings.healThreshold === 99 ? 'selected' : ''}>💚 Cualquier daño recibido (<100% PS)</option>
-        </select>
-      </div>
-
-      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
-          🗺️ Prioridad de Rutas en el Mapa
-        </label>
-        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Tipo de casilla preferida al elegir camino:</div>
-        <select id="auto-node-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-          <option value="random" ${autoSettings.nodePriority === 'random' ? 'selected' : ''}>🎲 Al azar / Sin preferencia</option>
-          <option value="item" ${autoSettings.nodePriority === 'item' ? 'selected' : ''}>🎁 Priorizar Tesoros, Misterios y Tiendas</option>
-          <option value="battle" ${autoSettings.nodePriority === 'battle' ? 'selected' : ''}>⚔️ Priorizar Enfrentamientos y Combates</option>
-          <option value="rest" ${autoSettings.nodePriority === 'rest' ? 'selected' : ''}>⛺ Priorizar Campamentos y Descanso</option>
-        </select>
-      </div>
-
-      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
-          🏴‍☠️ Encuentros con Piratas Salvajes
-        </label>
-        <div style="font-size:7.5px;color:#aaa;margin-bottom:6px;">Acción por defecto al encontrar un pirata salvaje:</div>
-        <select id="auto-wild-sel" style="width:100%;padding:5px;font-size:9px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-          <option value="fight" ${autoSettings.wildAction === 'fight' ? 'selected' : ''}>⚔️ Luchar (ganar Experiencia para la banda)</option>
-          <option value="recruit" ${autoSettings.wildAction === 'recruit' ? 'selected' : ''}>💋 Reclutar / Seducir (pagando Berries)</option>
-          <option value="chains" ${autoSettings.wildAction === 'chains' ? 'selected' : ''}>⛓️ Tentar a la suerte (3 Cadenas)</option>
-        </select>
-      </div>
-
-      <div style="background:rgba(0,0,0,0.3);padding:10px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);">
-        <label style="font-size:9px;font-weight:bold;color:var(--gold);display:block;margin-bottom:4px;">
-          🏪 Compras Automáticas en Tiendas (Prioridad de 3 Objetos)
-        </label>
-        <div style="font-size:7.5px;color:#aaa;margin-bottom:8px;">
-          Elige 3 objetos en orden de prioridad y cuántos deseas mantener en inventario:
-        </div>
-        ${[0, 1, 2].map(idx => {
-    const sList = autoSettings.shopItems || [];
-    const itemSetting = sList[idx] || { id: 'none', qty: 0 };
-    return `
-          <div style="display:flex;gap:6px;align-items:center;margin-bottom:6px;">
-            <span style="font-size:9px;font-weight:bold;color:var(--gold);width:16px;">#${idx + 1}</span>
-            <select id="auto-shop-item-${idx}" style="flex:1;padding:4px;font-size:8.5px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-              <option value="none" ${itemSetting.id === 'none' ? 'selected' : ''}>❌ Ninguno (vacío)</option>
-              <option value="carne" ${itemSetting.id === 'carne' ? 'selected' : ''}>🍖 Carne de Cerdo (40 PS)</option>
-              <option value="carnereal" ${itemSetting.id === 'carnereal' ? 'selected' : ''}>🥩 Carne Real (100% PS)</option>
-              <option value="bocadillo" ${itemSetting.id === 'bocadillo' ? 'selected' : ''}>🥪 Bocadillo de Arroz (25 PS)</option>
-              <option value="sake" ${itemSetting.id === 'sake' ? 'selected' : ''}>🍶 Sake de Binks (Revivir)</option>
-              <option value="cartel" ${itemSetting.id === 'cartel' ? 'selected' : ''}>📜 Cartel de Recluta (1 Cadena)</option>
-              <option value="carteldorado" ${itemSetting.id === 'carteldorado' ? 'selected' : ''}>🏅 Cartel Dorado (2 Cadenas)</option>
-              <option value="cartelbuster" ${itemSetting.id === 'cartelbuster' ? 'selected' : ''}>📯 Buster Call (3 Cadenas)</option>
-              <option value="hierro" ${itemSetting.id === 'hierro' ? 'selected' : ''}>🛡️ Hierro Forjado (Exp)</option>
-            </select>
-            <span style="font-size:8px;color:#aaa;">Hasta:</span>
-            <select id="auto-shop-qty-${idx}" style="width:50px;padding:4px;font-size:8.5px;background:#222;color:#fff;border:1px solid #555;border-radius:4px;">
-              <option value="0" ${itemSetting.qty === 0 ? 'selected' : ''}>0</option>
-              ${[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(q => `<option value="${q}" ${itemSetting.qty === q ? 'selected' : ''}>${q}</option>`).join('')}
-            </select>
-          </div>`;
-  }).join('')}
-      </div>
-
+function showAutoSettingsModal(settingsHost = null, onClose = null) {
+  if(document.querySelector('.auto-config-overlay'))return;
+  const wasAuto=autoMode, activeBattle=battle && !battle.over ? battle : null;
+  const wasWaiting=activeBattle?.waiting;
+  pauseAutoForChoice();
+  if(activeBattle && !wasWaiting)pauseBattle();
+  const cfg=normalizeAutoSettings(autoSettings);
+  const bagAuto=autoBackpackSettings();
+  const ov=document.createElement('div');ov.className='overlay auto-config-overlay';
+  const select=(id,value,options)=>`<select id="${id}">${options.map(([key,label])=>`<option value="${key}" ${String(key)===String(value)?'selected':''}>${label}</option>`).join('')}</select>`;
+  const check=(id,label,on,disabled=false)=>`<label class="auto-check"><input type="checkbox" id="${id}" ${on?'checked':''} ${disabled?'disabled':''}><span>${label}</span></label>`;
+  const routes=AUTO_ROUTE_KEYS.filter(id=>id!=='random'&&id!=='battle').map(id=>[id,`${NODE_TYPES[id].emoji} ${NODE_TYPES[id].label}`]);
+  ov.innerHTML=`<div class="modal auto-config" role="dialog" aria-modal="true" aria-labelledby="auto-title">
+    <header class="auto-header"><div><small>PILOTO AUTOMÁTICO</small><h2 id="auto-title">Prepara tu viaje</h2><p>El avance se pausa mientras configuras.</p></div><button class="btn gray" id="auto-apply-close" aria-label="Cerrar sin guardar">✕</button></header>
+    <div class="auto-config-body">
+      <section class="auto-section"><h3>🧭 Ruta y ritmo</h3>
+        <label for="auto-node-sel">Evento al que quieres ir</label>
+        ${select('auto-node-sel',cfg.nodePriority,[['random','🎲 Sin preferencia'],...routes,['battle','⚔️ Combates (piratas, Marines y jefes)']])}
+        <p>Sigue las conexiones hacia el evento accesible más cercano. Si no hay ninguno, elige al azar. Los misterios se descubren al entrar.</p>
+        <div class="auto-two"><div><label for="auto-speed-sel">Avance por el mapa</label>${select('auto-speed-sel',cfg.speed,[['x1','Normal'],['x2','Rápido']])}</div>
+        <div><label for="auto-combat-speed">Velocidad de combate</label>${select('auto-combat-speed',preferredCombatSpeed(),[[1,'x1'],[2,'x2'],[4,'x4']])}</div></div>
+        ${check('auto-ultimates','Usar definitivas cuando estén listas',cfg.useUltimates)}
+        <details><summary>Parar antes de un evento</summary><div class="auto-check-grid">${routes.map(([id,label])=>check(`auto-pause-${id}`,label,cfg.pauseEvents.includes(id))).join('')}</div><p>Se detiene en el mapa para que entres manualmente.</p></details>
+      </section>
+      <section class="auto-section"><h3>🏴‍☠️ Encuentros y reclutas</h3>
+        <label for="auto-wild-sel">Pirata salvaje</label>${select('auto-wild-sel',cfg.wildAction,[['fight','Combatir'],['recruit','Reclutar con Berries'],['chains','Tentar a la suerte: cadenas'],['manual','Pausar y decidir yo']])}
+        <p>Si no puedes reclutar por precio, rareza o Nuzlocke, combate.</p>
+        <div class="auto-two"><div><label for="auto-chain-item">En las cadenas</label>${select('auto-chain-item',cfg.chainItem,[['risk','Arriesgar: 50%'],...['cartel','carteldorado','cartelbuster'].map(id=>[id,ITEMS[id].name])])}</div>
+        <div><label for="auto-chain-fail">Si una cadena aguanta</label>${select('auto-chain-fail',cfg.chainFail,[['fight','Combatir'],['pay','Pagar 3 carteles si tengo'],['manual','Pausar y decidir yo']])}</div></div>
+        <p>Si no tienes el cartel elegido, arriesga. Si no puedes pagar los 3 carteles, combate.</p>
+        <label for="auto-special-action">Crossguild</label>${select('auto-special-action',cfg.specialAction,[['manual','Pausar para elegir o jugar'],['gacha','Jugar carteles si puedo pagarlos'],['leave','Marcharme sin comprar']])}
+        <p>El catálogo se elige manualmente. Si no alcanza para los carteles o Nuzlocke lo impide, se marcha.</p>
+        <label for="auto-crossover">Camino alternativo · Crossover</label>${select('auto-crossover',cfg.crossoverAction,[['fight','Explorar y aceptar el duelo'],['leave','Retirarme y completar la saga'],['manual','Pausar y decidir yo']])}
+        <label for="auto-full-team">Si el equipo está lleno</label>${select('auto-full-team',cfg.fullTeamAction,[['keep','Conservar el equipo y dejar al nuevo'],['higherLevel','Sustituir al de menor nivel si el nuevo lo supera'],['manual','Pausar y decidir yo']])}
+        <p>Los personajes repetidos se fusionan. En caso de empate de nivel, se conserva el equipo.</p>
+      </section>
+      <section class="auto-section"><h3>🎒 Uso automático de la mochila</h3>
+        <label for="auto-full-bag">Si no cabe el objeto recogido</label>${select('auto-full-bag',cfg.fullBagAction,[['leave','Guardar lo que quepa y dejar el resto'],['manual','Pausar y decidir yo']])}
+        <p>La opción automática conserva los objetos que ya llevas y se aplica a ambas mochilas.</p>
+        ${check('auto-bag-enabled','Usar objetos automáticamente',bagAuto.enabled)}
+        <p>Comparte estas preferencias con Ajustes. Funciona también con el avance automático pausado.</p>
+        <label for="auto-bag-where">Dónde usar objetos</label>${select('auto-bag-where',bagAuto.where,[['both','Isla y combate'],['map','Solo en la isla'],['combat','Solo en combate']])}
+        <label for="auto-heal-sel">Curar cuando los PS estén al…</label>${select('auto-heal-sel',bagAuto.threshold,[[0,'No curar automáticamente'],[25,'25% o menos'],[50,'50% o menos'],[75,'75% o menos'],[99,'Cualquier daño']])}
+        <p>Objetos permitidos: usa uno por nakama y revisión, el menor que cubra el daño o el mayor disponible.</p>
+        ${['carne','carnereal','bocadillo'].map(id=>check(`auto-heal-${id}`,`${ITEMS[id].emoji} ${ITEMS[id].name} · ${ITEMS[id].desc}`,bagAuto.items[id])).join('')}
+        ${check('auto-revive',`${ITEMS.sake.emoji} Revivir con ${ITEMS.sake.name}`,bagAuto.items.sake,run?.mode==='nuzlocke')}
+        <p>${run?.mode==='nuzlocke'?'Nuzlocke: los nakamas caídos no pueden revivir.':ITEMS.sake.desc}</p>
+      </section>
+      <section class="auto-section"><h3>🏪 Compras y presupuesto</h3>
+        <label for="auto-reserve">Berries que quieres conservar</label><input id="auto-reserve" type="number" min="0" max="999999" step="50" value="${cfg.reserveBerries}">
+        <p>La reserva se respeta al comprar provisiones, reclutar y jugar carteles. Cantidad 0 = no comprar. Prioridad 1 = comprar primero.</p>
+        <div class="auto-stock-head"><span>Provisión</span><span>Hasta</span><span>Prioridad</span></div>
+        ${PORT_SHOP_STOCK.map((id,index)=>{const entry=cfg.shopItems.find(t=>t.id===id);const priority=cfg.shopItems.findIndex(t=>t.id===id);return `<div class="auto-stock-row"><div><b>${ITEMS[id].emoji} ${ITEMS[id].name}</b><small>${ITEMS[id].desc} · ${ITEMS[id].price} Berries</small></div><input aria-label="Cantidad de ${ITEMS[id].name}" data-auto-stock="${id}" type="number" min="0" max="99" value="${entry?.qty||0}">${select(`auto-priority-${id}`,priority<0?PORT_SHOP_STOCK.length:priority+1,PORT_SHOP_STOCK.map((_,i)=>[i+1,i+1]))}</div>`}).join('')}
+      </section>
     </div>
-
-    <div class="actions" style="flex-direction:column;gap:6px;">
-      <button class="btn green" id="auto-apply-start">▶️ ${autoMode ? 'GUARDAR Y CONTINUAR' : 'ACTIVAR MODO AUTOMÁTICO'}</button>
-      ${autoMode ? `<button class="btn red" id="auto-apply-stop">⏹️ DESACTIVAR MODO AUTOMÁTICO</button>` : ''}
-      <button class="btn gray" id="auto-apply-close">CANCELAR / CERRAR</button>
-    </div>
+    <footer class="auto-footer"><button class="btn gray" id="auto-save-only">Guardar y pausar</button><button class="btn green" id="auto-apply-start">Guardar y activar</button></footer>
   </div>`;
-
-  document.body.appendChild(ov);
-
-  const saveFormSettings = () => {
-    autoSettings.speed = ov.querySelector('#auto-speed-sel').value;
-    autoSettings.healThreshold = +ov.querySelector('#auto-heal-sel').value;
-    autoSettings.nodePriority = ov.querySelector('#auto-node-sel').value;
-    autoSettings.wildAction = ov.querySelector('#auto-wild-sel').value;
-    autoSettings.shopItems = [0, 1, 2].map(idx => ({
-      id: ov.querySelector(`#auto-shop-item-${idx}`).value,
-      qty: +ov.querySelector(`#auto-shop-qty-${idx}`).value
-    }));
-  };
-
-  ov.querySelector('#auto-apply-start').onclick = () => {
-    saveFormSettings();
-    autoMode = true;
-    ov.remove();
-    toast('🤖 Modo Automático ACTIVADO');
-    screenMap();
-  };
-
-  if (autoMode) {
-    const stopBtn = ov.querySelector('#auto-apply-stop');
-    if (stopBtn) {
-      stopBtn.onclick = () => {
-        ov.remove();
-        stopAutoMode();
-      };
+  if (settingsHost) {
+    settingsHost.classList.add('auto-config-overlay');
+    ov.className = 'settings-auto-content';
+    settingsHost.replaceChildren(ov);
+    ov.querySelector('.auto-header small').textContent = 'AJUSTES / MODO AUTOMÁTICO';
+    ov.querySelector('#auto-title').textContent = 'Modo automático';
+  } else document.body.appendChild(ov);
+  PORT_SHOP_STOCK.forEach(id=>ov.querySelector(`#auto-priority-${id}`).setAttribute('aria-label',`Prioridad de ${ITEMS[id].name}`));
+  let closed=false;
+  const close=(mode,save)=>{
+    if(closed)return;closed=true;
+    if(save) {
+      const val=id=>ov.querySelector(`#${id}`).value;
+      const on=id=>ov.querySelector(`#${id}`).checked;
+      autoSettings=normalizeAutoSettings({speed:val('auto-speed-sel'),nodePriority:val('auto-node-sel'),wildAction:val('auto-wild-sel'),
+        specialAction:val('auto-special-action'),chainItem:val('auto-chain-item'),chainFail:val('auto-chain-fail'),crossoverAction:val('auto-crossover'),
+        fullTeamAction:val('auto-full-team'),fullBagAction:val('auto-full-bag'),
+        healThreshold:+val('auto-heal-sel'),revive:on('auto-revive'),useUltimates:on('auto-ultimates'),reserveBerries:val('auto-reserve'),
+        healItems:['carne','carnereal','bocadillo'].filter(id=>on(`auto-heal-${id}`)),pauseEvents:routes.filter(([id])=>on(`auto-pause-${id}`)).map(([id])=>id),
+        shopItems:PORT_SHOP_STOCK.map(id=>({id,qty:+ov.querySelector(`[data-auto-stock="${id}"]`).value,priority:+val(`auto-priority-${id}`)})).sort((a,b)=>a.priority-b.priority)
+      });
+      autoSpeed=+val('auto-combat-speed');combatSpeedOverride=autoSpeed;
+      meta.settings.autoConfig={...autoSettings,combatSpeed:autoSpeed};
+      setAutoBackpackSettings({enabled:on('auto-bag-enabled'),where:val('auto-bag-where'),threshold:+val('auto-heal-sel'),
+        items:{carne:on('auto-heal-carne'),carnereal:on('auto-heal-carnereal'),bocadillo:on('auto-heal-bocadillo'),sake:on('auto-revive')}});
+      if(activeBattle && battle===activeBattle)battle.speed=autoSpeed;
     }
-  }
-
-  ov.querySelector('#auto-apply-close').onclick = () => ov.remove();
+    ov.remove();autoMode=mode;
+    if (onClose) { if(activeBattle && battle===activeBattle)refreshControls(); onClose(); return; }
+    if(activeBattle && battle===activeBattle && !battle.over) {refreshControls();if(!wasWaiting)resumeBattle();}
+    else if(run)screenMap();
+  };
+  ov.querySelector('#auto-apply-start').onclick=()=>close(true,true);
+  ov.querySelector('#auto-save-only').onclick=()=>close(false,true);
+  ov.querySelector('#auto-apply-close').onclick=()=>close(wasAuto,false);
+  if (settingsHost) settingsHost.onclick = e => { if (e.target === settingsHost) close(wasAuto,false); };
+  ov.addEventListener('keydown',e=>{
+    if(e.key==='Escape'){e.preventDefault();close(wasAuto,false);}
+    if(e.key==='Tab') {
+      const controls=[...ov.querySelectorAll('button,input,select,summary')].filter(el=>!el.disabled&&el.getClientRects().length);
+      const first=controls[0],last=controls.at(-1);
+      if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}
+      else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}
+    }
+  });
+  ov.querySelector('#auto-node-sel').focus({preventScroll:true});
 }
 
 // ---------- Dificultades de la aventura ----------
@@ -327,8 +411,10 @@ const META_DEFAULTS = () => ({
   fame: 0, upgrades: {}, accXp: 0, global: {}, defeated: [],
   sagaClears: {}, // id base -> nº de sagas conquistadas con ese nakama en la banda
   sagaDiffWins: {}, // sagaId -> { diffLevel: true }
+  islandProgress: {}, // saga:mode:difficulty -> completed island indices
   teamPresets: { 1: [], 2: [], 3: [] },
   stats: { kills: 0, items: 0 },
+  sagaStats: {}, // sagaId -> repeatable achievement counters
   relics: [],
   soloWins: 0,
   logPoses: 0,
@@ -350,6 +436,15 @@ function loadMeta() {
     meta.roster.push('luffy');
   }
   meta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 }, meta.settings || {});
+  autoSettings = normalizeAutoSettings(meta.settings.autoConfig);
+  // Preserve saved healing choices from the previous automatic-mode panel.
+  if (!meta.settings.autoBackpack && meta.settings.autoConfig) {
+    meta.settings.autoBackpack = {enabled:!!(autoSettings.healThreshold || autoSettings.revive),
+      threshold:autoSettings.healThreshold,where:'both',
+      items:Object.fromEntries(['carne','carnereal','bocadillo','sake'].map(id=>
+        [id,id==='sake' ? autoSettings.revive : autoSettings.healItems.includes(id)]))};
+  }
+  migrateLegacyIslandWins(meta);
   if (!meta.totalIslands) {
     const totalWins = Object.values(meta.wins || {}).reduce((a, b) => a + b, 0) +
       Object.values(meta.nuzWins || {}).reduce((a, b) => a + b, 0);
@@ -396,17 +491,37 @@ function saveMeta() { return persistLocalSave(); }
 function manualSave() {
   if (battle) return toast('💾 Termina el combate para guardar el viaje. El progreso se conserva en cada punto de guardado.');
   const write = () => {
-    if (persistLocalSave(run, true)) toast('💾 Partida guardada en este dispositivo');
+    prepareBackpack(run);
+    persistLocalSave(run, true);
+    return exportSave();
   };
   if (saveReadError) {
     modalConfirm('💾 ¿Sustituir el guardado?', 'No se pudo leer la copia anterior. Guardar la sustituirá por el progreso actual.', write);
-  } else write();
+  } else return write();
 }
 
 // ---------- Copias JSON portátiles, compatibles con el juego original ----------
-function exportSave() {
+async function exportSave() {
   const payload = GameSaveStorage.payload(meta, battle ? savedRun : run);
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  if (typeof window.showSaveFilePicker === 'function') {
+    let writable;
+    try {
+      const handle = await window.showSaveFilePicker({
+        suggestedName: 'grandlinelike.json',
+        types: [{ description: 'Partida JSON', accept: { 'application/json': ['.json'] } }],
+        excludeAcceptAllOption: true
+      });
+      writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      toast('💾 Copia JSON guardada');
+    } catch (error) {
+      if (writable) await writable.abort().catch(() => {});
+      if (error.name !== 'AbortError') toast('❌ No se pudo guardar el JSON. Inténtalo de nuevo.');
+    }
+    return;
+  }
   const a = document.createElement('a');
   const url = URL.createObjectURL(blob);
   a.href = url;
@@ -415,7 +530,7 @@ function exportSave() {
   a.click();
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
-  toast('💾 Copia JSON exportada');
+  toast('📥 Descarga iniciada. Este navegador elige la carpeta según sus ajustes de descarga.');
 }
 function importSaveFile(file) {
   if (file.size > GameSaveStorage.MAX_BYTES) return toast('❌ El archivo de guardado es demasiado grande.');
@@ -426,13 +541,16 @@ function importSaveFile(file) {
       const data = GameSaveStorage.parse(reader.result);
       validateGameSave(data);
       const nextMeta = Object.assign(META_DEFAULTS(), data.meta);
+      migrateLegacyIslandWins(nextMeta);
       nextMeta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 }, nextMeta.settings);
       if (!nextMeta.roster.includes('luffy')) nextMeta.roster.push('luffy');
       const nextRun = data.run || null;
       if (nextRun) {
+        ensureStartingTeam(nextRun);
         if (nextRun.mode === 'nuzlocke') nextRun.team = nextRun.team.filter(f => f.hp > 0);
-        nextRun.team.forEach(migrateFighter);
+        nextRun.team.forEach(f => migrateFighter(f, false, nextMeta));
       }
+      migrateIslandJourney(nextRun, nextMeta);
       const snapshot = GameSaveStorage.payload(nextMeta, nextRun);
       // Do not replace the current game unless both validation and persistence succeed.
       localSave.write(snapshot);
@@ -454,12 +572,31 @@ function importSaveFile(file) {
   reader.readAsText(file);
 }
 function validateGameSave(data) {
+  if (Object.keys(data.meta.sagaStats || {}).some(id => !SAGAS.some(s => s.id === id))) throw new Error('Contadores de saga incompatibles.');
   for (const key of ['dex', 'recruited', 'roster', 'defeated']) {
     if (data.meta[key]?.some(id => !CHARS[id])) throw new Error('Personaje desconocido.');
   }
   const r = data.run;
+  for (const [key, islands] of Object.entries(data.meta.islandProgress || {})) {
+    const [sagaId,mode,diff] = key.split(':');
+    const saga = SAGAS.find(s=>s.id===sagaId);
+    if (!saga || !['classic','nuzlocke'].includes(mode) || !['1','2','3','4','5'].includes(diff) || islands.some(i=>i>=saga.islands.length)) throw new Error('Progreso de islas incompatible.');
+  }
   if (!r) return;
+  const bagCapacity = 9 + (data.meta.global?.backpackTier || 0) * 3;
+  const stackLimit = 3 + (data.meta.global?.backpackTier || 0), occupied = [new Set(),new Set()];
+  for (const [key,pos] of Object.entries(r.bagLayout || {})) {
+    const [id,index] = key.split(':');
+    if (!ITEMS[id] || !/^\d+$/.test(index) || key !== `${id}:${Number(index)}`) throw new Error('Pila de mochila incompatible.');
+    if (Number(index) >= Math.ceil((r.items[id] || 0)/stackLimit)) continue; // A consumed stack may leave an old placement until the next checkpoint.
+    const cells = backpackCells(ITEMS[id].slotSize,pos.cell,pos.vertical,bagCapacity), used = occupied[+isBattleItem(id)];
+    if (cells.length !== ITEMS[id].slotSize || cells.some(c=>used.has(c))) throw new Error('Posición de mochila incompatible.');
+    cells.forEach(c=>used.add(c));
+  }
+  if ([...Object.keys(r.items || {}), ...Object.keys(r.pendingLoot || {})].some(id => !Object.hasOwn(ITEMS,id))) throw new Error('Objeto desconocido en la mochila.');
+  if (r.startingTeam?.some(id => !CHARS[id] || baseFormOf(id) !== id)) throw new Error('Equipo inicial incompatible.');
   if (!SAGAS[r.saga]?.islands[r.islandIdx] || r.team.some(f => !CHARS[f.id] || f.moves.some(id => !MOVES[id]))) throw new Error('Viaje incompatible.');
+  if (r.mapIdx !== undefined && r.mapIdx >= islandMapCount(SAGAS[r.saga].islands[r.islandIdx])) throw new Error('Mapa de isla incompatible.');
   if (r.map.rows.some(row => row.some(node => !NODE_TYPES[node.type]))) throw new Error('Mapa incompatible.');
 }
 
@@ -503,7 +640,20 @@ function gainFame(n) {
 
 // ---------- Estado de la partida ----------
 let run = null; // partida actual (historia)
+function trackJourneyRewards(fame = 0, logPoses = 0) {
+  if (!run) return;
+  run.rewards ||= {fame:0, logPoses:0, partial:true};
+  run.rewards.fame += fame;
+  run.rewards.logPoses += logPoses;
+}
+function journeyRewardsHTML(journey = run) {
+  const rewards = journey?.rewards;
+  const amount = value => Number.isFinite(value) && value >= 0 ? value.toLocaleString('es') : '0';
+  return `<div class="reward-list" aria-label="Recompensas conseguidas"><b>Conseguido en esta aventura</b><br>⭐ Fama: <strong>${amount(rewards?.fame)}</strong><br>🧭 Log Poses: <strong>${amount(rewards?.logPoses)}</strong>${!rewards || rewards.partial ? '<br><small>Solo se cuentan las recompensas registradas desde esta actualización.</small>' : ''}</div>`;
+}
 function saveRun() {
+  ensureStartingTeam(run);
+  prepareBackpack(run);
   if (run && run.mode === 'nuzlocke' && run.team) {
     run.team = run.team.filter(f => f && f.hp > 0);
   }
@@ -518,12 +668,15 @@ function loadRun() {
   try {
     if (loadedSave?.run) run = JSON.parse(JSON.stringify(loadedSave.run));
   } catch (e) { }
+  ensureStartingTeam(run);
   if (run && run.mode === 'nuzlocke' && run.team) {
     run.team = run.team.filter(f => f && f.hp > 0);
   }
-  if (run && run.team) run.team.forEach(migrateFighter);
+  if (run && run.team) run.team.forEach(f => migrateFighter(f));
+  migrateIslandJourney(run, meta);
+  prepareBackpack(run);
 }
-function migrateFighter(f) {
+function migrateFighter(f, isEnemy = false, progress = meta) {
   const current = CHARS[f.id];
   if (current && (f.moveRulesVersion || 0) < 2) {
     // El aprendizaje es automático: actualizar únicamente las fichas corregidas.
@@ -541,6 +694,7 @@ function migrateFighter(f) {
   if (f.spatkBonus == null) { f.spatkBonus = f.atkBonus || 0; f.spdefBonus = f.defBonus || 0; }
   if (f.ultCharge == null) f.ultCharge = 0;
   if (f.moves && f.moves.length > 2) f.moves = f.moves.slice(-2);
+  if (!isEnemy) syncEvolution(f, progress);
   return f;
 }
 loadRun();
@@ -551,16 +705,16 @@ function hpAt(base, lvl) { return Math.floor(base * (1 + 0.11 * (lvl - 1))) + lv
 function xpForLevel(lvl) { return Math.floor(lvl * lvl * 6); }
 
 function xpBarHTML(f) {
-  const maxed = f.lvl >= 99, goal = xpForLevel(f.lvl);
+  const maxed = f.lvl >= 100, goal = xpForLevel(f.lvl);
   const value = maxed ? goal : clamp(Number(f.xp) || 0, 0, goal);
   const label = maxed ? 'Nivel máximo' : `EXP ${value}/${goal} · siguiente nivel ${f.lvl + 1}`;
   return `<div class="xp-progress" data-level="${f.lvl}" title="${label}"><span class="xp-caption">${maxed ? 'NV. MÁX.' : 'EXP · NV. ' + f.lvl}</span><div class="xp-bar" role="progressbar" aria-label="${label}" aria-valuemin="0" aria-valuemax="${goal}" aria-valuenow="${value}"><i style="width:${value / goal * 100}%"></i></div></div>`;
 }
 
-function makeChar(id, lvl, isEnemy = false) {
+function makeChar(id, lvl, isEnemy = false, exactForm = false) {
+  if (!isEnemy && !exactForm) id = evolutionFormAt(id, lvl);
   const c = CHARS[id];
-  const moves = c.learnset.filter(([l]) => l <= lvl).map(([, m]) => m).slice(-2);
-  if (!moves.length) moves.push(c.learnset[0][1]); // nunca sin movimientos
+  const moves = formMovesAt(id, lvl, isEnemy || exactForm);
   let diffMult = 1.0;
   if (isEnemy && typeof run !== 'undefined' && run && run.diff > 1) {
     const dObj = DIFFICULTIES.find(d => d.id === run.diff);
@@ -577,6 +731,7 @@ function makeChar(id, lvl, isEnemy = false) {
     spd: Math.floor(statAt(c.base[5], lvl) * diffMult),
     atkBonus: 0, defBonus: 0, spatkBonus: 0, spdefBonus: 0,
     xp: 0, moves, ultCharge: 0, moveRulesVersion: 2,
+    ...(!isEnemy && !exactForm ? {evolutionRulesVersion:1} : {}),
   };
 }
 // Aplica las mejoras permanentes del Barco (solo a personajes del jugador)
@@ -605,9 +760,10 @@ const charData = f => CHARS[f.id];
 const charName = f => CHARS[f.id].name;
 
 function gainXP(f, amount, log) {
+  syncEvolution(f);
   f.xp += amount;
   const msgs = [];
-  while (f.xp >= xpForLevel(f.lvl) && f.lvl < 99) {
+  while (f.xp >= xpForLevel(f.lvl) && f.lvl < 100) {
     f.xp -= xpForLevel(f.lvl);
     f.lvl++;
     const c = CHARS[f.id];
@@ -624,14 +780,14 @@ function gainXP(f, amount, log) {
     msgs.push(`¡${c.name} sube al nivel ${f.lvl}!`);
     // nuevos movimientos (máximo 2 ataques regulares)
     for (const [l, m] of c.learnset) {
-      if (l === f.lvl && !f.moves.includes(m)) {
+      if (l === f.lvl && formMovesAt(f.id, f.lvl).includes(m) && !f.moves.includes(m)) {
         f.moves.push(m);
         if (f.moves.length > 2) f.moves.shift();
         msgs.push(`¡${c.name} aprende ${MOVES[m].name}!`);
       }
     }
     // transformación
-    if (c.evo && f.lvl >= c.evo.lvl) {
+    if (c.evo && f.lvl >= c.evo.lvl && startLvlOf(f.id) >= c.evo.lvl) {
       const to = c.evo.to;
       msgs.push(`✨ ¡${c.name} se transforma en ${CHARS[to].name}!`);
       f.id = to;
@@ -643,7 +799,7 @@ function gainXP(f, amount, log) {
       f.spatk = statAt(nc.base[3], f.lvl) + (f.spatkBonus || 0);
       f.spdef = statAt(nc.base[4], f.lvl) + (f.spdefBonus || 0);
       f.spd = statAt(nc.base[5], f.lvl) + (f.spdBonus || 0);
-      const nm = nc.learnset.filter(([l]) => l <= f.lvl).map(([, m]) => m).slice(-2);
+      const nm = formMovesAt(to, f.lvl);
       for (const m of nm) if (!f.moves.includes(m)) { f.moves.push(m); if (f.moves.length > 2) f.moves.shift(); }
       registerDex(to);
     }
@@ -659,9 +815,10 @@ function registerRecruit(id) {
   registerDex(id);
   if (!meta.recruited.includes(id)) { meta.recruited.push(id); saveMeta(); }
 }
-// Desbloquea para futuras aventuras a todos los nakamas de la banda actual al superar un jefe
+// Los reclutas de la banda actual solo son permanentes al completar la isla.
 function unlockRoster(allowBosses = true) {
   const added = [];
+  if (!run?.islandComplete) return added;
   for (const f of run.team) {
     const b = baseFormOf(f.id);
     if (!meta.roster.includes(b)) {
@@ -676,14 +833,15 @@ function unlockRoster(allowBosses = true) {
 // ---------- Generación de mapa ----------
 const NODE_TYPES = {
   wild: { emoji: '🏴‍☠️', label: 'Pirata salvaje' },
-  marine: { emoji: '⚓', label: 'Combate Marine' },
+  marine: { emoji: '🧢', label: 'Combate Marine' },
   item: { emoji: '🎁', label: 'Objeto' },
   mystery: { emoji: '❓', label: 'Misterio' },
   shop: { emoji: '🏪', label: 'Tienda' },
   rest: { emoji: '⛺', label: 'Campamento' },
-  special: { emoji: '🌟', label: 'Pirata especial' },
+  special: { emoji: '🌟', label: 'Crossguild' },
   boss: { emoji: '💀', label: 'Jefe' },
   crossover: { emoji: '🌀', label: 'Camino alternativo' },
+  travel: { emoji: '🧭', label: 'Siguiente mapa' },
 };
 
 function genMap(island) {
@@ -753,39 +911,56 @@ let currentTrack = null;
 let bgmAudio = null;
 let isMuted = false;
 try { isMuted = localStorage.getItem('oplike_muted') === 'true'; } catch (e) { }
+let musicFocused = document.hasFocus ? document.hasFocus() : true;
+
+function syncMusicPlayback() {
+  const audio = bgmAudio;
+  if (!audio) return;
+  if (!currentTrack || isMuted || document.hidden || !musicFocused) {
+    audio.pause();
+    return;
+  }
+  if (!audio.paused) return;
+  // Autoplay can be denied until the next user interaction.
+  audio.play()?.then(() => {
+    if (audio !== bgmAudio || !currentTrack || isMuted || document.hidden || !musicFocused) audio.pause();
+  }).catch(() => {});
+}
+
+document.addEventListener('visibilitychange', () => {
+  musicFocused = !document.hidden && (document.hasFocus ? document.hasFocus() : true);
+  syncMusicPlayback();
+});
+globalThis.addEventListener?.('blur', () => { musicFocused = false; syncMusicPlayback(); });
+globalThis.addEventListener?.('focus', () => { musicFocused = true; syncMusicPlayback(); });
+globalThis.addEventListener?.('pagehide', () => { musicFocused = false; syncMusicPlayback(); });
+globalThis.addEventListener?.('pageshow', () => {
+  musicFocused = document.hasFocus ? document.hasFocus() : true;
+  syncMusicPlayback();
+});
+['click', 'keydown', 'touchstart'].forEach(type => document.addEventListener(type, syncMusicPlayback));
 
 function playMusic(track) {
-  if (currentTrack === track) return;
+  if (currentTrack === track) return syncMusicPlayback();
   currentTrack = track;
   if (bgmAudio) {
     bgmAudio.pause();
     bgmAudio.currentTime = 0;
   }
+  bgmAudio = null;
   if (!track) return;
   bgmAudio = new Audio(`soundtracks/${track}.mp3`);
   bgmAudio.loop = true;
   bgmAudio.muted = isMuted;
   bgmAudio.volume = 0.45;
-  const playPromise = bgmAudio.play();
-  if (playPromise !== undefined) {
-    playPromise.catch(() => {
-      const unlock = () => {
-        if (bgmAudio && currentTrack === track) bgmAudio.play().catch(() => { });
-        document.removeEventListener('click', unlock);
-        document.removeEventListener('keydown', unlock);
-        document.removeEventListener('touchstart', unlock);
-      };
-      document.addEventListener('click', unlock);
-      document.addEventListener('keydown', unlock);
-      document.addEventListener('touchstart', unlock);
-    });
-  }
+  syncMusicPlayback();
 }
 
 function toggleMute() {
   isMuted = !isMuted;
   try { localStorage.setItem('oplike_muted', String(isMuted)); } catch (e) { }
   if (bgmAudio) bgmAudio.muted = isMuted;
+  syncMusicPlayback();
   const btn = $('#btn-mute');
   if (btn) btn.textContent = isMuted ? '🔇 MÚSICA' : '🎵 MÚSICA';
   const chkBtn = $('#chk-music-toggle');
@@ -812,7 +987,10 @@ function cycleTopbarAuto() {
     toast('⏹️ Modo Auto: PAUSADO');
   }
   if (typeof battle !== 'undefined' && battle && !battle.over) {
-    if (autoMode) battle.speed = (autoSettings.speed === 'x1') ? 1 : 2;
+    if (autoMode && combatSpeedOverride === null) {
+      battle.speed = (autoSettings.speed === 'x1') ? 1 : 2;
+      autoSpeed = battle.speed;
+    }
     refreshControls();
     renderBattlePreserveLog();
   } else if (typeof run !== 'undefined' && run) {
@@ -823,7 +1001,25 @@ function cycleTopbarAuto() {
 }
 
 // ---------- Render raíz ----------
+// Mobile browser zoom, toolbars and keyboards can shrink the visible viewport
+// without changing the layout viewport used by fixed event overlays.
+function syncGameViewport() {
+  const viewport = globalThis.visualViewport;
+  const style = document.documentElement?.style;
+  if (!viewport || !style) return;
+  style.setProperty('--game-view-width', `${viewport.width}px`);
+  style.setProperty('--game-view-height', `${viewport.height}px`);
+  style.setProperty('--game-view-left', `${viewport.offsetLeft}px`);
+  style.setProperty('--game-view-top', `${viewport.offsetTop}px`);
+}
+globalThis.visualViewport?.addEventListener('resize', syncGameViewport);
+globalThis.visualViewport?.addEventListener('scroll', syncGameViewport);
+syncGameViewport();
+
 function render(html) {
+  worldNavigator?.destroy();
+  worldNavigator = null;
+  worldSelection = null;
   applyDisplayPreferences();
   app.innerHTML = html;
   const btn = $('#btn-mute');
@@ -832,10 +1028,15 @@ function render(html) {
   if (saveBtn) saveBtn.onclick = manualSave;
   const setBtn = $('#btn-settings');
   if (setBtn) setBtn.onclick = showSettingsModal;
+  const speedBtn = $('#btn-map-speed');
+  if (speedBtn) speedBtn.onclick = cycleBattleSpeed;
   const autoBtn = $('#btn-topbar-auto');
   if (autoBtn) autoBtn.onclick = cycleTopbarAuto;
+  const cancelRepeat = $('#btn-cancel-island-repeat');
+  if (cancelRepeat) cancelRepeat.onclick = cancelIslandRepeats;
 }
 function toast(msg) {
+  document.querySelectorAll('.toast').forEach(el => el.remove());
   const t = document.createElement('div');
   t.className = 'toast'; t.textContent = msg;
   document.body.appendChild(t);
@@ -856,9 +1057,18 @@ function typeBadges(types) {
   ).join('')}</div>`;
 }
 
+function trackSagaStat(key, qty = 1) {
+  if (!run || battle?.tower || !['classic','nuzlocke'].includes(run.mode) || !SAGAS[run.saga]) return;
+  const sagaId = SAGAS[run.saga].id;
+  meta.sagaStats ||= {};
+  meta.sagaStats[sagaId] ||= {};
+  meta.sagaStats[sagaId][key] = (meta.sagaStats[sagaId][key] || 0) + qty;
+}
+
 function trackStat(key, qty = 1) {
   meta.stats = meta.stats || { kills: 0, items: 0 };
   meta.stats[key] = (meta.stats[key] || 0) + qty;
+  trackSagaStat(key, qty);
   saveMeta();
 }
 
@@ -872,18 +1082,22 @@ function trackKills(qty = 1) {
 
 function berriesHTML(v) { return `฿${v.toLocaleString('es')}`; }
 
-function topbar(showBerries = false, showAuto = showBerries) {
+function topbar(showBerries = false, showAuto = showBerries, showSpeed = false, showFlee = false) {
   const autoLabel = !autoMode ? '🤖 PAUSADO' : (autoSettings.speed === 'x1' ? '🤖 AUTO x1' : '🤖 AUTO x2');
   const autoBtnClass = !autoMode ? 'gray' : 'green';
+  const combatSpeed = battle?.speed ?? preferredCombatSpeed();
   return `<div class="topbar">
     <div class="logo">ONE PIECE <span>ROGUE LIKE</span></div>
     ${showBerries && run ? `<div class="floating-berries"><div class="berries">${berriesHTML(run.berries)}</div></div>` : ''}
     <div class="floating-controls">
-      <button class="btn small green" id="btn-save" title="Guardar partida en este dispositivo" aria-label="Guardar partida en este dispositivo">💾</button>
-      <button class="btn small gray" id="btn-settings" title="Ajustes de juego">⚙️ AJUSTES</button>
       ${showAuto ? `<button class="btn small ${autoBtnClass}" id="btn-topbar-auto" title="Cambiar velocidad o activar/pausar modo auto">${autoLabel}</button>` : ''}
+      <button class="btn small gray" id="btn-settings" title="Ajustes de juego">⚙️ AJUSTES</button>
+      ${showSpeed ? `<button class="btn small gray" id="btn-map-speed" title="Velocidad de combate: x1, x2 o x4" aria-label="Velocidad de combate x${combatSpeed}" aria-live="polite">⏩ x${combatSpeed}</button>` : ''}
+      <button class="btn small green" id="btn-save" title="Guardar partida como JSON" aria-label="Guardar partida como JSON">💾</button>
+      ${showBerries && showAuto && run && !showFlee ? '<button class="btn small red" id="btn-abandon" title="Abandonar el viaje" aria-label="Abandonar el viaje"><span aria-hidden="true">🏳️</span></button>' : ''}
+      ${showFlee ? '<button class="btn small red" data-ctl="run">🏃 HUIR</button>' : ''}
     </div>
-  </div>`;
+  </div>${islandRepeatStatusHTML()}`;
 }
 
 function applyDisplayPreferences() {
@@ -915,7 +1129,7 @@ function showSettingsModal() {
   meta.settings = meta.settings || { showEventConfirm: true, customSounds: false };
 
   const existing = document.querySelector('#settings-modal-overlay');
-  if (existing) existing.remove();
+  if (existing) return;
 
   const ov = document.createElement('div');
   ov.id = 'settings-modal-overlay';
@@ -923,6 +1137,13 @@ function showSettingsModal() {
 
   const showConfirm = meta.settings.showEventConfirm !== false;
   const customSounds = !!meta.settings.customSounds;
+  const bagAuto = autoBackpackSettings();
+  const settingsBattle = battle && !battle.over ? battle : null;
+  const wasWaiting = settingsBattle?.waiting;
+  const settingsRun = run;
+  const onMap = !!document.getElementById?.('island-carousel');
+  if (onMap) { clearTimeout(autoTimer); autoTimer = null; }
+  if (settingsBattle) pauseBattle();
 
   ov.innerHTML = `
     <div class="modal" style="max-width:440px;width:90%;">
@@ -933,6 +1154,24 @@ function showSettingsModal() {
         ${mobileColumnsControl()}
         <p>El aspecto y las columnas se guardan en este dispositivo.</p>
       </div>
+      <fieldset class="bag-auto-settings"><legend>🤖 Modo automático</legend><p>Configura la ruta, encuentros, compras y uso de objetos. Si la mochila está llena, guarda lo que quepa y deja el excedente.</p><button class="btn blue" id="setting-auto-config">Configurar modo automático</button></fieldset>
+      <fieldset class="bag-auto-settings">
+        <legend>🎒 Uso automático de la mochila</legend>
+        <label><input type="checkbox" id="setting-bag-auto" ${bagAuto.enabled ? 'checked' : ''}> Usar objetos automáticamente</label>
+        <p>Funciona aunque el avance automático esté pausado. Se comprueba al volver al mapa y al inicio de cada ronda.</p>
+        <label for="setting-bag-where">Dónde usar objetos</label>
+        <select id="setting-bag-where"><option value="both" ${bagAuto.where === 'both' ? 'selected' : ''}>Isla y combate</option><option value="map" ${bagAuto.where === 'map' ? 'selected' : ''}>Solo en la isla</option><option value="combat" ${bagAuto.where === 'combat' ? 'selected' : ''}>Solo en combate</option></select>
+        <label for="setting-bag-threshold">Curar con estos PS o menos</label>
+        <select id="setting-bag-threshold">${[0,25,50,75,99].map(n=>`<option value="${n}" ${bagAuto.threshold === n ? 'selected' : ''}>${n === 0 ? 'No curar automáticamente' : n === 99 ? 'Cualquier daño' : n + '% de PS'}</option>`).join('')}</select>
+        <span>Objetos permitidos</span>
+        ${['carne','carnereal','bocadillo','sake'].map(id=>`<label><input type="checkbox" data-setting-bag-item="${id}" ${bagAuto.items[id] ? 'checked' : ''}> ${ITEMS[id].emoji} ${ITEMS[id].name}</label>`).join('')}
+        <p>Prioriza la cura más pequeña que cubra el daño. Máximo un objeto por nakama en cada comprobación. El sake revive a un caído y respeta Nuzlocke. Frutas, mejoras y carteles conservan su uso actual.</p>
+      </fieldset>
+      <fieldset class="bag-auto-settings">
+        <legend>🎒 Uso manual en combate</legend>
+        <label><input type="checkbox" id="setting-bag-quick-use" ${meta.settings.quickBattleItems === true ? 'checked' : ''}> Usar objetos sin confirmación</label>
+        <p>Al pulsar un objeto durante el combate se usa una unidad al instante. Puedes pulsar varios seguidos sin abrir su ficha.</p>
+      </fieldset>
       <div style="display:flex;flex-direction:column;gap:12px;margin:16px 0;">
         <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.05);padding:10px;border-radius:6px;border:1px solid #ccc;">
           <div style="flex:1;padding-right:10px;">
@@ -971,6 +1210,17 @@ function showSettingsModal() {
   `;
   document.body.appendChild(ov);
 
+  ov.querySelector('#setting-bag-auto').onchange = e => setAutoBackpackSettings({enabled:e.target.checked});
+  ov.querySelector('#setting-bag-quick-use').onchange = e => {
+    meta.settings.quickBattleItems = e.target.checked;
+    saveMeta();
+  };
+  ov.querySelector('#setting-bag-where').onchange = e => setAutoBackpackSettings({where:e.target.value});
+  ov.querySelector('#setting-bag-threshold').onchange = e => setAutoBackpackSettings({threshold:Number(e.target.value)});
+  ov.querySelectorAll('[data-setting-bag-item]').forEach(input => {
+    input.onchange = e => setAutoBackpackSettings({items:{[input.dataset.settingBagItem]:e.target.checked}});
+  });
+
   ov.querySelector('#setting-theme').onchange = e => setDisplayPreference('theme', e.target.value);
 
   ov.querySelector('#chk-music-toggle').onclick = () => {
@@ -990,8 +1240,16 @@ function showSettingsModal() {
     }
   };
 
-  ov.querySelector('#btn-save-settings').onclick = () => ov.remove();
-  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true; ov.remove();
+    if (settingsBattle && battle === settingsBattle && !battle.over && !wasWaiting) resumeBattle();
+    else if (!settingsBattle && onMap && run === settingsRun) screenMap(2);
+  };
+  ov.querySelector('#btn-save-settings').onclick = close;
+  ov.querySelector('#setting-auto-config').onclick = () => showAutoSettingsModal(ov, close);
+  ov.onclick = e => { if (e.target === ov) close(); };
 }
 
 function showNodeConfirmModal(r, i) {
@@ -1018,13 +1276,16 @@ function showNodeConfirmModal(r, i) {
       detailsText = 'Un evento misterioso e impredecible. Puede resultar en una gran oportunidad, un tesoro o un desafío inesperado.';
       break;
     case 'shop':
-      detailsText = 'Visita el Mercado Clandestino de la isla para comprar consumibles, reclutar nakamas o mejorar tu banda con Berries.';
+      detailsText = 'Visita el Crossguild de la isla para comprar consumibles, reclutar nakamas o mejorar tu banda con Berries.';
       break;
     case 'rest':
       detailsText = 'Tu banda descansará en el campamento. Todos los nakamas conscientes recuperarán un 50% de sus PS máximos.';
       break;
     case 'special':
-      detailsText = 'Combate especial contra un pirata de gran poder. Una batalla muy exigente pero con grandes recompensas.';
+      detailsText = specialPiratePoolHTML();
+      break;
+    case 'travel':
+      detailsText = 'Continúa al siguiente mapa de esta isla con tu banda, objetos y PS actuales. El jefe espera al final del último mapa.';
       break;
     case 'crossover':
       detailsText = 'Un portal dimensional te traslada a un evento alternativo fuera de la historia principal.';
@@ -1075,6 +1336,8 @@ function makeListReorderable(container, itemSelector, onReorder) {
   let touchStartY = 0;
   let touchStartX = 0;
   let isTouchDragging = false;
+  let holdTimer = null;
+  const cancelHold = () => { clearTimeout(holdTimer); holdTimer = null; };
 
   items.forEach((item) => {
     const idx = parseInt(item.dataset.idx !== undefined ? item.dataset.idx : item.dataset.slot);
@@ -1112,12 +1375,19 @@ function makeListReorderable(container, itemSelector, onReorder) {
     };
 
     item.ontouchstart = e => {
+      cancelHold();
+      if (e.touches.length !== 1 || e.target.closest('button')) return;
       const touch = e.touches[0];
       touchStartY = touch.clientY;
       touchStartX = touch.clientX;
       touchStartElement = item;
       draggedIdx = idx;
       isTouchDragging = false;
+      holdTimer = setTimeout(() => {
+        if (!touchStartElement?.isConnected) return;
+        isTouchDragging = true;
+        touchStartElement.classList.add('dragging');
+      }, 350);
     };
 
     item.ontouchmove = e => {
@@ -1127,8 +1397,10 @@ function makeListReorderable(container, itemSelector, onReorder) {
       const dx = touch.clientX - touchStartX;
 
       if (!isTouchDragging && (Math.abs(dy) > 6 || Math.abs(dx) > 6)) {
-        isTouchDragging = true;
-        touchStartElement.classList.add('dragging');
+        cancelHold();
+        draggedIdx = null;
+        touchStartElement = null;
+        return;
       }
 
       if (isTouchDragging) {
@@ -1146,6 +1418,8 @@ function makeListReorderable(container, itemSelector, onReorder) {
     };
 
     item.ontouchend = e => {
+      cancelHold();
+      if (isTouchDragging && e.cancelable) e.preventDefault();
       if (draggedIdx !== null && isTouchDragging) {
         const touch = e.changedTouches[0];
         const elUnder = document.elementFromPoint(touch.clientX, touch.clientY);
@@ -1159,6 +1433,13 @@ function makeListReorderable(container, itemSelector, onReorder) {
       }
       if (touchStartElement) touchStartElement.classList.remove('dragging');
       items.forEach(el => el.classList.remove('dragover'));
+      touchStartElement = null;
+      draggedIdx = null;
+      isTouchDragging = false;
+    };
+    item.ontouchcancel = () => {
+      cancelHold();
+      items.forEach(el => el.classList.remove('dragging', 'dragover'));
       touchStartElement = null;
       draggedIdx = null;
       isTouchDragging = false;
@@ -1304,7 +1585,7 @@ const PROGRESSIVE_ACHIEVEMENTS = [
     id: 'special_visit',
     title: 'Encuentros Especiales',
     emoji: '🌟',
-    desc: 'Visita nodos de piratas especiales.',
+    desc: 'Visita nodos de Crossguild.',
     goals: [5, 15, 35, 75, 150],
     fames: [50, 100, 180, 300, 500],
     check: () => (meta.stats && meta.stats.special_visit) || 0,
@@ -1340,6 +1621,33 @@ const PROGRESSIVE_ACHIEVEMENTS = [
   }
 ];
 
+// Preserve existing tiers and claims; append repeatable goals up to 10,000.
+const GLOBAL_PROGRESSIVE_ACHIEVEMENTS = [...PROGRESSIVE_ACHIEVEMENTS];
+for (const p of GLOBAL_PROGRESSIVE_ACHIEVEMENTS) {
+  p.legacyTierLimit = p.goals.length;
+  if (p.id === 'dex') continue; // Unique discoveries are bounded by the character roster.
+  for (const goal of [100,250,500,1000,2000,3500,5000,7500,10000]) {
+    if (goal <= p.goals.at(-1)) continue;
+    p.goals.push(goal);
+    p.fames.push(Math.ceil(p.fames.at(-1) * 1.35 / 50) * 50);
+  }
+}
+const SAGA_PROGRESSIVE_ACHIEVEMENTS = SAGAS.flatMap(saga =>
+  GLOBAL_PROGRESSIVE_ACHIEVEMENTS.filter(p => p.id !== 'dex').map(p => ({
+    id: `saga_prog_${saga.id}_${p.id}`,
+    sagaId: saga.id,
+    title: `${p.title} · ${saga.name}`, emoji: p.emoji,
+    desc: `${p.desc} Solo en ${saga.name}.`,
+    goals: [...p.goals], fames: [...p.fames],
+    check: () => {
+      if (p.id === 'sagas') return (meta.wins[saga.id] || 0) + (meta.nuzWins[saga.id] || 0);
+      if (p.id === 'nuzlocke_wins') return meta.nuzWins[saga.id] || 0;
+      return meta.sagaStats?.[saga.id]?.[p.id] || 0;
+    }
+  }))
+);
+PROGRESSIVE_ACHIEVEMENTS.push(...SAGA_PROGRESSIVE_ACHIEVEMENTS);
+
 const STATIC_ACHIEVEMENTS = [
   { id: 'solo_sailor', title: 'Lobo de Mar Solitario', emoji: '🐺', desc: 'Zarpa y completa una saga con solo 1 personaje.', goal: 1, check: () => (meta.soloWins || 0), fame: 300, cat: 'desafios' },
   { id: 'straw_hats', title: 'Los 10 Sombrero de Paja', emoji: '🏴‍☠️', desc: 'Desbloquea o recluta a los 10 nakamas principales.', goal: 10, check: () => STRAW_HAT_MEMBERS.filter(id => isNakamaUnlocked(id)).length, fame: 250, cat: 'desafios' },
@@ -1361,8 +1669,20 @@ const SAGA_DIFF_ACHIEVEMENTS = SAGA_DEFS.flatMap(s =>
     goal: 1,
     check: () => (meta.sagaDiffWins && meta.sagaDiffWins[s.id] && meta.sagaDiffWins[s.id][d.id]) ? 1 : 0,
     fame: 40 + d.id * 30,
-    cat: 'sagas'
+    sagaId: s.id, cat: 'sagas'
   }))
+);
+
+const ISLAND_DIFF_ACHIEVEMENTS = SAGAS.flatMap((saga, sagaIdx) =>
+  saga.islands.flatMap((island, islandIdx) => DIFFICULTIES.map(d => ({
+    id: `island_diff_${saga.id}_${islandIdx}_${d.id}`,
+    sagaId: saga.id, cat: 'islas', emoji: d.emoji,
+    title: `${island.name} · ${d.name}`,
+    desc: `Supera ${island.name} (${saga.name}) por primera vez en ${d.name}, en Clásico o Nuzlocke.`,
+    goal: 1,
+    check: () => ['classic','nuzlocke'].some(mode => completedIslands(sagaIdx,mode,d.id).includes(islandIdx)) ? 1 : 0,
+    fame: 25 * (sagaIdx + 1) * d.id * d.id
+  })))
 );
 
 function getClaimedProgTier(p) {
@@ -1376,13 +1696,13 @@ function getClaimedProgTier(p) {
       if (meta.claimedAch[legId]) count++;
     }
   }
-  return count;
+  return Math.min(count, p.legacyTierLimit || p.goals.length);
 }
 
 function getAchievementsInfo() {
   meta.claimedAch = meta.claimedAch || {};
   meta.claimedProg = meta.claimedProg || {};
-  const visibleStaticList = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS).filter(isVisibleAch);
+  const visibleStaticList = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS, ISLAND_DIFF_ACHIEVEMENTS).filter(isVisibleAch);
   const completedStaticCount = visibleStaticList.filter(a => a.check() >= a.goal).length;
   const completedProgTiers = PROGRESSIVE_ACHIEVEMENTS.reduce((acc, p) => acc + getClaimedProgTier(p), 0);
   const totalCompleted = completedStaticCount + completedProgTiers;
@@ -1408,207 +1728,136 @@ function isVisibleAch(a) {
   return true;
 }
 
-let currentAchCategory = 'all';
-
-function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchCategory) {
-  meta.claimedAch = meta.claimedAch || {};
-  meta.claimedProg = meta.claimedProg || {};
-  currentAchCategory = initialCategory;
-
-  const visibleStaticList = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS).filter(isVisibleAch);
-  const { totalCompleted, totalAchievements } = getAchievementsInfo();
-
-  const renderProgCardHTML = p => {
-    const tierIdx = getClaimedProgTier(p);
-    const val = p.check();
-    const totalTiers = p.goals.length;
-    const isMax = tierIdx >= totalTiers;
-    const currentGoal = isMax ? p.goals[totalTiers - 1] : p.goals[tierIdx];
-    const currentFame = isMax ? p.fames[totalTiers - 1] : p.fames[tierIdx];
-    const done = !isMax && val >= currentGoal;
-    const pct = isMax ? 100 : Math.min(100, Math.floor((val / currentGoal) * 100));
-
-    return `<div class="achieve-row ${isMax ? 'done' : ''}">
-      <span class="emoji">${p.emoji}</span>
-      <div class="info">
-        <b>${p.title} ${isMax ? '(MÁXIMO)' : `Nivel ${tierIdx + 1}/${totalTiers}`}</b> — <span style="color:var(--accent);">⭐+${currentFame} Fama</span><br>
-        <small style="color:#555;">${p.desc}</small>
-        <div class="achieve-bar"><i style="width:${pct}%"></i></div>
-        <div style="font-size:7.5px;color:#666;margin-top:3px;font-weight:bold;">
-          ${isMax ? `Completado: ${val}/${currentGoal} (100%)` : `Progreso Nivel ${tierIdx + 1}: ${val}/${currentGoal} (${pct}%)`}
-        </div>
-      </div>
-      ${isMax
-        ? '<span style="font-size:8px;color:var(--green);font-weight:bold;">✓ MÁXIMO</span>'
-        : done
-          ? `<button class="btn small green" data-claim-prog="${p.id}">RECLAMAR ⭐${currentFame}</button>`
-          : '<span style="font-size:8px;color:#888;">🔒 EN PROGRESO</span>'}
-    </div>`;
-  };
-
-  const renderStaticCardHTML = a => {
-    const val = a.check();
-    const done = val >= a.goal;
-    const claimed = !!meta.claimedAch[a.id];
-    const pct = Math.min(100, Math.floor((val / a.goal) * 100));
-    return `<div class="achieve-row ${claimed ? 'done' : ''}">
-      <span class="emoji">${a.emoji}</span>
-      <div class="info">
-        <b>${a.title}</b> — <span style="color:var(--accent);">⭐+${a.fame} Fama</span><br>
-        <small style="color:#555;">${a.desc}</small>
-        <div class="achieve-bar"><i style="width:${pct}%"></i></div>
-        <div style="font-size:7.5px;color:#666;margin-top:3px;font-weight:bold;">Progreso: ${val}/${a.goal} (${pct}%)</div>
-      </div>
-      ${claimed ? '<span style="font-size:8px;color:var(--green);font-weight:bold;">✓ RECLAMADO</span>'
-        : done ? `<button class="btn small green" data-claim="${a.id}">RECLAMAR ⭐${a.fame}</button>`
-          : '<span style="font-size:8px;color:#888;">🔒 EN PROGRESO</span>'}
-    </div>`;
-  };
-
-  const getProgCardItem = p => {
-    const tierIdx = getClaimedProgTier(p);
-    const val = p.check();
-    const totalTiers = p.goals.length;
-    const isMax = tierIdx >= totalTiers;
-    const currentGoal = isMax ? p.goals[totalTiers - 1] : p.goals[tierIdx];
-    const canClaim = !isMax && val >= currentGoal;
-    return { canClaim, html: renderProgCardHTML(p) };
-  };
-
-  const getStaticCardItem = a => {
-    const val = a.check();
-    const done = val >= a.goal;
-    const claimed = !!meta.claimedAch[a.id];
-    const canClaim = !claimed && done;
-    return { canClaim, html: renderStaticCardHTML(a) };
-  };
-
-  const renderModalContent = () => {
-    let items = [];
-    if (currentAchCategory === 'all') {
-      items = [
-        ...PROGRESSIVE_ACHIEVEMENTS.map(getProgCardItem),
-        ...visibleStaticList.map(getStaticCardItem)
-      ];
-    } else if (currentAchCategory === 'prog') {
-      items = PROGRESSIVE_ACHIEVEMENTS.map(getProgCardItem);
-    } else if (currentAchCategory === 'sagas') {
-      items = visibleStaticList.filter(a => a.id.startsWith('saga_diff_')).map(getStaticCardItem);
-    } else if (currentAchCategory === 'desafios') {
-      items = visibleStaticList.filter(a => !a.id.startsWith('saga_diff_')).map(getStaticCardItem);
-    }
-
-    items.sort((a, b) => (b.canClaim ? 1 : 0) - (a.canClaim ? 1 : 0));
-    let html = items.map(x => x.html).join('');
-
-    if (!html) html = '<div style="font-size:9px;color:#888;text-align:center;padding:20px;">No hay logros en esta categoría.</div>';
-
-    return `
-      <h2>🏆 Logros de Pirata (${totalCompleted}/${totalAchievements})</h2>
-      <p style="font-size:8px;text-align:center;margin-bottom:8px;color:#666;">
-        Completa desafíos en tus aventuras para ganar ⭐ Fama adicional.
-      </p>
-      <div class="tabs" style="margin-bottom:10px;flex-wrap:wrap;gap:4px;">
-        <div class="tab ${currentAchCategory === 'all' ? 'active' : ''}" id="ach-cat-all" style="font-size:8px;padding:4px 6px;">TODOS</div>
-        <div class="tab ${currentAchCategory === 'prog' ? 'active' : ''}" id="ach-cat-prog" style="font-size:8px;padding:4px 6px;">🔄 PROGRESIVOS (${PROGRESSIVE_ACHIEVEMENTS.length})</div>
-        <div class="tab ${currentAchCategory === 'sagas' ? 'active' : ''}" id="ach-cat-sagas" style="font-size:8px;padding:4px 6px;">📜 SAGAS (${visibleStaticList.filter(a => a.id.startsWith('saga_diff_')).length})</div>
-        <div class="tab ${currentAchCategory === 'desafios' ? 'active' : ''}" id="ach-cat-desafios" style="font-size:8px;padding:4px 6px;">🎯 DESAFÍOS (${visibleStaticList.filter(a => !a.id.startsWith('saga_diff_')).length})</div>
-      </div>
-      <div class="achieve-list-container" style="max-height:340px;overflow-y:auto;">
-        ${html}
-      </div>
-      <div class="actions" style="margin-top:12px;"><button class="btn gray" id="ach-close">CERRAR</button></div>
-    `;
-  };
-
-  const existingOverlay = document.querySelector('#achievements-overlay');
-  if (existingOverlay) existingOverlay.remove();
-
-  const ov = document.createElement('div');
-  ov.id = 'achievements-overlay';
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="max-width:600px;">${renderModalContent()}</div>`;
-  document.body.appendChild(ov);
-
-  const container = ov.querySelector('.achieve-list-container');
-  if (container && savedScrollTop) {
-    container.scrollTop = savedScrollTop;
+function claimAchievement(id, progressive = false) {
+  if (progressive) {
+    const p = PROGRESSIVE_ACHIEVEMENTS.find(a=>a.id===id);
+    if (!p) return 0;
+    const tier = getClaimedProgTier(p);
+    if (tier >= p.goals.length || p.check() < p.goals[tier]) return 0;
+    meta.claimedProg[id] = tier + 1;
+    gainFame(p.fames[tier]);
+    return p.fames[tier];
   }
-
-  const syncFameUI = () => {
-    const shipBtn = $('#btn-ship');
-    if (shipBtn) shipBtn.innerHTML = `🏪 Tienda (⭐${meta.fame})`;
-    const achBtn = $('#btn-achievements');
-    const { totalCompleted, totalAchievements, hasUnclaimedAch } = getAchievementsInfo();
-
-    if (achBtn) {
-      achBtn.innerHTML = `
-        <span>🏆 Logros${hasUnclaimedAch ? ' <span class="ach-badge-dot" style="background:#e74c3c;color:#fff;font-size:7px;border-radius:50%;padding:1px 4px;margin-left:2px;font-weight:bold;animation:pulse 1s infinite alternate;border:1px solid #fff;">!</span>' : ''}</span>
-        <span style="font-size:8px;opacity:0.85;margin-top:2px;">(${totalCompleted}/${totalAchievements})</span>
-      `;
-    }
-    const topAchBtn = $('#btn-top-ach');
-    if (topAchBtn) {
-      topAchBtn.innerHTML = `🏆${hasUnclaimedAch ? '🔴' : ''}`;
-    }
-  };
-
-  const bindEvents = () => {
-    const cont = ov.querySelector('.achieve-list-container');
-    ['all', 'prog', 'sagas', 'desafios'].forEach(cat => {
-      const tabEl = ov.querySelector(`#ach-cat-${cat}`);
-      if (tabEl) tabEl.onclick = () => {
-        currentAchCategory = cat;
-        ov.querySelector('.modal').innerHTML = renderModalContent();
-        bindEvents();
-      };
-    });
-
-    ov.querySelectorAll('[data-claim]').forEach(btn => {
-      btn.onclick = () => {
-        const st = cont ? cont.scrollTop : 0;
-        const id = btn.dataset.claim;
-        const a = visibleStaticList.find(x => x.id === id);
-        if (!a || meta.claimedAch[id] || a.check() < a.goal) return;
-        meta.claimedAch[id] = true;
-        gainFame(a.fame);
-        saveMeta();
-        syncFameUI();
-        toast(`🏆 Logro completado: ¡+${a.fame} Fama!`);
-        ov.querySelector('.modal').innerHTML = renderModalContent();
-        bindEvents();
-        if (cont) cont.scrollTop = st;
-      };
-    });
-
-    ov.querySelectorAll('[data-claim-prog]').forEach(btn => {
-      btn.onclick = () => {
-        const st = cont ? cont.scrollTop : 0;
-        const id = btn.dataset.claimProg;
-        const p = PROGRESSIVE_ACHIEVEMENTS.find(x => x.id === id);
-        if (!p) return;
-        const tierIdx = getClaimedProgTier(p);
-        if (tierIdx >= p.goals.length || p.check() < p.goals[tierIdx]) return;
-
-        meta.claimedProg = meta.claimedProg || {};
-        meta.claimedProg[id] = tierIdx + 1;
-        gainFame(p.fames[tierIdx]);
-        saveMeta();
-        syncFameUI();
-        toast(`🏆 Logro Nivel ${tierIdx + 1} completado: ¡+${p.fames[tierIdx]} Fama!`);
-        ov.querySelector('.modal').innerHTML = renderModalContent();
-        bindEvents();
-        if (cont) cont.scrollTop = st;
-      };
-    });
-
-    const closeBtn = ov.querySelector('#ach-close');
-    if (closeBtn) closeBtn.onclick = () => { ov.remove(); syncFameUI(); };
-  };
-
-  bindEvents();
-  ov.onclick = e => { if (e.target === ov) { ov.remove(); syncFameUI(); } };
+  const a = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS,ISLAND_DIFF_ACHIEVEMENTS).find(a=>a.id===id);
+  if (!a || meta.claimedAch?.[id] || a.check() < a.goal) return 0;
+  meta.claimedAch ||= {};
+  meta.claimedAch[id] = true;
+  gainFame(a.fame);
+  return a.fame;
 }
+
+let currentAchCategory = 'all';
+let currentAchSaga = 'all';
+
+function collectionText(value) {
+  return String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function bindCollectionDialog(ov, close, initialSelector) {
+  ov.onkeydown = event => {
+    if ([...document.querySelectorAll('.overlay')].at(-1) !== ov) return;
+    if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); close(); return; }
+    if (event.key !== 'Tab') return;
+    const buttons = [...ov.querySelectorAll('button:not(:disabled),input,select,summary,[tabindex="0"]')].filter(el => el.getClientRects().length);
+    const first = buttons[0], last = buttons.at(-1);
+    if (!first) return;
+    const active = document.activeElement, outside = !ov.contains(active);
+    if (event.shiftKey && (outside || active === first || (first.compareDocumentPosition(active) & Node.DOCUMENT_POSITION_PRECEDING))) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && (outside || active === last || (last.compareDocumentPosition(active) & Node.DOCUMENT_POSITION_FOLLOWING))) { event.preventDefault(); first.focus(); }
+  };
+  ov.querySelector(initialSelector)?.focus({preventScroll:true});
+}
+function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchCategory) {
+  meta.claimedAch ||= {};
+  meta.claimedProg ||= {};
+  currentAchCategory = initialCategory;
+  const previousFocus = document.activeElement;
+  const visibleStaticList = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS, ISLAND_DIFF_ACHIEVEMENTS).filter(isVisibleAch);
+  let query = '', state = 'all', sort = 'ready', page = 0, filtersOpen = false;
+  const pageSize = 20, number = value => Number(value).toLocaleString('es');
+  const describe = (a, progressive) => {
+    const tier = progressive ? getClaimedProgTier(a) : 0;
+    const claimed = progressive ? tier >= a.goals.length : !!meta.claimedAch[a.id];
+    const goal = progressive ? a.goals[Math.min(tier,a.goals.length-1)] : a.goal;
+    const fame = progressive ? a.fames[Math.min(tier,a.fames.length-1)] : a.fame;
+    const value = a.check(), ready = !claimed && value >= goal;
+    return {a,progressive,tier,claimed,goal,fame,value,ready,status:claimed?'claimed':ready?'ready':'progress'};
+  };
+  const renderCard = item => {
+    const {a,progressive,tier,claimed,goal,fame,value,ready} = item;
+    const pct = Math.min(100,Math.floor(value/goal*100));
+    const label = claimed ? 'Completado' : ready ? 'Por reclamar' : 'En progreso';
+    return `<article class="achievement-card ${item.status} ${['sagas','islas'].includes(a.cat)?'native-difficulty':''}" data-achievement="${a.id}" tabindex="-1">
+      <span class="achievement-icon" aria-hidden="true">${a.emoji}</span>
+      <div class="achievement-content"><div class="achievement-meta"><span class="achievement-status">${claimed?'✓ ':''}${label}</span>${progressive?`<span>Etapa ${Math.min(tier+1,a.goals.length)} de ${a.goals.length}</span>`:''}</div>
+        <h3>${a.title}</h3><p>${a.desc}</p>
+        <div class="achievement-progress" role="progressbar" aria-label="Progreso de ${collectionText(a.title)}" aria-valuemin="0" aria-valuemax="${goal}" aria-valuenow="${Math.min(value,goal)}" aria-valuetext="${number(value)} de ${number(goal)}"><i style="width:${pct}%"></i></div>
+        <div class="achievement-count"><span>${number(value)} / ${number(goal)}</span><span>${pct}%</span></div>
+      </div>
+      <div class="achievement-reward"><strong>+${number(fame)} <span>Fama</span></strong>${ready?`<button class="btn green" ${progressive?'data-claim-prog':'data-claim'}="${a.id}" aria-label="Reclamar ${number(fame)} Fama por ${collectionText(a.title)}">Reclamar</button>`:`<span>${claimed?'Recompensa recibida':'Recompensa'}</span>`}</div>
+    </article>`;
+  };
+  const renderContent = () => {
+    const all = [...PROGRESSIVE_ACHIEVEMENTS.map(a=>describe(a,true)),...visibleStaticList.map(a=>describe(a,false))];
+    const readyCount = all.filter(a=>a.ready).length;
+    const q = query.trim().toLocaleLowerCase('es');
+    const items = all.filter(({a,progressive,status}) =>
+      (currentAchCategory==='all' || (currentAchCategory==='prog'?progressive:!progressive&&a.cat===currentAchCategory)) &&
+      (currentAchSaga==='all' || (currentAchSaga==='global'?!a.sagaId:a.sagaId===currentAchSaga)) &&
+      (state==='all'||state===status) && (!q || `${a.title} ${a.desc}`.toLocaleLowerCase('es').includes(q))
+    ).sort((a,b)=>sort === 'ready' ? Number(b.ready)-Number(a.ready) :
+      (sort === 'progress-desc' ? -1 : 1) * (Math.min(1,a.value/a.goal)-Math.min(1,b.value/b.goal)));
+    const pages = Math.max(1,Math.ceil(items.length/pageSize));page=Math.min(page,pages-1);
+    const {totalCompleted,totalAchievements} = getAchievementsInfo();
+    return `<header class="collection-header"><div><span class="collection-eyebrow">Tu aventura</span><h2 id="ach-title" tabindex="-1">Logros de pirata</h2></div><button class="btn gray collection-close" id="ach-close" aria-label="Cerrar logros">Cerrar <span aria-hidden="true">×</span></button></header>
+      <div class="collection-summary"><div><strong>${number(totalCompleted)} <small>/ ${number(totalAchievements)}</small></strong><span>Objetivos completados</span></div><button class="collection-summary-action" id="ach-show-ready"><strong>${number(readyCount)}</strong><span>Por reclamar →</span></button></div>
+      <div class="collection-search"><label for="ach-search">Buscar logro<input id="ach-search" type="search" placeholder="Nombre, isla u objetivo" value="${collectionText(query)}"></label><label for="ach-state">Estado<select id="ach-state">${[['all','Todos'],['ready','Por reclamar'],['progress','En progreso'],['claimed','Completados']].map(([v,l])=>`<option value="${v}" ${state===v?'selected':''}>${l}</option>`).join('')}</select></label></div>
+      <details class="collection-extra" ${filtersOpen?'open':''}><summary>Filtros${currentAchCategory!=='all'||currentAchSaga!=='all'||sort!=='ready'?' · activos':''}</summary><div class="collection-filter-grid">
+        <label for="ach-sort">Ordenar por<select id="ach-sort">${[['ready','Por reclamar primero'],['progress-desc','% completado: mayor a menor'],['progress-asc','% completado: menor a mayor']].map(([v,l])=>`<option value="${v}" ${sort===v?'selected':''}>${l}</option>`).join('')}</select></label>
+        <label for="ach-category">Tipo de logro<select id="ach-category">${[['all','Todos los tipos'],['prog','Progresivos'],['sagas','Sagas'],['islas','Islas'],['desafios','Desafíos']].map(([v,l])=>`<option value="${v}" ${currentAchCategory===v?'selected':''}>${l}</option>`).join('')}</select></label>
+        <label for="ach-saga">Saga<select id="ach-saga">${[['all','Todas las sagas'],['global','Globales'],...SAGAS.map(s=>[s.id,s.name])].map(([v,l])=>`<option value="${v}" ${currentAchSaga===v?'selected':''}>${l}</option>`).join('')}</select></label>
+      </div></details>
+      <div class="collection-results"><span role="status">${number(items.length)} logros${items.length?` · ${number(page*pageSize+1)}–${number(Math.min((page+1)*pageSize,items.length))}`:''}</span><button class="collection-text-button" id="ach-reset">Limpiar filtros</button></div>
+      <div class="achieve-list-container collection-list" aria-label="Lista de logros" tabindex="0">${items.slice(page*pageSize,(page+1)*pageSize).map(renderCard).join('')||'<div class="collection-empty"><h3>No hay logros con estos filtros</h3><p>Prueba otra búsqueda o limpia los filtros.</p></div>'}</div>
+      <nav class="collection-pagination" aria-label="Páginas de logros"><button class="btn gray" data-ach-page="-1" ${page===0?'disabled':''} aria-label="Página anterior de logros">← Anterior</button><span>Página ${page+1} de ${pages}</span><button class="btn gray" data-ach-page="1" ${page===pages-1?'disabled':''} aria-label="Página siguiente de logros">Siguiente →</button></nav>`;
+  };
+  document.querySelector('#achievements-overlay')?.remove();
+  const ov = document.createElement('div');ov.id='achievements-overlay';ov.className='overlay collection-overlay';
+  ov.innerHTML=`<section class="modal collection-modal achievements-modal" role="dialog" aria-modal="true" aria-labelledby="ach-title">${renderContent()}</section>`;
+  document.body.appendChild(ov);
+  const syncFameUI = () => {
+    const info=getAchievementsInfo(),ach=$('#btn-achievements'),shop=$('#btn-ship'),top=$('#btn-top-ach');
+    if(shop)shop.innerHTML=`🏪 Tienda (⭐${meta.fame})`;
+    if(ach)ach.innerHTML=`<span>🏆 Logros${info.hasUnclaimedAch?' · ¡Por reclamar!':''}</span><span>(${info.totalCompleted}/${info.totalAchievements})</span>`;
+    if(top)top.innerHTML=`🏆${info.hasUnclaimedAch?'🔴':''}`;
+  };
+  const close=()=>{ov.remove();syncFameUI();if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});};
+  const refresh=(selector,scroll=0,cursor=null)=>{
+    filtersOpen=ov.querySelector('details').open;
+    ov.querySelector('.modal').innerHTML=renderContent();bindEvents();
+    ov.querySelector('.collection-list').scrollTop=scroll;
+    const target=ov.querySelector(selector)||ov.querySelector('#ach-title');
+    target.focus({preventScroll:true});if(cursor!==null)target.setSelectionRange?.(cursor,cursor);
+  };
+  const bindEvents=()=>{
+    ov.querySelector('#ach-close').onclick=close;
+    ov.querySelector('#ach-search').oninput=e=>{query=e.target.value;page=0;refresh('#ach-search',0,e.target.selectionStart);};
+    for(const [id,update] of [['ach-sort',v=>sort=v],['ach-state',v=>state=v],['ach-category',v=>currentAchCategory=v],['ach-saga',v=>currentAchSaga=v]])ov.querySelector('#'+id).onchange=e=>{update(e.target.value);page=0;refresh('#'+id);};
+    ov.querySelector('#ach-show-ready').onclick=()=>{state='ready';query='';currentAchCategory='all';currentAchSaga='all';page=0;refresh('#ach-state');};
+    ov.querySelector('#ach-reset').onclick=()=>{query='';state='all';sort='ready';currentAchCategory='all';currentAchSaga='all';page=0;refresh('#ach-search');};
+    ov.querySelectorAll('[data-ach-page]').forEach(btn=>btn.onclick=()=>{page+=Number(btn.dataset.achPage);refresh('.collection-list');});
+    ov.querySelectorAll('[data-claim],[data-claim-prog]').forEach(btn=>btn.onclick=()=>{
+      const progressive=!!btn.dataset.claimProg,id=btn.dataset.claimProg||btn.dataset.claim;
+      const scroll=ov.querySelector('.collection-list').scrollTop;
+      const fame=claimAchievement(id,progressive);if(!fame)return;
+      saveMeta();syncFameUI();toast(`🏆 ¡Recompensa recibida: +${number(fame)} Fama!`);
+      refresh(`[data-achievement="${id}"]`,scroll);
+    });
+  };
+  bindEvents();if(typeof savedScrollTop==='number')ov.querySelector('.collection-list').scrollTop=savedScrollTop;
+  ov.onclick=e=>{if(e.target===ov)close();};
+  bindCollectionDialog(ov,close,'#ach-title');
+}
+
 
 // ============ LOG POSE GACHA CARTELES ============
 let logPoseBlockedSagaIds = [];
@@ -1638,14 +1887,16 @@ function showLogPoseGachaModal() {
       <h2>🎰 Mercado de Carteles</h2>
       <p style="font-size:8.5px;text-align:center;margin-bottom:6px;line-height:1.8;">
         Gasta tus Log Poses para destapar carteles de SE BUSCA de tus sagas desbloqueadas.<br>
-        ¡Pueden tocarte reclutas de 1⭐ hasta 5⭐ legendarios!
+        ¡Pueden tocarte reclutas de 1⭐ hasta 5⭐ legendarios!<br>
+        Duplicados: 3⭐ → 50 🧭 · 4⭐ → 500 🧭 · 5⭐ → 1000 🧭.<br>
+        Con 500 estrellas acumuladas, el siguiente premio es un legendario nuevo de las sagas seleccionadas; si ya tienes todos, recibes 1000 🧭.
       </p>
       <div style="font-size:10px;text-align:center;margin-bottom:6px;color:var(--gold);font-weight:bold;background:rgba(255,215,0,0.1);padding:6px;border-radius:6px;border:1px solid var(--gold);">
         🧭 Saldo: <b>${meta.logPoses} Log Poses</b>
       </div>
       <div style="font-size:9.5px;text-align:center;margin-bottom:10px;color:#f39c12;background:rgba(243,156,18,0.12);padding:6px 10px;border-radius:6px;border:1px solid rgba(243,156,18,0.4);display:flex;align-items:center;justify-content:center;gap:6px;">
-        <span>⭐ Estrellas acumuladas (Pity): <b>${meta.starPity || 0} / 1000</b></span>
-        ${(meta.starPity || 0) >= 1000 ? '<span style="color:#2ecc71;font-weight:bold;">¡LEGENDARIO ASEGURADO!</span>' : ''}
+        <span>⭐ Estrellas acumuladas (Pity): <b>${meta.starPity || 0} / 500</b></span>
+        ${(meta.starPity || 0) >= 500 ? '<span style="color:#2ecc71;font-weight:bold;">¡LEGENDARIO ASEGURADO!</span>' : ''}
       </div>
       <div style="font-size:8.5px;margin-bottom:6px;font-weight:bold;color:#aaa;">
         🛡️ Bloquear sagas para que no salgan en los carteles (+200 🧭 cada una):
@@ -1715,11 +1966,25 @@ function showLogPoseGachaModal() {
   ov.onclick = e => { if (e.target === ov) ov.remove(); };
 }
 
+function duplicatePosterReward(id) {
+  return isNakamaUnlocked(id) ? ({3:50,4:500,5:1000}[CHARS[id].rareza] || 0) : 0;
+}
+
 function startLogPoseGacha(activeSagas) {
   meta.starPity = meta.starPity || 0;
+  const activePirates = [...new Set(activeSagas.flatMap(s => sagaBasePirateIds(s.id)))];
+  const guaranteed = meta.starPity >= 500;
+  const newLegendaries = activePirates.filter(id => CHARS[id].rareza === 5 && !isNakamaUnlocked(id));
+  if (guaranteed && !newLegendaries.length) {
+    meta.logPoses = (meta.logPoses || 0) + 1000;
+    meta.starPity = 0;
+    saveMeta();
+    modalInfo('🧭 Compensación de legendario', 'No quedan legendarios nuevos en las sagas seleccionadas. Recibes <b>1000 Log Poses</b> en lugar de un personaje duplicado.', () => screenHome());
+    return;
+  }
   const weights = [41.5, 30, 21, 7, 0.5];
   let roll = Math.random() * 100, stopIdx = 4;
-  if (meta.starPity >= 1000) {
+  if (meta.starPity >= 500) {
     stopIdx = 4; // Pity activado: legendario asegurado (5⭐)
   } else {
     for (let i = 0; i < 5; i++) {
@@ -1728,10 +1993,8 @@ function startLogPoseGacha(activeSagas) {
     }
   }
 
-  const activeSagaIds = activeSagas.map(s => s.id);
-  const activePirates = activeSagaIds.flatMap(sId => sagaBasePirateIds(sId));
   const targetRarity = stopIdx + 1;
-  let pool = activePirates.filter(id => CHARS[id] && CHARS[id].rareza === targetRarity);
+  let pool = guaranteed ? newLegendaries : activePirates.filter(id => CHARS[id] && CHARS[id].rareza === targetRarity);
 
   if (!pool.length) {
     for (let d = 1; d <= 4; d++) {
@@ -1763,7 +2026,7 @@ function startLogPoseGacha(activeSagas) {
     <h2>🎰 Carteles de SE BUSCA (Log Pose)</h2>
     <p style="font-size:8px;text-align:center;margin-bottom:6px;">Destapa los carteles en orden. ¡En uno de ellos está tu nuevo recluta!</p>
     <div style="font-size:9px;text-align:center;margin-bottom:10px;color:#f39c12;">
-      ⭐ Estrellas acumuladas (Pity): <b>${meta.starPity} / 1000</b>
+      ⭐ Estrellas acumuladas (Pity): <b>${meta.starPity} / 500</b>
     </div>
     <div class="poster-row">
       ${[0, 1, 2, 3, 4].map(i => `
@@ -1783,19 +2046,24 @@ function startLogPoseGacha(activeSagas) {
   };
 
   const flip = i => {
+    if (i !== current) return;
     const face = ov.querySelector(`#pf-${i}`);
     const el = ov.querySelector(`[data-p="${i}"]`);
     if (i === stopIdx) {
+      current = -1;
       const c = CHARS[prizeId];
+      const duplicateReward = duplicatePosterReward(prizeId);
+      meta.logPoses = (meta.logPoses || 0) + duplicateReward;
       face.innerHTML = `${charIcon(prizeId, 28)}<br><span>${c.name}</span>`;
       el.classList.add('hit'); el.classList.remove('next');
       registerRecruit(prizeId);
       const b = baseFormOf(prizeId);
-      if (!meta.roster.includes(b)) { meta.roster.push(b); saveMeta(); }
+      if (!meta.roster.includes(b)) meta.roster.push(b);
+      saveMeta();
       ov.querySelectorAll('.poster').forEach(p => { p.onclick = null; });
       setTimeout(() => {
         ov.remove();
-        modalInfo('🎉 ¡Nuevo personaje reclutado!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(prizeId, 44)}</span><br><b>${c.name}</b> ${'⭐'.repeat(c.rareza)}<br><small style="color:var(--gold);">${c.types.join(' / ')}</small><br><br><span style="font-size:9px;color:var(--green);">¡Añadido a tu Dex e Inventario de Tripulación!</span></div>`, () => screenHome());
+        modalInfo(duplicateReward ? '🧭 Personaje duplicado' : '🎉 ¡Nuevo personaje reclutado!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(prizeId, 44)}</span><br><b>${c.name}</b> ${'⭐'.repeat(c.rareza)}<br><small style="color:var(--gold);">${c.types.join(' / ')}</small><br><br><span style="font-size:9px;color:var(--green);">${duplicateReward ? `Duplicado: +${duplicateReward} Log Poses` : '¡Añadido a tu Dex e Inventario de Tripulación!'}</span></div>`, () => screenHome());
       }, 1400);
     } else {
       face.innerHTML = `💨<br><span>VACÍO</span>`;
@@ -1811,7 +2079,7 @@ function startLogPoseGacha(activeSagas) {
 function screenHome() {
   playMusic('menu');
   const accLvl = accountLevel();
-  const runnerUnlocked = accLvl >= 30;
+  const runnerUnlocked = accLvl >= 1;
   const towerUnlocked = accLvl >= 20;
   const challengeUnlocked = accLvl >= 50;
   const { totalCompleted: completedAch, totalAchievements: totalAchCount, hasUnclaimedAch } = getAchievementsInfo();
@@ -1835,7 +2103,7 @@ function screenHome() {
         <div class="mode-btn">${challengeUnlocked ? 'ENTRAR' : '🔒 NV. CUENTA 50'}</div>
       </div>
     </div>
-    <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? 'Doble salto · 25 fama cada 1.000 m' : '🔒 Se desbloquea al nivel 30 de cuenta'}</small></span></button>
+    <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? 'Doble salto · 25 fama cada 1.000 m' : '🔒 Se desbloquea al nivel 1 de cuenta'}</small></span></button>
     <button class="local-menu-button" id="btn-local"><span aria-hidden="true">⚔️</span><span><strong>MULTIJUGADOR LOCAL</strong><small>Duelo · Torneo · Alianza contra un yonko · Conexión por QR</small></span></button>
     <div style="text-align:center;margin:12px 0"><button class="btn gray small" id="btn-offline">⬇ Preparar juego sin internet</button></div>
     <div class="home-main-buttons">
@@ -1858,7 +2126,7 @@ function screenHome() {
     </div>
     <div style="text-align:center;margin-top:8px;">
       <button class="btn red small" id="btn-logpose-gacha" style="padding:7px 16px;font-size:9.5px;font-weight:bold;width:100%;max-width:280px;box-shadow:0 2px 6px rgba(231,76,60,0.4);">
-        🎰 TIRADA DE CARTELES (🧭 ${meta.logPoses || 0})
+        <img class="carteles-menu-icon" src="/art/cross-guild-map.png" alt="" aria-hidden="true" draggable="false"> CARTELES (🧭 ${meta.logPoses || 0})
       </button>
     </div>
     <div style="text-align:center;margin-top:8px;">
@@ -1896,7 +2164,7 @@ function screenHome() {
   if (towerUnlocked) $('#mode-tower').onclick = () => screenTowerIntro();
   if (challengeUnlocked) $('#mode-challenge').onclick = () => screenChallenges();
   $('#btn-runner').onclick = async () => {
-    if (accountLevel() < 30) return toast('🔒 Luffy Run se desbloquea al nivel 30 de cuenta.');
+    if (accountLevel() < 1) return toast('🔒 Luffy Run se desbloquea al nivel 1 de cuenta.');
     const btn = $('#btn-runner');
     btn.disabled = true;
     try {
@@ -1938,17 +2206,17 @@ function screenHome() {
 
 // ============ PANTALLA: SAGAS ============
 // Cada saga se desbloquea al conquistar la anterior en dificultad 3 (Capitán) o superior
-const sagaMaxDiffCleared = sagaId => {
-  const wins = (meta.sagaDiffWins && meta.sagaDiffWins[sagaId]) || {};
+function sagaMaxDiffCleared(sagaId, progress = meta) {
+  const wins = (progress.sagaDiffWins && progress.sagaDiffWins[sagaId]) || {};
   const diffs = Object.keys(wins).filter(k => wins[k]).map(Number);
   return diffs.length ? Math.max(...diffs) : 0;
-};
+}
 
-const sagaUnlocked = i => {
+function sagaUnlocked(i, progress = meta) {
   if (i === 0) return true;
   const prevSaga = SAGAS[i - 1];
-  return sagaMaxDiffCleared(prevSaga.id) >= 3;
-};
+  return sagaMaxDiffCleared(prevSaga.id, progress) >= 3;
+}
 
 // Desbloqueo secuencial de dificultades por saga:
 // Dificultad 1 (Grumete) siempre disponible. Para Dificultad N (N > 1), se requiere haber superado la N-1 en esa misma saga.
@@ -1999,7 +2267,7 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
       }));
     }
 
-    // 3. Mercado Clandestino (Carteles SE BUSCA)
+    // 3. Crossguild (Carteles SE BUSCA)
     const weights = [41.5, 30, 21, 7, 0.5];
     const totalWeight = 100;
     const gachaTiers = [1, 2, 3, 4, 5].map(r => {
@@ -2177,7 +2445,7 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
       }).join('');
       tabHTML = `
         <div style="font-size:8px;line-height:1.7;margin-bottom:8px;color:#555;">
-          Probabilidades de los 5 Carteles SE BUSCA en el Mercado Clandestino 🌟.
+          Probabilidades de los 5 Carteles SE BUSCA en el Crossguild 🌟.
         </div>
         <div style="max-height:280px;overflow-y:auto;border:1px solid var(--ink);">
           <table class="chart-table">
@@ -2196,13 +2464,13 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
         </select>
       </div>
       <div class="tabs" style="margin-bottom:10px;flex-wrap:wrap;gap:4px;">
-        <div class="tab ${currentProbTab === 'wild' ? 'active' : ''}" id="spm-tab-wild" style="font-size:8px;padding:4px 6px;">🏴‍☠️ SALVAJES</div>
-        <div class="tab ${currentProbTab === 'boss' ? 'active' : ''}" id="spm-tab-boss" style="font-size:8px;padding:4px 6px;">💀 JEFES</div>
-        <div class="tab ${currentProbTab === 'items' ? 'active' : ''}" id="spm-tab-items" style="font-size:8px;padding:4px 6px;">🎁 OBJETOS</div>
-        <div class="tab ${currentProbTab === 'events' ? 'active' : ''}" id="spm-tab-events" style="font-size:8px;padding:4px 6px;">❓ MISTERIO</div>
-        <div class="tab ${currentProbTab === 'gacha' ? 'active' : ''}" id="spm-tab-gacha" style="font-size:8px;padding:4px 6px;">🎰 MERCADO</div>
+        <button type="button" class="tab ${currentProbTab === 'wild' ? 'active' : ''}" id="spm-tab-wild" style="font-size:8px;padding:4px 6px;">🏴‍☠️ SALVAJES</button>
+        <button type="button" class="tab ${currentProbTab === 'boss' ? 'active' : ''}" id="spm-tab-boss" style="font-size:8px;padding:4px 6px;">💀 JEFES</button>
+        <button type="button" class="tab ${currentProbTab === 'items' ? 'active' : ''}" id="spm-tab-items" style="font-size:8px;padding:4px 6px;">🎁 OBJETOS</button>
+        <button type="button" class="tab ${currentProbTab === 'events' ? 'active' : ''}" id="spm-tab-events" style="font-size:8px;padding:4px 6px;">❓ MISTERIO</button>
+        <button type="button" class="tab ${currentProbTab === 'gacha' ? 'active' : ''}" id="spm-tab-gacha" style="font-size:8px;padding:4px 6px;">🎰 MERCADO</button>
       </div>
-      ${tabHTML}
+      <div class="probabilities-content">${tabHTML}</div>
       <div class="actions" style="margin-top:12px;"><button class="btn gray" id="spm-close">CERRAR</button></div>
     `;
   };
@@ -2212,8 +2480,8 @@ function showSagaProbabilitiesModal(initialSagaIdx = 0) {
 
   const ov = document.createElement('div');
   ov.id = 'saga-prob-overlay';
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="max-width:620px;">${renderModalContent()}</div>`;
+  ov.className = 'overlay collection-overlay';
+  ov.innerHTML = `<div class="modal collection-modal probabilities-modal" role="dialog" aria-modal="true" aria-label="Probabilidades de las sagas">${renderModalContent()}</div>`;
   document.body.appendChild(ov);
 
   const bindEvents = () => {
@@ -2294,22 +2562,19 @@ function showSagaInfoModal(sagaIdx = 0) {
 
 let storyMode = 'classic';
 
-function screenSagas() {
+function screenSagas(focusSaga, previousScroll) {
   playMusic('menu');
+  if (!Number.isInteger(focusSaga) && meta.lastCompletedIsland && SAGAS[meta.lastCompletedIsland.saga]?.islands[meta.lastCompletedIsland.index]) {
+    storyMode = meta.lastCompletedIsland.mode === 'nuzlocke' ? 'nuzlocke' : 'classic';
+    selectedDiff = DIFFICULTIES.some(d => d.id === meta.lastCompletedIsland.diff) ? meta.lastCompletedIsland.diff : 1;
+  }
 
   const curDiffObj = DIFFICULTIES.find(d => d.id === selectedDiff) || DIFFICULTIES[0];
 
   render(`
     ${topbar(false)}
-    <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
-    <div class="panel" style="margin-bottom:10px;">
-      <h2>Historia — El Mundo de One Piece</h2>
-      <p>Elige tu modo, la dificultad y selecciona una saga para zarpar.</p>
-      <div style="margin-top:8px;text-align:right;">
-        <button class="btn small blue" id="btn-saga-probs-all" style="font-size:8px;">📊 PROBABILIDADES DE SAGAS</button>
-      </div>
-    </div>
-
+    <div class="world-controls">
+      <div class="world-title-row"><button class="btn gray small" id="btn-back">← VOLVER</button><h1>HISTORIA · GRAND LINE</h1><button class="btn small blue" id="btn-saga-probs-all" aria-label="Probabilidades de todas las sagas">📊</button></div>
     <div class="diff-picker-bar">
       <div class="tabs" style="margin-bottom:0;flex:1;max-width:320px;">
         <div class="tab ${storyMode === 'classic' ? 'active' : ''}" id="tab-classic">CLÁSICO</div>
@@ -2334,75 +2599,20 @@ function screenSagas() {
       </div>
     </div>
 
-    <div class="saga-list-container">
-      ${SAGAS.map((s, idx) => {
-    const diffWinsMap = (meta.sagaDiffWins && meta.sagaDiffWins[s.id]) || {};
-    const diffWins = Object.keys(diffWinsMap).length;
-    const isSelectedCleared = !!diffWinsMap[selectedDiff];
-    const isSagaUnlocked = sagaUnlocked(idx);
-    const isDiffUnlocked = sagaDiffUnlocked(s.id, selectedDiff);
-    const curDiffName = curDiffObj.name;
-    const prevDiffObj = DIFFICULTIES.find(d => d.id === selectedDiff - 1);
-
-    return `
-        <div class="saga-row ${isSagaUnlocked && isDiffUnlocked ? '' : 'locked'} ${isSelectedCleared ? 'diff-cleared' : ''}" data-saga="${idx}">
-          <div class="saga-art" style="background:${s.img ? `url('${s.img}') center/cover no-repeat` : s.color || '#777'};">
-            <div class="saga-art-overlay">
-              <div class="saga-art-title">${isSagaUnlocked ? '' : '🔒 '}${s.name}</div>
-              <div class="saga-art-sub">${s.sub}</div>
-            </div>
-          </div>
-          <div class="saga-stats">
-            ${!isSagaUnlocked ? `
-              <div class="saga-lock-banner">
-                🔒 SAGA BLOQUEADA<br>
-                <span style="font-weight:normal;font-size:9px;color:#ffeaad;">
-                  Debes completar Dificultad <b>⚔️ Capitán</b> en <b>${SAGAS[idx - 1] ? SAGAS[idx - 1].name : ''}</b>
-                </span>
-              </div>` : `
-              <div class="saga-stats-top">
-                <div class="saga-tag-header">
-                  ${isSelectedCleared
-        ? `<span class="diff-cleared-tag">⭐ ${curDiffName} SUPERADA</span>`
-        : isDiffUnlocked
-          ? `<span class="diff-pending-tag">🎯 ${curDiffName} PENDIENTE</span>`
-          : `<span class="diff-locked-tag">🔒 ${curDiffName} BLOQUEADA</span>`}
-                </div>
-                <div class="saga-stat-line"><span>Victorias Clásico</span> <b>${meta.wins[s.id] || 0}</b></div>
-                <div class="saga-stat-line"><span>Victorias Nuzlocke</span> <b>${meta.nuzWins[s.id] || 0}</b></div>
-                <div class="saga-stat-line"><span>Dificultades Superadas</span> <b>${diffWins}/5 ⭐</b></div>
-                ${!isDiffUnlocked && prevDiffObj ? `
-                  <div class="saga-req-box">
-                    ⚠️ Requisito: Supera esta saga en Dificultad <b>${prevDiffObj.emoji} ${prevDiffObj.name}</b> primero.
-                  </div>
-                ` : ''}
-              </div>
-              <div class="saga-stats-bottom">
-                <div class="saga-diff-badges">
-                  ${DIFFICULTIES.map(d => {
-            const beaten = !!diffWinsMap[d.id];
-            const unlocked = sagaDiffUnlocked(s.id, d.id);
-            return `<span class="saga-diff-badge ${beaten ? 'beaten' : ''} ${!unlocked ? 'locked-badge' : ''}" title="${d.name}: ${beaten ? 'Superada ✓' : unlocked ? 'Disponible' : 'Bloqueada'}">
-                      ${d.emoji}${beaten ? '✓' : !unlocked ? '🔒' : ''}
-                    </span>`;
-          }).join('')}
-                </div>
-                <div class="saga-stats-btn-wrap">
-                  <button class="btn small gray btn-saga-probs" data-saga="${idx}">📊 PROBABILIDADES</button>
-                  <button class="btn small blue btn-saga-info" data-saga-info="${idx}" title="Información de Jefes y Niveles">ℹ️</button>
-                </div>
-              </div>
-            `}
-          </div>
-        </div>
-      `}).join('')}
+    <div class="world-nav"><details class="world-saga-picker" id="world-saga-picker"><summary id="world-jump">🧭 Sagas · ${SAGAS[focusSaga || 0].name}</summary><div class="world-saga-options">${SAGAS.map((s,i) => `<button type="button" data-jump-saga="${i}" aria-pressed="${i === (focusSaga || 0)}">${sagaUnlocked(i) ? '' : '🔒 '}${s.name}</button>`).join('')}</div></details><button class="btn small gray" id="world-to-start">↓ INICIO</button></div>
     </div>
-    <div class="footer-note">Más sagas en camino. ¡Mientras tanto, prueba la Torre Marine!</div>
+    <div class="world-ocean-frame">
+    <div class="world-sea" aria-hidden="true"></div>
+    <div class="world-map" id="world-map" tabindex="0" role="region" aria-label="Carta de Grand Line. Avanza hacia arriba desde East Blue.">
+      <div class="world-chart"><svg class="world-route" aria-hidden="true" preserveAspectRatio="none"><path/></svg><div class="world-ship" role="img" aria-label="Going Merry"><span class="world-ship-wake"></span><img src="/art/world/ship-north.webp" alt="" width="90" height="90"></div><p class="world-end">↑ EL VIAJE CONTINÚA</p>${SAGAS.map((_,i) => worldSagaHTML(i)).reverse().join('')}<p class="world-start">↑ Sigue el Log Pose hacia arriba<br>Explora también las islas y sagas bloqueadas.</p></div>
+    </div>
+    <section class="world-inspector" id="world-island-panel" aria-label="Destino seleccionado" hidden></section>
+    </div>
   `);
 
   $('#btn-back').onclick = () => { screenHome(); };
-  $('#tab-classic').onclick = () => { storyMode = 'classic'; screenSagas(); };
-  $('#tab-nuz').onclick = () => { storyMode = 'nuzlocke'; screenSagas(); };
+  $('#tab-classic').onclick = () => { storyMode = 'classic'; screenSagas(Number($('#world-jump').dataset.saga), $('#world-map').scrollTop); };
+  $('#tab-nuz').onclick = () => { storyMode = 'nuzlocke'; screenSagas(Number($('#world-jump').dataset.saga), $('#world-map').scrollTop); };
 
   const diffTrigger = $('#btn-diff-trigger');
   const diffMenu = $('#diff-dropdown-menu');
@@ -2425,7 +2635,7 @@ function screenSagas() {
     item.onclick = e => {
       e.stopPropagation();
       selectedDiff = +item.dataset.diff;
-      screenSagas();
+      screenSagas(Number($('#world-jump').dataset.saga), $('#world-map').scrollTop);
     };
   });
 
@@ -2436,30 +2646,13 @@ function screenSagas() {
     };
   });
 
-  document.querySelectorAll('.saga-row').forEach(el => {
-    const idx = +el.dataset.saga;
-    const s = SAGAS[idx];
-    el.onclick = () => {
-      if (!sagaUnlocked(idx)) {
-        toast(`🔒 Debes completar Dificultad Capitán en ${SAGAS[idx - 1].name}.`);
-        return;
-      }
-      if (!sagaDiffUnlocked(s.id, selectedDiff)) {
-        const prevD = DIFFICULTIES.find(d => d.id === selectedDiff - 1);
-        const curD = DIFFICULTIES.find(d => d.id === selectedDiff);
-        toast(`🔒 Debes superar ${s.name} en Dificultad ${prevD ? prevD.name : ''} primero.`);
-        return;
-      }
-      screenStarter(idx);
-    };
-  });
-
   document.querySelectorAll('.btn-saga-probs').forEach(btn => {
     btn.onclick = e => {
       e.stopPropagation();
       showSagaProbabilitiesModal(+btn.dataset.saga);
     };
   });
+  bindWorldMapNavigation(focusSaga, previousScroll);
 }
 
 // ============ LISTAS DE PERSONAJES: FILTRO, ORDEN Y CUADRÍCULA 3x3 ============
@@ -2510,28 +2703,28 @@ function bindCharControls(st, onChange) {
 }
 
 // Filtra (nombre, saga, tipo, rareza) y ordena la lista de personajes
-function filterSortChars(ids, st) {
+function filterSortChars(ids, st, resolve = id => id) {
   const q = (st.q || '').trim().toLowerCase();
   const out = ids.filter(id => {
-    const c = CHARS[id];
+    const c = CHARS[resolve(id)];
     if (q && !c.name.toLowerCase().includes(q)) return false;
     if (st.saga && c.saga !== st.saga) return false;
     if (st.type && !c.types.includes(st.type)) return false;
     if (+st.rarity && c.rareza !== +st.rarity) return false;
     return true;
   });
-  const byName = (a, b) => CHARS[a].name.localeCompare(CHARS[b].name);
-  const baseStatSum = id => CHARS[id].base.reduce((a, b) => a + b, 0);
+  const byName = (a, b) => CHARS[resolve(a)].name.localeCompare(CHARS[resolve(b)].name);
+  const baseStatSum = id => CHARS[resolve(id)].base.reduce((a, b) => a + b, 0);
   if (st.sort === 'name') out.sort(byName);
-  else if (st.sort === 'rarezaAsc') out.sort((a, b) => CHARS[a].rareza - CHARS[b].rareza || byName(a, b));
-  else if (st.sort === 'rarezaDesc') out.sort((a, b) => CHARS[b].rareza - CHARS[a].rareza || byName(a, b));
+  else if (st.sort === 'rarezaAsc') out.sort((a, b) => CHARS[resolve(a)].rareza - CHARS[resolve(b)].rareza || byName(a, b));
+  else if (st.sort === 'rarezaDesc') out.sort((a, b) => CHARS[resolve(b)].rareza - CHARS[resolve(a)].rareza || byName(a, b));
   else if (st.sort === 'statTotalDesc') out.sort((a, b) => baseStatSum(b) - baseStatSum(a) || byName(a, b));
-  else if (st.sort === 'hpDesc') out.sort((a, b) => CHARS[b].base[0] - CHARS[a].base[0] || byName(a, b));
-  else if (st.sort === 'atkDesc') out.sort((a, b) => CHARS[b].base[1] - CHARS[a].base[1] || byName(a, b));
-  else if (st.sort === 'defDesc') out.sort((a, b) => CHARS[b].base[2] - CHARS[a].base[2] || byName(a, b));
-  else if (st.sort === 'spatkDesc') out.sort((a, b) => CHARS[b].base[3] - CHARS[a].base[3] || byName(a, b));
-  else if (st.sort === 'spdefDesc') out.sort((a, b) => CHARS[b].base[4] - CHARS[a].base[4] || byName(a, b));
-  else if (st.sort === 'spdDesc') out.sort((a, b) => CHARS[b].base[5] - CHARS[a].base[5] || byName(a, b));
+  else if (st.sort === 'hpDesc') out.sort((a, b) => CHARS[resolve(b)].base[0] - CHARS[resolve(a)].base[0] || byName(a, b));
+  else if (st.sort === 'atkDesc') out.sort((a, b) => CHARS[resolve(b)].base[1] - CHARS[resolve(a)].base[1] || byName(a, b));
+  else if (st.sort === 'defDesc') out.sort((a, b) => CHARS[resolve(b)].base[2] - CHARS[resolve(a)].base[2] || byName(a, b));
+  else if (st.sort === 'spatkDesc') out.sort((a, b) => CHARS[resolve(b)].base[3] - CHARS[resolve(a)].base[3] || byName(a, b));
+  else if (st.sort === 'spdefDesc') out.sort((a, b) => CHARS[resolve(b)].base[4] - CHARS[resolve(a)].base[4] || byName(a, b));
+  else if (st.sort === 'spdDesc') out.sort((a, b) => CHARS[resolve(b)].base[5] - CHARS[resolve(a)].base[5] || byName(a, b));
   return out;
 }
 
@@ -2573,183 +2766,193 @@ function renderCharGrid(el, ids, st, cardFn, bindFn) {
 // ============ MODAL: INVENTARIO DE NAKAMAS ============
 let invViewState = { q: '', type: '', rarity: 0 };
 
-function showInventoryModal(opts = {}) {
-  const onSelect = opts.onSelect || null;
-  const currentTeam = opts.currentTeam || [];
-  const title = opts.title || '🎒 INVENTARIO DE NAKAMAS';
-
-  const rosterChars = (meta.roster || []).filter(id => CHARS[id]);
-  const allUnlocked = [...new Set(['luffy', ...rosterChars])].filter(id => CHARS[id] && isNakamaUnlocked(id));
-
-  invViewState = { q: '', type: '', rarity: 0 };
-
-  const renderModalContent = () => {
-    let ids = filterSortChars(allUnlocked, invViewState);
-    const cap = maxStartLvlCap();
-
-    const cardsHTML = ids.map(id => {
-      const c = CHARS[id];
-      const inTeam = currentTeam.includes(id);
-      const startLvl = startLvlOf(id);
-      const cost = logPoseUpgradeCost(startLvl);
-      const isMax = startLvl >= cap;
-      const canAfford = (meta.logPoses || 0) >= cost;
-
-      return `
-        <div class="dex-card sel-card ${inTeam ? 'picked' : ''}" data-id="${id}" style="position:relative;background:var(--paper);border:2px solid var(--ink);padding:8px 6px;text-align:center;cursor:pointer;">
-          ${inTeam ? '<div class="veteran-tag" style="background:var(--green);font-size:7px;">EN EQUIPO</div>' : ''}
-          <div class="emoji">${charIcon(id, 34)}</div>
-          <div style="font-size:8.5px;margin:3px 0;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${c.name}</div>
-          <div class="char-lvl" style="font-size:7.5px;">Nv. ${startLvl} · ${'⭐'.repeat(c.rareza)}</div>
-          <div class="type-badges" style="margin:3px 0;justify-content:center;">${typeBadges(c.types)}</div>
-          <div style="display:flex;flex-direction:column;gap:3px;margin-top:4px;">
-            ${isMax ? `
-              <span style="font-size:7px;color:var(--green);font-weight:bold;background:rgba(0,0,0,0.06);padding:2px;border-radius:3px;">🔒 Nv. Máx (${cap})</span>
-            ` : `
-              <button class="btn small gold btn-upg-inv" data-id="${id}" ${canAfford ? '' : 'disabled'} style="font-size:7px;padding:3px 4px;" title="Cuesta ${cost} Log Poses">
-                ⬆️ Nv ${startLvl + 1} (${cost} 🧭)
-              </button>
-            `}
-            <div style="display:flex;gap:3px;justify-content:center;">
-              ${onSelect ? `<button class="btn small green btn-pick-inv" data-id="${id}" style="font-size:7px;padding:3px 6px;flex:1;">${inTeam ? 'SELECCIONADO' : 'ELEGIR'}</button>` : ''}
-              <button class="btn small gray btn-info-inv" data-id="${id}" style="font-size:7px;padding:3px 6px;">ℹ️ FICHA</button>
-            </div>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    return `
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
-        <h2 style="margin:0;font-size:12px;color:var(--sea);">${title}</h2>
-        <div id="inv-logpose-info" style="font-size:9.5px;font-weight:bold;color:var(--gold);background:var(--ink);padding:3px 8px;border-radius:4px;border:1px solid var(--gold);cursor:pointer;" title="Toca para saber más sobre los Log Poses">
-          🧭 Log Poses: ${meta.logPoses || 0} ℹ️
-        </div>
-        <button class="btn gray small" id="inv-close-x" style="padding:2px 6px;font-size:9px;">✕</button>
-      </div>
-      <div style="font-size:8px;color:#555;margin-bottom:8px;">
-        Nakamas disponibles: <b>${allUnlocked.length}</b> ${onSelect ? '· Toca un personaje para elegirlo para tu equipo' : ''}
-      </div>
-      <div class="char-controls" style="margin-bottom:10px;gap:4px;">
-        <input id="inv-q" placeholder="🔎 Buscar por nombre..." value="${(invViewState.q || '').replace(/"/g, '&quot;')}" style="font-size:8px;padding:5px;">
-        <select id="inv-type" style="font-size:8px;padding:5px;">
-          <option value="">Todos los tipos</option>
-          ${Object.keys(TYPES).map(t => `<option value="${t}" ${invViewState.type === t ? 'selected' : ''}>${TYPES[t].emoji} ${t}</option>`).join('')}
-        </select>
-        <select id="inv-rarity" style="font-size:8px;padding:5px;">
-          <option value="0">Toda rareza</option>
-          ${[1, 2, 3, 4, 5].map(r => `<option value="${r}" ${+invViewState.rarity === r ? 'selected' : ''}>${'⭐'.repeat(r)}</option>`).join('')}
-        </select>
-      </div>
-      ${mobileColumnsControl()}
-      <div id="inv-cards-grid" style="max-height:360px;overflow-y:auto;display:grid;grid-template-columns:repeat(auto-fill, minmax(110px, 1fr));gap:8px;padding:4px;border:1px solid #ccc;background:rgba(0,0,0,0.05);">
-        ${cardsHTML || '<div style="grid-column:1/-1;text-align:center;font-size:9px;color:#888;padding:20px;">Sin nakamas que coincidan.</div>'}
-      </div>
-      <div class="actions" style="margin-top:10px;text-align:right;">
-        <button class="btn gray small" id="inv-close-btn">CERRAR</button>
-      </div>
-    `;
-  };
-
-  const existing = document.querySelector('#inventory-modal-overlay');
-  if (existing) existing.remove();
-
+// Keep the roster position when opening another team slot.
+let nakamaPickerState = { q:'', saga:'', type:'', rarity:0, sort:'name', scope:'all', page:0 };
+function showNakamaPicker(opts) {
+  document.querySelector('#inventory-modal-overlay')?.remove();
+  const previousFocus = document.activeElement;
+  const st = nakamaPickerState;
+  const team = opts.currentTeam || [];
+  const unlocked = [...new Set(['luffy', ...(meta.roster || [])])].filter(id => CHARS[id] && isNakamaUnlocked(id));
+  const display = id => evolutionFormAt(id, startLvlOf(id));
+  const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const sagaIds = new Set(unlocked.map(id => CHARS[display(id)].saga));
+  const sagas = SAGAS.filter(s => sagaIds.has(s.id));
+  if (!sagas.some(s => s.id === st.saga)) st.saga = '';
   const ov = document.createElement('div');
   ov.id = 'inventory-modal-overlay';
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="max-width:640px;width:95%;">${renderModalContent()}</div>`;
+  ov.className = 'overlay nakama-picker-overlay';
+  ov.innerHTML = `<section class="modal nakama-picker" role="dialog" aria-modal="true" aria-labelledby="nakama-picker-title" aria-describedby="nakama-picker-hint">
+    <header class="nakama-picker-header"><div><small>TU TRIPULACIÓN</small><h2 id="nakama-picker-title">${esc(opts.title || 'Elige un nakama')}</h2></div><button class="btn gray" id="np-close" aria-label="Cerrar selector">✕</button></header>
+    <p id="nakama-picker-hint">Pulsa un retrato para elegirlo. Los nakamas de otro hueco se intercambian.</p>
+    <div class="nakama-picker-filters">
+      <label>Nombre<input id="np-search" type="search" placeholder="Buscar nakama…" value="${esc(st.q)}" autocomplete="off"></label>
+      <label>Saga<select id="np-saga"><option value="">Todas las sagas</option>${sagas.map(s => `<option value="${esc(s.id)}" ${st.saga === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+    </div>
+    <div class="nakama-picker-scopes" role="group" aria-label="Disponibilidad">${[['all','Todos'],['free','Fuera del equipo'],['team','En el equipo']].map(([value,label]) => `<button class="btn gray" data-scope="${value}" aria-pressed="${st.scope === value}">${label}</button>`).join('')}</div>
+    <details class="nakama-picker-more"><summary>Tipo, rareza y orden</summary><div class="nakama-picker-extra">
+      <label>Tipo<select id="np-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t => `<option value="${esc(t)}" ${st.type === t ? 'selected' : ''}>${TYPES[t].emoji} ${esc(t)}</option>`).join('')}</select></label>
+      <label>Rareza<select id="np-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r => `<option value="${r}" ${+st.rarity === r ? 'selected' : ''}>${r} estrellas</option>`).join('')}</select></label>
+      <label>Orden<select id="np-sort">${[['name','Nombre A–Z'],['rarezaDesc','Mayor rareza'],['statTotalDesc','Stats base totales'],['atkDesc','Ataque base'],['spatkDesc','Ataque especial base'],['spdDesc','Velocidad base']].map(([value,label]) => `<option value="${value}" ${st.sort === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+    </div></details>
+    <div class="nakama-picker-summary"><span id="np-count" role="status"></span><button class="btn gray" id="np-reset">Limpiar filtros</button></div>
+    <div class="nakama-picker-roster" id="np-roster"></div>
+    <footer class="nakama-picker-pages"><button class="btn gray" id="np-prev" aria-label="Página anterior">◀</button><span id="np-page" role="status"></span><button class="btn gray" id="np-next" aria-label="Página siguiente">▶</button></footer>
+  </section>`;
   document.body.appendChild(ov);
-
-  const refreshModalContent = () => {
-    const grid = ov.querySelector('#inv-cards-grid');
-    const gridScrollTop = grid ? grid.scrollTop : 0;
-    const modal = ov.querySelector('.modal');
-    const modalScrollTop = modal ? modal.scrollTop : 0;
-
-    modal.innerHTML = renderModalContent();
-    bindEvents();
-
-    const newGrid = ov.querySelector('#inv-cards-grid');
-    if (newGrid) newGrid.scrollTop = gridScrollTop;
-    const newModal = ov.querySelector('.modal');
-    if (newModal) newModal.scrollTop = modalScrollTop;
-  };
-
-  const bindEvents = () => {
-    const logPoseBtn = ov.querySelector('#inv-logpose-info');
-    if (logPoseBtn) {
-      logPoseBtn.onclick = () => {
-        modalInfo(
-          '🧭 Log Poses de Navegación',
-          `<div style="font-size:8.5px;line-height:1.5;color:#333;text-align:left;padding:4px;">
-            Los <b>Log Poses 🧭</b> son brujulas de navegación de Grand Line que obtienes al derrotar enemigos durante tu travesía en el modo Historia.<br><br>
-            • <b>¿Para qué sirven?</b> Se consumen para entrenar y <b>subir de nivel base permanente</b> a tus nakamas desde este inventario.<br>
-            • <b>Recompensas en combate:</b> Obtienes de 1 a 3 Log Poses por enemigo vencido (y más en combates de jefes).<br>
-            • <b>Coste incremental:</b> Cuanto mayor sea el nivel de un nakama, más Log Poses necesitarás para subirlo al siguiente nivel (hasta el límite de tu saga actual).
-          </div>`
-        );
+  const find = sel => ov.querySelector(sel);
+  const close = () => { ov.remove(); if (previousFocus?.isConnected) previousFocus.focus(); };
+  const draw = () => {
+    const ids = filterSortChars(unlocked, st, display).filter(id => st.scope === 'all' || (st.scope === 'team' ? team.includes(id) : !team.includes(id)));
+    const pageSize = 12, pages = Math.max(1, Math.ceil(ids.length / pageSize));
+    st.page = clamp(st.page, 0, pages - 1);
+    find('#np-count').textContent = `${ids.length} de ${unlocked.length} nakamas`;
+    find('#np-page').textContent = `Página ${st.page + 1} de ${pages}`;
+    find('#np-prev').disabled = st.page === 0;
+    find('#np-next').disabled = st.page === pages - 1;
+    find('#np-reset').disabled = !st.q && !st.saga && !st.type && !+st.rarity && st.scope === 'all' && st.sort === 'name';
+    find('.nakama-picker-more').classList.toggle('filtered', !!st.type || !!+st.rarity || st.sort !== 'name');
+    ov.querySelectorAll('[data-scope]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.scope === st.scope)));
+    find('#np-roster').innerHTML = ids.slice(st.page * pageSize, (st.page + 1) * pageSize).map(id => {
+      const c = CHARS[display(id)], current = opts.selectedId === id;
+      return `<article class="nakama-picker-card ${team.includes(id) ? 'in-team' : ''}">
+        <button class="nakama-picker-pick" data-id="${esc(id)}" aria-label="Elegir a ${esc(c.name)}${current ? ', en este hueco' : team.includes(id) ? ', en el equipo' : ''}">
+          <span class="nakama-picker-badge">${current ? 'Este hueco' : team.includes(id) ? 'En equipo' : ''}</span>
+          ${charIcon(display(id), 48)}<strong>${esc(c.name)}</strong><span>Nv. ${startLvlOf(id)} · ${'⭐'.repeat(c.rareza)}</span><span class="type-badges">${typeBadges(c.types)}</span>
+        </button><button class="nakama-picker-info" data-info="${esc(id)}" aria-label="Ver ficha de ${esc(c.name)}" title="Ver ficha">ⓘ</button>
+      </article>`;
+    }).join('') || '<p class="nakama-picker-empty">No hay nakamas con estos filtros. Prueba otra saga o pulsa «Limpiar filtros».</p>';
+    find('#np-roster').scrollTop = 0;
+    ov.querySelectorAll('[data-id]').forEach(btn => btn.onclick = () => { close(); opts.onSelect(btn.dataset.id); });
+    ov.querySelectorAll('[data-info]').forEach(btn => btn.onclick = () => {
+      showCharModal(btn.dataset.info);
+      const closeSheet = document.querySelector('#sheet-close');
+      const sheet = closeSheet.closest('.overlay');
+      const returnToPicker = () => { sheet.remove(); btn.focus(); };
+      closeSheet.onclick = returnToPicker;
+      sheet.onclick = e => { if (e.target === sheet) returnToPicker(); };
+      sheet.onkeydown = e => {
+        if (e.key === 'Escape') { e.preventDefault(); returnToPicker(); }
+        if (e.key === 'Tab') {
+          const buttons = [...sheet.querySelectorAll('button:not(:disabled)')];
+          const first = buttons[0], last = buttons[buttons.length - 1];
+          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+        }
       };
+      closeSheet.focus();
+    });
+  };
+  find('#np-close').onclick = close;
+  find('#np-search').oninput = e => { st.q = e.target.value; st.page = 0; draw(); };
+  for (const key of ['saga','type','rarity','sort']) find(`#np-${key}`).onchange = e => { st[key] = e.target.value; st.page = 0; draw(); };
+  ov.querySelectorAll('[data-scope]').forEach(btn => btn.onclick = () => { st.scope = btn.dataset.scope; st.page = 0; draw(); });
+  find('#np-reset').onclick = () => {
+    Object.assign(st, {q:'', saga:'', type:'', rarity:0, sort:'name', scope:'all', page:0});
+    find('#np-search').value = '';
+    for (const key of ['saga','type','rarity','sort']) find(`#np-${key}`).value = st[key];
+    draw();
+  };
+  for (const [key, step] of [['prev',-1],['next',1]]) find(`#np-${key}`).onclick = () => {
+    st.page += step; draw();
+    // A disabled paging control must not strand keyboard focus.
+    if (find(`#np-${key}`).disabled) find('.nakama-picker-pick')?.focus();
+  };
+  ov.onclick = e => { if (e.target === ov) close(); };
+  ov.onkeydown = e => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    if (e.key === 'Tab') {
+      const focusable = [...ov.querySelectorAll('button:not(:disabled),input,select,summary')].filter(el => el.getClientRects().length);
+      const first = focusable[0], last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     }
-
-    const qInput = ov.querySelector('#inv-q');
-    if (qInput) qInput.oninput = e => {
-      invViewState.q = e.target.value;
-      refreshModalContent();
-      const newQ = ov.querySelector('#inv-q');
-      if (newQ) { newQ.focus(); newQ.selectionStart = newQ.selectionEnd = newQ.value.length; }
-    };
-
-    const typeSel = ov.querySelector('#inv-type');
-    if (typeSel) typeSel.onchange = e => {
-      invViewState.type = e.target.value;
-      refreshModalContent();
-    };
-
-    const raritySel = ov.querySelector('#inv-rarity');
-    if (raritySel) raritySel.onchange = e => {
-      invViewState.rarity = +e.target.value;
-      refreshModalContent();
-    };
-
-    ov.querySelectorAll('.btn-upg-inv').forEach(btn => {
-      btn.onclick = e => {
-        e.stopPropagation();
-        if (upgradeCharLvl(btn.dataset.id)) {
-          refreshModalContent();
-        }
-      };
-    });
-
-    ov.querySelectorAll('.dex-card').forEach(card => {
-      card.onclick = (e) => {
-        if (e.target.closest('.btn-upg-inv') || e.target.closest('.btn-info-inv')) return;
-        const id = card.dataset.id;
-        if (onSelect) {
-          ov.remove();
-          onSelect(id);
-        } else {
-          showCharModal(id);
-        }
-      };
-    });
-
-    ov.querySelectorAll('.btn-info-inv').forEach(btn => {
-      btn.onclick = e => {
-        e.stopPropagation();
-        showCharModal(btn.dataset.id);
-      };
-    });
-
-    const closeBtn = ov.querySelector('#inv-close-btn');
-    if (closeBtn) closeBtn.onclick = () => ov.remove();
-
-    const closeX = ov.querySelector('#inv-close-x');
-    if (closeX) closeX.onclick = () => ov.remove();
   };
-
-  bindEvents();
-  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  draw();
+  find('#np-close').focus();
 }
+
+function showInventoryModal(opts = {}) {
+  if (opts.onSelect) return showNakamaPicker(opts);
+  const previousFocus=document.activeElement;
+  const currentTeam=opts.currentTeam || (run?.team || []).map(f=>baseFormOf(f.id));
+  const roster=(meta.roster || []).filter(id=>CHARS[id]);
+  const allUnlocked=[...new Set(['luffy',...roster])].filter(id=>CHARS[id]&&isNakamaUnlocked(id));
+  const number=value=>Number(value).toLocaleString('es');
+  const compact=value=>Number(value).toLocaleString('es',{notation:value>=1000000?'compact':'standard',maximumFractionDigits:1});
+  let page=0,filtersOpen=false;
+  const pageSize=12;
+  invViewState={q:'',type:'',rarity:0,saga:'',sort:'name'};
+  const renderContent=()=>{
+    const ids=filterSortChars(allUnlocked,invViewState,id=>evolutionFormAt(id,startLvlOf(id)));
+    const pages=Math.max(1,Math.ceil(ids.length/pageSize));page=Math.min(page,pages-1);
+    const cap=maxStartLvlCap();
+    const cards=ids.slice(page*pageSize,(page+1)*pageSize).map(id=>{
+      const displayId=evolutionFormAt(id,startLvlOf(id)),c=CHARS[displayId],level=startLvlOf(id);
+      const cost=logPoseUpgradeCost(level),maxed=level>=cap,canAfford=(meta.logPoses||0)>=cost;
+      return `<article class="inventory-card ${currentTeam.includes(id)?'in-team':''}" data-id="${id}">
+        <div class="inventory-card-top"><span>${currentTeam.includes(id)?'En tu equipo':'Nakama'}</span><span class="inventory-rarity" aria-label="Rareza ${c.rareza} de 5 estrellas"><span aria-hidden="true">★</span> ${c.rareza}/5</span></div>
+        <button class="inventory-profile btn-info-inv" data-id="${id}" aria-label="Ver ficha de ${collectionText(c.name)}"><span class="inventory-portrait" aria-hidden="true">${charIcon(displayId,80)}</span><strong>${c.name}</strong><span class="inventory-profile-link">Ver ficha ↗</span></button>
+        <div class="inventory-level">Nivel base <strong>${level}</strong></div><div class="type-badges">${typeBadges(c.types)}</div>
+        <div class="inventory-upgrade">${maxed?`<span class="inventory-limit">Límite de saga: Nv. ${cap}</span><button class="btn btn-upg-inv" data-id="${id}" disabled aria-label="Nivel máximo de saga alcanzado"><span class="inventory-upgrade-label">Nivel máximo</span><span class="inventory-upgrade-short" aria-hidden="true">Máx.</span></button>`:`<span class="inventory-cost" title="${number(cost)} Log Poses">Coste: <strong>${compact(cost)} 🧭</strong></span><button class="btn gold btn-upg-inv" data-id="${id}" ${canAfford?'':'disabled'} aria-label="Mejorar a ${collectionText(c.name)} al nivel base ${level+1} por ${number(cost)} Log Poses"><span class="inventory-upgrade-label">Subir a Nv. ${level+1}</span><span class="inventory-upgrade-short" aria-hidden="true">↑ Lv. ${level+1}</span></button>${canAfford?'':`<span class="inventory-shortfall">Faltan ${compact(cost-(meta.logPoses||0))} 🧭</span>`}`}</div>
+      </article>`;
+    }).join('');
+    const filtered=invViewState.type||+invViewState.rarity||invViewState.saga;
+    return `<header class="collection-header"><div><span class="collection-eyebrow">Tu tripulación</span><h2 id="inv-title" tabindex="-1">${collectionText(opts.title || 'Inventario de nakamas')}</h2></div><button class="btn gray collection-close" id="inv-close-x" aria-label="Cerrar inventario">Cerrar <span aria-hidden="true">×</span></button></header>
+      <div class="collection-summary"><div><strong>${allUnlocked.length}</strong><span>Nakamas disponibles</span></div><button class="collection-summary-action" id="inv-logpose-info" aria-label="${number(meta.logPoses||0)} Log Poses disponibles. Ver cómo conseguirlos"><strong>${compact(meta.logPoses||0)} 🧭</strong><span>Log Poses · ¿Cómo conseguirlos?</span></button></div>
+      <label for="inv-q" class="inventory-search-label">Buscar nakama<input id="inv-q" type="search" placeholder="Nombre del personaje o su forma" value="${collectionText(invViewState.q)}"></label>
+      <details class="collection-extra" ${filtersOpen?'open':''}><summary>Filtros y vista${filtered?' · activos':''}</summary><div class="collection-filter-grid inventory-filters">
+        <label for="inv-saga">Saga<select id="inv-saga"><option value="">Todas las sagas</option>${groupUpgradeRoster(allUnlocked).map(g=>`<option value="${g.id}" ${invViewState.saga===g.id?'selected':''}>${g.name}</option>`).join('')}</select></label>
+        <label for="inv-type">Tipo<select id="inv-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t=>`<option value="${t}" ${invViewState.type===t?'selected':''}>${t}</option>`).join('')}</select></label>
+        <label for="inv-rarity">Rareza<select id="inv-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r=>`<option value="${r}" ${+invViewState.rarity===r?'selected':''}>${r} ${r===1?'estrella':'estrellas'}</option>`).join('')}</select></label>
+        <label for="inv-sort">Ordenar<select id="inv-sort">${[['name','Nombre A–Z'],['rarezaDesc','Mayor rareza'],['rarezaAsc','Menor rareza'],['statTotalDesc','Mayor fuerza base']].map(([v,l])=>`<option value="${v}" ${invViewState.sort===v?'selected':''}>${l}</option>`).join('')}</select></label>
+      </div></details>
+      <div class="collection-results"><span role="status">${ids.length} nakamas${ids.length?` · ${page*pageSize+1}–${Math.min((page+1)*pageSize,ids.length)}`:''}</span><button class="collection-text-button" id="inv-reset">Limpiar filtros</button></div>
+      <div id="inv-cards-grid" class="collection-list inventory-grid" aria-label="Lista de nakamas" tabindex="0">${cards||'<div class="collection-empty"><h3>No hay nakamas con estos filtros</h3><p>Prueba otro nombre o limpia los filtros.</p></div>'}</div>
+      <nav class="collection-pagination" aria-label="Páginas de nakamas"><button class="btn gray" data-inv-page="-1" ${page===0?'disabled':''} aria-label="Página anterior de nakamas">← Anterior</button><span>Página ${page+1} de ${pages}</span><button class="btn gray" data-inv-page="1" ${page===pages-1?'disabled':''} aria-label="Página siguiente de nakamas">Siguiente →</button></nav>`;
+  };
+  document.querySelector('#inventory-modal-overlay')?.remove();
+  const ov=document.createElement('div');ov.id='inventory-modal-overlay';ov.className='overlay collection-overlay';
+  ov.innerHTML=`<section class="modal collection-modal inventory-modal" role="dialog" aria-modal="true" aria-labelledby="inv-title">${renderContent()}</section>`;
+  document.body.appendChild(ov);
+  const close=()=>{ov.remove();if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});};
+  const refresh=(selector,resetScroll=false,cursor=null)=>{
+    const scroll=resetScroll?0:ov.querySelector('#inv-cards-grid').scrollTop;
+    filtersOpen=ov.querySelector('details').open;
+    ov.querySelector('.modal').innerHTML=renderContent();bindEvents();
+    ov.querySelector('#inv-cards-grid').scrollTop=scroll;
+    const target=selector.split(',').map(part=>ov.querySelector(part)).find(Boolean)||ov.querySelector('#inv-cards-grid');
+    target.focus({preventScroll:true});if(cursor!==null)target.setSelectionRange?.(cursor,cursor);
+  };
+  const bindEvents=()=>{
+    ov.querySelector('#inv-close-x').onclick=close;
+    ov.querySelector('#inv-q').oninput=e=>{invViewState.q=e.target.value;page=0;refresh('#inv-q',true,e.target.selectionStart);};
+    for(const [id,key] of [['inv-type','type'],['inv-rarity','rarity'],['inv-saga','saga'],['inv-sort','sort']])ov.querySelector('#'+id).onchange=e=>{invViewState[key]=e.target.value;page=0;refresh('#'+id,true);};
+    ov.querySelector('#inv-reset').onclick=()=>{invViewState={q:'',type:'',rarity:0,saga:'',sort:'name'};page=0;refresh('#inv-q',true);};
+    ov.querySelectorAll('[data-inv-page]').forEach(btn=>btn.onclick=()=>{page+=Number(btn.dataset.invPage);refresh('#inv-cards-grid',true);});
+    ov.querySelectorAll('.btn-upg-inv').forEach(btn=>btn.onclick=()=>{
+      if(upgradeCharLvl(btn.dataset.id))refresh(`.btn-upg-inv[data-id="${btn.dataset.id}"]:not(:disabled),.btn-info-inv[data-id="${btn.dataset.id}"]`);
+    });
+    ov.querySelectorAll('.btn-info-inv').forEach(btn=>btn.onclick=()=>{
+      showCharModal(btn.dataset.id);
+      const sheet=document.querySelector('#sheet-close')?.closest('.overlay');if(!sheet)return;
+      const closeSheet=()=>{sheet.remove();if(btn.isConnected)btn.focus({preventScroll:true});};
+      sheet.querySelector('#sheet-close').onclick=closeSheet;
+      sheet.onclick=e=>{if(e.target===sheet)closeSheet();};
+      sheet.querySelector('.modal').setAttribute('role','dialog');sheet.querySelector('.modal').setAttribute('aria-modal','true');sheet.querySelector('.modal').setAttribute('aria-label',`Ficha de ${CHARS[evolutionFormAt(btn.dataset.id,startLvlOf(btn.dataset.id))].name}`);
+      bindCollectionDialog(sheet,closeSheet,'#sheet-close');
+    });
+    ov.querySelector('#inv-logpose-info').onclick=()=>{
+      const returnFocus=()=>ov.querySelector('#inv-logpose-info')?.focus({preventScroll:true});
+      modalInfo('🧭 Log Poses de navegación','<div class="collection-help"><p>Sirven para subir el <strong>nivel base permanente</strong> de tus nakamas y desbloquear sus evoluciones.</p><p>Se obtienen al derrotar enemigos: en East Blue, cada pirata entrega 3, cada marine 4 y cada jefe 7. La cantidad se multiplica por el número de saga.</p><p>El coste aumenta con cada nivel. El nivel máximo disponible depende de tu progreso en las sagas.</p></div>',returnFocus);
+      const help=document.querySelector('#modal-ok').closest('.overlay');const closeHelp=()=>{help.remove();returnFocus();};
+      help.querySelector('.modal').setAttribute('role','dialog');help.querySelector('.modal').setAttribute('aria-modal','true');help.querySelector('.modal').setAttribute('aria-label','Log Poses de navegación');
+      bindCollectionDialog(help,closeHelp,'#modal-ok');
+    };
+  };
+  bindEvents();ov.onclick=e=>{if(e.target===ov)close();};bindCollectionDialog(ov,close,'#inv-title');
+}
+
 
 // ============ PANTALLA: INICIAL ============
 const starterView = { q: '', saga: '', type: '', rarity: 0, sort: 'default', page: 0 };
@@ -2773,7 +2976,241 @@ function starterSlotsCount() {
 
 let currentStarterUpdateFn = null;
 
-function screenStarter(sagaIdx) {
+function islandMapCount(island) {
+  return Math.min(5, Math.max(3, 2 + island.boss.length));
+}
+function migrateLegacyIslandWins(progress) {
+  progress.islandProgress ||= {};
+  for (const saga of SAGAS) for (const [diff, won] of Object.entries(progress.sagaDiffWins?.[saga.id] || {})) {
+    if (!won || Object.keys(progress.islandProgress).some(k=>k.startsWith(`${saga.id}:`) && k.endsWith(`:${diff}`))) continue;
+    for (const mode of ['classic','nuzlocke']) progress.islandProgress[`${saga.id}:${mode}:${diff}`] = saga.islands.map((_,i)=>i);
+  }
+}
+function islandProgressKey(sagaIdx, mode = storyMode, diff = selectedDiff || 1) {
+  return `${SAGAS[sagaIdx].id}:${mode}:${diff}`;
+}
+function migrateIslandJourney(journey, progress) {
+  if (!journey || journey.campaignVersion === 1 || !SAGAS[journey.saga]?.islands[journey.islandIdx]) return;
+  journey.campaignVersion = 1;
+  // Continue the existing map as the final map; never regenerate or discard saved nodes.
+  journey.mapIdx = islandMapCount(SAGAS[journey.saga].islands[journey.islandIdx]) - 1;
+  progress.islandProgress ||= {};
+  const key = islandProgressKey(journey.saga, journey.mode, journey.diff || 1);
+  const legacyWins = progress.sagaDiffWins?.[SAGAS[journey.saga].id]?.[journey.diff || 1] ? SAGAS[journey.saga].islands.map((_,i)=>i) : [];
+  progress.islandProgress[key] = [...new Set([...(progress.islandProgress[key] || legacyWins), ...(journey.badges || []).filter(i => Number.isInteger(i) && i < journey.islandIdx)])];
+}
+function completedIslands(sagaIdx, mode = storyMode, diff = selectedDiff || 1) {
+  const key = islandProgressKey(sagaIdx, mode, diff);
+  if (Object.hasOwn(meta.islandProgress || {}, key)) return meta.islandProgress[key];
+  // Previously conquered sagas keep all their islands accessible.
+  // A new victory in one mode must not grant the other mode's island progress.
+  if (Object.keys(meta.islandProgress || {}).some(k => k.startsWith(`${SAGAS[sagaIdx].id}:`) && k.endsWith(`:${diff}`))) return [];
+  return meta.sagaDiffWins?.[SAGAS[sagaIdx].id]?.[diff] ? SAGAS[sagaIdx].islands.map((_,i) => i) : [];
+}
+function islandAvailable(sagaIdx, index, mode = storyMode, diff = selectedDiff || 1) {
+  const done = completedIslands(sagaIdx, mode, diff);
+  return index === 0 || done.includes(index) || done.includes(index - 1);
+}
+function genIslandMap(island, mapIdx) {
+  const finalMap = mapIdx === islandMapCount(island) - 1;
+  const map = genMap({...island, final:finalMap && island.final});
+  if (!finalMap) map.rows[map.rows.length - 1][0].type = 'travel';
+  return map;
+}
+// One chart shared by Historia and every return from an island expedition.
+function worldIslandState(sagaIdx, index) {
+  const saga = SAGAS[sagaIdx];
+  const active = !!(run && !run.islandComplete && run.saga === sagaIdx && run.islandIdx === index && run.mode === storyMode && (run.diff || 1) === selectedDiff);
+  let reason = '';
+  if (!sagaUnlocked(sagaIdx)) reason = `Supera ${SAGAS[sagaIdx - 1].name} en dificultad Capitán.`;
+  else if (!sagaDiffUnlocked(saga.id, selectedDiff)) reason = `Supera esta saga en dificultad ${DIFFICULTIES.find(d => d.id === selectedDiff - 1)?.name}.`;
+  else if (!islandAvailable(sagaIdx, index)) reason = `Completa ${saga.islands[index - 1]?.name} para desbloquear esta isla.`;
+  return {active, available:active || !reason, reason:active ? '' : reason};
+}
+
+function worldSagaHTML(sagaIdx) {
+  const saga = SAGAS[sagaIdx], done = completedIslands(sagaIdx);
+  const wins = meta.sagaDiffWins?.[saga.id] || {};
+  const entry = worldIslandState(sagaIdx, 0);
+  const crossing = saga.id === 'eastblue'
+    ? '<div class="world-redline" data-world-crossing><strong>RED LINE · REVERSE MOUNTAIN</strong><span>↑ Entrada a Grand Line · Paradise</span></div>'
+    : saga.id === 'gyojin'
+      ? '<div class="world-redline" data-world-crossing><strong>RED LINE · NUEVO MUNDO ↑</strong><span>La ruta pasa bajo el continente, por la Isla Gyojin</span></div>' : '';
+  return `${crossing}<section class="world-saga" id="world-saga-${sagaIdx}" data-world-saga="${sagaIdx}" style="--saga-color:${saga.color}">
+    <div class="world-islands">${saga.islands.map((island, i) => {
+      const {active, available} = worldIslandState(sagaIdx, i);
+      const state = active ? `Continuar · mapa ${(run.mapIdx || 0) + 1}/${islandMapCount(island)}` : !available ? 'Bloqueada' : done.includes(i) ? 'Completada · explorar' : 'Explorar destino';
+      return `<div class="world-stop ${i % 2 ? 'starboard' : 'port'} ${done.includes(i) ? 'is-complete' : ''} ${active ? 'is-current' : ''} ${available ? '' : 'is-locked'}" id="world-island-${sagaIdx}-${i}" data-location-key="${saga.id}-${i}">
+        <div class="world-island-card">
+        <button class="island-select" data-world-island="${i}" data-world-saga="${sagaIdx}" aria-controls="world-island-panel" aria-expanded="false" aria-label="${island.name}. ${state}">
+          <span class="island-land" aria-hidden="true">
+            <img src="/art/world/${saga.id}-${i}.webp" alt="" width="320" height="240" loading="lazy" decoding="async">
+          </span>
+
+          <span class="island-label"><b>${island.location?.place || island.name}</b><span class="island-zone">${island.location?.zone || saga.name}</span><span>${islandMapCount(island)} mapas · ${island.boss.length} ${island.boss.length === 1 ? 'jefe' : 'jefes'}</span><small>${state}</small></span>
+        </button>
+        </div>
+      </div>`;
+    }).reverse().join('')}</div>
+    <header class="world-saga-heading">
+      <span class="atlas-eyebrow">${sagaIdx === 0 ? 'EAST BLUE · COMIENZA AQUÍ' : sagaIdx <= 5 ? 'GRAND LINE · PARADISE' : sagaIdx === 6 ? 'BAJO LA RED LINE · 10.000 M' : 'GRAND LINE · NUEVO MUNDO'}</span>
+      <h2>${saga.name}</h2>
+      <p>${done.length}/${saga.islands.length} islas completadas ${wins[selectedDiff] ? '· ★ Dificultad superada' : ''}</p>
+      ${entry.reason ? `<p class="world-lock">🔒 ${entry.reason}</p>` : ''}
+      <details class="world-saga-details"><summary>Datos de saga · dificultades e información</summary>
+        <p>Victorias Clásico: ${meta.wins[saga.id] || 0} · Nuzlocke: ${meta.nuzWins[saga.id] || 0}</p>
+        <div class="world-difficulties">${DIFFICULTIES.map(d => `<span>${d.emoji} ${d.name}: ${wins[d.id] ? '✓ Superada' : sagaDiffUnlocked(saga.id, d.id) ? 'Disponible' : '🔒 Bloqueada'}</span>`).join('')}</div>
+        <div class="actions"><button class="btn small gray btn-saga-probs" data-saga="${sagaIdx}">📊 PROBABILIDADES</button><button class="btn small blue" data-saga-info="${sagaIdx}">ⓘ JEFES Y NIVELES</button></div>
+      </details>
+    </header>
+  </section>`;
+}
+
+function worldStopTop(chart,stop) {
+  return stop.getBoundingClientRect ? chart.scrollTop + stop.getBoundingClientRect().top - chart.getBoundingClientRect().top : stop.offsetTop;
+}
+function updateWorldSagaPicker(index) {
+  $('#world-jump').dataset.saga = String(index);
+  $('#world-jump').textContent = '🧭 Sagas · ' + SAGAS[index].name;
+  document.querySelectorAll('[data-jump-saga]').forEach(button => button.setAttribute('aria-pressed', String(Number(button.dataset.jumpSaga) === index)));
+}
+function scrollWorldStart(chart) {
+  updateWorldSagaPicker(0);
+  // On short phones, keep the first island in view rather than only its saga footer.
+  const first = $('#world-island-0-0');
+  chart.scrollTop = Math.min(chart.scrollHeight - chart.clientHeight, worldStopTop(chart,first) - 16);
+}
+
+function bindWorldMapNavigation(focusSaga, previousScroll) {
+  const chart = $('#world-map');
+  const recent = meta.lastCompletedIsland;
+  updateWorldSagaPicker(Number.isInteger(focusSaga) ? focusSaga : recent && SAGAS[recent.saga]?.islands[recent.index] ? recent.saga : 0);
+  if (previousScroll != null) chart.scrollTop = previousScroll;
+  else if (recent && SAGAS[recent.saga]?.islands[recent.index] && (!Number.isInteger(focusSaga) || focusSaga === recent.saga)) {
+    const target = $(`#world-island-${recent.saga}-${recent.index}`);
+    updateWorldSagaPicker(recent.saga);
+    chart.scrollTop = worldStopTop(chart,target) - chart.clientHeight / 2 + target.offsetHeight / 2;
+  }
+  else if (Number.isInteger(focusSaga)) {
+    const current = run && run.saga === focusSaga && !run.islandComplete && run.mode === storyMode && (run.diff || 1) === selectedDiff;
+    const index = current ? run.islandIdx : SAGAS[focusSaga].islands.findIndex((_, i) => worldIslandState(focusSaga, i).available && !completedIslands(focusSaga).includes(i));
+    const target = $(`#world-island-${focusSaga}-${Math.max(0, index)}`);
+    chart.scrollTop = worldStopTop(chart,target) - chart.clientHeight / 2 + target.offsetHeight / 2;
+  } else scrollWorldStart(chart);
+  $('#world-to-start').onclick = () => scrollWorldStart(chart);
+  document.querySelectorAll('[data-jump-saga]').forEach(button => button.onclick = () => {
+    const index = Number(button.dataset.jumpSaga);
+    const target = $(`#world-island-${index}-0`);
+    chart.scrollTop = worldStopTop(chart,target) - 16;
+    updateWorldSagaPicker(index);
+    $('#world-saga-picker').open = false;
+    $('#world-jump').focus();
+  });
+  worldNavigator = globalThis.WorldVoyage?.mount(chart, {
+    initialId:worldShipLocation || (run && !run.islandComplete ? `${SAGAS[run.saga]?.id}-${run.islandIdx}` : recent && SAGAS[recent.saga]?.islands[recent.index] ? `${SAGAS[recent.saga].id}-${recent.index}` : null),
+    onTravel:() => updateWorldArrival(true),
+    onArrival:id => { worldShipLocation=id; updateWorldArrival(false); }
+  });
+  chart.parentElement && (chart.parentElement.onkeydown = e => {
+    if(e.key === 'Escape' && worldSelection){e.preventDefault();closeWorldIsland();}
+  });
+  document.querySelectorAll('[data-island-info]').forEach(button => {
+    button.onclick = () => selectWorldIsland(+button.dataset.worldSaga, +button.dataset.islandInfo, button);
+  });
+  document.querySelectorAll('[data-world-island]').forEach(button => {
+    button.onclick = () => selectWorldIsland(+button.dataset.worldSaga, +button.dataset.worldIsland, button);
+  });
+}
+
+// Reading a destination never starts or replaces an expedition.
+function worldIslandCompletion(sagaIdx,index,mode,diff) {
+  const key=islandProgressKey(sagaIdx,mode,diff),progress=meta.islandProgress || {};
+  if(Object.hasOwn(progress,key))return progress[key].includes(index);
+  const saga=SAGAS[sagaIdx].id;
+  if(Object.keys(progress).some(k=>k.startsWith(`${saga}:`)&&k.endsWith(`:${diff}`)))return false;
+  // Legacy saga victories unlocked islands but did not record a mode per difficulty.
+  return meta.sagaDiffWins?.[saga]?.[diff] ? 'legacy' : false;
+}
+function worldIslandPanelHTML(sagaIdx,index) {
+  const saga=SAGAS[sagaIdx],island=saga.islands[index],location=island.location;
+  const state=worldIslandState(sagaIdx,index);
+  const progress=['classic','nuzlocke'].map(mode => `<div class="world-mode-progress"><strong>${mode==='classic'?'Clásico':'Nuzlocke'}</strong><div>${DIFFICULTIES.map(d=>{
+    const result=worldIslandCompletion(sagaIdx,index,mode,d.id),won=result===true;
+    const status=won?'superada':result==='legacy'?'guardado antiguo: modo no registrado':'pendiente';
+    return `<span class="${won?'won':''}" title="${d.name}: ${status}" aria-label="${d.name}: ${status}">${d.emoji} ${won?'✓':result==='legacy'?'?':'—'}</span>`;
+  }).join('')}</div></div>`).join('');
+  return `<header><div><h2>${location?.place || island.name}</h2><p>${location?.zone || saga.name} · ${location?.kind || 'Destino'}</p></div><button class="btn gray small" id="world-close" aria-label="Cerrar destino">✕</button></header>
+    <div class="world-inspector-body">
+    <div class="world-completions" aria-label="Dificultades completadas por modo">${progress}</div>
+    <p>${islandMapCount(island)} mapas · Enemigos Nv. ${island.lvl[0]}–${island.lvl[1]}</p>
+    <details><summary>Jefes y datos del destino</summary><p>${location?.description || ''}</p><p>${island.boss.map((id,k)=>`${CHARS[id].name} · Nv. ${island.bossLvl[k]}`).join('<br>')}</p><p>${saga.name} · ${storyMode==='classic'?'Clásico':'Nuzlocke'} · ${DIFFICULTIES.find(d=>d.id===selectedDiff)?.name}</p></details>
+    ${state.reason?`<p class="world-lock">🔒 ${state.reason}</p>`:''}</div>
+    <footer><span id="world-arrival" role="status" aria-live="polite">Destino seleccionado</span><div class="world-panel-actions"><button class="btn small gray" id="world-skip" hidden>SALTAR TRAVESÍA</button><button class="btn small gold" id="world-enter" ${state.available?'':'disabled'}>${state.active?'CONTINUAR':'ENTRAR'}</button></div></footer>`;
+}
+function selectWorldIsland(sagaIdx,index,trigger) {
+  const panel=$('#world-island-panel');if(!panel)return;
+  if(worldSelection?.trigger?.setAttribute)worldSelection.trigger.setAttribute('aria-expanded','false');
+  worldSelection={sagaIdx,index,trigger};
+  panel.innerHTML=worldIslandPanelHTML(sagaIdx,index);panel.hidden=false;
+  trigger?.setAttribute?.('aria-expanded','true');
+  document.querySelectorAll('.world-stop.is-selected').forEach(el=>el.classList.remove('is-selected'));
+  $(`#world-island-${sagaIdx}-${index}`)?.classList?.add('is-selected');
+  $('#world-close').onclick=closeWorldIsland;
+  $('#world-skip').onclick=()=>worldNavigator?.finish();
+  $('#world-enter').onclick=enterWorldIsland;
+  const started=worldNavigator?.travelTo(`${SAGAS[sagaIdx].id}-${index}`);
+  if(!started)updateWorldArrival(false);
+  $('#world-close').focus?.({preventScroll:true});
+}
+function updateWorldArrival(sailing) {
+  if(!worldSelection)return;
+  const state=worldIslandState(worldSelection.sagaIdx,worldSelection.index);
+  $('#world-enter').disabled=sailing || !state.available;
+  $('#world-skip').hidden=!sailing;
+  $('#world-arrival').textContent=sailing?'Navegando…':state.available?'¡Destino alcanzado!':'Destino bloqueado';
+}
+function closeWorldIsland() {
+  const selection=worldSelection;worldSelection=null;
+  $('#world-island-panel').hidden=true;
+  selection?.trigger?.setAttribute?.('aria-expanded','false');
+  document.querySelectorAll('.world-stop.is-selected').forEach(el=>el.classList.remove('is-selected'));
+  if(selection?.trigger?.isConnected)selection.trigger.focus({preventScroll:true});
+}
+function enterWorldIsland() {
+  if(!worldSelection || worldNavigator?.sailing)return;
+  const {sagaIdx,index}=worldSelection,state=worldIslandState(sagaIdx,index);
+  if(!state.available)return;
+  if(state.active){screenMap();return;}
+  const choose=()=>screenStarter(sagaIdx,index);
+  if(run)modalConfirm('🧭 ¿Preparar otra expedición?', 'Al zarpar sustituirás el viaje en curso. Los reclutas de una isla sin completar aún no son permanentes.', choose);
+  else choose();
+}
+
+function screenIslands(sagaIdx) {
+  screenSagas(sagaIdx);
+}
+
+function showIslandInfo(sagaIdx, index, trigger) {
+  const saga=SAGAS[sagaIdx], island=saga.islands[index];
+  const {available, reason}=worldIslandState(sagaIdx,index);
+  const ov=document.createElement('div');
+  ov.className='overlay';
+  ov.innerHTML=`<div class="modal island-info" role="dialog" aria-modal="true" aria-label="Información de ${island.name}">
+    <h2>${available ? 'ⓘ' : '🔒'} ${island.name}</h2>
+    <p>${islandMapCount(island)} mapas · ${island.boss.length} ${island.boss.length===1 ? 'jefe' : 'jefes'} en un único combate final.</p>
+    <div class="island-bosses"><h3>Jefes y niveles</h3>${island.boss.map((id,k)=>`<div class="island-boss"><span>${CHARS[id].name}</span><strong>Nv. ${island.bossLvl[k]}</strong></div>`).join('')}</div>
+    <p>${available ? 'Isla disponible. Selecciónala en el mapa para preparar tu banda o continuar tu viaje.' : reason}</p>
+    <div class="actions"><button class="btn gray" data-close-island-info>CERRAR</button></div>
+  </div>`;
+  const close=()=>{ov.remove();if(trigger?.isConnected)trigger.focus();};
+  ov.querySelector('[data-close-island-info]').onclick=close;
+  ov.onclick=e=>{if(e.target===ov)close();};
+  ov.onkeydown=e=>{if(e.key==='Escape'){e.preventDefault();e.stopPropagation();close();}else if(e.key==='Tab'){e.preventDefault();ov.querySelector('[data-close-island-info]').focus();}};
+  document.body.appendChild(ov);
+  ov.querySelector('[data-close-island-info]').focus();
+}
+
+function screenStarter(sagaIdx, islandIdx = 0) {
   playMusic('menu');
   const saga = SAGAS[sagaIdx];
   const maxSlots = starterSlotsCount();
@@ -2784,10 +3221,15 @@ function screenStarter(sagaIdx) {
   const renderSlotsGrid = () => {
     let slotsHTML = '';
     const cap = maxStartLvlCap();
-    for (let i = 0; i < maxSlots; i++) {
+    for (let i = 0; i < 6; i++) {
+      if (i >= maxSlots) {
+        slotsHTML += `<div class="starter-slot-card locked-slot" aria-label="Hueco ${i + 1} bloqueado"><div class="starter-slot-badge">HUECO ${i + 1}</div><span aria-hidden="true">🔒</span><b>Bloqueado</b><small>Desbloquea más huecos en la tienda</small></div>`;
+        continue;
+      }
       const id = picked[i];
       if (id && CHARS[id]) {
-        const c = CHARS[id];
+        const displayId = evolutionFormAt(id, startLvlOf(id));
+        const c = CHARS[displayId];
         const startLvl = startLvlOf(id);
         const cost = logPoseUpgradeCost(startLvl);
         const isMax = startLvl >= cap;
@@ -2796,7 +3238,7 @@ function screenStarter(sagaIdx) {
         slotsHTML += `
           <div class="starter-slot-card occupied" data-slot="${i}">
             <div class="starter-slot-badge">HUECO ${i + 1}</div>
-            <div style="margin-top:14px;" class="emoji">${charIcon(id, 40)}</div>
+            <div style="margin-top:14px;" class="emoji">${charIcon(displayId, 40)}</div>
             <div style="font-size:10px;font-weight:bold;margin:3px 0;">${c.name}</div>
             <div class="char-lvl" style="font-size:8px;">Nv. ${startLvl} · ${'⭐'.repeat(c.rareza)}</div>
             <div class="type-badges" style="margin:3px 0;justify-content:center;">${typeBadges(c.types)}</div>
@@ -2805,12 +3247,12 @@ function screenStarter(sagaIdx) {
                 <span style="font-size:7.5px;color:var(--green);font-weight:bold;background:rgba(0,0,0,0.06);padding:2px 6px;border-radius:3px;display:inline-block;">🔒 Nv. Máx (${cap})</span>
               ` : `
                 <button class="btn small gold btn-upg-slot" data-id="${id}" ${canAfford ? '' : 'disabled'} style="font-size:7.5px;padding:3px 6px;width:100%;" title="Cuesta ${cost} Log Poses">
-                  ⬆️ Subir Nv (${cost} 🧭)
+                  Nv +1 · ${cost} 🧭
                 </button>
               `}
             </div>
             <div style="display:flex;gap:3px;margin-top:2px;width:100%;justify-content:center;">
-              <button class="btn small blue btn-swap-slot" data-slot="${i}" style="font-size:7.5px;padding:3px 5px;flex:1;">🔄 Cambiar</button>
+              <button class="btn small blue btn-swap-slot" data-slot="${i}" style="font-size:7.5px;padding:3px 5px;flex:1;" aria-label="Cambiar nakama">↔</button>
               <button class="btn small gray btn-info-slot" data-id="${id}" style="font-size:7.5px;padding:3px 5px;">ℹ️</button>
               <button class="btn small red btn-remove-slot" data-slot="${i}" style="font-size:7.5px;padding:3px 5px;">✕</button>
             </div>
@@ -2855,7 +3297,7 @@ function screenStarter(sagaIdx) {
   render(`
     ${topbar(false)}
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
-    <div class="subtitle" style="font-size:14px;">Aventura en ${saga.name}</div>
+    <div class="subtitle" style="font-size:14px;">${saga.name} · ${saga.islands[islandIdx].name}</div>
     <div class="panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
         <h2 id="starter-team-heading" style="margin:0;">🏴‍☠️ Configuración de la Banda (${picked.length}/${maxSlots})</h2>
@@ -2863,25 +3305,28 @@ function screenStarter(sagaIdx) {
           🧭 Log Poses: ${meta.logPoses || 0} ℹ️
         </div>
       </div>
-      <p style="font-size:8.5px;color:#555;margin-bottom:12px;">Toca un personaje para cambiarlo, sube su nivel con 🧭 Log Poses o pulsa un hueco vacío para abrir el inventario.</p>
+      <p style="font-size:8.5px;color:#555;margin-bottom:12px;">Toca para elegir · Mantén pulsado para reordenar.</p>
       
       <div id="starter-slots-container"></div>
+      <section class="team-synergy-summary" aria-label="Sinergias del equipo"><h3>Sinergias activas</h3><div id="starter-synergies" aria-live="polite"></div><button class="btn small gray" id="starter-synergy-info">Ver sinergias y tipos</button></section>
       ${renderPresetsBar()}
 
-      <div style="text-align:center;margin-top:16px;">
+      <div class="starter-launch-actions" style="text-align:center;margin-top:16px;">
         <button class="btn green" id="btn-zarpar" style="font-size:11px;padding:10px 20px;">
           ⚔️ ZARPAR CON TU BANDA (${picked.length}/${maxSlots})
         </button>
+        <button class="btn blue" id="btn-auto-island">🤖 Automático</button>
       </div>
     </div>
   `);
 
-  $('#btn-back').onclick = screenSagas;
+  $('#btn-back').onclick = () => screenIslands(sagaIdx);
 
   const openInventoryPicker = (slotIdx) => {
     showInventoryModal({
       title: `Añadir / Sustituir Nakama (Hueco ${slotIdx + 1})`,
       currentTeam: picked,
+      selectedId: picked[slotIdx],
       onSelect: (newId) => {
         const existingIdx = picked.indexOf(newId);
         if (existingIdx >= 0 && existingIdx !== slotIdx) {
@@ -2992,12 +3437,18 @@ function screenStarter(sagaIdx) {
     });
 
     const zarparBtn = $('#btn-zarpar');
+    const repeatBtn = $('#btn-auto-island');
+    if (repeatBtn) {
+      const team = picked.filter(Boolean);
+      repeatBtn.disabled = team.length < 1;
+      repeatBtn.onclick = () => showIslandRepeatSetup(sagaIdx, team, islandIdx);
+    }
     if (zarparBtn) {
       const cleanPicked = picked.filter(Boolean);
       zarparBtn.disabled = cleanPicked.length < 1;
       zarparBtn.textContent = `⚔️ ZARPAR CON TU BANDA (${cleanPicked.length}/${maxSlots})`;
       zarparBtn.onclick = () => {
-        if (cleanPicked.length >= 1) startRun(sagaIdx, cleanPicked);
+        if (cleanPicked.length >= 1) startRun(sagaIdx, cleanPicked, islandIdx);
       };
     }
   };
@@ -3007,6 +3458,9 @@ function screenStarter(sagaIdx) {
     if (heading) heading.textContent = `🏴‍☠️ Configuración de la Banda (${picked.filter(Boolean).length}/${maxSlots})`;
     const slotsContainer = $('#starter-slots-container');
     if (slotsContainer) slotsContainer.innerHTML = renderSlotsGrid();
+    const previewTeam = picked.filter(Boolean).map(id => applyUpgrades(makeChar(id, startLvlOf(id))));
+    $('#starter-synergies').innerHTML = activeSynergiesHTML(previewTeam);
+    $('#starter-synergy-info').onclick = () => showSynergyModal(previewTeam);
     const presetBarCont = document.querySelector('.preset-bar');
     if (presetBarCont) presetBarCont.outerHTML = renderPresetsBar();
     const lpCont = $('#starter-logpose-info');
@@ -3019,13 +3473,13 @@ function screenStarter(sagaIdx) {
 }
 
 // Límite de nivel inicial según la máxima saga accesible:
-// 5 (East Blue), 8 (Alabasta), 14 (Skypiea), 17 (Water 7), 20 (Thriller Bark), 23...
-function maxStartLvlCap() {
+// East Blue permite Nv.15; las siguientes sagas nunca reducen ese límite.
+function maxStartLvlCap(progress = meta) {
   let highestSaga = 0;
   for (let i = 0; i < SAGAS.length; i++) {
-    if (sagaUnlocked(i)) highestSaga = i;
+    if (sagaUnlocked(i, progress)) highestSaga = i;
   }
-  return Math.max(10, SAGAS[highestSaga] ? SAGAS[highestSaga].islands[0].lvl[0] : 10);
+  return Math.max(15, SAGAS[highestSaga] ? SAGAS[highestSaga].islands[0].lvl[0] : 15);
 }
 
 function logPoseUpgradeCost(currentLvl) {
@@ -3033,11 +3487,11 @@ function logPoseUpgradeCost(currentLvl) {
   return Math.floor(3 * Math.pow(1.5, diff) + diff * 2 + 3);
 }
 
-function startLvlOf(id) {
+function startLvlOf(id, progress = meta) {
   const base = baseFormOf(id);
-  const purchased = (meta.charUpgrades || {})[base] || 0;
+  const purchased = (progress.charUpgrades || {})[base] || 0;
   const rawLvl = 5 + purchased;
-  const cap = maxStartLvlCap();
+  const cap = maxStartLvlCap(progress);
   return Math.min(rawLvl, cap);
 }
 
@@ -3058,13 +3512,467 @@ function upgradeCharLvl(id) {
   }
   meta.logPoses -= cost;
   meta.charUpgrades[base] = (meta.charUpgrades[base] || 0) + 1;
+  for (const team of [run?.team, tower?.team]) {
+    for (const f of team || []) if (baseFormOf(f.id) === base) {
+      syncEvolution(f);
+      registerDex(f.id);
+    }
+  }
+  if (run) saveRun();
   saveMeta();
   toast(`✨ ¡${CHARS[id].name} sube al Nivel ${startLvlOf(id)}! (${cost} 🧭 consumidos)`);
   return true;
 }
 
-function startRun(sagaIdx, starterIds) {
+// Preserve the embarkation selection even when Nuzlocke removes fallen fighters.
+function ensureStartingTeam(journey) {
+  if (!journey || journey.startingTeam !== undefined) return;
+  const ids = (journey.team || []).filter(f => f && CHARS[f.id]).map(f => baseFormOf(f.id)).slice(0,6);
+  if (ids.length) journey.startingTeam = ids;
+}
+function islandRepeatStatusHTML() {
+  const repeat = run?.islandRepeat;
+  if (!repeat || repeat.result) return '';
+  return `<div class="island-repeat-status"><span title="${repeat.wins} victorias · ${repeat.losses} derrotas">🤖 Intento <b>${repeat.completed+1}/${repeat.total}</b></span><button class="btn small gray" id="btn-cancel-island-repeat" aria-label="Cancelar repeticiones automáticas">Cancelar serie</button></div>`;
+}
+function showIslandRepeatSetup(sagaIdx, starterIds, islandIdx) {
+  const island = SAGAS[sagaIdx].islands[islandIdx], trigger = document.activeElement;
+  const difficulty = DIFFICULTIES.find(d => d.id === selectedDiff) || DIFFICULTIES[0];
+  const ov = document.createElement('div'); ov.className = 'overlay';
+  ov.innerHTML = `<section class="modal repeat-setup" role="dialog" aria-modal="true" aria-labelledby="repeat-title">
+    <h2 id="repeat-title">🤖 Repetir isla</h2><p><strong>${island.name}</strong> · ${storyMode==='nuzlocke'?'Nuzlocke':'Clásico'} · ${difficulty.name}</p>
+    <p class="repeat-team">${starterIds.map(id=>CHARS[id].name).join(' · ')}</p>
+    <label for="repeat-count">Número de intentos<input id="repeat-count" type="number" inputmode="numeric" min="1" max="1000" step="1" value="10" required></label>
+    <p>Cada victoria o derrota cuenta como un intento. Cada salida empieza con este mismo equipo, sus niveles base y las provisiones iniciales.</p>
+    <p>Usa tu configuración actual del modo automático: ruta, eventos, reclutamiento, compras, curas y velocidad. Si necesita una decisión o falta espacio en la mochila, la serie se pausa sin perder el contador. Puedes continuarla o cancelarla.</p>
+    <p id="repeat-error" role="alert"></p><div class="actions"><button class="btn gray" id="repeat-cancel">Volver</button><button class="btn green" id="repeat-start">Jugar 10 intentos</button></div>
+  </section>`;
+  document.body.appendChild(ov);
+  const close=()=>{ov.remove();if(trigger?.isConnected)trigger.focus({preventScroll:true});};
+  const input=ov.querySelector('#repeat-count'), start=ov.querySelector('#repeat-start');
+  input.oninput=()=>{start.textContent=`Jugar ${input.value || '…'} intentos`;};
+  ov.querySelector('#repeat-cancel').onclick=close;
+  start.onclick=()=>{
+    if (!input.reportValidity()) return;
+    if (!startIslandRepeats(sagaIdx,starterIds,islandIdx,Number(input.value))) {
+      ov.querySelector('#repeat-error').textContent='Revisa el número de intentos, la isla y el equipo.';return;
+    }
+    ov.remove();
+  };
+  ov.onclick=e=>{if(e.target===ov)close();};bindCollectionDialog(ov,close,'#repeat-count');
+}
+function startIslandRepeats(sagaIdx, starterIds, islandIdx, total) {
+  if (!Number.isInteger(total) || total<1 || total>1000 || !SAGAS[sagaIdx]?.islands[islandIdx] ||
+      !Array.isArray(starterIds) || !starterIds.length || starterIds.length>starterSlotsCount() ||
+      new Set(starterIds).size!==starterIds.length || starterIds.some(id=>!CHARS[id] || baseFormOf(id)!==id || !isNakamaUnlocked(id)) ||
+      !islandAvailable(sagaIdx,islandIdx)) return false;
+  clearTimeout(autoTimer);autoTimer=null;autoMode=true;
+  startRun(sagaIdx,starterIds,islandIdx,{total,completed:0,wins:0,losses:0,result:null});
+  return true;
+}
+function finishIslandRepeat(result, continueAuto = autoMode) {
+  const repeat=run?.islandRepeat;
+  if (!repeat) return false;
+  if (!repeat.result) {
+    repeat.result=result;repeat.completed++;
+    if(result==='win')repeat.wins++;else repeat.losses++;
+    saveRun();
+  }
+  showIslandRepeatCheckpoint(continueAuto);
+  return true;
+}
+function showIslandRepeatCheckpoint(continueAuto = false) {
+  const journey=run, repeat=journey?.islandRepeat;
+  if (!repeat?.result) return;
+  clearTimeout(autoTimer);autoTimer=null;
+  const finished=repeat.completed>=repeat.total;
+  autoMode=!!continueAuto && !finished;
+  const attempt=islandRetrySpec(journey);
+  render(`${topbar(false)}<section class="panel repeat-checkpoint" id="repeat-checkpoint">
+    <h2>${finished?'🏁 Serie completada':'🤖 Intento completado'}</h2><p>${SAGAS[journey.saga].islands[journey.islandIdx].name}</p>
+    <p class="repeat-progress"><strong>${repeat.completed} / ${repeat.total}</strong> intentos</p>
+    <p>${repeat.wins} victorias · ${repeat.losses} derrotas</p><p>Último resultado: ${repeat.result==='win'?'victoria':'derrota'}. El progreso permanente se conserva.</p>
+    ${journeyRewardsHTML(journey)}
+    ${finished?'':`<p>${autoMode?'El siguiente intento comienza automáticamente.':'Serie pausada. Continúa cuando quieras.'}</p><button class="btn green" id="repeat-next">Continuar serie</button>`}
+    <button class="btn gray" id="repeat-finish">${finished?'Volver a las islas':'Cancelar repeticiones'}</button></section>`);
+  const next=()=>{
+    if(run!==journey || !journey.islandRepeat || !$('#repeat-checkpoint') || finished)return;
+    clearTimeout(autoTimer);autoTimer=null;
+    storyMode=attempt.mode;selectedDiff=attempt.diff;autoMode=true;
+    startRun(attempt.saga,attempt.starterIds,attempt.islandIdx,{...repeat,result:null});
+  };
+  if(!finished)$('#repeat-next').onclick=next;
+  $('#repeat-finish').onclick=()=>{
+    if(run!==journey)return;
+    autoMode=false;clearTimeout(autoTimer);autoTimer=null;
+    storyMode=attempt.mode;selectedDiff=attempt.diff;clearRun();screenIslands(attempt.saga);
+  };
+  if(autoMode)scheduleAutoStep(next,1200);
+}
+function cancelIslandRepeats() {
+  if(!run?.islandRepeat)return;
+  delete run.islandRepeat;
+  autoMode=false;clearTimeout(autoTimer);autoTimer=null;saveRun();
+  toast('Repeticiones canceladas. Puedes terminar este intento manualmente.');
+  if(battle)renderBattlePreserveLog();else screenMap();
+}
+function islandRetrySpec(journey) {
+  ensureStartingTeam(journey);
+  if (!journey?.startingTeam?.length || !SAGAS[journey.saga]?.islands[journey.islandIdx]) return null;
+  return {saga:journey.saga, islandIdx:journey.islandIdx, mode:journey.mode,
+    diff:journey.diff || 1, starterIds:[...journey.startingTeam]};
+}
+function retryIsland(attempt) {
+  if (!attempt) return;
+  autoMode = false;
+  clearTimeout(autoTimer); autoTimer = null;
+  if (battle) { battle.over = true; clearTimeout(battle.timer); battle = null; }
+  storyMode = attempt.mode; selectedDiff = attempt.diff;
+  startRun(attempt.saga, attempt.starterIds, attempt.islandIdx);
+}
+function confirmRestartIsland() {
+  const journey = run, attempt = islandRetrySpec(journey);
+  if (!attempt) return;
+  const wasAuto = autoMode;
+  autoMode = false; clearTimeout(autoTimer); autoTimer = null;
+  modalConfirm('🔄 ¿Reiniciar isla?',
+    'Volverás al mapa 1 con el equipo que elegiste al zarpar, sus niveles base actuales y las provisiones iniciales.<br>Se perderán los reclutas y las mejoras temporales de este intento. El progreso permanente se conserva.',
+    () => { if (run === journey) retryIsland(attempt); },
+    () => { if (run === journey) { autoMode = wasAuto; screenMap(); } });
+}
+
+// Quantities remain authoritative; placements only describe each stack's footprint.
+function backpackCapacity() { return 9 + Math.min(17, Math.max(0, meta.global.backpackTier || 0)) * 3; }
+function backpackStackLimit() { return 3 + Math.min(17, Math.max(0, meta.global.backpackTier || 0)); }
+function backpackUpgradeCost() { return 300 * ((meta.global.backpackTier || 0) + 1); }
+function buyBackpackUpgrade() {
+  const cost = backpackUpgradeCost();
+  if (backpackCapacity() >= 60 || meta.fame < cost) return false;
+  meta.fame -= cost;
+  meta.global.backpackTier = (meta.global.backpackTier || 0) + 1;
+  saveMeta();
+  return true;
+}
+function backpackUsed(items, combat = null) {
+  return Object.entries(items || {}).reduce((sum, [id, count]) => {
+    const item = ITEMS[id];
+    return sum + (item && count > 0 && (combat === null || isBattleItem(id) === combat) ? Math.ceil(count / backpackStackLimit()) * item.slotSize : 0);
+  }, 0);
+}
+function planBackpackAddition(owner, id, count = 1) {
+  if (!owner || !ITEMS[id] || !Number.isInteger(count) || count <= 0) return null;
+  const items = {...owner.items, [id]:(owner.items[id] || 0) + count};
+  const category = isBattleItem(id);
+  if (backpackUsed(items,category) > backpackCapacity()) return null;
+  let plan = planBackpack({...owner,items});
+  const fits = () => !plan.missing.some(s => isBattleItem(s.id) === category);
+  if (!fits()) {
+    // Reorganize this bag only when the free cells are too fragmented.
+    const bagLayout = Object.fromEntries(backpackStacks(owner)
+      .filter(s => isBattleItem(s.id) !== category && owner.bagLayout?.[s.key])
+      .map(s => [s.key,owner.bagLayout[s.key]]));
+    plan = planBackpack({...owner,items,bagLayout},true);
+  }
+  return fits() ? plan : null;
+}
+function backpackFits(owner, id, count = 1) {
+  return !!planBackpackAddition(owner,id,count);
+}
+function addBackpackItem(owner, id, count = 1) {
+  const plan = planBackpackAddition(owner,id,count);
+  if (!plan) return false;
+  owner.items[id] = (owner.items[id] || 0) + count;
+  owner.bagLayout = plan.layout;
+  return true;
+}
+function receiveBackpackItem(owner, id, count = 1) {
+  if (!ITEMS[id] || !Number.isInteger(count) || count < 1) return false;
+  const stored = addBackpackItem(owner, id, count);
+  if (!stored) {
+    owner.pendingLoot ||= {};
+    owner.pendingLoot[id] = (owner.pendingLoot[id] || 0) + count;
+    if (autoMode) resolveAutoLoot(owner);
+    else { clearTimeout(autoTimer); autoTimer = null; }
+  }
+  return stored;
+}
+function resolveAutoLoot(owner) {
+  if (!autoMode || !hasPendingLoot(owner)) return;
+  if (autoSettings.fullBagAction === 'manual') {
+    pauseAutoForChoice('🎒 Mochila llena: guarda o deja el objeto.');
+    return;
+  }
+  const left = [];
+  for (const [id, count] of Object.entries(owner.pendingLoot || {})) {
+    if (!ITEMS[id] || count <= 0) continue;
+    let remaining = count;
+    while (remaining > 0 && addBackpackItem(owner, id)) remaining--;
+    if (remaining) left.push(`${ITEMS[id].name} ×${remaining}`);
+    delete owner.pendingLoot[id];
+  }
+  if (left.length) toast(`🤖 Mochila llena: se deja ${left.join(', ')}.`);
+  saveBackpack(owner);
+}
+function prepareBackpack(owner) {
+  if (!owner) return;
+  owner.items ||= {};
+  owner.pendingLoot ||= {};
+  const plan = planBackpack(owner);
+  for (const {id,count} of plan.missing) {
+    owner.items[id] -= count;
+    owner.pendingLoot[id] = (owner.pendingLoot[id] || 0) + count;
+  }
+  owner.bagLayout = planBackpack({...owner,bagLayout:plan.layout}).layout;
+  owner.backpackVersion = 1;
+}
+function hasPendingLoot(owner) { return Object.values(owner?.pendingLoot || {}).some(n => n > 0); }
+function isBattleItem(id) { return ['heal','revive','battleBoost'].includes(ITEMS[id]?.kind); }
+function backpackStacks(owner) {
+  const stacks = [];
+  for (const [id,total] of Object.entries(owner.items || {})) {
+    const item = ITEMS[id];
+    if (!item) continue;
+    for (let remaining = total, index = 0; remaining > 0; remaining -= backpackStackLimit(), index++) {
+      stacks.push({id, key:`${id}:${index}`, count:Math.min(remaining,backpackStackLimit()), size:item.slotSize});
+    }
+  }
+  return stacks;
+}
+function backpackShape(size, vertical = false) {
+  return size === 4 ? {w:2,h:2} : {w:vertical ? 1 : size,h:vertical ? size : 1};
+}
+function backpackCells(size, cell, vertical = false, capacity = backpackCapacity()) {
+  const {w,h} = backpackShape(size,vertical);
+  if (!Number.isInteger(cell) || cell < 0 || cell % 3 + w > 3 || Math.floor(cell / 3) + h > capacity / 3) return [];
+  return Array.from({length:h},(_,r)=>Array.from({length:w},(_,c)=>cell+r*3+c)).flat();
+}
+function planBackpack(owner, horizontalFirst = false) {
+  const stacks = backpackStacks(owner), layout = {}, missing = [], occupied = [new Set(),new Set()];
+  const reserve = (s,pos) => {
+    if (!pos || typeof pos.vertical !== 'boolean') return false;
+    const cells = backpackCells(s.size,pos.cell,pos.vertical), used = occupied[+isBattleItem(s.id)];
+    if (cells.length !== s.size || cells.some(c => used.has(c))) return false;
+    layout[s.key] = {cell:pos.cell,vertical:pos.vertical};
+    cells.forEach(c => used.add(c)); return true;
+  };
+  // Keep valid user placements. Pack only new stacks and legacy inventories.
+  for (const s of stacks) reserve(s,owner.bagLayout?.[s.key]);
+  const positions = Array.from({length:backpackCapacity()},(_,cell)=>[
+    {cell,vertical:false},{cell,vertical:true}
+  ]).flat();
+  // During repacking, keep full-width pieces in rows before using narrow side gaps.
+  if (horizontalFirst) positions.sort((a,b)=>Number(a.vertical)-Number(b.vertical));
+  for (const s of stacks.filter(s=>!layout[s.key]).sort((a,b)=>b.size-a.size)) {
+    let stored = false;
+    for (const pos of positions) if (reserve(s,pos)) { stored=true;break; }
+    if (!stored) missing.push(s);
+  }
+  return {layout,missing};
+}
+function canPlaceBackpackStack(owner, key, cell, vertical) {
+  const stacks = backpackStacks(owner), stack = stacks.find(s=>s.key===key);
+  if (!stack) return false;
+  const cells = backpackCells(stack.size,cell,vertical);
+  if (cells.length !== stack.size) return false;
+  return stacks.filter(s=>s.key!==key && isBattleItem(s.id)===isBattleItem(stack.id)).every(s=>{
+    const p = owner.bagLayout?.[s.key];
+    return !p || !backpackCells(s.size,p.cell,p.vertical).some(c=>cells.includes(c));
+  });
+}
+function moveBackpackStack(owner, key, cell, vertical) {
+  prepareBackpack(owner);
+  if (!canPlaceBackpackStack(owner,key,cell,vertical)) return false;
+  owner.bagLayout[key] = {cell,vertical};
+  return true;
+}
+function placePendingBackpackItem(owner, id, cell, vertical) {
+  if (!(owner.pendingLoot?.[id] > 0) || !ITEMS[id]) return false;
+  prepareBackpack(owner);
+  const total = owner.items[id] || 0, key = `${id}:${Math.floor(total/backpackStackLimit())}`;
+  if (total % backpackStackLimit()) {
+    if (!addBackpackItem(owner,id)) return false;
+  } else {
+    const proposed = {...owner,items:{...owner.items,[id]:total+1}};
+    if (!canPlaceBackpackStack(proposed,key,cell,vertical)) return false;
+    owner.items[id] = total+1;
+    owner.bagLayout[key] = {cell,vertical};
+  }
+  owner.pendingLoot[id]--;
+  return true;
+}
+function backpackHTML(owner, combat = false, category = null) {
+  if (!combat && category === null) return `<div class="backpacks">${backpackHTML(owner,false,false)}${backpackHTML(owner,false,true)}</div>`;
+  const battleBag = combat || category === true;
+  const capacity = backpackCapacity(), used = backpackUsed(owner.items,battleBag);
+  const layout = planBackpack(owner).layout;
+  const stacks = backpackStacks(owner).filter(({id,key}) => isBattleItem(id) === battleBag && layout[key]);
+  const occupied = new Set();
+  const cells = stacks.map(({id,key,count,size}) => {
+    const item = ITEMS[id], pos = layout[key], {w,h} = backpackShape(size,pos.vertical);
+    const footprint = backpackCells(size,pos.cell,pos.vertical);footprint.forEach(c=>occupied.add(c));
+    return `<button type="button" class="bag-piece bag-filled" style="grid-column:${pos.cell%3+1}/span ${w};grid-row:${Math.floor(pos.cell/3)+1}/span ${h};--bag-piece-columns:${w}" data-bag-item="${id}" data-bag-count="${count}" data-bag-stack="${key}" title="${item.name} ×${count} · ${w}×${h}" aria-label="${item.name} ×${count}, ocupa ${w} por ${h} casillas">
+      <span class="bag-piece-cells">${footprint.map(c=>`<span class="bag-cell bag-occupied"><span class="bag-slot-number">${c+1}</span></span>`).join('')}</span>
+      <span class="bag-icon">${item.emoji}</span><span class="bag-quantity">×${count}</span>
+      <span class="bag-item-name">${item.name}${size > 1 ? ` · ${w}×${h}` : ''}</span>
+    </button>`;
+  }).join('');
+  const empty = Array.from({length:capacity},(_,i)=>i).filter(i=>!occupied.has(i)).map(i=>`<div class="bag-cell bag-empty" style="grid-column:${i%3+1};grid-row:${Math.floor(i/3)+1}" aria-label="Casilla ${i+1} libre"><span class="bag-slot-number">${i+1}</span><span>＋</span></div>`).join('');
+  const pending = Object.entries(owner.pendingLoot || {}).filter(([id,n])=>ITEMS[id] && n>0 && (isBattleItem(id) === battleBag)).map(([id,n])=>`
+    <div class="bag-pending-item"><span>${ITEMS[id].emoji} ${ITEMS[id].name} ×${n}</span>
+      <button type="button" data-bag-collect="${id}">COLOCAR</button>
+      <button type="button" data-bag-leave="${id}">DEJAR ×${n}</button></div>`).join('');
+  return `<div class="backpack ${combat ? 'backpack-combat' : ''}">
+    <div class="bag-heading"><strong>🎒 ${battleBag ? 'COMBATE' : 'ISLA'}</strong><span aria-label="Espacio ocupado">${used}/${capacity} casillas</span></div>
+    <div class="bag-grid">${cells}${empty}</div>
+    ${combat ? '' : `<button type="button" class="btn small" data-bag-organize="${battleBag}">ORGANIZAR MOCHILA</button>`}
+    ${pending ? `<div class="bag-pending"><b>Pendiente de guardar</b><p>Elige una posición, reorganiza la mochila o deja los objetos para continuar.</p>${pending}</div>` : ''}
+    ${combat ? '' : `<p class="bag-help">${battleBag ? 'Curas, resurrecciones y bebidas de combate.' : 'Carteles, frutas y mejoras para la isla.'} Hasta ${backpackStackLimit()} unidades del mismo objeto por pila. Las dos mochilas tienen su propio espacio y se amplían juntas.</p>`}
+  </div>`;
+}
+function saveBackpack(owner) { if (owner === run) saveRun(); }
+function showBackpackOrganizer(owner, battleBag, refresh, initialId = null) {
+  prepareBackpack(owner);
+  if (autoMode) pauseAutoForChoice();
+  const activeBattle = battle && (battle.tower ? tower : run) === owner ? battle : null;
+  const wasWaiting = activeBattle?.waiting;
+  if (activeBattle && !activeBattle.over) pauseBattle();
+  const ov = document.createElement('div');ov.className='overlay';
+  let selection=initialId ? `pending:${initialId}` : '', cell=null, vertical=false, closed=false;
+  const close=()=>{
+    if (closed) return;
+    closed=true;ov.remove();refresh();
+    if (activeBattle && battle===activeBattle && !battle.over && !wasWaiting) resumeBattle();
+  };
+  const renderOrganizer=()=>{
+    const modalScroll=ov.querySelector('.bag-organizer')?.scrollTop || 0;
+    const gridScroll=ov.querySelector('.bag-grid')?.scrollTop || 0;
+    const stacks=backpackStacks(owner).filter(s=>isBattleItem(s.id)===battleBag);
+    const pending=Object.entries(owner.pendingLoot || {}).filter(([id,n])=>n>0&&isBattleItem(id)===battleBag);
+    const options=[...stacks.map(s=>({value:s.key,label:`${ITEMS[s.id].name} ×${s.count}`})),...pending.map(([id,n])=>({value:`pending:${id}`,label:`Por guardar: ${ITEMS[id].name} ×${n}`}))];
+    if (!options.some(o=>o.value===selection)) {selection=options[0]?.value || '';cell=null;}
+    const incoming=selection.startsWith('pending:'), id=incoming ? selection.slice(8) : stacks.find(s=>s.key===selection)?.id;
+    const total=owner.items[id] || 0, merging=incoming && total%backpackStackLimit()>0;
+    const key=incoming ? `${id}:${Math.floor(total/backpackStackLimit())}` : selection;
+    if (cell===null && !incoming) {cell=owner.bagLayout[key]?.cell ?? null;vertical=owner.bagLayout[key]?.vertical || false;}
+    const proposed=incoming ? {...owner,items:{...owner.items,[id]:total+1}} : owner;
+    const valid=!!id && (merging || canPlaceBackpackStack(proposed,key,cell,vertical));
+    const footprint=id ? backpackCells(ITEMS[id].slotSize,cell,vertical) : [];
+    const occupied=new Map();
+    for(const s of stacks){const p=owner.bagLayout[s.key];for(const c of backpackCells(s.size,p.cell,p.vertical))occupied.set(c,s);}
+    ov.innerHTML=`<div class="modal bag-organizer"><h2>🎒 Organizar ${battleBag?'combate':'isla'}</h2>
+      <p>Elige una pila, gírala y toca su casilla inicial. Cada pieza debe caber entera, sin cruzar el borde de una fila.</p>
+      <label>Pila de objetos<select data-layout-select>${options.map(o=>`<option value="${o.value}" ${selection===o.value?'selected':''}>${o.label}</option>`).join('')}</select></label>
+      <div class="actions"><button class="btn small" data-layout-rotate ${!id||[1,4].includes(ITEMS[id].slotSize)||merging?'disabled':''}>GIRAR · ${vertical?'VERTICAL':'HORIZONTAL'}</button></div>
+      <div class="bag-grid">${Array.from({length:backpackCapacity()},(_,i)=>{
+        const stack=occupied.get(i),ghost=footprint.includes(i);
+        return `<button type="button" class="bag-cell ${stack?'bag-occupied':'bag-empty'} ${ghost?(valid?'bag-placement-valid':'bag-placement-invalid'):''}" data-layout-cell="${i}" aria-label="Casilla ${i+1}${stack?`: ${ITEMS[stack.id].name}`:': libre'}"><span class="bag-slot-number">${i+1}</span><span>${stack?ITEMS[stack.id].emoji:ghost&&id?ITEMS[id].emoji:'＋'}</span></button>`;
+      }).join('')}</div>
+      <p role="status">${!id?'No hay objetos en esta mochila.':merging?'Se añadirá a una pila del mismo objeto.':cell===null?'Selecciona una casilla inicial.':valid?'La pieza cabe en esta posición.':'No cabe aquí: gira la pieza o elige otras casillas.'}</p>
+      <div class="actions"><button class="btn green" data-layout-place ${valid?'':'disabled'}>${merging?'APILAR 1':incoming?'GUARDAR 1':'MOVER PILA'}</button><button class="btn gray" data-layout-close>VOLVER</button></div></div>`;
+    ov.querySelector('[data-layout-select]').onchange=e=>{selection=e.target.value;cell=null;vertical=false;renderOrganizer();};
+    ov.querySelector('[data-layout-rotate]').onclick=()=>{vertical=!vertical;renderOrganizer();};
+    ov.querySelectorAll('[data-layout-cell]').forEach(btn=>{btn.onclick=()=>{cell=Number(btn.dataset.layoutCell);renderOrganizer();};});
+    ov.querySelector('[data-layout-place]').onclick=()=>{
+      if(closed || !valid) return;
+      const done=incoming ? placePendingBackpackItem(owner,id,cell,vertical) : moveBackpackStack(owner,key,cell,vertical);
+      if(!done){renderOrganizer();return;}
+      saveBackpack(owner);cell=null;renderOrganizer();
+    };
+    ov.querySelector('[data-layout-close]').onclick=close;
+    ov.querySelector('.bag-organizer').scrollTop=modalScroll;
+    ov.querySelector('.bag-grid').scrollTop=gridScroll;
+  };
+  renderOrganizer();document.body.appendChild(ov);
+  ov.onclick=e=>{if(e.target===ov)close();};
+}
+function bindBackpack(root, owner, combat, refresh) {
+  root.querySelectorAll('[data-bag-organize]').forEach(button => {
+    button.onclick = () => showBackpackOrganizer(owner,button.dataset.bagOrganize==='true',refresh);
+  });
+  root.querySelectorAll('[data-bag-item]').forEach(button => {
+    button.onclick = () => showBackpackItem(owner, button.dataset.bagItem, Number(button.dataset.bagCount), combat, refresh);
+  });
+  root.querySelectorAll('[data-bag-collect]').forEach(button => {
+    button.onclick = () => {
+      const id = button.dataset.bagCollect;
+      if (!(owner.pendingLoot?.[id] > 0)) return;
+      showBackpackOrganizer(owner,isBattleItem(id),refresh,id);
+    };
+  });
+  root.querySelectorAll('[data-bag-leave]').forEach(button => {
+    button.onclick = () => {
+      const id = button.dataset.bagLeave;
+      modalConfirm('¿Dejar el objeto?', `Dejarás ${ITEMS[id].name} ×${owner.pendingLoot[id]}.`, () => {
+        delete owner.pendingLoot[id]; saveBackpack(owner); refresh();
+      });
+    };
+  });
+}
+function showBackpackItem(owner, id, count, combat, refresh) {
+  if (!(owner.items[id] > 0) || (combat && !isBattleItem(id))) return;
+  const b = combat ? battle : null;
+  if (combat && (!b || b.over || b.waiting)) return;
+  if (combat && meta.settings.quickBattleItems === true) return useBattleItem(id);
+  if (b) pauseBattle();
+  const item = ITEMS[id], ov = document.createElement('div');
+  ov.className = 'overlay';
+  const usable = combat ? isBattleItem(id) : owner === run && !['ball','battleBoost'].includes(item.kind);
+  ov.innerHTML = `<div class="modal bag-item-modal"><h2>${item.emoji} ${item.name}</h2><p>${item.desc}</p>
+    <p>${item.slotSize} casilla${item.slotSize > 1 ? 's' : ''} · Hasta ${backpackStackLimit()} por pila</p>
+    ${!usable ? `<p>${item.kind === 'ball' ? 'Se usa en el evento de las cadenas.' : item.kind === 'battleBoost' ? 'Se usa durante el combate.' : 'Se usa fuera del combate.'}</p>` : ''}
+    <div class="actions"><button class="btn green" data-bag-use ${usable ? '' : 'disabled'}>USAR</button>
+      <button class="btn red" data-bag-discard>DESCARTAR ${count > 1 ? `PILA ×${count}` : '1'}</button>
+      <button class="btn gray" data-bag-close>VOLVER</button></div></div>`;
+  document.body.appendChild(ov);
+  let closed = false;
+  const close = () => {
+    if (closed) return;
+    closed = true; ov.remove();
+    if (b && battle === b && !b.over) resumeBattle();
+  };
+  ov.querySelector('[data-bag-close]').onclick = close;
+  ov.querySelector('[data-bag-use]').onclick = () => {
+    if (!usable || closed) return;
+    close();
+    if (combat) useBattleItem(id); else useItemFromMap(id);
+  };
+  ov.querySelector('[data-bag-discard]').onclick = () => {
+    if (closed) return;
+    modalConfirm('¿Descartar objeto?', `Descartarás ${item.name} ×${Math.min(count,owner.items[id])}.`, () => {
+      if (closed) return;
+      owner.items[id] = Math.max(0,owner.items[id]-count);
+      saveBackpack(owner); close(); refresh();
+    });
+  };
+  ov.onclick = event => { if (event.target === ov) close(); };
+}
+function refreshBattleBackpack() {
+  const el = $('#battle-backpack');
+  if (!el || !battle) return;
+  const owner = battle.tower ? tower : run;
+  if (!owner) return;
+  el.innerHTML = backpackHTML(owner,true);
+  bindBackpack(el,owner,true,refreshBattleBackpack);
+}
+
+function showTowerBackpack(onContinue) {
+  const owner = tower, ov = document.createElement('div');
+  ov.className = 'overlay';
+  let continued = false;
+  const update = () => {
+    ov.innerHTML = `<div class="modal"><h2>🎒 Prepara tu mochila</h2>${backpackHTML(owner)}<div class="actions"><button class="btn green" data-bag-continue ${hasPendingLoot(owner) ? 'disabled' : ''}>CONTINUAR</button></div></div>`;
+    bindBackpack(ov,owner,false,update);
+    ov.querySelector('[data-bag-continue]').onclick = () => {
+      if (continued || hasPendingLoot(owner) || tower !== owner) return;
+      continued = true; ov.remove(); onContinue();
+    };
+  };
+  update(); document.body.appendChild(ov);
+}
+
+function startRun(sagaIdx, starterIds, islandIdx = 0, islandRepeat = null) {
   const saga = SAGAS[sagaIdx];
+  if (!saga?.islands[islandIdx] || !islandAvailable(sagaIdx,islandIdx)) return;
   const items = {
     cartel: 3 + (meta.global.cartelesplus2 ? 4 : meta.global.cartelesplus ? 2 : 0),
   };
@@ -3091,24 +3999,36 @@ function startRun(sagaIdx, starterIds) {
 
   run = {
     saga: sagaIdx, mode: storyMode, diff: selectedDiff || 1,
-    islandIdx: 0,
+    islandIdx, mapIdx:0, campaignVersion:1, islandComplete:false,
+    startingTeam: starterIds.map(baseFormOf),
+    rewards: {fame:0, logPoses:0},
     team: starterIds.map(id => applyUpgrades(makeChar(id, startLvlOf(id)))),
     items,
     berries,
     badges: [],
-    map: genMap(saga.islands[0]),
+    map: genIslandMap(saga.islands[islandIdx],0),
     pos: null,
-    sagaRerollUsed: false,
     nuzCaught: {}, // isla -> ya reclutado
   };
+  if(islandRepeat)run.islandRepeat={...islandRepeat};
+  prepareBackpack(run);
   starterIds.forEach(registerRecruit);
+  run.team.forEach(f => registerDex(f.id));
   saveRun();
-  screenMap();
+  screenMap(hasPendingLoot(run) ? 2 : 0);
 }
 
 // ============ PANTALLA: MAPA ============
 function screenMap(activePageIdx = 0) {
-  playMusic('menu');
+  if(run?.islandRepeat?.result)return showIslandRepeatCheckpoint(autoMode);
+  if(run?.islandRepeat && !run.team.some(f=>f.hp>0))return gameOver();
+  playMusic('combat');
+  runAutoItems(false);
+  resolveAutoLoot(run);
+  if (autoMode && hasPendingLoot(run)) {
+    pauseAutoForChoice('🎒 Guarda o deja los objetos pendientes para continuar.');
+    activePageIdx = 2;
+  }
   if (run && run.mode === 'nuzlocke' && run.team) {
     run.team = run.team.filter(f => f && f.hp > 0);
   }
@@ -3135,22 +4055,20 @@ function screenMap(activePageIdx = 0) {
     const isReach = reach.some(([rr, ii]) => rr === r && ii === i);
     const isCur = run.pos && run.pos[0] === r && run.pos[1] === i;
     nodesHTML += `<button type="button" class="map-node ${n.done ? 'done' : ''} ${isReach ? 'reachable' : ''} ${isCur ? 'current' : ''}"
-      style="--map-x:${x}%;--map-y:${y}%;--map-forward:${100-y}%" data-r="${r}" data-i="${i}" title="${NODE_TYPES[n.type].label}" aria-label="${NODE_TYPES[n.type].label}, etapa ${r+1}${isCur ? ", posición actual" : ''}" ${isReach ? '' : 'disabled'}>${NODE_TYPES[n.type].emoji}</button>`;
+      style="--map-x:${x}%;--map-y:${y}%;--map-forward:${100-y}%" data-r="${r}" data-i="${i}" title="${NODE_TYPES[n.type].label}" aria-label="${NODE_TYPES[n.type].label}, etapa ${r+1}${isCur ? ", posición actual" : ''}" ${isReach ? '' : 'disabled'}>${n.type === 'special' ? '<img class="map-event-icon" src="/art/cross-guild-map.png" alt="" aria-hidden="true" draggable="false">' : NODE_TYPES[n.type].emoji}</button>`;
   }));
 
-  const canReroll = run.islandIdx === 0 && run.pos === null && !run.sagaRerollUsed;
-
   render(`
-    ${topbar(true)}
+    ${topbar(true, true, true)}
     <div class="map-wrap">
       <div class="map-carousel" id="island-carousel">
         <!-- PÁGINA 1: MAPA (ANCHO Y ALTO COMPLETO) -->
         <div class="carousel-page" id="page-map">
           <div class="map-board" style="--scene:url('${SAGAS[run.saga]?.img}');--map-rows:${rows.length}">
-            <div class="map-heading"><div class="map-title">📍 SAGA: <b>${saga.name}</b> · Isla ${run.islandIdx + 1}/${saga.islands.length}: <b>${island.name}</b> (${run.mode === 'nuzlocke' ? 'NUZLOCKE' : 'CLÁSICO'})</div>
+            <div class="map-heading"><div class="map-title">📍 <b>${saga.name}</b> · Isla ${run.islandIdx + 1}/${saga.islands.length}: <b>${island.name}</b> · Mapa ${(run.mapIdx || 0)+1}/${islandMapCount(island)} (${run.mode === 'nuzlocke' ? 'NUZLOCKE' : 'CLÁSICO'})</div>
             <div class="map-tools">
-              <button class="btn gold small" id="btn-map-reroll" aria-label="Regenerar mapa" title="Regenerar mapa una vez por saga" ${canReroll ? '' : 'disabled'} style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
-                ↻ ${canReroll ? 1 : 0}
+              <button class="btn gold small" id="btn-restart-island" aria-label="Reiniciar isla" title="Volver a empezar esta isla con tu equipo inicial" style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
+                ↻ REINICIAR
               </button>
             </div></div>
             <div class="map-route">
@@ -3176,6 +4094,7 @@ function screenMap(activePageIdx = 0) {
                     <span class="emoji">${charIcon(f.id, 36)}</span>
                     <div class="info">${idx + 1}. <b>${charName(f)}</b> ${rarityTag}${fusionTag}<br>Nv${f.lvl}
                       ${typeBadges(fighterTypes(f))}
+                      <div class="hp-nums">PS: ${f.hp}/${f.maxhp}</div>
                       <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>${xpBarHTML(f)}
                     </div>
                     ${run.team.length > 1 ? `<span class="btn-dismiss-slot" data-dismiss-idx="${idx}" title="Expulsar de la banda" style="color:#e74c3c;font-size:11px;cursor:pointer;padding:2px 4px;margin-left:auto;opacity:0.75;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.75">🗑️</span>` : ''}
@@ -3185,45 +4104,21 @@ function screenMap(activePageIdx = 0) {
             <div style="font-size:7.5px;color:#666;margin-top:8px;">¡El orden importa! Combaten de arriba a abajo. Arrastra (o toca ≡ y luego el destino) para reordenar · toca para ver la ficha.</div>
             <h3 style="margin-top:12px;">SINERGIAS DE TRIPULACIÓN <button class="btn small gray" id="btn-syn-info" style="font-size:7px;padding:2px 6px;">ℹ️ VER TODAS</button>
               <button class="btn small gray" id="btn-chart-info" style="font-size:7px;padding:2px 6px;">📊 TIPOS</button></h3>
-            <div class="syn-chips">${synChipsHTML(run.team)}</div>
+            <div class="team-synergy-summary">${activeSynergiesHTML(run.team)}</div>
           </div>
         </div>
 
         <!-- PÁGINA 3: MOCHILA Y EMBLEMAS (ANCHO COMPLETO) -->
         <div class="carousel-page" id="page-bag">
           <div class="panel">
-            <h3>🎒 MOCHILA DE OBJETOS</h3>
-            ${Object.entries(run.items).filter(([, n]) => n > 0).map(([id, n]) =>
-              `<div class="item-row" data-item="${id}"><span>${ITEMS[id].emoji}</span> ${ITEMS[id].name} ×${n}</div>`
-            ).join('') || '<div style="font-size:8px;color:#888;">Bolsa vacía</div>'}
+            <div id="map-backpack">${backpackHTML(run)}</div>
             <h3 style="margin-top:14px;">🏅 EMBLEMAS DE LA SAGA</h3>
             <div class="badge-grid">
               ${saga.islands.map((isl, i) =>
                 `<div class="badge-slot ${run.badges.includes(i) ? '' : 'empty'}" title="${isl.name}">${run.badges.includes(i) ? '🏅' : '·'}</div>`
               ).join('')}
             </div>
-            <h3 style="margin-top:14px;">🤖 MODO AUTOMÁTICO</h3>
-            ${autoMode ? `
-              <div class="auto-mode-box" style="margin-top:6px;background:rgba(217,83,79,0.15);padding:8px;border-radius:6px;border:1px solid var(--red);text-align:center;">
-                <button class="btn red small" id="btn-stop-auto" style="width:100%;font-size:9px;font-weight:bold;padding:6px 8px;">
-                  🛑 PARAR MODO AUTO
-                </button>
-                <button class="btn gray small" id="btn-config-auto" style="width:100%;font-size:7.5px;margin-top:4px;padding:3px 6px;">
-                  ⚙️ Opciones del Auto
-                </button>
-              </div>
-            ` : `
-              <div class="auto-mode-box" style="margin-top:6px;background:rgba(0,0,0,0.35);padding:8px;border-radius:6px;border:1px solid rgba(255,255,255,0.15);text-align:center;">
-                <button class="btn gold small" id="btn-toggle-auto" style="width:100%;font-size:8.5px;font-weight:bold;padding:5px 8px;">
-                  🤖 MODO AUTO
-                </button>
-                <div style="font-size:7px;color:#aaa;margin-top:4px;">Toca para activar u opciones</div>
-              </div>
-            `}
-            <div style="display:flex;gap:8px;margin-top:14px;">
-              <button class="btn red small" id="btn-abandon" style="flex:1;">ABANDONAR</button>
-              <button class="btn gray small" id="btn-home" style="flex:1;">MENÚ PRINCIPAL</button>
-            </div>
+
           </div>
         </div>
       </div>
@@ -3290,18 +4185,6 @@ function screenMap(activePageIdx = 0) {
     }
   }
 
-  const mapRerollBtn = $('#btn-map-reroll');
-  if (mapRerollBtn && canReroll) {
-    mapRerollBtn.onclick = () => {
-      run.sagaRerollUsed = true;
-      run.map = genMap(island);
-      run.pos = null;
-      saveRun();
-      toast('🎲 ¡Mapa de la saga regenerado!');
-      screenMap();
-    };
-  }
-
   document.querySelectorAll('.map-node.reachable').forEach(el => {
     el.onclick = () => {
       const r = +el.dataset.r;
@@ -3327,6 +4210,7 @@ function screenMap(activePageIdx = 0) {
         <span class="emoji">${charIcon(f.id, 36)}</span>
         <div class="info">${idx + 1}. <b>${charName(f)}</b> ${rarityTag}${fusionTag}<br>Nv${f.lvl}
           ${typeBadges(fighterTypes(f))}
+          <div class="hp-nums">PS: ${f.hp}/${f.maxhp}</div>
           <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>${xpBarHTML(f)}
         </div>
         ${run.team.length > 1 ? `<span class="btn-dismiss-slot" data-dismiss-idx="${idx}" title="Expulsar de la banda" style="color:#e74c3c;font-size:11px;cursor:pointer;padding:2px 4px;margin-left:auto;opacity:0.75;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.75">🗑️</span>` : ''}
@@ -3411,33 +4295,32 @@ function screenMap(activePageIdx = 0) {
   };
 
   bindTeamSlots();
-  document.querySelectorAll('.item-row').forEach(el => {
-    el.onclick = () => useItemFromMap(el.dataset.item);
-  });
-  $('#btn-home').onclick = screenHome;
+  const refreshMapBackpack = () => {
+    const root = $('#map-backpack');
+    root.innerHTML = backpackHTML(run);
+    bindBackpack(root, run, false, refreshMapBackpack);
+  };
+  bindBackpack($('#map-backpack'), run, false, refreshMapBackpack);
+  $('#btn-restart-island').onclick = confirmRestartIsland;
   $('#btn-abandon').onclick = () => {
+    const journey = run, wasAuto = autoMode;
+    pauseAutoForChoice();
     modalConfirm('🏳️ ¿Abandonar el viaje?',
       'Se perderá todo el progreso de esta aventura.<br>La Fama, los veteranos y la Dex se conservan.',
-      () => { clearRun(); screenHome(); });
+      () => { clearRun(); screenHome(); },
+      () => { if (run === journey) { autoMode = wasAuto; screenMap(); } });
   };
   $('#btn-syn-info').onclick = () => showSynergyModal(run.team);
   $('#btn-chart-info').onclick = () => showTypeChartModal(run.team);
 
-  const stopAutoBtn = $('#btn-stop-auto');
-  if (stopAutoBtn) stopAutoBtn.onclick = stopAutoMode;
-  const configAutoBtn = $('#btn-config-auto');
-  if (configAutoBtn) configAutoBtn.onclick = showAutoSettingsModal;
-  const toggleAutoBtn = $('#btn-toggle-auto');
-  if (toggleAutoBtn) toggleAutoBtn.onclick = showAutoSettingsModal;
 
   if (autoMode && run) {
-    runAutoItems();
     if (reach.length > 0) {
       const target = pickAutoNode(reach);
       if (target) {
         const [r, i] = target;
         scheduleAutoStep(() => {
-          if (autoMode && run) enterNode(r, i);
+          advanceAutoNode(r,i);
         }, 750);
       }
     }
@@ -3476,7 +4359,8 @@ function showItemTargetModal(item, title, renderRow, onSelect) {
 
 function useItemFromMap(id) {
   const item = ITEMS[id];
-  if (!item) return;
+  if (!item || !run || !(run.items[id] > 0) || (battle && !battle.over)) return;
+  if (item.kind === 'battleBoost') return toast('Esta bebida se usa durante el combate.');
 
   if (item.kind === 'ball') {
     return toast(`📜 ${item.name}: Se usa automáticamente al intentar reclutar piratas.`);
@@ -3506,7 +4390,7 @@ function useItemFromMap(id) {
               <div class="info">
                 <b>${charName(f)}</b> <small>(Nv.${f.lvl})</small><br>
                 ${typeBadges(fTypes)}
-    ${isLive ? xpBarHTML(f) : ''}
+                ${xpBarHTML(f)}
               </div>
               <div style="font-size:16px;">${isSel ? '✅' : '⚪'}</div>
             </div>`;
@@ -3558,12 +4442,9 @@ function useItemFromMap(id) {
             }
           });
           run.items[id]--;
-          trackItemCollected(1);
           trackStat('fruit_use', 1);
           saveRun();
-          if (grantedLog.length) {
-            screenMap(2);
-          }
+          screenMap(2);
         };
       }
 
@@ -3604,7 +4485,6 @@ function useItemFromMap(id) {
       const restored = Math.min(target.maxhp - target.hp, val);
       target.hp = Math.min(target.maxhp, target.hp + val);
       run.items[id]--;
-      trackItemCollected(1);
       trackStat('item_use', 1);
       saveRun();
       toast(`💚 ¡${charName(target)} recupera ${restored} PS!`);
@@ -3634,7 +4514,6 @@ function useItemFromMap(id) {
     }, (target) => {
       target.hp = Math.floor(target.maxhp * (item.val || 0.5));
       run.items[id]--;
-      trackItemCollected(1);
       trackStat('item_use', 1);
       saveRun();
       toast(`✨ ¡${charName(target)} ha sido revivido con ${target.hp} PS!`);
@@ -3666,7 +4545,6 @@ function useItemFromMap(id) {
         target.def += 2;
       }
       run.items[id]--;
-      trackItemCollected(1);
       trackStat('item_use', 1);
       saveRun();
       toast(`⚡ ¡${charName(target)} ha ganado +2 ${isAtk ? 'ATQ' : 'DEF'} permanentemente!`);
@@ -3693,6 +4571,11 @@ function pickWildEnemy(pool) {
 
 // ============ ENTRAR EN NODO ============
 function enterNode(r, i) {
+  resolveAutoLoot(run);
+  if (hasPendingLoot(run)) {
+    if (autoMode) pauseAutoForChoice();
+    toast('🎒 Guarda o deja los objetos pendientes antes de continuar.'); screenMap(2); return;
+  }
   const node = run.map.rows[r][i];
   run.pos = [r, i];
   node.done = true;
@@ -3701,6 +4584,15 @@ function enterNode(r, i) {
   const island = saga.islands[run.islandIdx];
 
   switch (node.type) {
+    case 'travel': {
+      if ((run.mapIdx || 0) >= islandMapCount(island)-1) return;
+      run.mapIdx = (run.mapIdx || 0)+1;
+      run.map = genIslandMap(island,run.mapIdx);
+      run.pos = null;
+      saveRun();
+      modalInfo('🧭 La expedición continúa', `<p class="reward-list">${island.name} · Mapa ${run.mapIdx+1}/${islandMapCount(island)}<br>Tu banda conserva sus PS, objetos y progreso. El jefe espera en el último mapa.</p>`,screenMap);
+      break;
+    }
     case 'wild': {
       const id = pickWildEnemy(island.pool);
       let lvl = rnd(island.lvl[0], island.lvl[1]);
@@ -3717,11 +4609,11 @@ function enterNode(r, i) {
         if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
         enemies.push(makeChar(id, lvl, true));
       }
-      startBattle(enemies, { wild: false, reward: rnd(120, 260) * (run.islandIdx + 1) });
+      startBattle(enemies, { wild: false, marine: true });
       break;
     }
     case 'boss': {
-      const enemies = island.boss.map((id, k) => makeChar(id, island.bossLvl[k]));
+      const enemies = island.boss.map((id, k) => makeChar(id, island.bossLvl[k], false, true));
       startBattle(enemies, { wild: false, boss: true, reward: 400 * (run.islandIdx + 1) });
       break;
     }
@@ -3733,10 +4625,10 @@ function enterNode(r, i) {
         const commonLoot = ['carne', 'carne', 'carnereal', 'cartel', 'cartel', 'carteldorado', 'sake', 'bocadillo'];
         id = pick(commonLoot);
       }
-      run.items[id] = (run.items[id] || 0) + 1;
+      const stored = receiveBackpackItem(run,id);
       trackItemCollected(1);
       saveRun();
-      modalInfo('🎁 ¡Objeto encontrado!', `<div class="reward-list">${ITEMS[id].emoji} <b>${ITEMS[id].name}</b><br><small>${ITEMS[id].desc}</small></div>`, screenMap);
+      modalInfo('🎁 ¡Objeto encontrado!', `<div class="reward-list">${ITEMS[id].emoji} <b>${ITEMS[id].name}</b><br><small>${ITEMS[id].desc}</small>${stored ? '' : hasPendingLoot(run) ? '<br>🎒 Elige dónde guardar el objeto en la mochila.' : '<br>🤖 Mochila llena: objeto dejado.'}</div>`, () => screenMap(hasPendingLoot(run) ? 2 : 0));
       break;
     }
     case 'mystery': trackStat('mystery_visit', 1); doMystery(island); break;
@@ -3761,21 +4653,22 @@ function doMystery(island) {
     const commonEvents = MYSTERY_EVENTS.filter(e => e.kind !== 'fruta');
     ev = pick(commonEvents);
   }
+  const eventArt = `<div class="event-art" aria-hidden="true">${{berries:'🎁',item:'🧑‍🌾',battle:'⚔️',healall:'♨️',boost:'🥋',damage:'🕸️',recruit:'🏴‍☠️',fruta:'🍈'}[ev.kind] || '❓'}</div>`;
   switch (ev.kind) {
     case 'berries': {
       const n = rnd(ev.min, ev.max) * (run.islandIdx + 1);
       run.berries += n; saveRun();
-      modalInfo('❓ Misterio', `<div class="reward-list">${ev.text.replace('{n}', n)}</div>`, screenMap);
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text.replace('{n}', n)}</div>`, screenMap);
       break;
     }
     case 'item': {
       const id = pick(['carne', 'cartel', 'carnereal', 'carteldorado']);
-      run.items[id] = (run.items[id] || 0) + 1; saveRun();
-      modalInfo('❓ Misterio', `<div class="reward-list">${ev.text}<br><br>${ITEMS[id].emoji} <b>${ITEMS[id].name}</b></div>`, screenMap);
+      const stored = receiveBackpackItem(run,id); saveRun();
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS[id].emoji} <b>${ITEMS[id].name}</b>${stored ? '' : hasPendingLoot(run) ? '<br>🎒 Elige dónde guardar el objeto en la mochila.' : '<br>🤖 Mochila llena: objeto dejado.'}</div>`, () => screenMap(hasPendingLoot(run) ? 2 : 0));
       break;
     }
     case 'battle': {
-      modalInfo('❓ ¡Emboscada!', `<div class="reward-list">${ev.text}</div>`, () => {
+      modalInfo('❓ ¡Emboscada!', `${eventArt}<div class="reward-list">${ev.text}</div>`, () => {
         const id = pickWildEnemy(island.pool);
         let lvl = rnd(island.lvl[0] + 1, island.lvl[1] + 2);
         if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
@@ -3787,26 +4680,26 @@ function doMystery(island) {
       trackStat('mystery_heal', 1);
       run.team.forEach(f => { if (f.hp > 0) f.hp = f.maxhp; });
       saveRun();
-      modalInfo('❓ Misterio', `<div class="reward-list">${ev.text} ♨️</div>`, screenMap);
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text} ♨️</div>`, screenMap);
       break;
     }
     case 'boost': {
       trackStat('mystery_train', 1);
       const f = run.team[0];
       f.atkBonus += 2; f.atk += 2; saveRun();
-      modalInfo('❓ Misterio', `<div class="reward-list">${ev.text}<br>(${charName(f)})</div>`, screenMap);
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br>(${charName(f)})</div>`, screenMap);
       break;
     }
     case 'damage': {
       const f = run.team[0];
       f.hp = Math.max(1, f.hp - ev.val); saveRun();
-      modalInfo('❓ Misterio', `<div class="reward-list">${ev.text}<br>(${charName(f)})</div>`, screenMap);
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br>(${charName(f)})</div>`, screenMap);
       break;
     }
     case 'recruit': {
       if (run.mode === 'nuzlocke' && run.nuzCaught[run.islandIdx]) {
         run.berries += 200; saveRun();
-        modalInfo('❓ Misterio', `<div class="reward-list">Un pirata quería unirse, pero la regla Nuzlocke lo impide.<br>Te deja 200 Berries de regalo.</div>`, screenMap);
+        modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">Un pirata quería unirse, pero la regla Nuzlocke lo impide.<br>Te deja 200 Berries de regalo.</div>`, screenMap);
       } else {
         const id = pickWildEnemy(island.pool);
         const recLvl = Math.max(1, Math.floor(island.lvl[0] * 0.85));
@@ -3815,27 +4708,27 @@ function doMystery(island) {
           if (ok) {
             if (run.mode === 'nuzlocke') run.nuzCaught[run.islandIdx] = true;
             registerRecruit(id); saveRun();
-            modalInfo('❓ ¡Nuevo nakama!', `<div class="reward-list">${ev.text}<br><br><span style="font-size:30px">${charIcon(id, 40)}</span><br><b>${CHARS[id].name}</b> Nv${f.lvl}</div>`, screenMap);
+            modalInfo('❓ ¡Nuevo nakama!', `${eventArt}<div class="reward-list">${ev.text}<br><br><span style="font-size:30px">${charIcon(id, 40)}</span><br><b>${CHARS[id].name}</b> Nv${f.lvl}</div>`, screenMap);
           } else {
             run.berries += 100; saveRun();
-            modalInfo('❓ Misterio', `<div class="reward-list">Dejas marchar al pirata. Te regala 100 Berries por la molestia.</div>`, screenMap);
+            modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">Dejas marchar al pirata. Te regala 100 Berries por la molestia.</div>`, screenMap);
           }
         });
       }
       break;
     }
     case 'fruta': {
-      run.items['fruta_diablo'] = (run.items['fruta_diablo'] || 0) + 1;
+      const stored = receiveBackpackItem(run,'fruta_diablo');
       trackItemCollected(1);
       saveRun();
-      modalInfo('❓ Misterio', `<div class="reward-list">${ev.text}<br><br>${ITEMS['fruta_diablo'].emoji} <b>${ITEMS['fruta_diablo'].name}</b> añadida a tu bolsa.</div>`, screenMap);
+      modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS['fruta_diablo'].emoji} <b>${ITEMS['fruta_diablo'].name}</b>${stored ? ' añadida a tu mochila.' : hasPendingLoot(run) ? '<br>🎒 Elige dónde guardar el objeto en la mochila.' : '<br>🤖 Mochila llena: objeto dejado.'}</div>`, () => screenMap(hasPendingLoot(run) ? 2 : 0));
       break;
     }
   }
 }
 
 // ============ ENCUENTRO SALVAJE ============
-function wildRecruitPrice(c) { return c.rareza * 150 * (run.islandIdx + 1); }
+function wildRecruitPrice(c) { return c.rareza * 150 * ((run?.mapIdx || 0) + 1); }
 
 function cartelesBadgeHTML() {
   if (!run || !run.items) return '';
@@ -3874,9 +4767,10 @@ function wildEncounter(wild) {
   if (autoMode) {
     scheduleAutoStep(() => {
       if (!document.body.contains(ov)) return;
+      if(autoSettings.wildAction==='manual'){pauseAutoForChoice('Elige qué hacer con este pirata.');return;}
       if (!isLegendary && autoSettings.wildAction === 'recruit') {
         const payBtn = ov.querySelector('#we-pay');
-        if (payBtn && !payBtn.disabled) { payBtn.click(); return; }
+        if (payBtn && !payBtn.disabled && autoCanSpend(price)) { payBtn.click(); return; }
       } else if (!isLegendary && autoSettings.wildAction === 'chains') {
         const chainBtn = ov.querySelector('#we-chains');
         if (chainBtn && !chainBtn.disabled) { chainBtn.click(); return; }
@@ -3991,6 +4885,11 @@ function renderChains(wild, onRecruit) {
         advance(b === 'cartel' ? 1 : b === 'carteldorado' ? 2 : 3);
       };
     });
+    if(autoMode) scheduleAutoStep(()=>{
+      if(!document.body.contains(ov))return;
+      const item=ov.querySelector(`[data-chainball="${autoSettings.chainItem}"]`);
+      if(item)item.click();else ov.querySelector(`[data-c="${current}"]`)?.click();
+    },700);
   };
   update();
 }
@@ -4034,19 +4933,28 @@ function chainsFail(wild, onRecruit) {
     modalInfo('⚔️ ¡Furia desatada!', `<div class="reward-list">${c.emoji} ¡${c.name} rompe sus cadenas y se abalanza sobre vosotros con más fuerza que nunca!</div>`,
       () => startBattle([wild], { wild: true, xpMult: 1.5 }));
   };
+  if(autoMode)scheduleAutoStep(()=>{
+    if(!document.body.contains(ov))return;
+    if(autoSettings.chainFail==='manual'){pauseAutoForChoice('La cadena aguanta: decide si pagar o combatir.');return;}
+    ov.querySelector(autoSettings.chainFail==='pay'&&can?'#cd-pay':'#cd-fight').click();
+  },700);
+
 }
 
 // ============ RECLUTAR Y FUSIÓN DE PERSONAJES ============
 // Si el personaje ya está en la banda, se fusionan: gana 1 estrella y +5% de stats.
 function addToTeam(f, done) {
+  syncEvolution(f);
   const existing = run.team.find(m => baseFormOf(m.id) === baseFormOf(f.id));
   if (existing) {
+    syncEvolution(existing);
     existing.stars = (existing.stars || 0) + 1;
     const oldLvl = existing.lvl;
     const newLvl = Math.max(existing.lvl, f.lvl);
     if (newLvl > oldLvl) {
       existing.lvl = newLvl;
       existing.xp = f.xp || 0;
+      existing.id = evolutionFormAt(existing.id, existing.lvl);
       const c = CHARS[existing.id];
       if (c) {
         existing.maxhp = hpAt(c.base[0], existing.lvl);
@@ -4055,11 +4963,8 @@ function addToTeam(f, done) {
         existing.spatk = statAt(c.base[3], existing.lvl);
         existing.spdef = statAt(c.base[4], existing.lvl);
         existing.spd = statAt(c.base[5], existing.lvl);
-        const updatedMoves = c.learnset.filter(([l]) => l <= existing.lvl).map(([, m]) => m).slice(-2);
+        const updatedMoves = formMovesAt(existing.id, existing.lvl);
         if (updatedMoves.length) existing.moves = updatedMoves;
-        if (c.evo && existing.lvl >= c.evo.lvl) {
-          existing.id = c.evo.to;
-        }
         applyUpgrades(existing);
       }
     }
@@ -4083,6 +4988,19 @@ function addToTeam(f, done) {
     done && done(true);
     return;
   }
+  if (autoMode && autoSettings.fullTeamAction !== 'manual') {
+    const lowest = run.team.reduce((index, member, i) => member.lvl < run.team[index].lvl ? i : index, 0);
+    const replace = autoSettings.fullTeamAction === 'higherLevel' && f.lvl > run.team[lowest].lvl;
+    if (replace) {
+      const out = run.team[lowest];
+      run.team[lowest] = f;
+      saveRun();
+      toast(`🤖 ${charName(f)} (Nv${f.lvl}) sustituye a ${charName(out)} (Nv${out.lvl}).`);
+    } else toast(`🤖 Equipo lleno: se conserva la banda y se deja marchar a ${charName(f)}.`);
+    done && done(replace);
+    return;
+  }
+  if(autoMode)pauseAutoForChoice('Banda llena: elige a quién sustituir.');
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal">
@@ -4120,9 +5038,10 @@ function addToTeam(f, done) {
 
 // ============ FICHA DE PERSONAJE ============
 // Muestra las características reales del personaje en la saga (nivel, fusiones y barco).
-function showCharModal(fOrId) {
+function showCharModal(fOrId, existingOverlay = null) {
   const isLive = typeof fOrId === 'object';
-  const f = isLive ? migrateFighter(fOrId) : applyUpgrades(makeChar(fOrId, startLvlOf(fOrId)));
+  const previewId = !isLive && !BASE_OF[fOrId] ? evolutionFormAt(fOrId, startLvlOf(fOrId)) : fOrId;
+  const f = isLive ? migrateFighter(fOrId, !!battle?.eTeam.includes(fOrId)) : applyUpgrades(makeChar(previewId, startLvlOf(fOrId), false, true));
   const c = CHARS[f.id];
   const lore = (typeof LORE !== 'undefined' && LORE) ? (LORE[f.id] || LORE[baseFormOf(f.id)] || {}) : {};
   const pInfo = passiveInfo(f);
@@ -4139,7 +5058,7 @@ function showCharModal(fOrId) {
   const fTypes = fighterTypes(f);
   const isFru = fTypes.includes('Fruta'), isHak = fTypes.includes('Haki');
   const known = f.moves;
-  const future = c.learnset.filter(([l, m]) => l > f.lvl && !known.includes(m));
+  const future = c.learnset.filter(([l, m]) => (l > f.lvl || (c.evo && l >= c.evo.lvl && startLvlOf(f.id) < c.evo.lvl)) && !known.includes(m));
   const rarityTag = c.rareza ? `<span style="color:var(--gold);font-size:14px;margin-left:6px;" title="Rareza: ${c.rareza} estrellas">${'⭐'.repeat(c.rareza)}</span>` : '';
   const fusionTag = f.stars ? `<span style="color:#ff6b6b;font-size:11px;font-weight:bold;margin-left:6px;">[+${f.stars}⭐ Fusión]</span>` : '';
   const hasUpgrades = (f.hpBonus || 0) + (f.atkBonus || 0) + (f.defBonus || 0) + (f.spatkBonus || 0) + (f.spdefBonus || 0) + (f.spdBonus || 0) > 0;
@@ -4149,9 +5068,10 @@ function showCharModal(fOrId) {
   const canAffordUpg = (meta.logPoses || 0) >= upgCost;
   const isMaxLvl = f.lvl >= cap;
 
-  const ov = document.createElement('div');
+  const ov = existingOverlay || document.createElement('div');
+  const closeSheet = existingOverlay?.querySelector('#sheet-close')?.onclick || (() => ov.remove());
   ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal char-sheet">
+  ov.innerHTML = `<div class="modal char-sheet" role="dialog" aria-modal="true" aria-label="Ficha de ${collectionText(c.name)}">
     <h2><span style="font-size:26px;vertical-align:middle;">${charIcon(f.id, 34)}</span> ${c.name}${rarityTag}${fusionTag} <small>Nv.${f.lvl}</small></h2>
     <div class="char-sheet-hero" style="text-align:center;padding:12px;margin:8px 0 12px;background:radial-gradient(ellipse at center, rgba(232, 200, 50, 0.22) 0%, rgba(0,0,0,0.35) 75%);border:2px solid var(--gold);border-radius:8px;position:relative;">
       <div class="char-sheet-sprite" data-character="${f.id}" style="display:inline-block;filter:drop-shadow(3px 5px 8px rgba(0,0,0,0.6));">
@@ -4203,18 +5123,31 @@ function showCharModal(fOrId) {
     return `<div class="sheet-move"><span class="type-badge" style="background:${TYPES[mv.type]?.color || '#888'}">${mv.type.toUpperCase()}</span>
               ${mv.name} <small>${mv.power ? mv.power + ' PWR · ' + Math.round((mv.acc || 0.9) * 100) + '%' + cat : 'APOYO'}</small></div>`;
   }).join('')}
-      ${future.map(([l, m]) => `<div class="sheet-move future">🔒 Nv${l} — ${MOVES[m] ? MOVES[m].name : m}</div>`).join('')}
+      ${future.map(([l, m]) => `<div class="sheet-move future">🔒 Nv${l}${c.evo && l >= c.evo.lvl ? ` · nivel base ${c.evo.lvl}` : ''} — ${MOVES[m] ? MOVES[m].name : m}</div>`).join('')}
     </div>
     ${pInfo ? `<div class="sheet-section"><b>✨ Pasiva — ${pInfo.label}</b><p>${pInfo.desc}</p></div>` : ''}
     ${ultMv ? `<div class="sheet-section"><b>💥 Habilidad Definitiva — ${ultMv.name}</b><p>${ultMv.type ? `<span class="type-badge" style="background:${TYPES[ultMv.type]?.color || '#888'}">${ultMv.type.toUpperCase()}</span> ` : ''}${ultMv.power ? ultMv.power + ' PWR · ' + Math.round((ultMv.acc || 0.9) * 100) + '% precisión' : 'MOVIMIENTO DEFINITIVO'}</p></div>` : ''}
-    ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>Al nivel ${c.evo.lvl} se convierte en ${CHARS[c.evo.to] ? CHARS[c.evo.to].name : c.evo.to}.</p></div>` : ''}
+    ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>${CHARS[c.evo.to].name} requiere nivel base ${c.evo.lvl} y nivel ${c.evo.lvl} en partida. Tu nivel base: ${startLvlOf(f.id)}. ${startLvlOf(f.id) >= c.evo.lvl ? 'Forma desbloqueada.' : 'Puedes seguir subiendo en partida, pero sus ataques se desbloquean al mejorar el nivel base.'}</p></div>` : ''}
     <p class="sheet-desc">${c.desc}</p>
     <div class="actions" style="flex-direction:column;gap:6px;">
       ${isLive && (!battle || battle.over) && run && run.team && run.team.includes(f) ? `<button class="btn red small" id="sheet-dismiss-btn" style="width:100%;">🗑️ EXPULSAR DE LA BANDA</button>` : ''}
       <button class="btn gray" id="sheet-close" style="width:100%;">CERRAR</button>
     </div>
   </div>`;
-  document.body.appendChild(ov);
+  if (!existingOverlay) document.body.appendChild(ov);
+  const upgradeBtn = ov.querySelector('#sheet-upg-btn');
+  if (upgradeBtn) {
+    let upgrading = false;
+    upgradeBtn.onclick = () => {
+      if (upgrading || upgradeBtn.disabled) return;
+      upgrading = true;
+      if (!upgradeCharLvl(f.id)) { upgrading = false; return; }
+      const scrollTop = ov.querySelector('.modal').scrollTop;
+      showCharModal(fOrId, ov);
+      ov.querySelector('.modal').scrollTop = scrollTop;
+      (ov.querySelector('#sheet-upg-btn:not(:disabled)') || ov.querySelector('#sheet-close')).focus?.({preventScroll:true});
+    };
+  }
   const dismissBtn = ov.querySelector('#sheet-dismiss-btn');
   if (dismissBtn) {
     dismissBtn.onclick = () => {
@@ -4238,11 +5171,11 @@ function showCharModal(fOrId) {
       );
     };
   }
-  ov.querySelector('#sheet-close').onclick = () => ov.remove();
-  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.querySelector('#sheet-close').onclick = closeSheet;
+  if (!existingOverlay) ov.onclick = e => { if (e.target === ov) closeSheet(); };
 }
 
-// ============ EVENTO: PIRATA ESPECIAL ============
+// ============ EVENTO: CROSSGUILD ============
 // Dos opciones: contratar a cualquier pirata del catálogo pagando su caché,
 // o jugar a los 5 carteles de SE BUSCA: se destapan en orden y el número
 // de cartel donde aparece el pirata marca su rareza (1º = 1⭐ ... 5º = 5⭐).
@@ -4266,6 +5199,8 @@ const sagaPoolByRareza = (sagaId, r) => {
 const basePirateIds = () => sagaBasePirateIds(SAGAS[run.saga].id);
 // Cartel de rareza r en la saga actual
 const poolByRareza = r => sagaPoolByRareza(SAGAS[run.saga].id, r);
+const specialMapMultiplier = () => (run?.mapIdx || 0) + 1;
+const specialGachaPrice = () => 300 * specialMapMultiplier();
 const hirePrice = c => c.rareza * c.rareza * 250; // precio elevado por elegir a dedo
 
 function specialBlockedReason() {
@@ -4288,19 +5223,33 @@ function specialJoin(id, lvl) {
   });
 }
 
+function specialPiratePoolHTML() {
+  const pool = basePirateIds().sort((a, b) => CHARS[a].rareza - CHARS[b].rareza || CHARS[a].name.localeCompare(CHARS[b].name));
+  const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  return `
+    <p class="special-pool-heading">${esc(SAGAS[run.saga].name)} · ${pool.length} piratas posibles</p>
+    <div class="special-pool" role="list" aria-label="Piratas disponibles en este evento">
+      ${pool.map(id => {
+        const c = CHARS[id], seen = meta.dex.includes(id);
+        return `<div class="special-pool-card ${seen ? 'seen' : 'unseen'}" role="listitem" aria-label="${seen ? esc(c.name) : 'Pirata sin avistar'}, ${c.rareza} estrellas">
+          <div class="special-pool-portrait" aria-hidden="true">${charIcon(id, 54)}</div>
+          <b>${seen ? esc(c.name) : '???'}</b><span class="special-pool-stars">${'⭐'.repeat(c.rareza)}</span>
+        </div>`;
+      }).join('')}
+    </div>`;
+}
+
 function doSpecialPirate(island) {
   meta.starPity = meta.starPity || 0;
   const lvl = island.lvl[1] + 2;
-  const gachaPrice = 300 * (run.islandIdx + 1);
+  const gachaPrice = specialGachaPrice();
   const blocked = specialBlockedReason();
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal">
-    <h2>🌟 Mercado clandestino</h2>
-    <p style="font-size:9px;line-height:1.9;text-align:center;">Un contacto de los bajos fondos te ofrece reclutas (Nv${lvl}).<br><br>
-    <b>🎯 Elegir:</b> cualquier pirata del catálogo (hasta 4⭐), pagando su caché completo.<br>
-    <b>🎰 Carteles:</b> 5 carteles de SE BUSCA boca abajo. Destápalos en orden:
-    el 1º es el más probable (recluta de 1⭐)... y el 5º, el premio gordo (5⭐).</p>
+    <h2>🌟 Crossguild</h2>
+    ${specialPiratePoolHTML()}
+    <p class="special-map-price" style="font-size:8px;text-align:center;line-height:1.8;">Mapa ${specialMapMultiplier()} · Carteles ×${specialMapMultiplier()} · 5⭐ solo en carteles</p>
     ${cartelesBadgeHTML()}
     <div style="font-size:9.5px;text-align:center;margin-top:6px;margin-bottom:6px;color:#f39c12;background:rgba(243,156,18,0.12);padding:6px 10px;border-radius:6px;border:1px solid rgba(243,156,18,0.4);display:flex;align-items:center;justify-content:center;gap:6px;">
       <span>⭐ Estrellas acumuladas (Pity): <b>${meta.starPity || 0} / 1000</b></span>
@@ -4309,7 +5258,7 @@ function doSpecialPirate(island) {
     ${blocked ? `<div class="special-fail">${blocked}</div>` : ''}
     <div class="actions" style="flex-direction:column;align-items:stretch;">
       <button class="btn blue" id="sp-choose" ${blocked ? 'disabled' : ''}>🎯 ELEGIR PIRATA — catálogo</button>
-      <button class="btn gold" id="sp-gacha" ${blocked || run.berries < gachaPrice ? 'disabled' : ''}>🎰 JUGAR CARTELES — ${berriesHTML(gachaPrice)}</button>
+      <button class="btn gold" id="sp-gacha" ${blocked || run.berries < gachaPrice ? 'disabled' : ''}>🌟 JUGAR CARTELES — ${berriesHTML(gachaPrice)}</button>
       <button class="btn gray" id="sp-rates">📊 TABLA DE PROBABILIDADES</button>
       <button class="btn gray" id="sp-leave">🌊 MARCHARSE</button>
     </div>
@@ -4317,7 +5266,9 @@ function doSpecialPirate(island) {
   document.body.appendChild(ov);
   if (autoMode) {
     scheduleAutoStep(() => {
-      const btn = ov.querySelector('#sp-leave');
+      if(autoSettings.specialAction==='manual'){pauseAutoForChoice('Crossguild: elige catálogo o carteles.');return;}
+      const play=ov.querySelector('#sp-gacha');
+      const btn = autoSettings.specialAction==='gacha' && play && !play.disabled && autoCanSpend(gachaPrice) ? play : ov.querySelector('#sp-leave');
       if (btn && document.body.contains(ov)) btn.click();
     }, 700);
   }
@@ -4337,14 +5288,14 @@ function doSpecialPirate(island) {
 function renderSpecialCatalog(lvl) {
   // solo puedes contratar a quienes ya venciste en el modo historia
   const ids = basePirateIds()
-    .filter(id => meta.defeated.includes(id))
+    .filter(id => CHARS[id].rareza < 5 && meta.defeated.includes(id))
     .sort((a, b) => CHARS[a].rareza - CHARS[b].rareza || CHARS[a].name.localeCompare(CHARS[b].name));
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal">
     <h2>🎯 Catálogo de reclutas (Nv${lvl})</h2>
     <div style="text-align:center;font-size:9px;margin-bottom:8px;color:var(--accent);">${berriesHTML(run.berries)} disponibles</div>
-    <p style="font-size:8px;text-align:center;color:#777;margin-bottom:8px;">Solo aparecen piratas de esta saga a los que ya hayas vencido en combate.</p>
+    <p style="font-size:8px;text-align:center;color:#777;margin-bottom:8px;">Piratas de 1–4 estrellas de esta saga que ya has derrotado.</p>
     ${ids.length ? '' : '<p style="font-size:9px;text-align:center;color:#888;padding:10px;">Aún no has vencido a nadie de esta saga.<br>¡Derrota rivales y vuelve!</p>'}
     <div class="pick-grid">
       ${ids.map(id => {
@@ -4368,6 +5319,7 @@ function renderSpecialCatalog(lvl) {
   ov.querySelectorAll('[data-hire]').forEach(btn => {
     btn.onclick = () => {
       const id = btn.dataset.hire;
+      if (!ids.includes(id) || CHARS[id].rareza >= 5) return;
       const price = hirePrice(CHARS[id]);
       if (run.berries < price) return;
       run.berries -= price;
@@ -4377,7 +5329,7 @@ function renderSpecialCatalog(lvl) {
   });
 }
 
-function revealSpecialRecruit(ov, prizeId, lvl) {
+function revealSpecialRecruit(ov, prizeId, lvl, reward = CHARS[prizeId].rareza) {
   let completed = false;
   const complete = () => {
     if (completed || !ov.isConnected) return;
@@ -4388,10 +5340,16 @@ function revealSpecialRecruit(ov, prizeId, lvl) {
   try {
     if (typeof MarketReveal !== 'undefined') {
       MarketReveal.show({host:ov, name:CHARS[prizeId].name, rarity:CHARS[prizeId].rareza,
+        rewardText:`+${reward} Log Pose${reward === 1 ? '' : 's'}`,
         portraitHTML:charIcon(prizeId, 140), onComplete:complete});
+      if(autoMode){
+        const advance=()=>{if(!ov.isConnected)return;const button=ov.querySelector('.mr-continue');if(button)button.click();if(ov.isConnected)scheduleAutoStep(advance,700);};
+        scheduleAutoStep(advance,1400);
+      }
       return;
     }
   } catch (_) { /* A cosmetic failure must not prevent recruitment. */ }
+  toast(`🧭 +${reward} Log Poses del cartel premiado`);
   setTimeout(complete, 1400);
 }
 
@@ -4414,20 +5372,20 @@ function renderSpecialGacha(lvl) {
   }
   saveMeta();
 
-  let current = 0;
+  let current = 0, resolved = false;
   const ov = document.createElement('div');
   ov.className = 'overlay market-cartels';
   ov.innerHTML = `<div class="modal">
     <h2>🎰 Los 5 carteles de SE BUSCA</h2>
-    <p style="font-size:8px;text-align:center;margin-bottom:6px;">Destapa los carteles en orden. ¡En uno de ellos está tu recluta!</p>
+    <p style="font-size:8px;text-align:center;margin-bottom:6px;">Destapa los carteles en orden. ¡En uno de ellos está tu recluta! El cartel premiado también da 1 Log Pose por estrella. Si ya tienes al personaje en tu inventario, los de 3⭐ dan 50, los de 4⭐ dan 500 y los de 5⭐ dan 1000 Log Poses.</p>
     <div style="font-size:9px;text-align:center;margin-bottom:10px;color:#f39c12;">
       ⭐ Estrellas acumuladas (Pity): <b>${meta.starPity} / 1000</b>
     </div>
     <div class="poster-row">
       ${[0, 1, 2, 3, 4].map(i => `
         <button type="button" class="poster" data-p="${i}" aria-label="Destapar cartel de ${i + 1} estrellas" disabled>
-          <div class="poster-stars">${'⭐'.repeat(i + 1)}</div>
-          <div class="poster-face" id="pf-${i}">📜<br><span>SE BUSCA</span></div>
+          <div class="poster-stars">${'★'.repeat(i + 1)}</div>
+          <div class="poster-face" id="pf-${i}"><strong>WANTED</strong><span class="poster-silhouette">?</span><span>DEAD OR ALIVE</span></div>
         </button>`).join('')}
     </div>
   </div>`;
@@ -4438,17 +5396,24 @@ function renderSpecialGacha(lvl) {
       el.disabled = i !== current;
       el.onclick = i === current ? () => flip(i) : null;
     });
+    if(autoMode && !resolved)scheduleAutoStep(()=>{if(document.body.contains(ov))ov.querySelector(`[data-p="${current}"]`)?.click();},700);
   };
   const flip = i => {
+    if (resolved || !ov.isConnected || i !== current) return;
     const face = ov.querySelector(`#pf-${i}`);
     const el = ov.querySelector(`[data-p="${i}"]`);
     if (i === stopIdx) {
+      resolved = true;
       const c = CHARS[prizeId];
+      const reward = duplicatePosterReward(prizeId) || c.rareza;
+      trackJourneyRewards(0, reward);
+      meta.logPoses = (meta.logPoses || 0) + reward;
+      saveMeta();
       face.innerHTML = `${charIcon(prizeId, 28)}<br><span>${c.name}</span>`;
       el.classList.add('hit'); el.classList.remove('next');
       registerDex(prizeId);
       ov.querySelectorAll('.poster').forEach(p => { p.onclick = null; p.disabled = true; });
-      revealSpecialRecruit(ov, prizeId, lvl);
+      revealSpecialRecruit(ov, prizeId, lvl, reward);
     } else {
       face.innerHTML = `💨<br><span>VACÍO</span>`;
       el.classList.add('empty');
@@ -4530,8 +5495,8 @@ function modalConfirm(title, html, onYes, onNo) {
 
 // ============ TIENDA ============
 function screenShop() {
-  playMusic('menu');
-  const stock = ['carne', 'carnereal', 'bocadillo', 'sake', 'cartel', 'carteldorado', 'cartelbuster', 'hierro'];
+  playMusic('combat');
+  const stock = PORT_SHOP_STOCK;
   const inventorySummary = Object.entries((run && run.items) || {})
     .filter(([, n]) => n > 0)
     .map(([id, n]) => `${ITEMS[id] ? ITEMS[id].emoji : ''} ×${n}`)
@@ -4546,10 +5511,8 @@ function screenShop() {
     return `<div class="shop-item" style="border-color:rgba(46,204,113,0.3);background:rgba(46,204,113,0.05);">
       <span class="emoji">${it.emoji}</span>
       <div class="info">
-        <b>${it.name}</b> <span style="font-size:8.5px;color:#aaa;">(Tienes: ${n})</span> — Venta (75%): <span class="price" style="color:#2ecc71;font-weight:bold;">+${berriesHTML(sellPrice)}</span><br>
-        <small style="color:#888;">${it.desc} · Valor original: ${it.price} 💰</small>
-      </div>
-      <button class="btn small green" data-sell="${id}">VENDER (+${sellPrice} 💰)</button>
+        <b>${it.name}</b> <span style="font-size:8.5px;color:#aaa;">(Tienes: ${n})</span> — Venta (75%): <span class="price" style="color:#2ecc71;font-weight:bold;">+${berriesHTML(sellPrice)}</span></div>
+      <button class="btn small green" data-sell="${id}">VENDER</button>
     </div>`;
   }).join('') : '<div style="font-size:8.5px;color:#888;text-align:center;padding:8px;background:rgba(0,0,0,0.15);border-radius:6px;margin-bottom:10px;">Tu bolsa está vacía. No tienes objetos para vender.</div>';
 
@@ -4557,9 +5520,9 @@ function screenShop() {
     ${topbar(true, false)}
     <div class="panel">
       <h2>🏪 Tienda del puerto</h2>
-      <p style="font-size:9px;margin-bottom:6px;">"¡Bienvenido! Todo pirata necesita provisiones o vender botín sobrante."</p>
+
       <div style="font-size:9.5px;background:rgba(255,215,0,0.12);padding:6px 10px;border-radius:6px;border:1px solid var(--gold);margin-bottom:10px;text-align:center;">
-        <b>🎒 Tu Bolsa:</b> ${inventorySummary || 'Vacía'}
+        <b>🎒 Isla: ${backpackUsed(run.items,false)}/${backpackCapacity()} · Combate: ${backpackUsed(run.items,true)}/${backpackCapacity()} casillas</b><br>${inventorySummary || 'Vacía'}
       </div>
 
       <h3 style="margin-top:10px;margin-bottom:6px;font-size:11px;color:var(--gold);">🛒 COMPRAR PROVISIONES</h3>
@@ -4570,13 +5533,13 @@ function screenShop() {
           <span class="emoji">${it.emoji}</span>
           <div class="info">
             <b>${it.name}</b> <span style="font-size:8.5px;color:var(--gold);font-weight:bold;margin-left:4px;">(Tienes: ${owned})</span> — <span class="price">${berriesHTML(it.price)}</span><br>
-            <small>${it.desc}</small>
+            <small>${it.desc} · ${it.slotSize} casilla${it.slotSize > 1 ? 's' : ''} / ${backpackStackLimit()} uds.</small>
           </div>
-          <button class="btn small ${run.berries >= it.price ? 'green' : 'gray'}" data-buy="${id}" ${run.berries >= it.price ? '' : 'disabled'}>COMPRAR</button>
+          <button class="btn small ${run.berries >= it.price && backpackFits(run,id) ? 'green' : 'gray'}" data-buy="${id}" ${run.berries >= it.price && backpackFits(run,id) ? '' : 'disabled'}>${backpackFits(run,id) ? 'COMPRAR' : 'SIN ESPACIO'}</button>
         </div>`;
   }).join('')}
 
-      <h3 style="margin-top:14px;margin-bottom:6px;font-size:11px;color:#2ecc71;">💰 VENDER OBJETOS DE TU BOLSA (75% del valor)</h3>
+      <h3 style="margin-top:14px;margin-bottom:6px;font-size:11px;color:#2ecc71;">💰 VENDER · 75% del valor</h3>
       ${sellItemsHTML}
 
       <div class="actions" style="margin-top:14px;text-align:center;">
@@ -4587,14 +5550,16 @@ function screenShop() {
   document.querySelectorAll('[data-buy]').forEach(b => {
     b.onclick = () => {
       const id = b.dataset.buy;
-      if (run.berries < ITEMS[id].price) return;
+      if (!stock.includes(id) || run.berries < ITEMS[id].price) return;
+      if (!backpackFits(run,id)) { toast('🎒 No hay espacio en la mochila.'); return; }
+      const stored = receiveBackpackItem(run,id);
       run.berries -= ITEMS[id].price;
-      run.items[id] = (run.items[id] || 0) + 1;
       trackItemCollected(1);
       trackStat('shop_buy', 1);
       saveRun();
       toast(`Comprado: ${ITEMS[id].name} ${ITEMS[id].emoji}`);
       screenShop();
+      if (!stored) showBackpackOrganizer(run,isBattleItem(id),screenShop,id);
     };
   });
   document.querySelectorAll('[data-sell]').forEach(b => {
@@ -4627,7 +5592,7 @@ function screenShop() {
         const currentQty = (run.items && run.items[t.id]) || 0;
         if (currentQty < t.qty) {
           const itemPrice = ITEMS[t.id] ? ITEMS[t.id].price : 999999;
-          if (run.berries >= itemPrice) {
+          if (autoCanSpend(itemPrice)) {
             const buyBtn = document.querySelector(`[data-buy="${t.id}"]`);
             if (buyBtn && !buyBtn.disabled) {
               buyBtn.click();
@@ -4651,7 +5616,11 @@ function screenShop() {
 // eligiendo siempre el mejor movimiento según los tipos. El jugador solo
 // interviene con objetos, carteles de recluta, velocidad o huida.
 let battle = null;
-let autoSpeed = 1; // recordado entre combates
+let autoSpeed = [1,2,4].includes(meta.settings.autoConfig?.combatSpeed) ? meta.settings.autoConfig.combatSpeed : 1; // recordado entre combates
+let combatSpeedOverride = meta.settings.autoConfig?.combatSpeed === autoSpeed ? autoSpeed : null; // elección manual compartida entre mapa y combate
+function preferredCombatSpeed() {
+  return combatSpeedOverride ?? (autoMode ? (autoSettings.speed === 'x1' ? 1 : 2) : autoSpeed);
+}
 
 // ---------- Clímax de combate (anti combates eternos) ----------
 // A partir de la ronda CLIMAX_ROUND el daño de ambos bandos sube un 10%
@@ -4665,7 +5634,8 @@ function healScaleNow() {
   return battle ? clamp(1 - 0.20 * Math.max(0, (battle.round || 1) - CLIMAX_ROUND), 0, 1) : 1;
 }
 
-const activeP = () => battle.pTeam.find(f => f.hp > 0);
+const activeP = () => battle.pTeam.includes(battle.curP) && battle.curP.hp > 0
+  ? battle.curP : battle.pTeam.find(f => f.hp > 0);
 const activeE = () => battle.eTeam.find(f => f.hp > 0);
 
 // ---------- Motor de pasivas (compendio) ----------
@@ -4774,7 +5744,7 @@ function passiveInfo(f) {
 }
 
 // ---------- Sinergias de equipo (rediseño) ----------
-// 2+ nakamas vivos del mismo tipo = sinergia I; el equipo entero = sinergia II.
+// Two matching living members unlock I, three unlock II; six reinforce its numeric bonuses.
 const SYNERGIES = {
   Corte: {
     name: 'Precisión Quirúrgica',
@@ -4850,15 +5820,19 @@ const SYNERGIES = {
 const synEmoji = t => t === 'Nakama' ? '🏴‍☠️' : TYPES[t].emoji;
 const isNakamaChar = f => !!(charData(f).nakama || (CHARS[baseFormOf(f.id)] && CHARS[baseFormOf(f.id)].nakama));
 
+function synergyCount(team, type) {
+  return team.filter(f => f.hp > 0 && (type === 'Nakama' ? isNakamaChar(f) : fighterTypes(f).includes(type))).length;
+}
 function synergyTier(team, type) {
-  const alive = team.filter(f => f.hp > 0);
-  if (alive.length < 2) return 0;
-  const cnt = type === 'Nakama'
-    ? alive.filter(isNakamaChar).length
-    : alive.filter(f => charData(f).types.includes(type)).length;
-  if (cnt === alive.length) return 2;
-  if (cnt >= 2) return 1;
-  return 0;
+  const count = synergyCount(team, type);
+  return count >= 3 ? 2 : count >= 2 ? 1 : 0;
+}
+function synergyBoost(team, type) {
+  return team.length === 6 && synergyCount(team, type) === 6 ? 1.4 : 1;
+}
+function synergyBonus(team, type, first, second) {
+  const tier = synergyTier(team, type);
+  return tier === 2 ? second * synergyBoost(team, type) : tier === 1 ? first : 0;
 }
 function teamSynergies(team) {
   return Object.keys(SYNERGIES).map(t => ({ t, tier: synergyTier(team, t) })).filter(x => x.tier > 0);
@@ -4867,8 +5841,16 @@ function synChipsHTML(team) {
   const list = teamSynergies(team);
   if (!list.length) return '<span class="syn-none">sin sinergias</span>';
   return list.map(({ t, tier }) =>
-    `<span class="syn-chip t${tier}" title="${SYNERGIES[t].name}: ${tier === 2 ? SYNERGIES[t].d2 : SYNERGIES[t].d1}">${synEmoji(t)} ${t} ${tier === 2 ? 'Ⅱ' : 'Ⅰ'}</span>`
+    `<span class="syn-chip t${tier}" title="${SYNERGIES[t].name}: ${tier === 2 ? SYNERGIES[t].d2 : SYNERGIES[t].d1}${synergyBoost(team,t)>1 ? ' · 6/6: bonus numéricos reforzados (25% → 35%)' : ''}">${synEmoji(t)} ${t} ${tier === 2 ? 'Ⅱ' : 'Ⅰ'}${synergyBoost(team,t)>1 ? ' ★ 6/6' : ''}</span>`
   ).join('');
+}
+
+function activeSynergiesHTML(team) {
+  const active = teamSynergies(team);
+  if (!active.length) return '<p class="synergy-empty">Sin sinergias activas. Reúne 2 nakamas con el mismo tag para activar el nivel I.</p>';
+  return '<div class="active-synergy-grid">' + active.map(({t,tier}) =>
+    `<article class="active-synergy-card"><header><b>${synEmoji(t)} ${t}</b><span>Nivel ${tier === 2 ? 'II' : 'I'} · ${synergyCount(team,t)} nakamas</span></header><p>${tier === 2 ? SYNERGIES[t].d2 : SYNERGIES[t].d1}</p>${synergyBoost(team,t)>1 ? '<strong>★ 6/6 · Bonus numéricos ×1,4</strong>' : ''}</article>`
+  ).join('') + '</div>';
 }
 
 // ---------- Tags de naturaleza ----------
@@ -4880,28 +5862,28 @@ const hasHaki = f => fighterTypes(f).includes('Haki') || (f.moves || []).some(id
 function nakamaStatMult(team) {
   if (synergyTier(team, 'Nakama') < 1) return 1;
   const prim = team.filter(f => f.hp > 0).map(f => charData(f).types[0]);
-  return new Set(prim).size === prim.length ? 1.1 : 1;
+  return new Set(prim).size === prim.length ? 1 + synergyBonus(team, 'Nakama', .10, .10) : 1;
 }
 
 // Modal informativo con todas las sinergias y el estado del equipo actual
 function showSynergyModal(team) {
   const ov = document.createElement('div');
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="display:flex;flex-direction:column;max-height:85vh;max-width:580px;position:relative;overflow:hidden;padding-bottom:0;">
+  ov.className = 'overlay collection-overlay';
+  ov.innerHTML = `<div class="modal collection-modal guide-modal" role="dialog" aria-modal="true" aria-label="Guía de sinergias y tipos">
     <h2 style="flex-shrink:0;">🧩 Sinergias de equipo</h2>
-    <p style="font-size:8px;text-align:center;margin-bottom:10px;flex-shrink:0;">2+ nakamas vivos que comparten tipo activan la Sinergia I;
-    si el equipo entero lo comparte, la Sinergia II.</p>
-    <div style="overflow-y:auto;flex:1;padding-right:4px;margin-bottom:6px;">
+    <p style="font-size:8px;text-align:center;margin-bottom:10px;flex-shrink:0;">2 nakamas vivos del mismo tag: nivel I. 3 o más: nivel II.
+    Con 6/6 del mismo tag, sus bonus numéricos aumentan un 40 % (por ejemplo, 25 % → 35 %). Los efectos absolutos se mantienen.</p>
+    <div class="collection-list guide-content">
       ${Object.keys(SYNERGIES).map(t => {
     const tier = team ? synergyTier(team, t) : 0;
     const s = SYNERGIES[t];
-    return `<div class="sheet-section" style="${tier ? 'background:#fff8e0;' : ''}">
-            <b>${synEmoji(t)} ${t} — ${s.name} ${tier ? `<span style="color:var(--accent);">— ACTIVA ${tier === 2 ? 'Ⅱ' : 'Ⅰ'}</span>` : ''}</b>
-            <p>Ⅰ: ${s.d1}<br>Ⅱ: ${s.d2}</p>
+    return `<div class="sheet-section synergy-guide-card ${tier ? 'is-active' : ''}">
+            <b>${synEmoji(t)} ${t} — ${s.name}${team ? ` · ${synergyCount(team,t)} nakamas` : ''} ${tier ? `<span style="color:var(--accent);">— ACTIVA ${tier === 2 ? 'Ⅱ' : 'Ⅰ'}</span>` : ''}</b>
+            <p>Ⅰ: ${s.d1}<br>Ⅱ: ${s.d2}<br><b>6/6:</b> ${t === 'Nakama' ? 'Bonus de estadísticas +14 % si no repiten tipo primario; la protección conserva 1 PS.' : 'Bonus numéricos ×1,4; sin duplicar inmunidades ni efectos garantizados.'}${team && synergyBoost(team,t)>1 ? ' ★ ACTIVO' : ''}</p>
           </div>`;
   }).join('')}
     </div>
-    <div class="actions" style="background:var(--paper);padding:10px 18px;margin-left:-18px;margin-right:-18px;border-top:2px solid var(--ink);box-shadow:0 -4px 12px rgba(0,0,0,0.18);z-index:20;display:flex;gap:10px;justify-content:center;flex-shrink:0;">
+    <div class="actions guide-actions">
       <button class="btn blue" id="syn-chart">📊 TABLA DE DEBILIDADES</button>
       <button class="btn gray" id="syn-close">✖️ CERRAR</button>
     </div>
@@ -4922,18 +5904,18 @@ function showTypeChartModal(team) {
       <td><span class="type-badge" style="background:${TYPES[atk].color}">${TYPES[atk].emoji} ${atk.toUpperCase()}</span></td>
       <td style="color:var(--green);">${strong || '—'}</td>
       <td style="color:var(--red);">${weak || '—'}</td>
-      <td style="font-size:7px;color:#666;">${note || ''}</td>
+      <td>${note || '—'}</td>
     </tr>`;
   }).join('');
   const ov = document.createElement('div');
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="display:flex;flex-direction:column;max-height:85vh;max-width:560px;position:relative;overflow:hidden;padding-bottom:0;">
+  ov.className = 'overlay collection-overlay';
+  ov.innerHTML = `<div class="modal collection-modal guide-modal" role="dialog" aria-modal="true" aria-label="Guía de sinergias y tipos">
     <h2 style="flex-shrink:0;">📊 Tabla de debilidades</h2>
-    <div style="overflow-y:auto;flex:1;padding-right:4px;margin-bottom:6px;">
-      <div style="overflow-x:auto;">
-        <table class="chart-table">
-          <tr><th>Atacante</th><th>+25% fuerte contra</th><th>-25% débil contra</th><th>Efecto especial</th></tr>
-          ${rows}
+    <div class="collection-list guide-content">
+      <div class="guide-type-table">
+        <table class="chart-table" aria-label="Tabla de debilidades y efectos especiales">
+          <thead><tr><th scope="col">Atacante</th><th scope="col">+25%<br>Fuerte contra</th><th scope="col">−25%<br>Débil contra</th><th scope="col">Efecto especial</th></tr></thead>
+          <tbody>${rows}</tbody>
         </table>
       </div>
       <div class="sheet-section" style="margin-top:10px;">
@@ -4956,7 +5938,7 @@ function showTypeChartModal(team) {
         por ronda</b> hasta anularse. Desde la ronda 30 ambos activos sufren desgaste creciente, incluso si esquivan. Si ambos bandos caen a la vez, pierdes el combate.</p>
       </div>
     </div>
-    <div class="actions" style="background:var(--paper);padding:10px 18px;margin-left:-18px;margin-right:-18px;border-top:2px solid var(--ink);box-shadow:0 -4px 12px rgba(0,0,0,0.18);z-index:20;display:flex;gap:10px;justify-content:center;flex-shrink:0;">
+    <div class="actions guide-actions">
       <button class="btn blue" id="tc-syn">🧩 SINERGIAS</button>
       <button class="btn gray" id="tc-close">✖️ CERRAR</button>
     </div>
@@ -4969,6 +5951,7 @@ function showTypeChartModal(team) {
 }
 
 const CROSSOVER_ULTIMATES = {
+  narutokurama: MOVES.bijudama,
   naruto: { name: 'Rasengan Shuriken', type: 'Viento', power: 140, acc: 0.9 },
   sasuke: { name: 'Kirin', type: 'Rayo', power: 140, acc: 0.9 },
   kakashi: { name: 'Raikiri', type: 'Rayo', power: 135, acc: 0.95 },
@@ -5007,7 +5990,13 @@ function getUltimateMove(f) {
   const c = CHARS[f.id] || CHARS[base];
   if (!c) return MOVES.punetazo;
 
-  if (isP(f,'luffy')) return f.lvl >= 38 ? MOVES.kingkonggun : f.lvl >= 20 ? MOVES.jetgatling : MOVES.gatlinggoma;
+  if (c.evo && startLvlOf(f.id) < c.evo.lvl && !battle?.eTeam.includes(f)) {
+    const lockedMoves = c.learnset.filter(([level]) => level >= c.evo.lvl).map(([,id]) => id);
+    if (!c.ultimate || lockedMoves.includes(c.ultimate)) {
+      const available = formMovesAt(f.id, f.lvl).map(id => MOVES[id]).filter(m => m?.power > 0);
+      return available.sort((a,b) => b.power * b.acc - a.power * a.acc)[0] || MOVES.punetazo;
+    }
+  }
   if (c.ultimate && MOVES[c.ultimate]) return MOVES[c.ultimate];
   if (c.learnset && c.learnset.length >= 3) {
     const highMove = c.learnset[c.learnset.length - 1][1];
@@ -5018,10 +6007,17 @@ function getUltimateMove(f) {
   return ownMoves.sort((a,b) => b.power * b.acc - a.power * a.acc)[0] || MOVES.punetazo;
 }
 
+function enemyUltimatesEnabled(b = battle) {
+  const marineford = SAGAS.findIndex(s => s.id === 'marineford');
+  return !!b && !b.tower && !!run && marineford >= 0 && run.saga >= marineford;
+}
+
 function useUltimate(f) {
   const b = battle;
   if (!b || b.over || !f || f.hp <= 0) return;
-  const enemy = b.curE;
+  const isEnemy = b.eTeam.includes(f);
+  if (isEnemy && !enemyUltimatesEnabled(b)) return;
+  const enemy = isEnemy ? b.curP : b.curE;
   if (!enemy || enemy.hp <= 0) return;
   if (f.lvl < 20) return toast(`🔒 Ultimate de ${charName(f)} desbloqueable a Nv20.`);
   if ((f.ultCharge || 0) < 100) return toast(`⚡ Ultimate de ${charName(f)} al ${Math.floor(f.ultCharge || 0)}% (golpea para cargar).`);
@@ -5029,7 +6025,7 @@ function useUltimate(f) {
   f.ultCharge = 0;
   const ultMv = getUltimateMove(f);
   log(`💥 <b>¡DEFINITIVA DE ${charName(f).toUpperCase()}!</b> Desata <b>${ultMv.name}</b> 💥`);
-  attackWith(f, enemy, ultMv, 'enemy');
+  attackWith(f, enemy, ultMv, isEnemy ? 'player' : 'enemy');
   refreshHPCards();
 }
 
@@ -5037,9 +6033,7 @@ function startBattle(enemies, opts) {
   playMusic('combat');
   const team = opts.tower ? tower.team : run.team;
   if (!team.some(f => f.hp > 0)) return opts.tower ? towerGameOver() : gameOver();
-  if (autoMode) {
-    autoSpeed = (autoSettings.speed === 'x1') ? 1 : 2;
-  }
+  autoSpeed = preferredCombatSpeed();
   battle = {
     pTeam: team, eTeam: enemies,
     items: opts.tower ? tower.items : run.items,
@@ -5047,13 +6041,19 @@ function startBattle(enemies, opts) {
     tower: !!opts.tower,
     timer: null,
     round: 1,
+    switchUsed: false,
+    itemBuffs: new Map(),
+    teamTotals: {p: team.length, e: enemies.length},
   };
   enemies.forEach(e => registerDex(e.id));
   // reinicia pasivas y estados por-combate
   [...battle.pTeam, ...battle.eTeam].forEach(f => {
-    migrateFighter(f);
+    migrateFighter(f, battle.eTeam.includes(f));
     f.dodgeLeft = passiveRule(f).dodge || 0;
-    f.st = {}; // estados: burn (quemadura), poison (veneno), slow (ralentizado), gust (viento a favor)
+    // Carry timed effects through the journey; reset combat-only passive flags.
+    const previous = battle.pTeam.includes(f) ? f.st || {} : {};
+    f.st = Object.fromEntries(['burn','burnRate','poison','poisonDefense','slow','slowRate','gust','gustBonus']
+      .filter(key => previous[key] !== undefined).map(key => [key, previous[key]]));
   });
   battle.firstHit = { p: true, e: true }; // para Rayo Ⅱ: primer ataque crítico garantizado
   battle.curP = activeP();
@@ -5067,6 +6067,14 @@ function startBattle(enemies, opts) {
   scheduleRound(900);
 }
 
+function battleItemMult(f, stat) {
+  return 1 + ((!battle || battle.over) ? 0 : battle.itemBuffs?.get(f)?.[stat] || 0);
+}
+function combatStatsHTML(f) {
+  return `      <span class="combat-stat">⚔️ ATQ ${Math.floor(f.atk * battleItemMult(f,'atk'))}${battleItemMult(f,'atk') > 1 ? ' ↑' : ''}</span>
+      <span class="combat-stat">🛡️ DEF ${Math.floor(f.def * battleItemMult(f,'def'))}${battleItemMult(f,'def') > 1 ? ' ↑' : ''}</span>
+      <span class="combat-stat">⚡ VEL ${f.spd}</span>`;
+}
 function hpBarClass(f) {
   const p = f.hp / f.maxhp;
   return p < 0.25 ? 'crit' : p < 0.5 ? 'low' : '';
@@ -5093,20 +6101,22 @@ function fighterCardHTML(f, side, idx, active) {
   const isUltReady = isUltUnlocked && (f.ultCharge || 0) >= 100;
   const ultPct = isUltUnlocked ? clamp(f.ultCharge || 0, 0, 100) : 0;
 
-  const ultBarHTML = side === 'p' ? `
+  const ultBarHTML = (side === 'p' || enemyUltimatesEnabled()) ? `
     <div class="ult-bar-wrap ${isUltUnlocked ? '' : 'locked'}" title="${isUltUnlocked ? 'Ultimate (' + Math.floor(ultPct) + '%)' : 'Desbloquea Ultimate a Nv20'}">
       ${isUltUnlocked ? `<div class="ult-bar" style="width:${ultPct}%"></div>` : '<div class="ult-bar-text">🔒 ULTI A NV20</div>'}
     </div>` : '';
 
   return `<div class="fcard ${f.hp <= 0 ? 'ko' : ''} ${f === active ? 'active' : ''} ${isUltReady ? 'ult-ready' : ''}" id="fc-${side}-${idx}">
-    <div class="fcard-title">${c.name} ${rarityTag} ${fusionTag} Nv${f.lvl} <span class="fcard-tags">${tagIcons(f)}</span><span class="fcard-st">${stIcons(f)}</span></div>
+    <div class="fcard-title">${c.name} ${rarityTag} ${fusionTag} Nv${f.lvl} <span class="fcard-tags">${tagIcons(f)}</span><span class="fcard-st">${stIcons(f)}</span>
+      ${side === 'p' ? xpBarHTML(f) : ''}
+    </div>
     <div class="fcard-hp">
       <div class="hp-bar"><i class="${hpBarClass(f)}" style="width:${clamp(f.hp / f.maxhp * 100, 0, 100)}%"></i></div>
       <div class="hp-nums">${f.hp}/${f.maxhp}</div>
     </div>
-    <div class="fcard-meters">${side === 'p' ? xpBarHTML(f) : ''}${ultBarHTML}</div>
+    <div class="fcard-meters">${ultBarHTML}</div>
     <div class="fcard-stats-mini" style="font-size:7.5px;color:#eee;text-align:center;margin:2px 0;background:rgba(0,0,0,0.3);padding:2px 4px;border-radius:3px;">
-      ⚔️ ATQ ${f.atk} · 🛡️ DEF ${f.def} · ⚡ VEL ${f.spd}
+      ${combatStatsHTML(f)}
     </div>
     <div class="fcard-sprite" data-character="${f.id}">
       <span class="sprite ${side === 'e' ? 'flip' : ''}">${charIcon(f.id, 64)}</span>
@@ -5141,45 +6151,89 @@ function showBattleCrew() {
 
 function controlsHTML() {
   const b = battle;
-  let html = '';
-  for (const id of ['carne', 'carnereal', 'bocadillo', 'sake']) {
-    if (b.items[id] > 0) html += `<button class="btn small blue" data-ctl="item" data-arg="${id}" title="${ITEMS[id].name}">${ITEMS[id].emoji} ×${b.items[id]}</button>`;
-  }
+  let html = '<div class="battle-control-row battle-tools" aria-label="Controles del combate">';
   html += `<button class="btn small gray battle-crew-button" data-ctl="crew">👥 BANDAS</button>`;
-  html += `<button class="btn small gray" data-ctl="speed" title="Atajo: barra espaciadora">⏩ VELOCIDAD x${b.speed}</button>`;
-  html += `<button class="btn small gray" data-ctl="info">🧩 SINERGIAS Y TIPOS</button>`;
-  if (b.opts.wild && !b.tower) html += `<button class="btn small red" data-ctl="run">🏃 HUIR</button>`;
+  html += '</div><div class="battle-control-row battle-exit" aria-label="Salir del combate">';
   if (b.tower) html += `<button class="btn small red" data-ctl="quit">🏳️ RENDIRSE</button>`;
-  return html;
+  return html + '</div>';
+}
+
+function battleTeamCount(side) {
+  const team = side === 'p' ? battle.pTeam : battle.eTeam;
+  const total = battle.teamTotals?.[side] ?? team.length;
+  return `${team.filter(f => f.hp > 0).length}/${total} en pie`;
+}
+
+function switchBattleFighter(index) {
+  const b = battle;
+  const next = b?.pTeam[index];
+  if (!b || b.over || b.waiting || b.switchUsed || !next || next.hp <= 0 ||
+      next === b.curP || b.curP?.hp <= 0 || b.curE?.hp <= 0) return false;
+  b.switchUsed = true;
+  const previous = b.curP;
+  b.curP = next;
+  log(`🔄 ${charName(previous)} se retira. ¡Adelante, ${charName(next)}! Relevo utilizado.`);
+  renderBattlePreserveLog();
+  return true;
+}
+
+function reservesHTML() {
+  const b = battle;
+  return `<div class="battle-reserve-heading">🏴‍☠️ TU TRIPULACIÓN <span>${b.switchUsed ? 'Relevo usado · 0/1' : 'Toca una reserva · 1 relevo disponible'}</span></div>
+    <div class="battle-reserve-list">${b.pTeam.map((f, index) => {
+      const active = f === b.curP;
+      const disabled = active || f.hp <= 0 || b.switchUsed || b.over || b.waiting || b.curP?.hp <= 0 || b.curE?.hp <= 0;
+      return `<button class="battle-reserve ${active ? 'is-active' : ''} ${f.hp <= 0 ? 'is-ko' : ''}" data-reserve="${index}" ${disabled ? 'disabled' : ''} aria-label="${active ? 'Activo' : 'Relevar con'} ${charName(f)}, ${f.hp}/${f.maxhp} PS">
+        ${charIcon(f.id, 80)}<b>${charName(f)}</b>
+        <span class="hp-bar"><i class="${hpBarClass(f)}" style="width:${clamp(f.hp / f.maxhp * 100, 0, 100)}%"></i></span>
+        <small>${f.hp}/${f.maxhp} PS · ${f.hp <= 0 ? 'KO' : active ? 'Activo' : 'Reserva'}</small>
+      </button>`;
+    }).join('')}</div>`;
+}
+
+function refreshReserves() {
+  const el = $('#battle-reserves');
+  if (!el) return;
+  el.innerHTML = reservesHTML();
+  el.querySelectorAll('[data-reserve]').forEach(button => {
+    button.onclick = () => switchBattleFighter(Number(button.dataset.reserve));
+  });
 }
 
 function renderBattle(logLines) {
   const b = battle;
   const eHead = b.opts.wild ? '🌊' : b.opts.boss ? '💀' : '⚓';
   render(`
-    ${topbar(!b.tower)}
+    ${topbar(!b.tower, !b.tower, true, b.opts.wild && !b.tower)}
     <div class="battle-layout">
       <div class="battle-main">
         <div class="battle-cols" style="--scene:url('${b.tower ? '/art/scenes/marineford.webp' : (SAGAS[run?.saga || 0]?.img || '/art/scenes/eastblue.webp')}')">
           <div class="battle-side" id="side-p">
             <div class="side-head"><div class="trainer">🏴‍☠️</div>TU BANDA
+              <div class="battle-team-count" id="count-p">${battleTeamCount('p')}</div>
               <div class="syn-chips" id="syn-p">${synChipsHTML(b.pTeam)}</div>
             </div>
             ${b.pTeam.map((f, i) => fighterCardHTML(f, 'p', i, b.curP)).join('')}
           </div>
           <div class="battle-side" id="side-e">
             <div class="side-head"><div class="trainer">${eHead}</div>${b.opts.wild ? 'SALVAJE' : 'ENEMIGO'}
+              <div class="battle-team-count" id="count-e">${battleTeamCount('e')}</div>
               <div class="syn-chips" id="syn-e">${synChipsHTML(b.eTeam)}</div>
             </div>
             ${b.eTeam.map((f, i) => fighterCardHTML(f, 'e', i, b.curE)).join('')}
           </div>
         </div>
-        <div class="battle-log" id="battle-log">${logLines.map(l => `<div>${l}</div>`).join('')}</div>
+        <div class="battle-reserves" id="battle-reserves"></div>
+        <div class="battle-lower-panels">
+          <section class="battle-log-panel"><h3>REGISTRO</h3><div class="battle-log" id="battle-log">${logLines.map(l => `<div>${l}</div>`).join('')}</div></section>
+          <section id="battle-backpack" aria-label="Mochila de combate"></section>
+        </div>
       </div>
       <div class="battle-sidebar" id="battle-controls">${controlsHTML()}</div>
     </div>
   `);
   bindControls();
+  refreshReserves();
   // En combate: las cartas enemigas muestran su ficha; las cartas aliadas activan la Ultimate si está lista
   [['p', b.pTeam], ['e', b.eTeam]].forEach(([side, team]) => {
     team.forEach((f, i) => {
@@ -5205,6 +6259,7 @@ function renderBattle(logLines) {
       }
     });
   });
+  refreshBattleBackpack();
   keepActiveFightersVisible();
 }
 
@@ -5217,6 +6272,7 @@ function renderBattlePreserveLog() {
 function refreshControls() {
   const el = $('#battle-controls');
   if (el) { el.innerHTML = controlsHTML(); bindControls(); }
+  refreshBattleBackpack();
 }
 
 function log(msg) {
@@ -5227,10 +6283,12 @@ function log(msg) {
   }
   const el = $('#battle-log');
   if (!el) return;
+  const follow = el.scrollHeight - el.scrollTop - el.clientHeight < 24;
   const d = document.createElement('div');
   d.innerHTML = msg;
   el.appendChild(d);
-  while (el.children.length > 5) el.removeChild(el.firstChild);
+  while (el.children.length > 30) el.removeChild(el.firstChild);
+  if (follow) el.scrollTop = el.scrollHeight;
 }
 
 function keepActiveFightersVisible() {
@@ -5247,6 +6305,10 @@ function keepActiveFightersVisible() {
 function refreshHPCards() {
   if (!battle) return;
   if (battle.opts?.local) return;
+  for (const side of ['p', 'e']) {
+    const count = $(`#count-${side}`);
+    if (count) count.textContent = battleTeamCount(side);
+  }
   [['p', battle.pTeam, battle.curP], ['e', battle.eTeam, battle.curE]].forEach(([side, team, active]) => {
     team.forEach((f, i) => {
       const card = $(`#fc-${side}-${i}`);
@@ -5264,6 +6326,8 @@ function refreshHPCards() {
       if (ultBar) ultBar.style.width = clamp(f.ultCharge || 0, 0, 100) + '%';
       const xpEl = card.querySelector('.xp-progress');
       if (xpEl) xpEl.outerHTML = xpBarHTML(f);
+      const statsEl = card.querySelector('.fcard-stats-mini');
+      if (statsEl) statsEl.innerHTML = combatStatsHTML(f);
       const stEl = card.querySelector('.fcard-st');
       if (stEl) stEl.textContent = stIcons(f);
       const pEl = card.querySelector('.fcard-passive');
@@ -5276,6 +6340,7 @@ function refreshHPCards() {
   });
   const sp = $('#syn-p'); if (sp) sp.innerHTML = synChipsHTML(battle.pTeam);
   const se = $('#syn-e'); if (se) se.innerHTML = synChipsHTML(battle.eTeam);
+  refreshReserves();
   keepActiveFightersVisible();
 }
 
@@ -5308,10 +6373,10 @@ function critChanceFor(att) {
   if (isP(att, 'mihawk')) c += 0.15;
   if (isP(att, 'oden')) c += 0.10;
   const team = teamOf(att);
-  if (synergyTier(team, 'Corte') === 2) c += 0.10;
+  c += synergyBonus(team, 'Corte', 0, .10);
   const tD = synergyTier(team, 'Disparo');
-  if (tD) c += tD === 2 ? 0.20 : 0.10;
-  if (synergyTier(team, 'Haki') === 2) c += 0.10;
+  if (tD) c += synergyBonus(team, 'Disparo', .10, .20);
+  c += synergyBonus(team, 'Haki', 0, .10);
   return Math.min(.75, c);
 }
 function critDmgFor(att) {
@@ -5319,7 +6384,7 @@ function critDmgFor(att) {
   if (isP(att, 'oden')) m += 0.20;
   if (isP(att, 'saitama')) m += 0.50;
   const tC = synergyTier(teamOf(att), 'Corte');
-  if (tC) m += tC === 2 ? 0.35 : 0.15;
+  if (tC) m += synergyBonus(teamOf(att), 'Corte', .15, .35);
   return m;
 }
 function evaChanceFor(dfd) {
@@ -5329,7 +6394,7 @@ function evaChanceFor(dfd) {
   if (teamOf(dfd).some(x => x.hp > 0 && isP(x, 'dragon'))) e += 0.15;
   if (isP(dfd, 'smoker')) e += 0.20;
   const tV = synergyTier(teamOf(dfd), 'Viento');
-  if (tV) e += tV === 2 ? 0.18 : 0.08;
+  if (tV) e += synergyBonus(teamOf(dfd), 'Viento', .08, .18);
   return Math.min(.60, e);
 }
 
@@ -5341,8 +6406,8 @@ function calcDamage(att, dfd, mv, crit, variance) {
   if (isP(dfd, 'luffy') && mv.type === 'Rayo') eff = 0;
   const atkTeam = teamOf(att), defTeam = teamOf(dfd);
   // Categoría: físico usa ATQ vs DEF; especial usa ESP_ATQ vs ESP_DEF
-  let atkStat = (phys ? att.atk : att.spatk) * nakamaStatMult(atkTeam);
-  let defStat = (phys ? dfd.def : dfd.spdef) * nakamaStatMult(defTeam);
+  let atkStat = (phys ? att.atk : att.spatk) * nakamaStatMult(atkTeam) * battleItemMult(att,'atk');
+  let defStat = (phys ? dfd.def : dfd.spdef) * nakamaStatMult(defTeam) * battleItemMult(dfd,'def');
   const ar = passiveRule(att), dr = passiveRule(dfd);
   atkStat *= ar.attack || 1;
   defStat *= dr.defense || 1;
@@ -5360,15 +6425,15 @@ function calcDamage(att, dfd, mv, crit, variance) {
   // Veneno: daño neutral que ignora el 20% de la defensa
   if (mv.type === 'Veneno') defStat *= 0.8;
   // Golpe Ⅱ: los ataques físicos rompen un 15% de la DEF rival
-  if (phys && synergyTier(atkTeam, 'Golpe') === 2) defStat *= 0.85;
+  if (phys) defStat *= 1 - synergyBonus(atkTeam, 'Golpe', 0, .15);
   // Tierra: +15/+30% de DEF física
   const tT = synergyTier(defTeam, 'Tierra');
-  if (phys && tT) defStat *= tT === 2 ? 1.30 : 1.15;
+  if (phys && tT) defStat *= 1 + synergyBonus(defTeam, 'Tierra', .15, .30);
   // Agua Ⅱ y Fruta Ⅱ: +15% de ESP_DEF
-  if (!phys && synergyTier(defTeam, 'Agua') === 2) defStat *= 1.15;
-  if (!phys && synergyTier(defTeam, 'Fruta') === 2) defStat *= 1.15;
+  if (!phys) defStat *= 1 + synergyBonus(defTeam, 'Agua', 0, .15);
+  if (!phys) defStat *= 1 + synergyBonus(defTeam, 'Fruta', 0, .15);
   // Estado Veneno: el envenenado pierde un 20% de ESP_DEF
-  if (!phys && dfd.st && dfd.st.poison) defStat *= 0.8;
+  if (!phys && dfd.st && dfd.st.poison) defStat *= 1 - (dfd.st.poisonDefense || .20);
   // Efectos de daño por tag FRUTA
   if (mv.type === 'Agua' && hasFruta(dfd)) eff *= 1.5;
   if (mv.type === 'Oscuridad' && hasFruta(dfd)) eff *= 1.35;
@@ -5383,18 +6448,18 @@ function calcDamage(att, dfd, mv, crit, variance) {
   if (crit) dmg *= critDmgFor(att);
   // Sinergias de daño del atacante
   const tGolpe = synergyTier(atkTeam, 'Golpe');
-  if (phys && tGolpe) dmg *= tGolpe === 2 ? 1.25 : 1.12;
+  if (phys && tGolpe) dmg *= 1 + synergyBonus(atkTeam, 'Golpe', .12, .25);
   const tFuego = synergyTier(atkTeam, 'Fuego');
-  if (mv.type === 'Fuego' && tFuego) dmg *= tFuego === 2 ? 1.25 : 1.12;
+  if (mv.type === 'Fuego' && tFuego) dmg *= 1 + synergyBonus(atkTeam, 'Fuego', .12, .25);
   const tHielo = synergyTier(atkTeam, 'Hielo');
-  if (mv.type === 'Hielo' && tHielo) dmg *= tHielo === 2 ? 1.20 : 1.10;
-  if (mv.type === 'Veneno' && synergyTier(atkTeam, 'Veneno')) dmg *= 1.10;
+  if (mv.type === 'Hielo' && tHielo) dmg *= 1 + synergyBonus(atkTeam, 'Hielo', .10, .20);
+  if (mv.type === 'Veneno') dmg *= 1 + synergyBonus(atkTeam, 'Veneno', .10, .10);
   const tOsc = synergyTier(atkTeam, 'Oscuridad');
-  if (tOsc && hasFruta(dfd)) dmg *= tOsc === 2 ? 1.25 : 1.10;
+  if (tOsc && hasFruta(dfd)) dmg *= 1 + synergyBonus(atkTeam, 'Oscuridad', .10, .25);
   const tFru = synergyTier(atkTeam, 'Fruta');
-  if (!phys && tFru) dmg *= tFru === 2 ? 1.25 : 1.12;
+  if (!phys && tFru) dmg *= 1 + synergyBonus(atkTeam, 'Fruta', .12, .25);
   const tHaki = synergyTier(atkTeam, 'Haki');
-  if (tHaki) dmg *= tHaki === 2 ? 1.18 : 1.08;
+  if (tHaki) dmg *= 1 + synergyBonus(atkTeam, 'Haki', .08, .18);
   // Pasivas de daño de 5 estrellas
   if (teamOf(att).some(x => x.hp > 0 && isP(x, 'roger'))) dmg *= 1.20;
   if (isP(dfd, 'kaido')) dmg *= 0.85;
@@ -5489,7 +6554,8 @@ function attackWith(att, dfd, mv, targetSide) {
     log(`¡${charName(dfd)} esquiva ${mv.name}! 💨`);
     if (synergyTier(teamOf(dfd), 'Viento') === 2) {
       dfd.st.gust = 2;
-      log(`💨 ¡Ligereza! ${charName(dfd)} gana +20% de VEL.`);
+      dfd.st.gustBonus = .20 * synergyBoost(teamOf(dfd), 'Viento');
+      log(`💨 ¡Ligereza! ${charName(dfd)} gana +${Math.round(dfd.st.gustBonus * 100)}% de VEL.`);
     }
     return;
   }
@@ -5503,7 +6569,7 @@ function attackWith(att, dfd, mv, targetSide) {
   if (dmg > 0) dfd.st.receivedHit = true;
   if (passiveRule(att).slow) dfd.st.slow = 2;
   // Recarga de Ultimate al golpear al enemigo (para personajes de nivel base >= 20)
-  if (att && att.lvl >= 20 && (b.opts?.local || b.pTeam.includes(att))) {
+  if (att && att.lvl >= 20 && (b.opts?.local || b.pTeam.includes(att) || (enemyUltimatesEnabled(b) && b.eTeam.includes(att)))) {
     att.ultCharge = Math.min(100, (att.ultCharge || 0) + 34);
   }
   let txt = `${attName} usa <b>${mv.name}</b>. `;
@@ -5518,13 +6584,15 @@ function attackWith(att, dfd, mv, targetSide) {
   // Fuego Ⅱ: los críticos infligen Quemadura (3% PS por turno)
   if (crit && synergyTier(atkTeam, 'Fuego') === 2 && !dfd.st.burn) {
     dfd.st.burn = 3;
+    dfd.st.burnRate = .03 * synergyBoost(atkTeam, 'Fuego');
     log(`🔥 ¡${charName(dfd)} sufre una Quemadura!`);
   }
   // Hielo Ⅱ: los ataques ralentizan (-15% VEL, 1 turno)
-  if (synergyTier(atkTeam, 'Hielo') === 2) dfd.st.slow = 2;
+  if (synergyTier(atkTeam, 'Hielo') === 2) { dfd.st.slow = 2; dfd.st.slowRate = .15 * synergyBoost(atkTeam, 'Hielo'); }
   // Veneno Ⅱ: 25% de probabilidad de envenenar con cualquier ataque
-  if (synergyTier(atkTeam, 'Veneno') === 2 && !dfd.st.poison && Math.random() < 0.25) {
+  if (synergyTier(atkTeam, 'Veneno') === 2 && !dfd.st.poison && Math.random() < .25 * synergyBoost(atkTeam, 'Veneno')) {
     dfd.st.poison = true;
+    dfd.st.poisonDefense = .20 * synergyBoost(atkTeam, 'Veneno');
     log(`☠️ ¡${charName(dfd)} ha sido envenenado!`);
   }
   // Viento: propaga el 20% del daño al siguiente enemigo en la fila
@@ -5550,9 +6618,9 @@ function effectiveSpeed(f) {
   const rule = passiveRule(f);
   let speed = f.spd * nakamaStatMult(teamOf(f)) * (rule.speed || 1);
   const tier = synergyTier(teamOf(f), 'Rayo');
-  if (tier) speed *= tier === 2 ? 1.40 : 1.20;
-  if (f.st?.slow) speed *= .85;
-  if (f.st?.gust) speed *= 1.20;
+  if (tier) speed *= 1 + synergyBonus(teamOf(f), 'Rayo', .20, .40);
+  if (f.st?.slow) speed *= 1 - (f.st.slowRate || .15);
+  if (f.st?.gust) speed *= 1 + (f.st.gustBonus || .20);
   if (rule.lowSpeed && f.hp < f.maxhp * .5) speed *= rule.lowSpeed;
   if (rule.openingSpeed && battle.round === 1) speed *= rule.openingSpeed;
   const foe = battle.pTeam.includes(f) ? battle.curE : battle.curP;
@@ -5563,12 +6631,12 @@ function effectiveSpeed(f) {
 function runRound() {
   const b = battle;
   if (!b || b.over || b.waiting) return;
-  if (autoMode) runAutoItems();
+  runAutoItems();
   const p = b.curP, e = b.curE;
   if (!p || !e || p.hp <= 0 || e.hp <= 0) return afterRound();
 
   // Modo auto: tira la Ultimate automáticamente si está cargada
-  if (autoMode && p.lvl >= 20 && (p.ultCharge || 0) >= 100) {
+  if (autoMode && autoSettings.useUltimates !== false && p.lvl >= 20 && (p.ultCharge || 0) >= 100) {
     useUltimate(p);
   }
 
@@ -5578,12 +6646,20 @@ function runRound() {
     : [[e, p, 'player'], [p, e, 'enemy']];
   let i = 0;
   const step = () => {
-    if (!battle || battle.over) return;
+    if (battle !== b || b.over) return;
     if (battle.waiting) { battle.pendingStep = step; return; }
+    b.pendingStep = null;
     if (i < order.length) {
-      const [att, dfd, side] = order[i++];
-      if (att.hp > 0 && dfd.hp > 0) attackWith(att, dfd, chooseMove(att, dfd), side);
-      setTimeout(step, 900 / battle.speed);
+      const side = order[i++][2];
+      // Preserve this round's turn order; a manual relay changes its actors, not its number of attacks.
+      const att = side === 'enemy' ? b.curP : b.curE;
+      const dfd = side === 'enemy' ? b.curE : b.curP;
+      if (att.hp > 0 && dfd.hp > 0) {
+        if (side === 'player' && enemyUltimatesEnabled(b) && att.lvl >= 20 && (att.ultCharge || 0) >= 100) useUltimate(att);
+        else attackWith(att, dfd, chooseMove(att, dfd), side);
+      }
+      b.pendingStep = step;
+      b.timer = setTimeout(step, 900 / battle.speed);
     } else {
       afterRound();
     }
@@ -5599,18 +6675,18 @@ function afterRound() {
   for (const f of actors) {
     if (!f || !f.st) continue;
     if (f.hp > 0 && f.st.burn) {
-      const d = Math.max(1, Math.floor(f.maxhp * 0.03));
+      const d = Math.max(1, Math.floor(f.maxhp * (f.st.burnRate || .03)));
       f.hp = Math.max(0, f.hp - d);
       log(`🔥 ${charName(f)} sufre quemaduras (-${d} PS).`);
-      if (--f.st.burn <= 0) delete f.st.burn;
+      if (--f.st.burn <= 0) { delete f.st.burn; delete f.st.burnRate; }
     }
     if (f.hp > 0 && f.st.poison) {
       const d = Math.max(1, Math.floor(f.maxhp * 0.04));
       f.hp = Math.max(0, f.hp - d);
       log(`☠️ ${charName(f)} sufre el veneno (-${d} PS).`);
     }
-    if (f.st.slow && --f.st.slow <= 0) delete f.st.slow;
-    if (f.st.gust && --f.st.gust <= 0) delete f.st.gust;
+    if (f.st.slow && --f.st.slow <= 0) { delete f.st.slow; delete f.st.slowRate; }
+    if (f.st.gust && --f.st.gust <= 0) { delete f.st.gust; delete f.st.gustBonus; }
   }
   // Resolución simultánea: nadie revive por drenaje ni ataca tras caer.
   const targets = actors.map(act => b.pTeam.includes(act) ? b.curE : b.curP);
@@ -5624,7 +6700,7 @@ function afterRound() {
     if (team.some(x => x.hp > 0 && isP(x,'kibutsuji'))) heal += .05;
     if (team.some(x => x.hp > 0 && isP(x,'ryokugyu'))) heal += .05;
     const water = synergyTier(team,'Agua');
-    if (water) heal += water === 2 ? .08 : .04;
+    if (water) heal += synergyBonus(team, 'Agua', .04, .08);
     const blocked = synergyTier(teamOf(foe),'Oscuridad') === 2;
     return {drain, heal:blocked ? 0 : Math.floor((heal * act.maxhp + drain) * healScaleNow())};
   });
@@ -5659,7 +6735,7 @@ function afterRound() {
         else if (isPlayer) { if (b.tower && tower) tower.nakamaGuardUsed = true; else if (run) { run.nakamaGuardUsed = true; saveRun(); } }
         else b.eGuardUsed = true;
         f.hp = 1;
-        log(`🏴‍☠️ ¡Espíritu de Tripulación! ${charName(f)} resiste con 1 PS.`);
+        log(`🏴‍☠️ ¡Espíritu de Tripulación! ${charName(f)} resiste con ${f.hp} PS.`);
       }
     }
   };
@@ -5682,20 +6758,24 @@ function afterRound() {
   b.rewarded ||= new Set();
   for (const defeated of b.eTeam.filter(f => f.hp <= 0 && !b.rewarded.has(f))) {
     b.rewarded.add(defeated);
-    meta.stats ||= {kills:0,items:0};
-    meta.stats.kills = (meta.stats.kills || 0) + 1;
-    saveMeta();
+    trackKills();
     log(`¡${charName(defeated)} cae derrotado!`);
-    // registro de vencidos en historia (habilita comprarlos en el mercado clandestino)
+    // registro de vencidos en historia (habilita comprarlos en Crossguild)
     if (run && !b.tower && !meta.defeated.includes(defeated.id)) {
       meta.defeated.push(defeated.id);
       saveMeta();
     }
     // Recompensa de Log Poses al derrotar enemigos en historia
     if (run && !b.tower) {
-      const sagaIdx = run.saga || 0;
-      const isBossEnemy = !!charData(defeated).boss || b.opts.boss;
-      const logPosesWon = isBossEnemy ? (sagaIdx + 3) : (sagaIdx + 1);
+      if (b.opts.boss) {
+        const fame = bossFameReward(run.diff);
+        trackJourneyRewards(fame);
+        gainFame(fame);
+        b.bossFameEarned = (b.bossFameEarned || 0) + fame;
+        log(`🏅 ${charName(defeated)}: +${fame} ⭐ Fama`);
+      }
+      const logPosesWon = enemyLogPoseReward(defeated, b.opts, run.saga || 0);
+      trackJourneyRewards(0, logPosesWon);
       meta.logPoses = (meta.logPoses || 0) + logPosesWon;
       saveMeta();
       log(`🧭 ¡Consigues ${logPosesWon} Log Pose! (Total: ${meta.logPoses})`);
@@ -5723,10 +6803,12 @@ function afterRound() {
   const ne = activeE(), np = activeP();
   if (!ne && np) {
     b.over = true;
+    refreshHPCards();
     return setTimeout(() => endBattle(true), 1300 / b.speed);
   }
   if (!np) {
     b.over = true;
+    refreshHPCards();
     return setTimeout(() => b.tower ? towerGameOver() : gameOver(), 1300 / b.speed);
   }
   if (deadE && ne !== b.curE) { registerDex(ne.id); log(`¡${charName(ne)} entra en combate!`); }
@@ -5741,7 +6823,8 @@ function afterRound() {
     const hs = Math.round(healScaleNow() * 100);
     log(`⚔️ Clímax: +${pct}% de daño · curaciones al ${hs}%.`);
   }
-  refreshHPCards();
+  if (changed) renderBattlePreserveLog();
+  else refreshHPCards();
   scheduleRound(changed ? 1800 : 1400);
 }
 
@@ -5772,8 +6855,7 @@ function bindControls() {
       if (kind === 'item') {
         useBattleItem(arg);
       } else if (kind === 'run') {
-        pauseBattle();
-        tryFlee();
+        confirmBattleFlee();
       }
     };
   });
@@ -5781,17 +6863,22 @@ function bindControls() {
 
 function cycleBattleSpeed() {
   const b = battle;
-  if (!b || b.over) return;
-  b.speed = { 1: 2, 2: 4, 4: 1 }[b.speed] || 1;
-  autoSpeed = b.speed;
-  refreshControls();
+  if (b?.over || (!b && !run)) return;
+  autoSpeed = { 1: 2, 2: 4, 4: 1 }[b ? b.speed : preferredCombatSpeed()] || 1;
+  combatSpeedOverride = autoSpeed;
+  if (b) { b.speed = autoSpeed; refreshControls(); }
+  const button = $('#btn-map-speed');
+  if (button) {
+    button.textContent = `⏩ x${autoSpeed}`;
+    button.setAttribute('aria-label', `Velocidad de combate x${autoSpeed}`);
+  }
 }
 
 // Atajo de teclado: la barra espaciadora cambia el multiplicador de velocidad en combate
 document.addEventListener('keydown', e => {
   if (e.code !== 'Space' && e.key !== ' ') return;
   const t = e.target;
-  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+  if (t && (['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(t.tagName) || t.isContentEditable)) return;
   if (!battle || battle.over) return;
   e.preventDefault(); // evita el scroll de página y "pulsar" el botón enfocado
   cycleBattleSpeed();
@@ -5807,15 +6894,17 @@ function resumeBattle(delay) {
   if (!b || b.over) return;
   b.waiting = false;
   refreshControls();
-  if (b.pendingStep) { const s = b.pendingStep; b.pendingStep = null; setTimeout(s, 500 / b.speed); }
+  if (b.pendingStep) { const s = b.pendingStep; b.pendingStep = null; b.timer = setTimeout(s, 500 / b.speed); }
   else scheduleRound(delay == null ? 900 : delay);
 }
 
 function useBattleItem(id) {
   const item = ITEMS[id];
   const b = battle;
+  if (!isBattleItem(id) || !b || b.over || b.waiting || !(b.items[id] > 0)) return;
   if (item.kind === 'heal') {
     const f = b.curP;
+    if (!f || f.hp <= 0) return toast('No hay un nakama activo consciente.');
     if (f.hp >= f.maxhp) return toast('PS al máximo.');
     b.items[id]--;
     f.hp = Math.min(f.maxhp, f.hp + item.val);
@@ -5828,8 +6917,33 @@ function useBattleItem(id) {
     b.items[id]--;
     f.hp = Math.floor(f.maxhp * item.val);
     log(`¡${charName(f)} vuelve a la lucha! 🍶`);
+  } else if (item.kind === 'battleBoost') {
+    const f = b.curP;
+    if (!f || f.hp <= 0) return toast('No hay un nakama activo consciente.');
+    const buffs = b.itemBuffs.get(f) || {};
+    if (buffs[item.stat]) return toast(`${charName(f)} ya tiene esta mejora durante el combate.`);
+    b.items[id]--;
+    b.itemBuffs.set(f,{...buffs,[item.stat]:item.val});
+    log(`${item.emoji} ${charName(f)} usa ${item.name}: +${item.val * 100}% hasta el final del combate.`);
   }
+  if (!b.tower) saveRun();
+  refreshHPCards();
   refreshControls();
+}
+
+function confirmBattleFlee() {
+  const b = battle;
+  if (!b || b.over || b.waiting || !b.opts.wild || b.tower) return;
+  pauseBattle();
+  let settled = false;
+  const finish = flee => {
+    if (settled || battle !== b || b.over) return;
+    settled = true;
+    if (flee) tryFlee(); else resumeBattle();
+  };
+  modalConfirm('🏃 ¿Intentar huir?',
+    'Si escapas, abandonarás este combate sin su recompensa. La huida tiene un 70 % de probabilidad de éxito; si falla, el combate continúa. ¿Quieres intentarlo?',
+    () => finish(true), () => finish(false));
 }
 
 function tryFlee() {
@@ -5843,9 +6957,24 @@ function tryFlee() {
   }
 }
 
+function enemyLogPoseReward(enemy, opts, sagaIdx) {
+  const kind = opts.boss || CHARS[enemy.id]?.boss ? 'boss' : opts.marine ? 'marine' : 'pirate';
+  return {pirate:3,marine:4,boss:7}[kind] * (sagaIdx + 1);
+}
+function encounterBerries(opts, sagaIdx, islandIdx) {
+  const base = opts.marine ? rnd(240,420) : rnd(80,160);
+  return Math.floor(base * (islandIdx + 1) * (1 + sagaIdx * .25));
+}
+
+function bossFameReward(diff = 1) {
+  const difficulty = DIFFICULTIES.find(d => d.id === diff) || DIFFICULTIES[0];
+  return Math.round(40 * difficulty.mult);
+}
+
 function endBattle(victory, fled, recruited) {
   if (battle && battle.tower) { battle = null; return endTowerBattle(victory); }
   const opts = battle ? battle.opts : {};
+  const bossFame = battle?.bossFameEarned || 0;
   battle = null;
   if (run && run.mode === 'nuzlocke') {
     run.team = run.team.filter(f => f && f.hp > 0);
@@ -5853,30 +6982,38 @@ function endBattle(victory, fled, recruited) {
   const notes = [];
   if (victory) {
     // cada enfrentamiento ganado sube 1 nivel completo a toda la banda viva
-    run.team.forEach(f => { if (f.hp > 0) gainXP(f, Math.max(0, xpForLevel(f.lvl) - f.xp)); });
+    run.team.forEach(f => { if (f.hp > 0) gainXP(f, xpForLevel(f.lvl)); });
     notes.push('⬆️ +1 nivel a la banda');
   }
   if (victory && opts.reward) {
     run.berries += opts.reward;
     notes.push(`+${berriesHTML(opts.reward)}`);
-  } else if (victory && opts.wild && !recruited) {
-    const b = rnd(40, 110) * (run.islandIdx + 1);
+  } else if (victory && (opts.wild || opts.marine) && !recruited) {
+    const b = encounterBerries(opts, run.saga || 0, run.islandIdx);
     run.berries += b;
     notes.push(`+${berriesHTML(b)}`);
   }
   if (notes.length) toast(notes.join(' · '));
   if (victory && opts.crossover) {
+    trackJourneyRewards(30);
     gainFame(30);
     saveRun();
     return crossoverReward(opts.crossover);
   }
   if (victory && opts.boss) {
+    if (run.islandComplete) return screenMap();
+    run.islandComplete = true;
     run.badges.push(run.islandIdx);
+    const completed = completedIslands(run.saga,run.mode,run.diff || 1);
+    meta.islandProgress ||= {};
+    meta.islandProgress[islandProgressKey(run.saga,run.mode,run.diff || 1)] = [...new Set([...completed,run.islandIdx])];
+    meta.lastCompletedIsland = {saga:run.saga, index:run.islandIdx, mode:run.mode, diff:run.diff || 1};
+    meta.totalIslands = (meta.totalIslands || 0)+1;
+    trackSagaStat('islands');
     const newVets = unlockRoster(true);
     if (newVets.length > 0) {
       toast(`🎉 ¡${newVets.map(id => CHARS[id] ? CHARS[id].name : id).join(', ')} desbloqueado/s para tu plantilla permanente!`);
     }
-    gainFame(20);
     const saga = SAGAS[run.saga];
     // Al vencer al jefe de la isla (en modo Clásico), toda la banda (incluyendo caídos) se recupera al 100% de PS
     run.team.forEach(f => { f.hp = f.maxhp; });
@@ -5884,18 +7021,21 @@ function endBattle(victory, fled, recruited) {
       saveRun();
       const diffLevel = (run && run.diff) || 1;
       if (diffLevel === 5) {
-        return offerCrossoverPath(newVets);
+        return offerCrossoverPath(newVets, bossFame);
       }
       return sagaComplete();
     }
-    run.islandIdx++;
-    run.map = genMap(saga.islands[run.islandIdx]);
-    run.pos = null;
-    saveRun();
+    if(finishIslandRepeat('win'))return;
+    const sagaIdx = run.saga, islandIdx = run.islandIdx;
+    storyMode = run.mode; selectedDiff = run.diff || 1;
+    autoMode = false;
+    if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
+    const rewardsHTML = journeyRewardsHTML();
+    clearRun();
     modalInfo('🏅 ¡Emblema conseguido!',
-      `<div class="reward-list">¡Has conquistado la isla!<br>+20 ⭐ Fama<br><br>Rumbo a <b>${saga.islands[run.islandIdx].name}</b> 🧭<br>Tu equipo se recupera durante la travesía.${newVets.length ? `<br><br><small>🏅 Veteranos desbloqueados para futuras aventuras:<br>${newVets.map(id => `${charIcon(id, 16)} ${CHARS[id].name}`).join(' · ')}</small>` : ''
+      `${rewardsHTML}<div class="reward-list">¡Has completado ${saga.islands[islandIdx].name}!<br>+${bossFame} ⭐ Fama<br><br>Desbloqueada: <b>${saga.islands[islandIdx+1].name}</b> 🧭<br>Elige la siguiente isla y prepara tu equipo.${newVets.length ? `<br><br><small>🏅 Nakamas permanentes:<br>${newVets.map(id => `${charIcon(id, 16)} ${CHARS[id].name}`).join(' · ')}</small>` : ''
       }</div>`,
-      screenMap);
+      () => screenIslands(sagaIdx));
     return;
   }
   saveRun();
@@ -5906,7 +7046,7 @@ function endBattle(victory, fled, recruited) {
 // Tras el combate del jefe final en Dificultad Rey Pirata se abre un camino alternativo
 // con un rival reforzado (+50% Daño y Defensa). Al vencerlo, eliges 1 de 3 personajes de 4⭐
 // (o un Boss de 5⭐ si ya tienes todos los de 4⭐).
-function offerCrossoverPath(newVets) {
+function offerCrossoverPath(newVets, bossFame) {
   const rows = run.map.rows;
   const last = rows[rows.length - 1];
   if (!(last && last[0] && last[0].type === 'crossover')) {
@@ -5920,7 +7060,7 @@ function offerCrossoverPath(newVets) {
   ov.innerHTML = `<div class="modal">
     <h2>🏅 ¡Último emblema conseguido!</h2>
     <p style="font-size:9px;text-align:center;line-height:1.9;margin-bottom:10px;">
-      Has vencido al último capitán de la saga. +20 ⭐ Fama<br>
+      Has vencido a los últimos jefes de la saga. +${bossFame} ⭐ Fama<br>
       ${newVets && newVets.length ? `<small>🏅 Veteranos desbloqueados: ${newVets.map(id => CHARS[id].name).join(' · ')}</small><br>` : ''}
       <br>Pero al recoger el emblema en Dificultad Rey Pirata, el aire vibra... Un <b>camino alternativo</b> 🌀
       aparece donde antes no había salida.<br><br>
@@ -5934,7 +7074,8 @@ function offerCrossoverPath(newVets) {
   document.body.appendChild(ov);
   if (autoMode) {
     scheduleAutoStep(() => {
-      const btn = ov.querySelector('#cx-explore');
+      if(autoSettings.crossoverAction==='manual'){pauseAutoForChoice('Decide si quieres explorar el camino alternativo.');return;}
+      const btn = ov.querySelector(autoSettings.crossoverAction==='leave'?'#cx-finish':'#cx-explore');
       if (btn && document.body.contains(ov)) btn.click();
     }, 700);
   }
@@ -5951,13 +7092,13 @@ function doCrossoverEvent(island) {
   // el aire dimensional reconforta: la banda consciente recupera un 50% de PS
   run.team.forEach(f => { if (f.hp > 0) f.hp = Math.min(f.maxhp, f.hp + Math.floor(f.maxhp * 0.5)); });
   saveRun();
-  const lvl = island.bossLvl[island.bossLvl.length - 1] + 1;
+  const lvl = island.bossLvl[island.bossLvl.length - 1] + 50;
   const bossId = pick(s.bosses);
   const escorts = s.bosses.filter(id => id !== bossId)
     .sort(() => Math.random() - 0.5)
     .slice(0, rnd(0, 2));
-  const enemies = escorts.map(id => makeChar(id, Math.max(5, lvl - 2)));
-  const boss = makeChar(bossId, lvl);
+  const enemies = escorts.map(id => makeChar(id, Math.max(5, lvl - 2), false, true));
+  const boss = makeChar(bossId, lvl, false, true);
   // el jefe del crossover recibe +50% en Daño y Defensa
   ['atk', 'def', 'spatk', 'spdef'].forEach(k => { boss[k] = Math.floor(boss[k] * (1 + CROSSOVER_BOOST)); });
   enemies.push(boss);
@@ -5984,7 +7125,8 @@ function doCrossoverEvent(island) {
   document.body.appendChild(ov);
   if (autoMode) {
     scheduleAutoStep(() => {
-      const btn = ov.querySelector('#cx-fight');
+      if(autoSettings.crossoverAction==='manual'){pauseAutoForChoice('Decide si aceptas el duelo crossover.');return;}
+      const btn = ov.querySelector(autoSettings.crossoverAction==='leave'?'#cx-leave':'#cx-fight');
       if (btn && document.body.contains(ov)) btn.click();
     }, 700);
   }
@@ -6023,7 +7165,7 @@ function crossoverReward(key) {
     const c5Series = s.bosses.filter(id => CHARS[id] && (CHARS[id].rareza === 5 || CHARS[id].boss));
     let pending5 = c5Series.filter(id => !meta.roster.includes(id));
     if (!pending5.length) {
-      const c5All = Object.keys(CHARS).filter(id => CHARS[id].saga === 'crossover' && (CHARS[id].rareza === 5 || CHARS[id].boss));
+    const c5All = Object.keys(CHARS).filter(id => !BASE_OF[id] && CHARS[id].saga === 'crossover' && (CHARS[id].rareza === 5 || CHARS[id].boss));
       pending5 = c5All.filter(id => !meta.roster.includes(id));
     }
     if (!pending5.length) pending5 = s.bosses;
@@ -6088,6 +7230,8 @@ function crossoverReward(key) {
 }
 
 function sagaComplete() {
+  if(run?.islandRepeat?.result)return showIslandRepeatCheckpoint(autoMode);
+  const continueRepeat=autoMode;
   autoMode = false;
   if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
   playMusic('menu');
@@ -6108,6 +7252,7 @@ function sagaComplete() {
   });
   if (isAllNakamas) {
     meta.allNakamaWins = (meta.allNakamaWins || 0) + 1;
+    trackSagaStat('all_nakama_wins');
   }
 
   meta.sagaDiffWins = meta.sagaDiffWins || {};
@@ -6122,29 +7267,32 @@ function sagaComplete() {
 
   if (isFirstDiffWin) {
     fameWon = Math.round(baseFame * dObj.mult);
-    rewardMessage = `<div style="color:var(--green);font-size:9px;margin-top:6px;">🎉 ¡Primera victoria en Dificultad ${dObj.emoji} ${dObj.name}! Recompensa completa: +${fameWon} ⭐ Fama</div>`;
+    rewardMessage = `<div style="color:var(--green);font-size:9px;margin-top:6px;">🎉 ¡Primera victoria en Dificultad <span class="native-difficulty">${dObj.emoji}</span> ${dObj.name}! Recompensa completa: +${fameWon} ⭐ Fama</div>`;
   } else {
     fameWon = Math.round(baseFame * dObj.mult * 0.2);
     rewardMessage = `<div style="color:var(--accent);font-size:8px;margin-top:6px;">⚠️ Ya habías conquistado esta saga en Dificultad ${dObj.name}. Recompensa reducida: +${fameWon} ⭐ Fama.<br>¡Cambia a otra dificultad para ganar la recompensa completa!</div>`;
   }
 
+  trackJourneyRewards(fameWon);
   gainFame(fameWon);
 
   // Guarda la banda completa (incluyendo legendarios/jefes) en meta.roster
   const addedLegendaries = unlockRoster(true);
   saveMeta();
-
+  if(finishIslandRepeat('win',continueRepeat))return;
   const team = run.team;
+  const rewardsHTML = journeyRewardsHTML();
   clearRun();
   render(`
     ${topbar(false)}
     <div class="panel" style="text-align:center;">
       <h2>🏴‍☠️ ¡SAGA CONQUISTADA!</h2>
-      <p style="margin:14px 0;">¡Has derrotado a todos los capitanes del ${saga.name} en Dificultad <b>${dObj.emoji} ${dObj.name}</b>!<br>
+      <p style="margin:14px 0;">¡Has derrotado a todos los capitanes del ${saga.name} en Dificultad <b><span class="native-difficulty">${dObj.emoji}</span> ${dObj.name}</b>!<br>
       Tu banda ya es leyenda en este mar.<br><br>
       <span style="font-size:30px;">${team.map(f => charIcon(f.id, 38)).join(' ')}</span><br><br>
       ${team.map(f => `${charName(f)}${f.stars ? ` ⭐${f.stars}` : ''} Nv${f.lvl}`).join(' · ')}<br><br>
       ${rewardMessage}</p>
+      ${rewardsHTML}
       <p style="font-size:9px;color:#666;margin-bottom:14px;">Tus nakamas ${addedLegendaries.length ? '(¡incluyendo legendarios!) ' : ''}quedan disponibles como veteranos para próximas aventuras.<br></p>
       <button class="btn green" id="btn-fin">VOLVER AL PUERTO</button>
     </div>
@@ -6153,13 +7301,18 @@ function sagaComplete() {
 }
 
 function gameOver() {
+  const continueRepeat=autoMode;
   autoMode = false;
   if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
   playMusic('dead');
   battle = null;
+  const retry = islandRetrySpec(run);
   const wasNuz = run && run.mode === 'nuzlocke';
   const consuelo = run ? run.badges.length * 10 : 0;
+  trackJourneyRewards(consuelo);
   if (consuelo) gainFame(consuelo);
+  if(finishIslandRepeat('loss',continueRepeat))return;
+  const rewardsHTML = journeyRewardsHTML();
   clearRun();
   render(`
     ${topbar(false)}
@@ -6168,10 +7321,18 @@ function gameOver() {
       <p style="margin:14px 0;">Toda tu banda ha sido derrotada.<br>
       ${wasNuz ? 'Las reglas Nuzlocke no perdonan...' : 'El mar es implacable, pero siempre puedes volver a zarpar.'}
       ${consuelo ? `<br><br>Tu hazaña no se olvida: +${consuelo} ⭐ Fama` : ''}</p>
-      <button class="btn red" id="btn-fin">VOLVER AL PUERTO</button>
+      ${rewardsHTML}
+      <div class="actions" style="flex-wrap:wrap;justify-content:center;">
+        ${retry ? '<button class="btn green" id="btn-retry-island">🔄 VOLVER A INTENTAR</button>' : ''}
+        <button class="btn red" id="btn-fin">VOLVER AL PUERTO</button>
+      </div>
     </div>
   `);
   $('#btn-fin').onclick = screenHome;
+  if (retry) {
+    let used = false;
+    $('#btn-retry-island').onclick = () => { if (!used) { used = true; retryIsland(retry); } };
+  }
 }
 
 // ============ TORRE MARINE ============
@@ -6184,60 +7345,90 @@ function screenTowerIntro() {
   const start50 = !!(meta.global && meta.global.tower_start50);
   const startFloor = start50 ? 50 : 1;
   const startLvl = start50 ? 65 : 15;
+  const previews = Object.fromEntries(pool.map(id => [id, applyUpgrades(makeChar(id, startLvl))]));
   render(`
     ${topbar(false)}
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
-    <div class="panel">
+    <div class="panel tower-selection">
       <h2>🗼 Torre Marine ${start50 ? '<span style="color:var(--gold);font-size:12px;">(Piso 50)</span>' : ''}</h2>
       <p>Combates automáticos infinitos contra oleadas cada vez más fuertes.
       Elige a <b>3 nakamas desbloqueados</b> (salen a Nv.${startLvl}, con sus mejoras del Barco)
       y recibe 3 Platos de Sanji. ${start50 ? '<b>¡Inicias tu ascenso directamente en el Piso 50!</b>' : '¿Hasta qué piso llegarás?'}</p>
       <p style="margin-top:10px;">Récord actual: <b>${meta.towerRecord}</b> pisos</p>
-      <div class="pick-grid" style="margin-top:12px;">
+      <div class="tower-selection-bar"><div id="tower-picked" aria-live="polite"></div><div id="tower-synergies"></div></div>
+      <label class="tower-search" for="tower-search">Buscar nakama<input type="search" id="tower-search" placeholder="Nombre o tipo"></label>
+      <p id="tower-results" role="status">${pool.length} nakamas disponibles</p>
+      <div class="tower-roster">
         ${pool.map(id => {
-    const c = CHARS[id];
-    return `<div class="pick-row" data-tower="${id}">
-            <span class="emoji">${charIcon(id, 22)}</span>
-            <div class="info"><b>${c.name}</b> ${'⭐'.repeat(c.rareza)}<br><small>${c.types.join(' / ')}</small></div>
-            <span class="tower-check" style="font-size:12px;"></span>
-          </div>`;
+    const f = previews[id], c = CHARS[f.id];
+    return `<button type="button" class="tower-card" data-tower="${id}" aria-pressed="false">
+            <span class="emoji">${charIcon(f.id, 64)}</span>
+            <b>${c.name}</b><span class="tower-rarity">${'⭐'.repeat(c.rareza)} · Nv. ${startLvl}</span>
+            <span class="type-badges">${typeBadges(fighterTypes(f))}</span>
+            <span class="tower-stats">♥ ${f.maxhp} PS · ⚔ ${f.atk} ATQ</span>
+            <span class="tower-check">Añadir al equipo</span>
+          </button>`;
   }).join('')}
       </div>
-      <div class="actions" style="text-align:center;margin-top:14px;">
+      <div class="actions tower-launch" style="text-align:center;margin-top:14px;">
         <button class="btn blue" id="btn-start" disabled>ELIGE 3 NAKAMAS (0/3)</button>
       </div>
     </div>
   `);
   $('#btn-back').onclick = screenHome;
   const startBtn = $('#btn-start');
+  const updateSelection = () => {
+    document.querySelectorAll('[data-tower]').forEach(r => {
+      const selected = picked.includes(r.dataset.tower);
+      r.setAttribute('aria-pressed', String(selected));
+      r.disabled = !selected && picked.length === 3;
+      r.querySelector('.tower-check').textContent = selected ? '✓ Seleccionado · Quitar' : 'Añadir al equipo';
+    });
+    $('#tower-picked').innerHTML = `<b>Tu equipo · ${picked.length}/3</b><div class="tower-picked-slots">${[0,1,2].map(i => picked[i] ? `<button class="btn gray" data-tower-remove="${picked[i]}">${charIcon(previews[picked[i]].id,32)} ${CHARS[previews[picked[i]].id].name} ×</button>` : `<span class="tower-empty-slot">${i+1}. Elige un nakama</span>`).join('')}</div>`;
+    $('#tower-picked').querySelectorAll('[data-tower-remove]').forEach(button => button.onclick = () => {picked.splice(picked.indexOf(button.dataset.towerRemove),1);updateSelection();});
+    $('#tower-synergies').innerHTML = activeSynergiesHTML(picked.map(id => previews[id]));
+    startBtn.disabled = picked.length !== 3;
+    startBtn.textContent = picked.length === 3 ? '¡SUBIR A LA TORRE!' : `ELIGE 3 NAKAMAS (${picked.length}/3)`;
+  };
+  $('#tower-search').oninput = e => {
+    const query = e.target.value.trim().toLocaleLowerCase('es');
+    let visible = 0;
+    document.querySelectorAll('[data-tower]').forEach(card => {
+      const f = previews[card.dataset.tower];
+      card.hidden = !`${CHARS[f.id].name} ${fighterTypes(f).join(' ')}`.toLocaleLowerCase('es').includes(query);
+      if (!card.hidden) visible++;
+    });
+    $('#tower-results').textContent = visible ? `${visible} nakamas disponibles` : 'No hay nakamas con esta búsqueda.';
+  };
   document.querySelectorAll('[data-tower]').forEach(el => {
     el.onclick = () => {
       const id = el.dataset.tower;
       const i = picked.indexOf(id);
       if (i >= 0) picked.splice(i, 1);
       else if (picked.length < 3) picked.push(id);
-      document.querySelectorAll('[data-tower]').forEach(r => {
-        r.querySelector('.tower-check').textContent = picked.includes(r.dataset.tower) ? '✅' : '';
-      });
-      startBtn.disabled = picked.length !== 3;
-      startBtn.textContent = picked.length === 3 ? '¡SUBIR A LA TORRE!' : `ELIGE 3 NAKAMAS (${picked.length}/3)`;
+      updateSelection();
     };
   });
+  updateSelection();
   startBtn.onclick = () => {
     if (picked.length !== 3) return;
     tower = { floor: startFloor, team: picked.map(id => applyUpgrades(makeChar(id, startLvl))), items: { bocadillo: 3, sake: 1 } };
-    towerNextBattle();
+    prepareBackpack(tower);
+    if (hasPendingLoot(tower)) showTowerBackpack(towerNextBattle); else towerNextBattle();
   };
 }
 
 function towerNextBattle() {
+  let highestSaga = 0;
+  SAGAS.forEach((_, i) => { if (sagaUnlocked(i)) highestSaga = i; });
+  const availableSagas = new Set(SAGAS.slice(0, highestSaga + 1).map(s => s.id));
   // sin formas evolucionadas ni personajes del crossover (solo salen en su evento)
-  const pool = Object.keys(CHARS).filter(id => !BASE_OF[id] && CHARS[id].saga !== 'crossover');
+  const pool = Object.keys(CHARS).filter(id => !BASE_OF[id] && availableSagas.has(CHARS[id].saga));
   const lvl = 13 + tower.floor * 2;
   const isBossFloor = tower.floor % 5 === 0;
-  const bossIds = Object.keys(CHARS).filter(id => CHARS[id].boss && CHARS[id].saga !== 'crossover');
+  const bossIds = Object.keys(CHARS).filter(id => CHARS[id].boss && availableSagas.has(CHARS[id].saga));
   const id = isBossFloor ? pick(bossIds) : pick(pool);
-  const enemy = makeChar(id, lvl + (isBossFloor ? 2 : 0));
+  const enemy = makeChar(id, lvl + (isBossFloor ? 2 : 0), false, true);
   startBattle([enemy], {
     wild: false, tower: true,
     intro: `🗼 Piso ${tower.floor} — ¡${CHARS[id].name} te desafía!`,
@@ -6248,14 +7439,14 @@ function endTowerBattle(victory) {
   if (!victory) return towerGameOver();
   tower.team.forEach(f => {
     if (f.hp > 0) {
-      gainXP(f, Math.max(0, xpForLevel(f.lvl) - f.xp)); // +1 nivel por piso
+      gainXP(f, xpForLevel(f.lvl)); // +1 nivel por piso conservando EXP
       gainXP(f, 30 + tower.floor * 6);
       f.hp = Math.min(f.maxhp, f.hp + Math.floor(f.maxhp * 0.3));
     }
   });
   tower.floor++;
-  if (tower.floor % 3 === 0) tower.items.bocadillo = (tower.items.bocadillo || 0) + 1;
-  towerNextBattle();
+  if (tower.floor % 3 === 0) receiveBackpackItem(tower,'bocadillo');
+  if (hasPendingLoot(tower)) showTowerBackpack(towerNextBattle); else towerNextBattle();
 }
 
 function towerGameOver() {
@@ -6306,7 +7497,7 @@ function nextStarterSlotItem() {
       maxed: true,
       name: 'Tamaño Máximo Alcanzado (6 Nakamas)',
       emoji: '👥',
-      desc: 'Has alcanzado el límite máximo de 6 nakamas iniciales (tamaño completo de la banda).',
+      desc: 'Los seis huecos están disponibles.',
       cost: 0,
       lvl: 0,
     };
@@ -6364,8 +7555,7 @@ const UPG_STATS = [
 ];
 let shipBuyLock = 0;
 let shipSearchQ = '';
-let shipExpanded = {};
-let shipSagaExpanded = {};
+const shipTraining = { selected: null, saga: '', teamOnly: false, page: 0 };
 function groupUpgradeRoster(ids) {
   const groups = [...SAGAS.map(s => ({id:s.id,name:s.name})), {id:'crossover',name:'CROSSOVER'}, {id:'other',name:'OTROS'}];
   const known = new Set(groups.map(g => g.id));
@@ -6375,7 +7565,7 @@ function groupUpgradeRoster(ids) {
   })})).filter(g => g.ids.length);
 }
 
-function upgCost(lvl) { return (Math.floor(lvl / 2) + 1) * 30; }
+function upgCost(lvl) { return 30 + lvl * 10; }
 
 function charTotalUpgSpent(id) {
   const u = meta.upgrades[id] || {};
@@ -6419,6 +7609,7 @@ function showSellStatsConfirmModal(id, spent, refund, onConfirm) {
 
 function screenShip() {
   playMusic('menu');
+  if (!run?.team?.length) shipTraining.teamOnly = false;
   const roster = meta.roster.filter(id => CHARS[id]);
   const accLvl = accountLevel();
   const maxLvl = maxUpgLvl();
@@ -6450,23 +7641,29 @@ function screenShip() {
     }
   });
 
-  const q = (shipSearchQ || '').trim().toLowerCase();
-  const filteredRoster = roster.filter(id => {
-    if (!q) return true;
-    return CHARS[id].name.toLowerCase().includes(q);
-  });
-
   render(`
     ${topbar(false)}
-    <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
+    <div class="shop-sticky-bar">
+      <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
+      <output class="shop-fame" aria-label="Fama disponible" aria-live="polite">⭐ ${meta.fame.toLocaleString('es')} Fama</output>
+    </div>
     <div class="panel">
       <h2>🏪 Tienda</h2>
-      <p style="font-size:9px;line-height:1.9;">Gasta ⭐ Fama en mejoras permanentes.
-      La Fama se gana con emblemas (+20), sagas (+100 / +150 en Nuzlocke), pisos de la Torre (+5), Luffy Run (+25 cada 1.000 m)
-      e incluso derrotas honrosas — y cada punto también da PX de cuenta.</p>
-      <div style="text-align:center;font-size:12px;margin:12px 0;color:var(--accent);">
-        ⭐ ${meta.fame} Fama · 👤 Cuenta Nv${accLvl} (${meta.accXp || 0}/${accountNextAt()} PX)
-      </div>
+      <p>Mejoras permanentes · Cuenta Nv${accLvl}</p>
+      <section class="ship-training" aria-label="Entrenamiento de nakamas">
+        <h2>Entrena a tu tripulación</h2>
+        <p>Elige un retrato y mejora sus stats.</p>
+        <div class="training-filters">
+          <input id="ship-search-q" aria-label="Buscar nakama" placeholder="Buscar nakama…" value="${(shipSearchQ || '').replace(/"/g, '&quot;')}">
+          <select id="ship-training-saga" aria-label="Filtrar por saga">
+            <option value="">Todas las sagas</option>
+            ${groupUpgradeRoster(roster).map(g => `<option value="${g.id}" ${shipTraining.saga === g.id ? 'selected' : ''}>${g.name}</option>`).join('')}
+          </select>
+          <button class="btn small gray" id="ship-training-team" aria-pressed="${shipTraining.teamOnly}" ${run?.team?.length ? '' : 'disabled'}>Mi equipo</button>
+        </div>
+        <div id="ship-roster-list"></div>
+      </section>
+
 
       <h2 style="font-size:11px;">👥 Casillas de Nakamas Iniciales</h2>
       <div class="global-upg-row ${nextSlot.maxed ? 'owned' : accLvl < nextSlot.lvl ? 'locked' : ''}">
@@ -6476,7 +7673,7 @@ function screenShip() {
             <b class="upg-name">${nextSlot.name}</b>
             ${nextSlot.maxed ? '' : `<span class="price">⭐${nextSlot.cost}</span>`}
           </div>
-          <div class="upg-desc">${nextSlot.desc} (Actualmente: ${starterSlotsCount()}/6 casillas)</div>
+          <div class="upg-desc">${starterSlotsCount()}/6 huecos disponibles${nextSlot.maxed ? "" : ` · Próximo: ${nextSlot.nextN}`}</div>
         </div>
         <div class="upg-action">
           ${nextSlot.maxed ? `<span class="upg-badge bought">✓ MÁXIMO (6/6)</span>`
@@ -6493,7 +7690,7 @@ function screenShip() {
             <b class="upg-name">${nextCap.name}</b>
             <span class="price">⭐${nextCap.cost}</span>
           </div>
-          <div class="upg-desc">${nextCap.desc} (Límite actual: Nv.${nextCap.curMax})</div>
+          <div class="upg-desc">Entrenamiento: Nv.${nextCap.curMax} → ${nextCap.nextMax}</div>
         </div>
         <div class="upg-action">
           ${accLvl < nextCap.lvl ? `<span class="upg-badge locked">🔒 Cuenta Nv${nextCap.lvl}</span>`
@@ -6503,6 +7700,12 @@ function screenShip() {
 
       <h2 style="font-size:11px;margin-top:14px;">🌍 Añadidos globales</h2>
       <div class="global-upg-grid">
+        <div class="global-upg-row">
+          <span class="upg-emoji">🎒</span><div class="upg-details"><b class="upg-name">Ampliar ambas mochilas</b>
+            <div class="upg-desc">${backpackCapacity()} casillas cada una · Pilas de ${backpackStackLimit()} · ${backpackCapacity() < 60 ? '+3 casillas en cada mochila y +1 unidad por pila' : 'Capacidad máxima'}</div>
+            ${backpackCapacity() < 60 ? `<span class="price">⭐${backpackUpgradeCost()} Fama</span>` : ''}</div>
+          <div class="upg-action"><button class="btn small green" id="btn-buy-backpack" ${backpackCapacity() >= 60 || meta.fame < backpackUpgradeCost() ? 'disabled' : ''}>${backpackCapacity() >= 60 ? 'MÁXIMO' : 'AMPLIAR +3'}</button></div>
+        </div>
         ${availableGlobals.map(([id, it]) => {
         const owned = !!meta.global[id];
         const locked = accLvl < it.lvl;
@@ -6525,38 +7728,48 @@ function screenShip() {
       }).join('')}
       </div>
 
-      <h2 style="font-size:11px;margin-top:16px;">⚓ Mi Barco — Entrenamiento de veteranos</h2>
-      <div style="margin:8px 0;">
-        <input id="ship-search-q" placeholder="🔎 Buscar veterano por nombre..." value="${(shipSearchQ || '').replace(/"/g, '&quot;')}" style="width:100%;padding:8px;border:2px solid var(--ink);font-family:inherit;font-size:9px;background:#fff;">
-      </div>
-      <div id="ship-roster-list"></div>
+
     </div>
   `);
 
   const renderRosterUI = () => {
-    const q = (shipSearchQ || '').trim().toLowerCase();
-    const filteredRoster = roster.filter(id => {
-      if (!q) return true;
-      return CHARS[id].name.toLowerCase().includes(q);
-    });
+    const q = (shipSearchQ || '').trim().toLocaleLowerCase('es');
+    const teamIds = new Set((run?.team || []).map(f => baseFormOf(f.id)));
+    const filteredRoster = groupUpgradeRoster(roster)
+      .filter(g => !shipTraining.saga || g.id === shipTraining.saga)
+      .flatMap(g => g.ids)
+      .filter(id => (!shipTraining.teamOnly || teamIds.has(baseFormOf(id))) && CHARS[id].name.toLocaleLowerCase('es').includes(q));
     const container = $('#ship-roster-list');
     if (!container) return;
+    const pageSize = 8;
+    const pages = Math.max(1, Math.ceil(filteredRoster.length / pageSize));
+    shipTraining.page = Math.min(shipTraining.page, pages - 1);
+    if (!filteredRoster.includes(shipTraining.selected)) shipTraining.selected = filteredRoster[0] || null;
+    const visible = filteredRoster.slice(shipTraining.page * pageSize, (shipTraining.page + 1) * pageSize);
+    const fame = document.querySelector('.shop-fame');
+    if (fame) fame.textContent = `⭐ ${meta.fame.toLocaleString('es')} Fama`;
+    document.querySelectorAll('[data-global],#btn-buy-starter-slot,#btn-buy-capitania').forEach(btn => {
+      const item = btn.dataset.global ? GLOBAL_ITEMS[btn.dataset.global] : btn.id === 'btn-buy-starter-slot' ? nextSlot : nextCap;
+      const can = !item.maxed && !(btn.dataset.global && meta.global[btn.dataset.global]) && accLvl >= item.lvl && meta.fame >= item.cost;
+      btn.disabled = !can;
+      btn.classList.toggle('green', can);
+      btn.classList.toggle('gray', !can);
+    });
 
     const cardHTML = id => {
       const c = CHARS[id];
       const u = meta.upgrades[id] || {};
-      const isExpanded = !!shipExpanded[id];
+      const isExpanded = true;
       const totalStats = UPG_STATS.reduce((acc, [st]) => acc + (u[st] || 0), 0);
       const totalSpent = charTotalUpgSpent(id);
       const refund = Math.floor(totalSpent * 0.5);
       return `<div class="ship-card-acc">
-        <div class="ship-card-header" data-toggle-ship="${id}">
+        <div class="ship-card-header">
           <span class="emoji">${charIcon(id, 28)}</span>
           <div style="flex:1;">
             <b>${c.name}</b> ${typeBadges(c.types)}<br>
             <small style="color:#666;font-size:7px;">Stats mejorados: <b>${totalStats}</b> (Límite: Nv${maxLvl})</small>
           </div>
-          <button class="btn small gray">${isExpanded ? '▲ CERRAR' : '▼ MEJORAR'}</button>
         </div>
         ${isExpanded ? `
           <div class="ship-card-body">
@@ -6567,9 +7780,9 @@ function screenShip() {
         const maxed = lvl >= maxLvl;
         const can = !maxed && meta.fame >= cost;
         return `<div class="upg">
-                  <span class="upg-label">${label} ${lvl}/${maxLvl}</span>
+                  <span class="upg-label">${label} ${lvl}/${maxLvl}</span><small class="training-gain">${desc}</small>
                   <button class="btn small ${can ? 'green' : 'gray'}" data-up="${id}" data-stat="${stat}"
-                    title="${desc}" ${can ? '' : 'disabled'}>${maxed ? 'MÁX' : `⭐${cost}`}</button>
+                    aria-label="Mejorar ${label} de ${c.name}: ${desc}, ${cost} Fama" title="${desc}" ${can ? '' : 'disabled'}>${maxed ? 'MÁX' : `⭐${cost}`}</button>
                 </div>`;
       }).join('')}
             </div>
@@ -6587,21 +7800,33 @@ function screenShip() {
         ` : ''}
       </div>`;
     };
-    const groups = groupUpgradeRoster(filteredRoster);
-    container.innerHTML = groups.length ? groups.map((group, index) => `
-      <details class="ship-saga" data-upgrade-saga="${group.id}" ${(q || shipSagaExpanded[group.id] === true || (shipSagaExpanded[group.id] === undefined && index === 0)) ? 'open' : ''}>
-        <summary><span>${group.name}</span><span>${group.ids.length} ${group.ids.length === 1 ? 'nakama' : 'nakamas'}</span></summary>
-        <div class="ship-saga-list">${group.ids.map(cardHTML).join('')}</div>
-      </details>`).join('') : '<p>No se han encontrado veteranos con ese nombre.</p>';
-    container.querySelectorAll('[data-upgrade-saga]').forEach(section => {
-      section.ontoggle = () => { shipSagaExpanded[section.dataset.upgradeSaga] = section.open; };
-    });
-
-    container.querySelectorAll('[data-toggle-ship]').forEach(hdr => {
-      hdr.onclick = () => {
-        const id = hdr.dataset.toggleShip;
-        shipExpanded[id] = !shipExpanded[id];
+    container.innerHTML = `<div class="training-layout">
+      <div class="training-picker">
+        <div class="training-portraits">${visible.map(id => `<button type="button" class="training-portrait" data-train="${id}" aria-pressed="${id === shipTraining.selected}">
+          ${charIcon(id,48)}<span>${CHARS[id].name}</span><small>${'⭐'.repeat(CHARS[id].rareza)}</small>
+        </button>`).join('') || '<p>No hay nakamas con estos filtros.</p>'}</div>
+        <nav class="training-pages" aria-label="Páginas de nakamas">
+          <button class="btn small gray" data-training-page="-1" aria-label="Página anterior" ${shipTraining.page === 0 ? 'disabled' : ''}>←</button>
+          <span aria-live="polite">${shipTraining.page + 1} / ${pages} · ${filteredRoster.length} nakamas</span>
+          <button class="btn small gray" data-training-page="1" aria-label="Página siguiente" ${shipTraining.page >= pages - 1 ? 'disabled' : ''}>→</button>
+        </nav>
+      </div>
+      <div class="training-detail" aria-label="Stats del nakama seleccionado">${shipTraining.selected ? cardHTML(shipTraining.selected) : '<p>Cambia los filtros para elegir un nakama.</p>'}</div>
+    </div>`;
+    container.querySelectorAll('[data-train]').forEach(btn => {
+      btn.onclick = () => {
+        shipTraining.selected = btn.dataset.train;
         renderRosterUI();
+        container.querySelector(`[data-train="${shipTraining.selected}"]`)?.focus({preventScroll:true});
+      };
+    });
+    container.querySelectorAll('[data-training-page]').forEach(btn => {
+      btn.onclick = () => {
+        const direction = btn.dataset.trainingPage;
+        shipTraining.page += Number(direction);
+        renderRosterUI();
+        const next = container.querySelector(`[data-training-page="${direction}"]`);
+        (next?.disabled ? container.querySelector('[data-train]') : next)?.focus({preventScroll:true});
       };
     });
 
@@ -6620,7 +7845,8 @@ function screenShip() {
         u[stat] = lvl + 1;
         saveMeta();
         toast(`✨ ${CHARS[id].name}: ${stat.toUpperCase()} sube a Nv.${u[stat]}`);
-        screenShip();
+        renderRosterUI();
+        container.querySelector(`[data-up="${id}"][data-stat="${stat}"]`)?.focus({preventScroll:true});
       };
     });
 
@@ -6637,7 +7863,7 @@ function screenShip() {
           delete meta.upgrades[id];
           saveMeta();
           toast(`💰 Has recibido ⭐${refund} Fama al vender las mejoras de ${c.name}.`);
-          screenShip();
+          renderRosterUI();
         });
       };
     });
@@ -6647,8 +7873,23 @@ function screenShip() {
 
   $('#btn-back').onclick = screenHome;
   const searchInput = $('#ship-search-q');
-  if (searchInput) searchInput.oninput = e => { shipSearchQ = e.target.value; renderRosterUI(); };
+  if (searchInput) searchInput.oninput = e => { shipSearchQ = e.target.value; shipTraining.page = 0; renderRosterUI(); };
+  $('#ship-training-saga').onchange = e => { shipTraining.saga = e.target.value; shipTraining.page = 0; renderRosterUI(); };
+  $('#ship-training-team').onclick = e => {
+    shipTraining.teamOnly = !shipTraining.teamOnly;
+    shipTraining.page = 0;
+    e.currentTarget.setAttribute('aria-pressed', String(shipTraining.teamOnly));
+    renderRosterUI();
+  };
 
+  const backpackBtn = $('#btn-buy-backpack');
+  if (backpackBtn) backpackBtn.onclick = () => {
+    if (Date.now() - shipBuyLock < 300) return;
+    shipBuyLock = Date.now();
+    if (!buyBackpackUpgrade()) return;
+    screenShip();
+    toast(`🎒 Ambas mochilas ampliadas a ${backpackCapacity()} casillas cada una y pilas de ${backpackStackLimit()}.`);
+  };
   const buySlotBtn = $('#btn-buy-starter-slot');
   if (buySlotBtn) {
     buySlotBtn.onclick = () => {
@@ -6697,30 +7938,6 @@ function screenShip() {
     };
   });
 
-  document.querySelectorAll('[data-toggle-ship]').forEach(el => {
-    el.onclick = () => {
-      const id = el.dataset.toggleShip;
-      shipExpanded[id] = !shipExpanded[id];
-      screenShip();
-    };
-  });
-
-  document.querySelectorAll('[data-up]').forEach(btn => {
-    btn.onclick = () => {
-      if (Date.now() - shipBuyLock < 300) return;
-      shipBuyLock = Date.now();
-      const id = btn.dataset.up, stat = btn.dataset.stat;
-      const u = meta.upgrades[id] = meta.upgrades[id] || {};
-      const lvl = u[stat] || 0;
-      const cost = upgCost(lvl);
-      if (lvl >= maxLvl || meta.fame < cost) return;
-      meta.fame -= cost;
-      u[stat] = lvl + 1;
-      saveMeta();
-      toast(`${CHARS[id].name}: ${stat.toUpperCase()} mejorado ⭐`);
-      screenShip();
-    };
-  });
 }
 
 // ============ DEX PIRATA ============
@@ -6734,7 +7951,7 @@ function dexCardHTML(id) {
   return `<div class="dex-card ${seen ? 'seen' : 'unknown'}" data-id="${id}">
     <div class="emoji">${seen ? charIcon(id, 46) : '❔'}</div>
     <div>${c.name}</div>
-    <div style="font-size:7px;">${'⭐'.repeat(c.rareza)}</div>
+    <div class="dex-rarity" style="font-size:7px;" aria-label="Rareza ${c.rareza} de 5 estrellas"><span class="dex-rarity-full" aria-hidden="true">${'⭐'.repeat(c.rareza)}</span><span class="dex-rarity-compact" aria-hidden="true">★ ${c.rareza}/5</span></div>
     ${vet ? '<div style="color:var(--accent)">🏅 veterano</div>' : got ? '<div style="color:var(--green)">✓ nakama</div>' : (seen ? '<div style="color:#999">visto</div>' : '<div style="color:#aaa">sin avistar</div>')}
   </div>`;
 }
@@ -6746,11 +7963,11 @@ function screenDex() {
   render(`
     ${topbar(false)}
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
-    <div class="panel">
-      <h2>📖 Dex Pirata — ${meta.dex.length}/${all.length} avistados, ${meta.recruited.length} reclutados</h2>
+    <div class="panel pirate-dex">
+      <header class="dex-header"><h2>📖 Dex Pirata</h2><div class="dex-progress" aria-label="Progreso de la colección"><span><strong>${meta.dex.length} <small>/ ${all.length}</small></strong>Avistados</span><span><strong>${meta.recruited.length}</strong>Reclutados</span></div></header>
       ${charControlsHTML(dexView, { sagas: sagaOpts })}
       <div id="char-grid"></div>
-      <div style="font-size:8px;color:#888;margin-top:10px;text-align:center;">Toca un personaje avistado para ver su ficha completa. Los no avistados solo muestran su nombre.</div>
+      <p class="dex-help">Toca un personaje avistado para abrir su ficha. Los no avistados solo muestran su nombre.</p>
     </div>
   `);
   $('#btn-back').onclick = screenHome;

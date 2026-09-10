@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="700" viewBox="0 0 1200 700">
+  <defs>
+    <linearGradient id="sea" x2="0" y2="1"><stop stop-color="#adcfc7"/><stop offset=".5" stop-color="#82bbc3"/><stop offset="1" stop-color="#a3c8bb"/></linearGradient>
+    <pattern id="grid" width="70" height="70" patternUnits="userSpaceOnUse"><path d="M70 0H0V70" fill="none" stroke="#ecedcb" stroke-opacity=".22"/></pattern>
+    <pattern id="waves" width="90" height="66" patternUnits="userSpaceOnUse"><path d="M12 28q8 7 16 0m0 0q8 7 16 0M58 53q7 6 14 0" fill="none" stroke="#326d77" stroke-opacity=".15" stroke-width="1.5"/></pattern>
+    <pattern id="rock" width="18" height="18" patternUnits="userSpaceOnUse" patternTransform="rotate(25)"><rect width="18" height="18" fill="#af7760"/><path d="M0 0V18M7 0V18" stroke="#f6d49e" stroke-opacity=".3" stroke-width="2"/></pattern>
+    <radialGradient id="vignette"><stop offset=".5" stop-color="#305957" stop-opacity="0"/><stop offset="1" stop-color="#305957" stop-opacity=".2"/></radialGradient>
+  </defs>
+  <path fill="url(#sea)" d="M0 0H1200V700H0Z"/>
+  <path d="M-30 140Q530 -30 1230 110L1230 190Q530 50-30 220Z M-30 540Q640 670 1230 470L1230 560Q640 760-30 630Z" fill="#d1d8b4" opacity=".27"/>
+  <path fill="url(#grid)" d="M0 0H1200V700H0Z"/><path fill="url(#waves)" d="M0 0H1200V700H0Z"/>
+  <path d="M-16 0H14L32 54 22 107 40 160 23 219 42 288 28 350 45 412 33 460 48 520 31 585 45 642 29 700H-16Z M1170 0H1200V700H1158L1173 645 1156 590 1177 520 1162 460 1175 404 1162 348 1183 282 1168 224 1181 162 1168 99 1180 43Z" fill="url(#rock)" stroke="#dfc895" stroke-width="4"/>
+  <g transform="translate(1035 120)" opacity=".45" stroke="#315d63">
+    <circle r="57" fill="none"/><circle r="46" fill="none" stroke-dasharray="2 5"/>
+    <path d="M0-73 11-11 0 0-11-11Z M73 0 11 11 0 0 11-11Z M0 73-11 11 0 0 11 11Z M-73 0-11-11 0 0-11 11Z" fill="#385e5d"/>
+    <path d="M0-73 0 0 11-11Z M73 0 0 0 11 11Z M0 73 0 0-11 11Z M-73 0 0 0-11-11Z" fill="#f3e8bd"/>
+    <circle r="5" fill="#f6e5b3"/><text y="-84" text-anchor="middle" fill="#315d63" stroke="none" font-family="Georgia,serif" font-size="18">N</text>
+  </g>
+  <path fill="url(#vignette)" d="M0 0H1200V700H0Z"/>
+</svg>

@@ -15,13 +15,14 @@ export function combatHarness(source='public') {
   exec(fs.readFileSync(source+'/data.js','utf8'));
   exec(fs.readFileSync(source+'/game.js','utf8').split('// ============ INICIO ============')[0]);
   exec(`
+    const originalEndBattle=endBattle;
     log=()=>{};toast=()=>{};refreshHPCards=()=>{};popDamage=()=>{};playMusic=()=>{};
     renderBattle=()=>{};renderBattlePreserveLog=()=>{};refreshControls=()=>{};
     saveMeta=()=>{};registerDex=()=>{};autoMode=false;
     let auditResult=null;
     endBattle=()=>{auditResult='win';};gameOver=()=>{auditResult='loss';};towerGameOver=gameOver;
   `);
-  return {exec,ctx,randomCalls:()=>randomCalls,
+  return {exec,ctx,randomCalls:()=>randomCalls,tick(){const task=queue.shift();if(task)task.fn();return !!task;},pending:()=>queue.length,
     duel(p,e,level=20,options={}) {
       seed=options.seed??1776;queue=[];
       ctx.auditSpec={p:Array.isArray(p)?p:[p],e:Array.isArray(e)?e:[e],level,...options};

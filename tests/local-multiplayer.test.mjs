@@ -21,6 +21,8 @@ test('local combat supports 1/3/6 teams without changing story, meta, timers or 
   const before = h.exec('JSON.stringify({run,meta,battle})');
   for (const size of [1, 3, 6]) {
     const b = api.create([player('host', size), player(guestId(1), size)]);
+    assert.deepEqual(Array.from(b.pTeam, f => f.id), player('host', size).team);
+    assert.deepEqual(Array.from(b.eTeam, f => f.id), player(guestId(1), size).team);
     assert.equal(b.pTeam[0].maxhp, b.eTeam[0].maxhp);
     for (let step = 0; !b.over && step < 500; step++) api.tick(b);
     assert.ok(b.over); assert.ok(['p', 'e', 'draw'].includes(b.winner));

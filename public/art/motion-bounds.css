@@ -430,7 +430,7 @@
 [data-character="joyboy"]{--motion-fit-x:0.72427215;--motion-fit-y:1.06217346;--motion-floor:0.14589900;--motion-center:0.00000000}
 [data-character="lili"]{--motion-fit-x:0.60638906;--motion-fit-y:0.98530503;--motion-floor:0.17493854;--motion-center:0.00000000}
 [data-character="emeth"]{--motion-fit-x:0.77886705;--motion-fit-y:1.05328041;--motion-floor:0.13485300;--motion-center:0.00000000}
-[data-character="naruto"]{--motion-fit-x:0.64416272;--motion-fit-y:1.01766543;--motion-floor:0.16403500;--motion-center:0.00000000}
+:is([data-character="naruto"],[data-character="narutokurama"]){--motion-fit-x:0.64416272;--motion-fit-y:1.01766543;--motion-floor:0.16403500;--motion-center:0.00000000}
 [data-character="sasuke"]{--motion-fit-x:0.66444136;--motion-fit-y:1.02773980;--motion-floor:0.15818668;--motion-center:0.00000000}
 [data-character="kakashi"]{--motion-fit-x:0.53819879;--motion-fit-y:0.90917113;--motion-floor:0.19780719;--motion-center:0.00000000}
 [data-character="madara"]{--motion-fit-x:0.59214839;--motion-fit-y:0.99283576;--motion-floor:0.18085604;--motion-center:-0.00314465}
@@ -456,3 +456,6 @@
 [data-character="genos"]{--motion-fit-x:0.60961947;--motion-fit-y:0.98165024;--motion-floor:0.17352581;--motion-center:-0.00300300}
 [data-character="garou"]{--motion-fit-x:0.55292217;--motion-fit-y:0.95300925;--motion-floor:0.19443292;--motion-center:0.00000000}
 [data-character="tatsumaki"]{--motion-fit-x:0.58071119;--motion-fit-y:0.94784457;--motion-floor:0.18247398;--motion-center:0.00000000}
+[data-character="luffy3"]{--motion-fit-x:0.61079273;--motion-fit-y:1.00758956;--motion-floor:0.18089397;--motion-center:-0.00330033}
+[data-character="luffy4"]{--motion-fit-x:0.52560878;--motion-fit-y:0.81446770;--motion-floor:0.19911215;--motion-center:-0.00366972}
+[data-character="luffy5"]{--motion-fit-x:0.60603197;--motion-fit-y:0.97438737;--motion-floor:0.17469325;--motion-center:-0.00317460}

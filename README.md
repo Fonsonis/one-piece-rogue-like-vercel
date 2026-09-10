@@ -29,7 +29,7 @@ Las redes de invitados con aislamiento, VPN, restricciones de red local y cierto
 
 ### Abrir el juego sin internet
 
-En el menú, **Preparar juego sin internet → Descargar / actualizar** almacena los recursos (~86 MB) en ese navegador. Espera la confirmación de descarga completa. Después abre **la misma dirección**; para multijugador sigue haciendo falta una red local, aunque no tenga acceso a internet. Una copia descargada se sirve desde caché sin consultar servicios de fuentes externos. Las actualizaciones se descargan con el mismo botón; una descarga fallida conserva la copia anterior.
+En el menú, **Preparar juego sin internet → Descargar / actualizar** almacena los recursos (~94 MB) en ese navegador. Espera la confirmación de descarga completa. Después abre **la misma dirección**; para multijugador sigue haciendo falta una red local, aunque no tenga acceso a internet. Una copia descargada se sirve desde caché sin consultar servicios de fuentes externos. Las actualizaciones se descargan con el mismo botón; una descarga fallida conserva la copia anterior.
 
 El navegador puede desalojar los recursos por falta de espacio. Conserva una exportación JSON independiente del progreso. Esta función registra un service worker únicamente al solicitar la descarga; no precarga archivos ni sustituye el guardado sin pulsar el botón.
 
@@ -57,6 +57,26 @@ npm start
 
 No abras el HTML con `file://`: Luffy Run carga módulos y recursos mediante HTTP.
 
+## Tripulación y relevo
+
+El combate mantiene un activo por bando y muestra la tripulación sobre los controles. Toca una reserva viva para hacer **un relevo manual por combate**, también en Torre Marine. El relevo es inmediato, conserva PS, estados y carga de Ultimate, y no añade ataques: el siguiente golpe pendiente usa al nuevo activo. Las sustituciones automáticas por derrota no gastan este relevo. Cada encuentro recupera su uso; el orden del equipo para el siguiente combate se conserva.
+
+Las fichas de combate y del equipo dan más espacio a los sprites. Los activos aparecen enfrentados, uno al lado del otro también en móvil, con vida, Ultimate y EXP encima y estadísticas debajo. Los logros se filtran mediante un desplegable y muestran la recompensa debajo del texto; el control de música también queda debajo de su descripción.
+
+Cada bando indica los personajes en pie sobre el total inicial del encuentro (por ejemplo, `3/4 en pie`). El denominador se conserva también cuando Nuzlocke elimina a un aliado. Bajo las fichas compactas aparecen la tripulación, los mensajes y tres filas de controles: objetos; bandas, velocidad y sinergias; huir o rendirse cuando esté disponible. Sin objetos se muestra un aviso en su fila. Las animaciones conservan las cuatro poses, con límites ajustados al atlas y sin desplazamientos ni giros adicionales para dar más tamaño al sprite. Si se actualizan los atlas, regenera primero los límites de movimiento y después ejecuta `node scripts/compact-sprite-bounds.mjs`.
+
+## Islas y expediciones
+
+Al elegir saga aparece su mapa de islas antes de preparar el equipo. Cada isla tiene entre 3 y 5 mapas de nodos (`min(5, max(3, 2 + número de jefes definidos))`), con combates y eventos. Los mapas intermedios terminan en una salida; solo el último contiene el encuentro de jefe. Los niveles, estadísticas y curvas de enemigos existentes se conservan.
+
+La banda mantiene PS, objetos y progreso entre mapas. **Los reclutas de la expedición solo se desbloquean permanentemente al completar la isla**, si siguen en la banda. Una derrota o un abandono previo no los añade a la plantilla. Los carteles comprados en el puerto con Log Poses conservan su desbloqueo directo.
+
+Vencer al jefe desbloquea la siguiente isla y permite preparar otro equipo. El progreso de islas se guarda por saga, modo y dificultad; las sagas ya conquistadas conservan sus islas disponibles. Un viaje antiguo continúa en su mapa guardado, tratado como último mapa de la isla, sin regenerarlo.
+
+Las sinergias se activan con 2 miembros vivos del mismo tag (nivel I) y 3 o más (nivel II). Con 6/6, sus bonus numéricos se multiplican por 1,4: un 25 % pasa al 35 %. Las inmunidades y protecciones garantizadas no se duplican.
+
+Huir requiere confirmación y pausa el combate mientras se decide. Los sprites de combate se centran sobre la sombra y pueden sobresalir de sus fichas; las notificaciones aparecen en horizontal arriba. Los carteles del evento especial usan papel envejecido y estrellas doradas.
+
 ## Guardado en el dispositivo
 
 - **💾**: sobrescribe un único documento JSON en el almacenamiento local del navegador, bajo la clave `oplike_save`. No descarga archivos ni envía datos a un servidor.
@@ -65,7 +85,7 @@ No abras el HTML con `file://`: Luffy Run carga módulos y recursos mediante HTT
 - **Importar JSON**: tras confirmar, valida el archivo y sustituye el progreso del dispositivo. Un archivo inválido o un fallo de escritura conserva la partida anterior.
 - Se recuperan las antiguas claves locales `oplike_meta` y `oplike_run` si todavía no existe el nuevo guardado. Las copias JSON con `game: "grandlinelike"` y `version: 1` siguen siendo compatibles. No hay inicio de sesión ni recuperación desde servidores antiguos.
 - En Ajustes puedes elegir aspecto claro/oscuro y 2 o 3 columnas de nakamas en móvil. Estas preferencias viajan en el mismo JSON local.
-- Luffy Run se desbloquea a nivel 30 de cuenta: máximo dos saltos antes de aterrizar y 25 de fama por cada 1.000 metros completos de una carrera. Los golpes suman puntos, pero no metros ni fama adicional. La recompensa se guarda al alcanzar el tramo; empezar otra carrera reinicia la distancia.
+- Luffy Run está disponible desde el nivel 1 de cuenta: máximo dos saltos antes de aterrizar y 25 de fama por cada 1.000 metros completos de una carrera. Los golpes suman puntos, pero no metros ni fama adicional. La recompensa se guarda al alcanzar el tramo; empezar otra carrera reinicia la distancia.
 - La tienda agrupa las mejoras de veteranos en listas desplegables por saga, con búsqueda por nombre.
 - Los récords y recompensas de Torre Marine, Desafíos y Luffy Run se conservan en el progreso permanente. Sus sesiones en curso siguen siendo temporales, como en el motor original.
 

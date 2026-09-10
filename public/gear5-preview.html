@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gear 5 · Prueba de animación</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#102532;color:#f8eed5;font:16px system-ui;min-height:100vh;display:grid;place-items:center;padding:20px}main{width:min(840px,100%)}h1{margin:0;font-size:28px}p{color:#b7cbd4;line-height:1.5}canvas{display:block;width:100%;aspect-ratio:2/1;background:radial-gradient(ellipse at bottom,#365660,#122a38);border:1px solid #52727e;border-radius:16px;image-rendering:pixelated}.controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:18px 0}button,select{font:inherit;border:1px solid #c9ad69;border-radius:8px;background:#f5d78c;color:#182b35;padding:10px 16px;cursor:pointer}label{display:flex;align-items:center;gap:10px}input{accent-color:#f5d78c;flex:1;min-width:80px}.scrub{width:100%}output{min-width:40px}a{color:#f5d78c}button:disabled{opacity:.5}
+</style>
+<main>
+<h1>Luffy · Gear 5</h1>
+<p>Crece, levanta la pierna y da un pisotón. Puedes detener la animación y examinar cada instante.</p>
+<canvas width="840" height="420" aria-label="Vista de la ultimate de Gear 5 contra Kaido"></canvas>
+<div class="controls">
+<button id="play" disabled>Reproducir</button>
+<label>Velocidad <select id="speed"><option value="1">Normal</option><option value="0.35">Cámara lenta</option></select></label>
+<label class="scrub">Fotograma <input id="frame" type="range" min="0" max="1000" value="0"><output id="percent">0 %</output></label>
+</div>
+<p id="status" role="status">Cargando sprites…</p>
+<a href="/">Volver al juego</a>
+</main>
+<script src="/data.js"></script>
+<script src="/art/ultimates/profiles.js"></script>
+<script src="/art/ultimates/effects.js"></script>
+<script>
+(async()=>{
+const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d');
+const play=document.querySelector('#play'),frame=document.querySelector('#frame'),speed=document.querySelector('#speed'),status=document.querySelector('#status');
+const [sprite,enemy]=await Promise.all([UltimateFX.loadSprite('luffy5'),UltimateFX.loadSprite('kaido')]);
+if(!sprite||!enemy||!ctx){status.textContent='No se pudieron cargar los sprites. Recarga la página.';return;}
+const profile=UltimateArtProfiles.resolve('luffy5',CHARS.luffy5,MOVES.bajranggun);
+let progress=0,running=false,last=0,raf=0;
+function draw(){UltimateFX.drawFrame(ctx,profile,progress,{width:840,height:420,sprite,actor:{x:165,y:390,size:165},defender:{image:enemy,x:660,y:390,size:165}});frame.value=Math.round(progress*1000);document.querySelector('#percent').value=Math.round(progress*100)+' %';}
+function stop(){running=false;cancelAnimationFrame(raf);play.textContent='Reproducir';}
+function tick(now){if(!running)return;if(last)progress=Math.min(1,progress+(now-last)/2400*Number(speed.value));last=now;draw();if(progress>=1)stop();else raf=requestAnimationFrame(tick);}
+play.onclick=()=>{if(running){stop();return;}if(progress>=1)progress=0;running=true;last=0;play.textContent='Pausar';raf=requestAnimationFrame(tick);};
+frame.oninput=()=>{stop();progress=Number(frame.value)/1000;draw();};
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stop();});
+play.disabled=false;status.textContent='Vista de prueba independiente: no modifica tu partida.';draw();
+})();
+</script>
+</html>

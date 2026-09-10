@@ -7,7 +7,7 @@ import {RunnerEngine} from '../public/runner/engine.mjs';
 function harness(memory = new Map(), blocked = false) {
   const messages = [], nodes = new Map();
   const node = () => ({onclick:null, innerHTML:'', textContent:'', remove(){}, appendChild(){}, classList:{add(){},remove(){}}, querySelector(){return node();}});
-  const ctx = vm.createContext({console, setTimeout(){return 1;},clearTimeout(){},
+  const ctx = vm.createContext({console, Blob, window:{async showSaveFilePicker(){throw {name:'AbortError'};}}, setTimeout(){return 1;},clearTimeout(){},
     document:{querySelector(selector){if(!nodes.has(selector))nodes.set(selector,node());return nodes.get(selector);}, getElementById(){return null;},addEventListener(){}, createElement:node,body:node()},
     localStorage:{getItem(k){if(blocked)throw Error('Denied');return memory.get(k)??null;},setItem(k,v){if(blocked)throw Error('Quota');memory.set(k,v);}},
     FileReader: class {readAsText(file){this.result=file.text;this.onload();}}
@@ -20,6 +20,18 @@ function harness(memory = new Map(), blocked = false) {
   }`);
   return {run,memory,messages,ctx};
 }
+
+test('imports resolve evolution against imported permanent levels, independently of the current profile',()=>{
+ for(const [currentLevel,importedLevel,expected] of [[100,15,'luffy'],[15,35,'luffy3']]){
+  const h=harness();
+  h.run(`meta.charUpgrades={luffy:${currentLevel-5}};meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));
+   const incoming=GameSaveStorage.payload({...meta,charUpgrades:{luffy:${importedLevel-5}}},{...sampleRun(),team:[makeChar('luffy5',100,true)]});
+   importSaveFile({size:100,text:JSON.stringify(incoming)});`);
+  assert.equal(h.run('run.team[0].id'),expected);
+  assert.equal(h.run('startLvlOf("luffy")'),importedLevel);
+  assert.equal(JSON.parse(h.memory.get('oplike_save')).run.team[0].id,expected);
+ }
+});
 
 test('manual save overwrites a single JSON and a fresh game restores all progress',()=>{
   const h=harness();
@@ -34,6 +46,29 @@ test('manual save overwrites a single JSON and a fresh game restores all progres
   assert.equal(restored.run('run.berries'),444);
   assert.equal(restored.run('run.team[0].id'),'luffy');
   restored.run('GameSaveStorage.validate(loadedSave);validateGameSave(loadedSave);');
+});
+
+test('Guardar opens the JSON location picker and writes the current game to the selected file',async()=>{
+ const h=harness();let options,contents,closed=false;
+ h.ctx.window.showSaveFilePicker=async opts=>{options=opts;return {createWritable:async()=>({write:async blob=>{contents=await blob.text();},close:async()=>{closed=true;}})};};
+ await h.run('run=sampleRun();meta.fame=125;manualSave();');
+ assert.equal(options.suggestedName,'grandlinelike.json');
+ assert.equal(options.types[0].accept['application/json'][0],'.json');
+ assert.equal(JSON.parse(contents).meta.fame,125);
+ assert.equal(JSON.parse(contents).run.berries,300);
+ assert.equal(closed,true);
+ assert.equal(JSON.parse(h.memory.get('oplike_save')).meta.fame,125);
+});
+
+test('canceling the picker keeps the local save, and file saving works when local storage is unavailable',async()=>{
+ const h=harness();await h.run('run=sampleRun();manualSave();');
+ assert.ok(h.memory.has('oplike_save'));
+ assert.ok(!h.messages.some(m=>m.includes('No se pudo guardar el JSON')));
+ const blocked=harness(new Map(),true);let written=false;
+ blocked.ctx.window.showSaveFilePicker=async()=>({createWritable:async()=>({write:async()=>{written=true;},close:async()=>{}})});
+ // The explicit write is authorized even when there is no readable browser storage.
+ blocked.run('saveReadError=false;');
+ await blocked.run('manualSave();');assert.equal(written,true);
 });
 
 test('legacy local saves migrate without deleting the old copy; JSON remains compatible',()=>{
@@ -132,7 +167,7 @@ test('upgrade saga groups cover every owned character once and in saga order',()
  const h=harness();
  const groups=JSON.parse(h.run('JSON.stringify(groupUpgradeRoster(Object.keys(CHARS)))'));
  const ids=groups.flatMap(g=>g.ids);
- assert.equal(ids.length,457);assert.equal(new Set(ids).size,457);
+ assert.equal(ids.length,h.run('Object.keys(CHARS).length'));assert.equal(new Set(ids).size,ids.length);
  assert.equal(groups[0].id,'eastblue');assert.equal(groups.at(-1).id,'crossover');
  assert.deepEqual(JSON.parse(h.run('JSON.stringify(groupUpgradeRoster([]))')),[]);
 });
