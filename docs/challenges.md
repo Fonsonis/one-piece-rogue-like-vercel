@@ -18,7 +18,7 @@ Cada una de las 426 identidades del catálogo tiene su reliquia; las 71 transfor
 
 Todas las reliquias conceden +10% ATQ, ESP.ATQ, DEF, ESP.DEF y VEL a cualquier portador. La pasiva adicional solo funciona con su identidad afín. Las curaciones respetan el Clímax y las auras necesitan que su portador siga vivo. Los multiplicadores se calculan durante el combate y no se acumulan sobre las estadísticas guardadas. Las reliquias no afectan al multijugador local.
 
-El campeón de Leyendas elige una entre tres reliquias: se priorizan las afinidades de su pareja y las identidades que aún no tenga en su colección. Cuando tiene toda la colección, se registran copias adicionales. Un personaje tiene un hueco y cada ID de reliquia solo puede estar equipado en un portador simultáneamente. El menú Reliquias permite equipar en cualquier nakama desbloqueado o dejar sin equipar; los cambios se aplican al siguiente combate.
+El campeón de Leyendas elige una entre tres reliquias: se priorizan las afinidades de su pareja y las identidades que aún no tenga en su colección. Cuando tiene toda la colección, se registran copias adicionales. Un personaje tiene un hueco y cada ID de reliquia solo puede estar equipado en un portador simultáneamente. El acceso «Reliquias · Ver y equipar» del Inventario abre la colección con búsqueda por nombre o afinidad, páginas de 12 reliquias, efectos y selector de portador (la afinidad aparece primero). Permite equipar en cualquier nakama desbloqueado, mover una reliquia, sustituir la que lleve o dejarla sin equipar; los cambios se guardan y se aplican al siguiente combate. Cada tarjeta de nakama muestra su reliquia y si tiene afinidad activa. Cerrar la colección conserva los filtros, página y desplazamiento del inventario y devuelve el foco al acceso. Desafíos y su premio abren el mismo diálogo, que vuelve al punto de origen; durante el combate solo permite consultar.
 
 ## Validación
 
@@ -27,3 +27,5 @@ El campeón de Leyendas elige una entre tres reliquias: se priorizan las afinida
 - `PLAYWRIGHT_MODULE=/ruta/a/playwright node tests/browser-challenges.mjs` con servidor local en el puerto 4175 y Chrome instalado. Usa un contexto de navegador aislado, sin tocar la partida del usuario.
 
 La prueba de navegador recorre selección, guardado y recarga, dos combates reales de parejas (con rivales debilitados en el contexto de prueba), elección de recompensa, equipamiento con afinidad, torneo individual con derrota en semifinal y victoria por el bronce, persistencia del premio y anchura móvil. Capturas en `outputs/challenges/`.
+
+La prueba `tests/browser-inventory-relics.mjs` verifica el acceso desde Inventario, colección vacía, búsqueda, paginación, equipar/mover/sustituir/desequipar, guardado tras recargar, bloqueo durante combate y navegación por teclado en escritorio y móvil oscuro.

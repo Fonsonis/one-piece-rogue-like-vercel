@@ -136,6 +136,18 @@ html[data-theme="dark"] :is(.team-synergy-summary,.tower-selection) { --collecti
 .collection-empty { grid-column:1/-1; padding:30px 18px; text-align:center; color:var(--collection-muted); }
 .collection-empty h3 { font-size:17px; margin-bottom:8px; }
 .collection-help { font:15px/1.6 system-ui,sans-serif; }.collection-help p + p { margin-top:14px; }
+.inventory-relics-link { width:100%; text-align:left; }
+.collection-modal .inventory-relic { margin:6px 0; font:12px/1.4 system-ui,sans-serif; overflow-wrap:anywhere; color:var(--collection-ink); }
+.inventory-relic span { color:var(--collection-ready); }
+.relic-modal .relic-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:12px; align-content:start; }
+.relic-modal .relic-card { min-width:0; padding:16px; border:1px solid var(--collection-line); border-radius:12px; background:var(--collection-soft); color:var(--collection-ink); overflow-wrap:anywhere; }
+.relic-modal .relic-card > b { font:750 17px/1.4 system-ui,sans-serif; }
+.relic-modal .relic-card p { margin:8px 0; font:14px/1.5 system-ui,sans-serif; }
+.relic-modal .relic-card .relic-affinity { padding:10px 0; border-top:1px solid var(--collection-line); }
+.relic-modal .relic-owner { color:var(--collection-ready); }
+.relic-modal .relic-help { padding:0 12px 12px; font:14px/1.5 system-ui,sans-serif; }
+.relic-modal #relic-feedback { font:13px/1.4 system-ui,sans-serif; }
+.relic-modal #relic-feedback:empty { display:none; }
 
 .achievement-card { display:grid; grid-template-columns:46px minmax(0,1fr) 118px; align-items:start; gap:14px; padding:17px; margin-bottom:10px; border:1px solid var(--collection-line); border-radius:12px; background:var(--collection-surface); }
 .achievement-card.ready { border:2px solid #5b9c80; padding:16px; background:linear-gradient(90deg,#eaf6ed,var(--collection-surface) 60%); }

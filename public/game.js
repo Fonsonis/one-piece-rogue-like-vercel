@@ -2892,15 +2892,18 @@ function showInventoryModal(opts = {}) {
     const cards=ids.slice(page*pageSize,(page+1)*pageSize).map(id=>{
       const displayId=evolutionFormAt(id,startLvlOf(id)),c=CHARS[displayId],level=startLvlOf(id);
       const cost=logPoseUpgradeCost(level),maxed=level>=cap,canAfford=(meta.logPoses||0)>=cost;
+      const relic=meta.relics.includes(meta.relicEquipment?.[id])?RELICS[meta.relicEquipment[id]]:null;
       return `<article class="inventory-card ${currentTeam.includes(id)?'in-team':''}" data-id="${id}">
         <div class="inventory-card-top"><span>${currentTeam.includes(id)?'En tu equipo':'Nakama'}</span><span class="inventory-rarity" aria-label="Rareza ${c.rareza} de 5 estrellas"><span aria-hidden="true">★</span> ${c.rareza}/5</span></div>
         <button class="inventory-profile btn-info-inv" data-id="${id}" aria-label="Ver ficha de ${collectionText(c.name)}"><span class="inventory-portrait" aria-hidden="true">${charIcon(displayId,80)}</span><strong>${c.name}</strong><span class="inventory-profile-link">Ver ficha ↗</span></button>
         <div class="inventory-level">Nivel base <strong>${level}</strong></div><div class="type-badges">${typeBadges(c.types)}</div>
+        <p class="inventory-relic">${relic?`🏺 ${esc(relic.name)}<br><span>${relic.character===id?'Afinidad activa':'Boost común activo'}</span>`:'Sin reliquia equipada'}</p>
         <div class="inventory-upgrade">${maxed?`<span class="inventory-limit">Límite de saga: Nv. ${cap}</span><button class="btn btn-upg-inv" data-id="${id}" disabled aria-label="Nivel máximo de saga alcanzado"><span class="inventory-upgrade-label">Nivel máximo</span><span class="inventory-upgrade-short" aria-hidden="true">Máx.</span></button>`:`<span class="inventory-cost" title="${number(cost)} Log Poses">Coste: <strong>${compact(cost)} 🧭</strong></span><button class="btn gold btn-upg-inv" data-id="${id}" ${canAfford?'':'disabled'} aria-label="Mejorar a ${collectionText(c.name)} al nivel base ${level+1} por ${number(cost)} Log Poses"><span class="inventory-upgrade-label">Subir a Nv. ${level+1}</span><span class="inventory-upgrade-short" aria-hidden="true">↑ Lv. ${level+1}</span></button>${canAfford?'':`<span class="inventory-shortfall">Faltan ${compact(cost-(meta.logPoses||0))} 🧭</span>`}`}</div>
       </article>`;
     }).join('');
     const filtered=invViewState.type||+invViewState.rarity||invViewState.saga;
-    return `<header class="collection-header"><div><span class="collection-eyebrow">Tu tripulación</span><h2 id="inv-title" tabindex="-1">${collectionText(opts.title || 'Inventario de nakamas')}</h2></div><button class="btn gray collection-close" id="inv-close-x" aria-label="Cerrar inventario">Cerrar <span aria-hidden="true">×</span></button></header>
+    return `<header class="collection-header"><div><span class="collection-eyebrow">Tu tripulación</span><h2 id="inv-title" tabindex="-1">${collectionText(opts.title || 'Inventario')}</h2></div><button class="btn gray collection-close" id="inv-close-x" aria-label="Cerrar inventario">Cerrar <span aria-hidden="true">×</span></button></header>
+      <button class="btn gray inventory-relics-link" id="inv-relics">🏺 Reliquias (${meta.relics.filter(id=>RELICS[id]).length}) · Ver y equipar →</button>
       <div class="collection-summary"><div><strong>${allUnlocked.length}</strong><span>Nakamas disponibles</span></div><button class="collection-summary-action" id="inv-logpose-info" aria-label="${number(meta.logPoses||0)} Log Poses disponibles. Ver cómo conseguirlos"><strong>${compact(meta.logPoses||0)} 🧭</strong><span>Log Poses · ¿Cómo conseguirlos?</span></button></div>
       <label for="inv-q" class="inventory-search-label">Buscar nakama<input id="inv-q" type="search" placeholder="Nombre del personaje o su forma" value="${collectionText(invViewState.q)}"></label>
       <details class="collection-extra" ${filtersOpen?'open':''}><summary>Filtros y vista${filtered?' · activos':''}</summary><div class="collection-filter-grid inventory-filters">
@@ -2928,6 +2931,7 @@ function showInventoryModal(opts = {}) {
   };
   const bindEvents=()=>{
     ov.querySelector('#inv-close-x').onclick=close;
+    ov.querySelector('#inv-relics').onclick=()=>showRelicCollection({onClose:()=>refresh('#inv-relics')});
     ov.querySelector('#inv-q').oninput=e=>{invViewState.q=e.target.value;page=0;refresh('#inv-q',true,e.target.selectionStart);};
     for(const [id,key] of [['inv-type','type'],['inv-rarity','rarity'],['inv-saga','saga'],['inv-sort','sort']])ov.querySelector('#'+id).onchange=e=>{invViewState[key]=e.target.value;page=0;refresh('#'+id,true);};
     ov.querySelector('#inv-reset').onclick=()=>{invViewState={q:'',type:'',rarity:0,saga:'',sort:'name'};page=0;refresh('#inv-q',true);};
@@ -7986,23 +7990,52 @@ function equipRelic(id,character) {
 function relicDetailsHTML(r) {
   return `<b>${r.emoji} ${esc(r.name)}</b><p>${r.desc}</p><p class="relic-affinity">Afinidad: ${esc(CHARS[r.character].name)} y sus formas<br><b>${esc(r.passiveName)}</b> · ${esc(r.passiveDesc)}</p>`;
 }
-function showRelicCollection() {
-  const bases = challengeOwnedBases();
-  render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button>
-    <section class="panel challenge-panel"><h2>🎒 Reliquias · ${meta.relics.length}</h2>
-    <p>Una reliquia por personaje, una copia equipada a la vez. El boost funciona en cualquier portador; la pasiva solo con su afinidad. Se aplica al empezar el siguiente combate de aventura, Torre o Desafíos.</p>
-    <label>Buscar reliquia o afinidad<input type="search" id="relic-search"></label>
-    <div class="relic-grid">${meta.relics.filter(id=>RELICS[id]).map(id=>{
+function showRelicCollection(opts = {}) {
+  const previousFocus=document.activeElement;
+  const owned=[...new Set(meta.relics)].filter(id=>RELICS[id]);
+  const bases=challengeOwnedBases().sort((a,b)=>CHARS[a].name.localeCompare(CHARS[b].name,'es'));
+  let query='',page=0;
+  const pageSize=12;
+  const ov=document.createElement('div');ov.className='overlay collection-overlay';ov.id='relic-modal-overlay';
+  ov.innerHTML=`<section class="modal collection-modal relic-modal" role="dialog" aria-modal="true" aria-labelledby="relic-title">
+    <header class="collection-header"><div><span class="collection-eyebrow">Inventario</span><h2 id="relic-title" tabindex="-1">🏺 Reliquias · ${owned.length}</h2></div><button class="btn gray collection-close" id="relic-close" aria-label="Cerrar reliquias">Cerrar <span aria-hidden="true">×</span></button></header>
+    <details class="collection-extra"><summary>Cómo funcionan las reliquias</summary><p class="relic-help">Una reliquia por personaje, una copia equipada a la vez. El boost funciona en cualquier portador; la pasiva solo con su afinidad. Elegir otro portador mueve la reliquia y sustituye la que tuviera equipada. Se aplica al empezar el siguiente combate de aventura, Torre o Desafíos.</p></details>
+    ${battle?'<p role="status">Puedes consultar las reliquias, pero debes terminar el combate para cambiar su portador.</p>':''}
+    <label for="relic-search">Buscar reliquia o afinidad<input type="search" id="relic-search" placeholder="Nombre de la reliquia o personaje"></label>
+    <div class="collection-results"><span id="relic-count" role="status"></span><button class="collection-text-button" id="relic-reset">Limpiar búsqueda</button></div>
+    <div id="relic-cards" class="collection-list relic-grid" aria-label="Reliquias obtenidas" tabindex="0"></div>
+    <nav class="collection-pagination" aria-label="Páginas de reliquias"><button class="btn gray" id="relic-prev" aria-label="Página anterior de reliquias">← Anterior</button><span id="relic-page"></span><button class="btn gray" id="relic-next" aria-label="Página siguiente de reliquias">Siguiente →</button></nav>
+    <p id="relic-feedback" role="status" aria-live="polite"></p>
+  </section>`;
+  document.body.appendChild(ov);
+  const find=selector=>ov.querySelector(selector);
+  const close=()=>{ov.remove();if(typeof opts.onClose==='function')opts.onClose();else if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});};
+  const draw=()=>{
+    const ids=owned.filter(id=>{const r=RELICS[id];return `${r.name} ${CHARS[r.character].name}`.toLocaleLowerCase('es').includes(query.toLocaleLowerCase('es'));});
+    const pages=Math.max(1,Math.ceil(ids.length/pageSize));page=Math.min(page,pages-1);
+    find('#relic-count').textContent=`${ids.length} reliquias${ids.length?` · ${page*pageSize+1}–${Math.min((page+1)*pageSize,ids.length)}`:''}`;
+    find('#relic-page').textContent=`Página ${page+1} de ${pages}`;
+    find('#relic-prev').disabled=page===0;find('#relic-next').disabled=page===pages-1;
+    find('#relic-cards').innerHTML=ids.slice(page*pageSize,(page+1)*pageSize).map(id=>{
       const r=RELICS[id],owner=Object.keys(meta.relicEquipment||{}).find(base=>meta.relicEquipment[base]===id);
+      const candidates=[...bases].sort((a,b)=>Number(b===r.character)-Number(a===r.character));
       return `<article class="relic-card" data-relic-card="${id}">${relicDetailsHTML(r)}
-        <label>Portador<select data-equip-relic="${id}" aria-label="Portador de ${esc(r.name)}"><option value="">Sin equipar</option>${bases.map(base=>`<option value="${base}" ${owner===base?'selected':''}>${esc(CHARS[base].name)}${base===r.character?' · ✨ AFINIDAD':''}</option>`).join('')}</select></label>
-        <small>${owner ? (owner===r.character?'✨ Pasiva de afinidad activa':'Boost común activo') : 'Sin portador'} · Copias: ${meta.relicCopies?.[id] || 1}</small></article>`;
-    }).join('') || '<p>Gana Batalla de Leyendas para conseguir tu primera reliquia.</p>'}</div></section>`);
-  $('#btn-back').onclick=screenChallenges;
-  document.querySelectorAll('[data-equip-relic]').forEach(el=>el.onchange=()=>{equipRelic(el.dataset.equipRelic,el.value);showRelicCollection();});
-  $('#relic-search').oninput=e=>document.querySelectorAll('[data-relic-card]').forEach(el=>{
-    const r=RELICS[el.dataset.relicCard];el.hidden=!`${r.name} ${CHARS[r.character].name}`.toLocaleLowerCase('es').includes(e.target.value.toLocaleLowerCase('es'));
-  });
+        <label>Equipar a<select data-equip-relic="${id}" aria-label="Portador de ${esc(r.name)}" ${battle?'disabled':''}><option value="">Sin equipar</option>${candidates.map(base=>`<option value="${base}" ${owner===base?'selected':''}>${esc(CHARS[base].name)}${base===r.character?' · ✨ AFINIDAD':''}</option>`).join('')}</select></label>
+        <p class="relic-owner">${owner?`Portador: ${esc(CHARS[owner].name)} · ${owner===r.character?'✨ Pasiva de afinidad activa':'Boost común activo'}`:'Sin portador'} · Copias: ${meta.relicCopies?.[id]||1}</p></article>`;
+    }).join('')||`<div class="collection-empty"><h3>${owned.length?'No hay reliquias con esta búsqueda':'Aún no tienes reliquias'}</h3><p>${owned.length?'Prueba otro nombre o limpia la búsqueda.':'Gana Batalla de Leyendas en Desafíos para conseguir tu primera reliquia.'}</p></div>`;
+    find('#relic-cards').scrollTop=0;
+    ov.querySelectorAll('[data-equip-relic]').forEach(el=>el.onchange=()=>{
+      const id=el.dataset.equipRelic,character=el.value,scroll=find('#relic-cards').scrollTop;
+      const equipped=equipRelic(id,character);
+      draw();find('#relic-cards').scrollTop=scroll;find(`[data-equip-relic="${id}"]`).focus({preventScroll:true});
+      find('#relic-feedback').textContent=equipped?(character?`${RELICS[id].name} equipada a ${CHARS[character].name}.`:`${RELICS[id].name} sin equipar.`):'Termina el combate para cambiar las reliquias.';
+    });
+  };
+  find('#relic-close').onclick=close;
+  find('#relic-search').oninput=e=>{query=e.target.value;page=0;draw();};
+  find('#relic-reset').onclick=()=>{query='';page=0;find('#relic-search').value='';draw();find('#relic-search').focus();};
+  for(const [id,step] of [['relic-prev',-1],['relic-next',1]])find('#'+id).onclick=()=>{page+=step;draw();find('#relic-cards').focus();};
+  ov.onclick=e=>{if(e.target===ov)close();};draw();bindCollectionDialog(ov,close,'#relic-title');
 }
 
 const CHALLENGE_PRIZES = {1:7500,2:5000,3:2500};
