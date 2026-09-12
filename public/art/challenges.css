@@ -39,3 +39,25 @@
 html[data-theme="dark"] .challenge-nakama-picker .btn { background:var(--paper-dark); color:var(--ink); border-color:#91aaa9; }
 html[data-theme="dark"] .challenge-nakama-picker .nakama-picker-scopes .btn[aria-pressed="true"] { background:#37677a; color:#fff; }
 html[data-theme="dark"] .challenge-nakama-picker .btn:disabled { opacity:1; color:#a6b6bd; border-color:#526a74; }
+/* A complete elimination tree, including future rounds, in one pannable region. */
+.tournament-viewport { max-width:100%; max-height:720px; overflow:auto; padding:8px 6px 18px; border:1px solid #91aaa9; border-radius:10px; background:var(--paper-dark); overscroll-behavior:contain; }
+.tournament-viewport:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+#app .challenge-panel .tournament-tree { display:flex; gap:32px; width:max-content; margin:0; }
+.tournament-round { flex:0 0 220px; width:220px; }
+#app .challenge-panel .tournament-round > h3 { height:68px; margin:0; padding:8px; background:var(--paper-dark); }
+.tournament-round h3 small { display:block; font:500 13px/1.5 system-ui,sans-serif; }
+.tournament-matches { position:relative; }
+#app .challenge-panel .tournament-matches .challenge-match { position:absolute; left:0; right:0; margin:0; z-index:1; display:grid; grid-template-rows:1fr 1fr; border:1px solid #79939c; }
+#app .challenge-panel .bracket-entry { position:relative; display:flex; flex-direction:column; justify-content:center; min-height:0; padding:5px 24px 5px 10px; font:12px/1.35 system-ui,sans-serif; }
+.bracket-entry > span:not(.bracket-won) { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.bracket-you { font-size:10px; font-weight:700; color:var(--sea); }
+.bracket-won { position:absolute; right:7px; top:50%; transform:translateY(-50%); font-size:18px; }
+.bracket-entry.pending { color:var(--ink); opacity:.65; font-style:italic; }
+#app .challenge-panel .challenge-match.current-match { outline:3px solid var(--sea); outline-offset:2px; }
+.tournament-link { position:absolute; left:100%; width:16px; border:2px solid #79939c; border-left:0; pointer-events:none; }
+.tournament-inlet { position:absolute; right:100%; width:16px; border-top:2px solid #79939c; pointer-events:none; }
+.tournament-bronze { width:220px; margin-top:16px; }
+#app .challenge-panel .tournament-bronze .challenge-match { margin:8px 0; }
+#app .challenge-panel .tournament-bronze .bracket-entry { min-height:48px; }
+@media(max-width:540px) { .tournament-viewport { max-height:70dvh; } }
+#app .challenge-panel .tournament-round > h3 { position:sticky; top:0; z-index:3; }
