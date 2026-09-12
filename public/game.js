@@ -2893,7 +2893,7 @@ function showInventoryModal(opts = {}) {
       </article>`;
     }).join('');
     const filtered=invViewState.type||+invViewState.rarity||invViewState.saga;
-    return `<header class="collection-header"><div><span class="collection-eyebrow">Tu tripulación</span><h2 id="inv-title" tabindex="-1">${collectionText(opts.title || 'Inventario')}</h2></div><button class="btn gray collection-close" id="inv-close-x" aria-label="Cerrar inventario">Cerrar <span aria-hidden="true">×</span></button></header>
+    return `<button class="btn gray collection-close" id="inv-close-x" aria-label="Cerrar inventario">Cerrar <span aria-hidden="true">×</span></button><div class="inventory-scroll"><header class="collection-header"><div><span class="collection-eyebrow">Tu tripulación</span><h2 id="inv-title" tabindex="-1">${collectionText(opts.title || 'Inventario')}</h2></div></header>
       <button class="btn gray inventory-relics-link" id="inv-relics">🏺 Reliquias (${meta.relics.filter(id=>RELICS[id]).length}) · Ver y equipar →</button>
       <div class="collection-summary"><div><strong>${allUnlocked.length}</strong><span>Nakamas disponibles</span></div><button class="collection-summary-action" id="inv-logpose-info" aria-label="${number(meta.logPoses||0)} Log Poses disponibles. Ver cómo conseguirlos"><strong>${compact(meta.logPoses||0)} 🧭</strong><span>Log Poses · ¿Cómo conseguirlos?</span></button></div>
       <label for="inv-q" class="inventory-search-label">Buscar nakama<input id="inv-q" type="search" placeholder="Nombre del personaje o su forma" value="${collectionText(invViewState.q)}"></label>
@@ -2905,7 +2905,7 @@ function showInventoryModal(opts = {}) {
       </div></details>
       <div class="collection-results"><span role="status">${ids.length} nakamas${ids.length?` · ${page*pageSize+1}–${Math.min((page+1)*pageSize,ids.length)}`:''}</span><button class="collection-text-button" id="inv-reset">Limpiar filtros</button></div>
       <div id="inv-cards-grid" class="collection-list inventory-grid" aria-label="Lista de nakamas" tabindex="0">${cards||'<div class="collection-empty"><h3>No hay nakamas con estos filtros</h3><p>Prueba otro nombre o limpia los filtros.</p></div>'}</div>
-      <nav class="collection-pagination" aria-label="Páginas de nakamas"><button class="btn gray" data-inv-page="-1" ${page===0?'disabled':''} aria-label="Página anterior de nakamas">← Anterior</button><span>Página ${page+1} de ${pages}</span><button class="btn gray" data-inv-page="1" ${page===pages-1?'disabled':''} aria-label="Página siguiente de nakamas">Siguiente →</button></nav>`;
+      </div><nav class="collection-pagination" aria-label="Páginas de nakamas"><button class="btn gray" data-inv-page="-1" ${page===0?'disabled':''} aria-label="Página anterior de nakamas">← Anterior</button><span>Página ${page+1} de ${pages}</span><button class="btn gray" data-inv-page="1" ${page===pages-1?'disabled':''} aria-label="Página siguiente de nakamas">Siguiente →</button></nav>`;
   };
   document.querySelector('#inventory-modal-overlay')?.remove();
   const ov=document.createElement('div');ov.id='inventory-modal-overlay';ov.className='overlay collection-overlay';
@@ -2913,10 +2913,10 @@ function showInventoryModal(opts = {}) {
   document.body.appendChild(ov);
   const close=()=>{ov.remove();if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});};
   const refresh=(selector,resetScroll=false,cursor=null)=>{
-    const scroll=resetScroll?0:ov.querySelector('#inv-cards-grid').scrollTop;
+    const scroll=resetScroll?0:ov.querySelector('.inventory-scroll').scrollTop;
     filtersOpen=ov.querySelector('details').open;
     ov.querySelector('.modal').innerHTML=renderContent();bindEvents();
-    ov.querySelector('#inv-cards-grid').scrollTop=scroll;
+    ov.querySelector('.inventory-scroll').scrollTop=scroll;
     const target=selector.split(',').map(part=>ov.querySelector(part)).find(Boolean)||ov.querySelector('#inv-cards-grid');
     target.focus({preventScroll:true});if(cursor!==null)target.setSelectionRange?.(cursor,cursor);
   };
@@ -2926,7 +2926,9 @@ function showInventoryModal(opts = {}) {
     ov.querySelector('#inv-q').oninput=e=>{invViewState.q=e.target.value;page=0;refresh('#inv-q',true,e.target.selectionStart);};
     for(const [id,key] of [['inv-type','type'],['inv-rarity','rarity'],['inv-saga','saga'],['inv-sort','sort']])ov.querySelector('#'+id).onchange=e=>{invViewState[key]=e.target.value;page=0;refresh('#'+id,true);};
     ov.querySelector('#inv-reset').onclick=()=>{invViewState={q:'',type:'',rarity:0,saga:'',sort:'name'};page=0;refresh('#inv-q',true);};
-    ov.querySelectorAll('[data-inv-page]').forEach(btn=>btn.onclick=()=>{page+=Number(btn.dataset.invPage);refresh('#inv-cards-grid',true);});
+    ov.querySelectorAll('[data-inv-page]').forEach(btn=>btn.onclick=()=>{page+=Number(btn.dataset.invPage);refresh('#inv-cards-grid',true);
+      const scroller=ov.querySelector('.inventory-scroll'),grid=ov.querySelector('#inv-cards-grid');
+      scroller.scrollTop=grid.getBoundingClientRect().top-scroller.getBoundingClientRect().top+scroller.scrollTop-64;});
     ov.querySelectorAll('.btn-upg-inv').forEach(btn=>btn.onclick=()=>{
       if(upgradeCharLvl(btn.dataset.id))refresh(`.btn-upg-inv[data-id="${btn.dataset.id}"]:not(:disabled),.btn-info-inv[data-id="${btn.dataset.id}"]`);
     });
