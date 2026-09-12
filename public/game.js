@@ -6042,7 +6042,6 @@ const tagIcons = f => {
 
 function fighterCardHTML(f, side, idx, active) {
   const c = charData(f);
-  const ps = passiveInfo(f);
   const rarityTag = c.rareza ? `<span style="color:var(--gold);font-size:7.5px;" title="Rareza ${c.rareza} estrellas">${'⭐'.repeat(c.rareza)}</span>` : '';
   const fusionTag = f.stars ? `<span style="color:#ff6b6b;font-weight:bold;font-size:7.5px;" title="Fusión +${f.stars}">[+${f.stars}⭐]</span>` : '';
   const isUltUnlocked = f.lvl >= 20;
@@ -6070,7 +6069,6 @@ function fighterCardHTML(f, side, idx, active) {
       <span class="sprite ${side === 'e' ? 'flip' : ''}">${charIcon(f.id, 64)}</span>
       <div class="platform"></div>
     </div>
-    ${ps ? `<div class="fcard-passive ${ps.active ? 'on' : ''}" title="${ps.desc}">✨ ${ps.label}</div>` : ''}
   </div>`;
 }
 
@@ -6149,6 +6147,21 @@ function refreshReserves() {
   });
 }
 
+// Las pasivas se agrupan después de la tripulación, fuera de las cartas de combate.
+function battleTeamPassivesHTML(team) {
+  const entries = team.flatMap(f => {
+    const info = passiveInfo(f), relic = equippedRelic(f), rows = [];
+    if (info) rows.push({label:info.label, desc:info.desc, active:info.active});
+    if (relic && relic.character === baseFormOf(f.id)) {
+      rows.push({label:`🏺 ${relic.passiveName}`, desc:relic.passiveDesc, active:f.hp > 0});
+    }
+    return rows.map(info => `<li class="team-passive ${info.active ? 'on' : ''}" title="${esc(info.desc)}">
+      <b>${esc(charName(f))}</b><span>${info.active ? '✨' : '◇'} ${esc(info.label)}</span>
+    </li>`);
+  });
+  return entries.length ? `<ul class="team-passive-list">${entries.join('')}</ul>` : '<p class="team-passive-empty">Sin pasivas</p>';
+}
+
 function battleLayoutHTML(logLines, labels = {}) {
   const b = battle;
   const eHead = b.opts.wild ? '🌊' : b.opts.boss ? '💀' : '⚓';
@@ -6172,6 +6185,10 @@ function battleLayoutHTML(logLines, labels = {}) {
           </div>
         </div>
         <div class="battle-reserves" id="battle-reserves"></div>
+        <div class="battle-team-passives" aria-label="Pasivas de los equipos">
+          <section><h3>✨ ${labels.p || 'TU BANDA'}</h3><div id="passives-p">${battleTeamPassivesHTML(b.pTeam)}</div></section>
+          <section><h3>✨ ${labels.e || 'ENEMIGOS'}</h3><div id="passives-e">${battleTeamPassivesHTML(b.eTeam)}</div></section>
+        </div>
         <div class="battle-lower-panels">
           <section class="battle-log-panel"><h3>REGISTRO</h3><div class="battle-log" id="battle-log">${logLines.map(l => `<div>${l}</div>`).join('')}</div></section>
           <section id="battle-backpack" aria-label="Mochila de combate"></section>
@@ -6284,14 +6301,11 @@ function refreshHPCards() {
       if (statsEl) statsEl.innerHTML = combatStatsHTML(f);
       const stEl = card.querySelector('.fcard-st');
       if (stEl) stEl.textContent = stIcons(f);
-      const pEl = card.querySelector('.fcard-passive');
-      if (pEl && passiveInfo(f)) {
-        const ps = passiveInfo(f);
-        pEl.textContent = `✨ ${ps.label}`;
-        pEl.classList.toggle('on', ps.active);
-      }
     });
   });
+  for (const [side, team] of [['p',battle.pTeam],['e',battle.eTeam]]) {
+    const el = $(`#passives-${side}`); if (el) el.innerHTML = battleTeamPassivesHTML(team);
+  }
   const sp = $('#syn-p'); if (sp) sp.innerHTML = synChipsHTML(battle.pTeam);
   const se = $('#syn-e'); if (se) se.innerHTML = synChipsHTML(battle.eTeam);
   refreshReserves();

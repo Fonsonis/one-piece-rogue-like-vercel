@@ -32,7 +32,7 @@ globalThis.LocalBattleView = (() => {
           const next = template.content.firstElementChild;
           card.className = next.className;
           // Conserva el nodo del sprite para que una actualización no corte sus animaciones.
-          for (const selector of ['.fcard-title','.fcard-hp','.fcard-meters','.fcard-stats-mini','.fcard-passive']) {
+          for (const selector of ['.fcard-title','.fcard-hp','.fcard-meters','.fcard-stats-mini']) {
             const current = card.querySelector(selector), replacement = next.querySelector(selector);
             if (current && replacement) current.innerHTML = replacement.innerHTML;
             else if (replacement) card.append(replacement);
@@ -42,6 +42,7 @@ globalThis.LocalBattleView = (() => {
         });
         root.querySelector(`#count-${side}`).textContent = battleTeamCount(side);
         root.querySelector(`#syn-${side}`).innerHTML = synChipsHTML(team);
+        root.querySelector(`#passives-${side}`).innerHTML = battleTeamPassivesHTML(team);
       }
       const log = root.querySelector('#battle-log');
       const follow = log.scrollHeight - log.scrollTop - log.clientHeight < 30;
