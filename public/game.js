@@ -2772,9 +2772,9 @@ let nakamaPickerState = { q:'', saga:'', type:'', rarity:0, sort:'name', scope:'
 function showNakamaPicker(opts) {
   document.querySelector('#inventory-modal-overlay')?.remove();
   const previousFocus = document.activeElement;
-  const st = nakamaPickerState;
+  const st = opts.state || nakamaPickerState;
   const team = opts.currentTeam || [];
-  const unlocked = [...new Set(['luffy', ...(meta.roster || [])])].filter(id => CHARS[id] && isNakamaUnlocked(id));
+  const unlocked = [...new Set(['luffy', ...(meta.roster || [])])].filter(id => CHARS[id] && isNakamaUnlocked(id) && (!opts.allowedIds || opts.allowedIds.includes(baseFormOf(id))));
   const display = id => evolutionFormAt(id, startLvlOf(id));
   const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const sagaIds = new Set(unlocked.map(id => CHARS[display(id)].saga));
@@ -2783,9 +2783,10 @@ function showNakamaPicker(opts) {
   const ov = document.createElement('div');
   ov.id = 'inventory-modal-overlay';
   ov.className = 'overlay nakama-picker-overlay';
+  if (opts.allowedIds) ov.classList.add('challenge-nakama-picker');
   ov.innerHTML = `<section class="modal nakama-picker" role="dialog" aria-modal="true" aria-labelledby="nakama-picker-title" aria-describedby="nakama-picker-hint">
     <header class="nakama-picker-header"><div><small>TU TRIPULACIÓN</small><h2 id="nakama-picker-title">${esc(opts.title || 'Elige un nakama')}</h2></div><button class="btn gray" id="np-close" aria-label="Cerrar selector">✕</button></header>
-    <p id="nakama-picker-hint">Pulsa un retrato para elegirlo. Los nakamas de otro hueco se intercambian.</p>
+    <p id="nakama-picker-hint">${esc(opts.hint || 'Pulsa un retrato para elegirlo. Los nakamas de otro hueco se intercambian.')}</p>
     <div class="nakama-picker-filters">
       <label>Nombre<input id="np-search" type="search" placeholder="Buscar nakama…" value="${esc(st.q)}" autocomplete="off"></label>
       <label>Saga<select id="np-saga"><option value="">Todas las sagas</option>${sagas.map(s => `<option value="${esc(s.id)}" ${st.saga === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
@@ -5995,7 +5996,9 @@ function startBattle(enemies, opts) {
   // reinicia pasivas y estados por-combate
   [...battle.pTeam, ...battle.eTeam].forEach(f => {
     migrateFighter(f, battle.eTeam.includes(f) || !!opts.challenge);
-    f.battleRelic = !opts.local && battle.pTeam.includes(f) && meta.relics.includes(meta.relicEquipment?.[baseFormOf(f.id)]) ? meta.relicEquipment[baseFormOf(f.id)] : null;
+    f.battleRelic = opts.challenge && battle.eTeam.includes(f)
+      ? `relic_${baseFormOf(f.id)}`
+      : !opts.local && battle.pTeam.includes(f) && meta.relics.includes(meta.relicEquipment?.[baseFormOf(f.id)]) ? meta.relicEquipment[baseFormOf(f.id)] : null;
     f.dodgeLeft = (passiveRule(f).dodge || 0) + (relicRule(f).dodge || 0);
     f.ultCharge = Math.max(f.ultCharge || 0, relicRule(f).charge || 0);
     // Carry timed effects through the journey; reset combat-only passive flags.
@@ -8010,7 +8013,7 @@ function challengeLevel(kind) {
   return Math.max(...wano.islands[Math.floor(wano.islands.length/2)].bossLvl);
 }
 function challengePool(kind) {
-  return challengeOwnedBases().map(id=>evolutionFormAt(id,challengeLevel(kind))).filter(id=>kind!=='legends'||CHARS[id].rareza===5);
+  return challengeOwnedBases().map(id=>evolutionFormAt(id,startLvlOf(id))).filter(id=>kind!=='legends'||CHARS[id].rareza===5);
 }
 function shuffleChallenge(list) {
   const out=[...list];
@@ -8097,12 +8100,21 @@ function endChallengeBattle(victory) {
   }
   saveMeta();screenChallengeBracket();
 }
+function challengeEnemyLevel(t) {
+  return t.kind==='legends'&&t.rounds[t.stage].name==='Final'?Math.max(...SAGAS.find(s=>s.id==='wano').islands.at(-1).bossLvl):t.level;
+}
+function challengePlayerTeam(t) {
+  return t.entrants[0].members.map(id=>applyUpgrades(makeChar(baseFormOf(id),startLvlOf(id))));
+}
 function playChallengeMatch() {
   const t=meta.challenge,m=challengeCurrentMatch(t);
   if(battle||!m||accountLevel()<35)return;
   const enemyIndex=m.a===0?m.b:m.a;
-  const enemyLevel=t.kind==='legends'&&t.rounds[t.stage].name==='Final'?Math.max(...SAGAS.find(s=>s.id==='wano').islands.at(-1).bossLvl):t.level;
-  const allies=t.entrants[0].members.map(id=>applyUpgrades(makeChar(id,t.level,false,true)));
+  const enemyLevel=challengeEnemyLevel(t);
+  const allies=challengePlayerTeam(t);
+  if(t.kind==='legends'&&allies.some(f=>CHARS[f.id].rareza!==5))return toast('Tu pareja debe conservar dos personajes de rareza 5★. Revisa sus niveles base o inicia un nuevo torneo.');
+  t.entrants[0].members=allies.map(f=>f.id);
+  saveMeta();
   const enemies=t.entrants[enemyIndex].members.map(id=>makeChar(id,enemyLevel,false,true));
   startBattle(enemies,{challenge:true,duos:t.kind==='legends',team:allies,items:{},intro:`🏆 ${t.bronze?'Tercer puesto':t.rounds[t.stage].name} · ${t.kind==='legends'?'Batalla de Leyendas · 2 contra 2':'Torneo de 8'} · Nv. rival ${enemyLevel}`});
 }
@@ -8117,48 +8129,85 @@ function claimChallengeRelic(id) {
 function screenChallenges() {
   playMusic('menu');if(accountLevel()<35){toast('🔒 Desafíos requiere nivel de cuenta 35.');return screenHome();}
   render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← PUERTO</button>
-    <section class="panel challenge-panel"><h2>🏆 Desafíos</h2><p>Torneos offline contra la IA. Desbloqueados a nivel de cuenta 35.</p>
+    <section class="panel challenge-panel"><h2 id="challenge-title" tabindex="-1">🏆 Desafíos</h2><p>Torneos offline contra la IA. Desbloqueados a nivel de cuenta 35.</p>
     ${meta.challenge?`<button class="btn gold" id="challenge-resume">${meta.challenge.finished?'VER RESULTADO Y RECOMPENSA':'CONTINUAR TORNEO'}</button>`:''}
     <div class="challenge-events"><article class="challenge-event"><span class="challenge-emblem">🏆</span><h3>Torneo de los Ocho</h3>
-    <p>8 participantes · duelos 1 contra 1 · Nv.65. Cuartos, semifinales, final y combate por el tercer puesto.</p><div class="challenge-prizes"><span>🥇 7.500</span><span>🥈 5.000</span><span>🥉 2.500</span></div><p>Log Poses por torneo. El resto de puestos no recibe premio.</p><button class="btn blue" data-challenge="tournament" ${challengeCanStart()?'':'disabled'}>ELEGIR LUCHADOR</button></article>
-    <article class="challenge-event legends"><span class="challenge-emblem">👑</span><h3>Batalla de Leyendas</h3><p>8 personajes · 4 parejas · combates 2 contra 2. Solo rareza 5★; las estrellas de fusión no cuentan.</p><p>Dificultad Wano · Nv.${challengeLevel('legends')} y final Nv.${Math.max(...SAGAS.find(s=>s.id==='wano').islands.at(-1).bossLvl)}. Cada personaje vivo actúa por ronda.</p><p>🏺 Campeones: elige una reliquia entre tres, priorizando afinidades de tu pareja y reliquias nuevas.</p><button class="btn gold" data-challenge="legends" ${challengeCanStart()?'':'disabled'}>FORMAR PAREJA</button></article></div>
-    <p>Equipos curados y Ultimate reiniciada en cada ronda. Se mantienen tus mejoras y formas desbloqueadas. Puedes salir al cuadro entre combates y continuar después.</p>
+    <p>8 participantes · duelos 1 contra 1 · Rivales Nv.65. Cuartos, semifinales, final y combate por el tercer puesto.</p><div class="challenge-prizes"><span>🥇 7.500</span><span>🥈 5.000</span><span>🥉 2.500</span></div><p>Log Poses por torneo. El resto de puestos no recibe premio.</p><button class="btn blue" data-challenge="tournament" ${challengeCanStart()?'':'disabled'}>ELEGIR LUCHADOR</button></article>
+    <article class="challenge-event legends"><span class="challenge-emblem">👑</span><h3>Batalla de Leyendas</h3><p>8 personajes · 4 parejas · combates 2 contra 2. Solo rareza 5★; las estrellas de fusión no cuentan.</p><p>Rivales de Wano · Nv.${challengeLevel('legends')} y final Nv.${Math.max(...SAGAS.find(s=>s.id==='wano').islands.at(-1).bossLvl)}. Cada personaje vivo actúa por ronda.</p><p>🏺 Campeones: elige una reliquia entre tres, priorizando afinidades de tu pareja y reliquias nuevas.</p><button class="btn gold" data-challenge="legends" ${challengeCanStart()?'':'disabled'}>FORMAR PAREJA</button></article></div>
+    <p><b>Tus personajes usan su nivel permanente actual.</b> Todos los rivales llevan una reliquia afín con boost y pasiva. Empiezas cada combate con PS completos y conservas tus mejoras y reliquias equipadas.</p><details class="challenge-rules"><summary>Cómo funcionan los torneos</summary><p>Sin consumibles. Ultimate reiniciada en cada combate, salvo la carga inicial de una reliquia. Puedes volver al puerto y continuar el cuadro guardado. Tus niveles se consultan de nuevo al empezar cada combate.</p></details>
     <button class="btn gray" id="challenge-relics">🎒 RELIQUIAS (${meta.relics.length})</button></section>`);
   $('#btn-back').onclick=screenHome;$('#challenge-relics').onclick=showRelicCollection;
   if(meta.challenge)$('#challenge-resume').onclick=screenChallengeBracket;
   document.querySelectorAll('[data-challenge]').forEach(el=>el.onclick=()=>screenChallengeSelection(el.dataset.challenge));
+  $('#challenge-title').focus();
 }
 function screenChallengeSelection(kind) {
   if(!challengeCanStart()||!['tournament','legends'].includes(kind))return screenChallenges();
-  const pool=challengePool(kind),count=kind==='legends'?2:1,picked=[];
-  render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button><section class="panel challenge-panel"><h2>${kind==='legends'?'👑 Forma tu pareja legendaria':'🏆 Elige tu luchador'}</h2>
-    <p>Nv.${challengeLevel(kind)} · ${pool.length} personajes disponibles. ${count===2?'Necesitas dos identidades distintas de rareza 5★.':''}</p>
-    ${pool.length<count?'<p role="status">No tienes suficientes personajes elegibles. Recluta legendarios o desbloquea sus formas de 5★ mejorando su nivel base.</p>':''}
-    <label>Buscar personaje<input type="search" id="challenge-search"></label><div class="tower-roster">${pool.map(id=>`<button class="tower-card" data-challenge-pick="${id}" aria-pressed="false">${charIcon(id,64)}<b>${esc(CHARS[id].name)}</b><span>${'⭐'.repeat(CHARS[id].rareza)}</span></button>`).join('')}</div>
-    <div class="challenge-launch"><p id="challenge-picked" aria-live="polite">Seleccionados: 0/${count}</p><button class="btn blue" id="challenge-start" disabled>COMENZAR TORNEO</button></div></section>`);
+  const pool=challengePool(kind), count=kind==='legends'?2:1, picked=Array(count).fill(null);
+  const pickerState={q:'',saga:'',type:'',rarity:0,sort:'name',scope:'all',page:0};
+  render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button>
+    <section class="panel challenge-panel challenge-selection"><h2 id="challenge-title" tabindex="-1">${kind==='legends'?'👑 Forma tu pareja legendaria':'🏆 Elige tu luchador'}</h2>
+    <p>Participas con el <b>nivel permanente de cada nakama</b>. Rivales Nv.${challengeLevel(kind)}${kind==='legends'?' · Final Nv.'+Math.max(...SAGAS.find(s=>s.id==='wano').islands.at(-1).bossLvl):''}, todos con reliquia afín.</p>
+    ${pool.length<count?'<p class="challenge-notice" role="status">No tienes suficientes personajes elegibles. Recluta legendarios o desbloquea sus formas de 5★ mejorando su nivel base.</p>':''}
+    <div class="challenge-team-slots" id="challenge-slots"></div>
+    <div id="challenge-selection-synergies"></div>
+    <div class="challenge-launch"><p id="challenge-picked" role="status"></p><button class="btn blue" id="challenge-start" disabled>COMENZAR TORNEO</button></div></section>`);
   $('#btn-back').onclick=screenChallenges;
-  document.querySelectorAll('[data-challenge-pick]').forEach(el=>el.onclick=()=>{
-    const id=el.dataset.challengePick,index=picked.indexOf(id);if(index>=0)picked.splice(index,1);else if(picked.length<count)picked.push(id);
-    document.querySelectorAll('[data-challenge-pick]').forEach(card=>{card.setAttribute('aria-pressed',String(picked.includes(card.dataset.challengePick)));card.disabled=picked.length===count&&!picked.includes(card.dataset.challengePick);});
-    $('#challenge-picked').textContent=`Seleccionados: ${picked.length}/${count} · ${picked.map(id=>CHARS[id].name).join(' + ')}`;$('#challenge-start').disabled=picked.length!==count;
-  });
-  $('#challenge-search').oninput=e=>document.querySelectorAll('[data-challenge-pick]').forEach(el=>el.hidden=!CHARS[el.dataset.challengePick].name.toLocaleLowerCase('es').includes(e.target.value.toLocaleLowerCase('es')));
-  $('#challenge-start').onclick=()=>startChallenge(kind,picked);
+  const draw=()=>{
+    $('#challenge-slots').innerHTML=picked.map((id,index)=>{
+      const f=id?applyUpgrades(makeChar(id,startLvlOf(id))):null;
+      const relic=id?RELICS[meta.relicEquipment?.[id]]:null;
+      return `<article class="challenge-slot"><h3>${count===1?'Tu luchador':`Nakama ${index+1}`}</h3>
+        <button class="challenge-slot-pick" data-challenge-slot="${index}" aria-label="${f?'Cambiar a '+esc(charName(f)):'Elegir nakama '+(index+1)}" ${pool.length?'':'disabled'}>
+        ${f?`${charIcon(f.id,80)}<strong>${esc(charName(f))}</strong><span>Nv. ${f.lvl} · ${'⭐'.repeat(CHARS[f.id].rareza)}</span><span class="type-badges">${typeBadges(fighterTypes(f))}</span><span>${f.maxhp} PS · ${f.atk} ATQ</span>`:'<span class="challenge-slot-plus" aria-hidden="true">＋</span><strong>Elegir nakama</strong><span>Buscar, filtrar y consultar fichas</span>'}</button>
+        ${f?`<p>${relic&&meta.relics.includes(relic.id)?`🏺 ${esc(relic.name)} · ${relic.character===id?'Afinidad activa':'Boost común'}`:'Sin reliquia equipada'}</p><button class="btn gray" data-challenge-info="${index}">Ver ficha</button><button class="btn gray" data-challenge-remove="${index}" aria-label="Quitar a ${esc(charName(f))}">Quitar</button>`:''}</article>`;
+    }).join('');
+    const team=picked.filter(Boolean).map(id=>applyUpgrades(makeChar(id,startLvlOf(id))));
+    $('#challenge-picked').textContent=`${team.length} de ${count} seleccionados${team.length===count?' · Equipo listo':''}`;
+    $('#challenge-start').disabled=team.length!==count;
+    $('#challenge-selection-synergies').innerHTML=activeSynergiesHTML(team);
+    document.querySelectorAll('[data-challenge-slot]').forEach(button=>button.onclick=()=>{
+      const index=Number(button.dataset.challengeSlot);
+      showNakamaPicker({title:count===1?'Elige tu luchador':`Elige el nakama ${index+1}`,allowedIds:challengePool(kind).map(baseFormOf),state:pickerState,
+        hint:`${kind==='legends'?'Solo personajes de rareza 5★. ':''}Se muestra tu nivel permanente. Si eliges un nakama del otro hueco, se intercambian.`,
+        currentTeam:picked.filter(Boolean),selectedId:picked[index],onSelect:id=>{
+          const base=baseFormOf(id),other=picked.indexOf(base);if(other>=0)picked[other]=picked[index];picked[index]=base;draw();
+          $(`[data-challenge-slot="${index}"]`).focus();
+        }});
+    });
+    document.querySelectorAll('[data-challenge-info]').forEach(button=>button.onclick=()=>{
+      const index=Number(button.dataset.challengeInfo);showCharModal(picked[index]);
+      const sheet=$('#sheet-close')?.closest('.overlay');if(!sheet)return;
+      const close=()=>{sheet.remove();draw();$(`[data-challenge-info="${index}"]`).focus();};
+      sheet.querySelector('#sheet-close').onclick=close;sheet.onclick=e=>{if(e.target===sheet)close();};
+      bindCollectionDialog(sheet,close,'#sheet-close');
+    });
+    document.querySelectorAll('[data-challenge-remove]').forEach(button=>button.onclick=()=>{const index=Number(button.dataset.challengeRemove);picked[index]=null;draw();$(`[data-challenge-slot="${index}"]`).focus();});
+  };
+  $('#challenge-start').onclick=()=>startChallenge(kind,picked.filter(Boolean).map(id=>evolutionFormAt(id,startLvlOf(id))));
+  draw();$('#challenge-title').focus();
 }
 function screenChallengeBracket() {
   const t=meta.challenge;if(!t)return screenChallenges();
-  const entrant=index=>t.entrants[index].members.map(id=>esc(CHARS[id].name)).join(' + ');
+  const playerTeam=challengePlayerTeam(t);
+  const entrant=index=>index===0?playerTeam.map(f=>esc(charName(f))).join(' + '):t.entrants[index].members.map(id=>esc(CHARS[id].name)).join(' + ');
+  const next=challengeCurrentMatch(t), enemyIndex=next?(next.a===0?next.b:next.a):null;
   const matchHTML=m=>`<div class="challenge-match">${[m.a,m.b].map(index=>`<div class="${m.winner===index?'winner':''} ${index===0?'your-entry':''}">${index===0?'🏴‍☠️ ':''}${entrant(index)}${m.winner===index?' ✓':''}</div>`).join('')}</div>`;
-  render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button><section class="panel challenge-panel"><h2>${t.kind==='legends'?'👑 Batalla de Leyendas':'🏆 Torneo de los Ocho'}</h2>
-    <p>Tu equipo: ${entrant(0)} · Nv.${t.level}</p><p>Los cruces entre rivales de la IA se simulan según la fuerza de sus equipos.</p>
+  render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button><section class="panel challenge-panel"><h2 id="challenge-title" tabindex="-1">${t.kind==='legends'?'👑 Batalla de Leyendas':'🏆 Torneo de los Ocho'}</h2>
+    <p><b>Tu equipo:</b> ${playerTeam.map(f=>`${esc(charName(f))} · Nv.${f.lvl}`).join(' + ')}</p>
+    ${next?`<section class="challenge-next"><h3>Próximo combate · ${t.bronze?'Tercer puesto':t.rounds[t.stage].name}</h3><p>${entrant(enemyIndex)} · Rivales Nv.${challengeEnemyLevel(t)}</p>
+      <button class="btn blue" id="challenge-fight">⚔️ ${t.bronze?'LUCHAR POR EL TERCER PUESTO':'SIGUIENTE COMBATE'}</button>
+      <details class="challenge-rules"><summary>Ver las reliquias del rival</summary>${t.entrants[enemyIndex].members.map(id=>`<article class="challenge-rival-relic"><h3>${esc(CHARS[id].name)}</h3>${relicDetailsHTML(RELICS[`relic_${baseFormOf(id)}`])}</article>`).join('')}</details></section>`:''}
+    <p>Los cruces entre rivales de la IA se simulan según la fuerza de sus equipos.</p>
     <div class="challenge-bracket">${t.rounds.map(round=>`<section><h3>${round.name}</h3>${round.matches.map(matchHTML).join('')}</section>`).join('')}${t.bronze?`<section><h3>Tercer puesto</h3>${matchHTML(t.bronze)}</section>`:''}</div>
-    ${t.finished?`<div class="challenge-result" role="status"><h3>${t.placement===0?'Torneo abandonado':t.placement===1?'🏆 ¡Campeón!':t.placement===5?'Eliminado en cuartos · puestos 5–8':`Puesto ${t.placement}${t.kind==='legends'&&t.placement===3?'–4':''}`}</h3><p>${t.reward?`🧭 +${t.reward.toLocaleString('es')} Log Poses añadidos a tu cuenta.`:t.pendingRelics.length?'🏺 Elige tu reliquia de campeón.':t.relicReward?`🏺 Reliquia obtenida: ${esc(RELICS[t.relicReward].name)}`:'Sin premio de Log Poses.'}</p></div>`:`<button class="btn blue" id="challenge-fight">⚔️ ${t.bronze?'LUCHAR POR EL TERCER PUESTO':'SIGUIENTE COMBATE'}</button><button class="btn gray" id="challenge-abandon">ABANDONAR TORNEO</button>`}
+    ${t.finished?`<div class="challenge-result" role="status"><h3>${t.placement===0?'Torneo abandonado':t.placement===1?'🏆 ¡Campeón!':t.placement===5?'Eliminado en cuartos · puestos 5–8':`Puesto ${t.placement}${t.kind==='legends'&&t.placement===3?'–4':''}`}</h3><p>${t.reward?`🧭 +${t.reward.toLocaleString('es')} Log Poses añadidos a tu cuenta.`:t.pendingRelics.length?'🏺 Elige tu reliquia de campeón.':t.relicReward?`🏺 Reliquia obtenida: ${esc(RELICS[t.relicReward].name)}`:'Sin premio de Log Poses.'}</p></div>`:`<button class="btn gray" id="challenge-abandon">ABANDONAR TORNEO</button>`}
     ${t.pendingRelics.length?`<div class="relic-grid">${t.pendingRelics.map(id=>`<article class="relic-card">${relicDetailsHTML(RELICS[id])}<button class="btn gold" data-claim-relic="${id}">ELEGIR</button></article>`).join('')}</div>`:''}
     ${t.relicReward?'<button class="btn gold" id="challenge-equip">EQUIPAR RELIQUIA</button>':''}</section>`);
   $('#btn-back').onclick=screenChallenges;
   if(!t.finished){$('#challenge-fight').onclick=playChallengeMatch;$('#challenge-abandon').onclick=()=>modalConfirm('¿Abandonar torneo?','Terminarás este torneo sin premio.',()=>{finishChallenge(0);screenChallenges();});}
   document.querySelectorAll('[data-claim-relic]').forEach(el=>el.onclick=()=>{if(claimChallengeRelic(el.dataset.claimRelic))screenChallengeBracket();});
   if(t.relicReward)$('#challenge-equip').onclick=showRelicCollection;
+  $('#challenge-title').focus();
 }
 
 // ============ INICIO ============

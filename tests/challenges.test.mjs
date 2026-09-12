@@ -115,3 +115,47 @@ test('local multiplayer ignores any relic snapshot from an imported fighter',()=
  const h=harness();h.exec(`const f=makeChar('shanks',65,false,true);f.battleRelic='relic_shanks';battle={opts:{local:true}};`);
  assert.equal(h.exec('equippedRelic(f)'),null);assert.equal(h.exec('relicStatMult(f)'),1);
 });
+test('both challenges use each player permanent level, including after resuming an old bracket',()=>{
+ for(const kind of ['tournament','legends']){
+  const h=harness();h.exec(`meta.charUpgrades={zoro:7,shanks:42,roger:61};meta.upgrades={shanks:{atk:4}};
+   run={mode:'nuzlocke',saga:9,diff:5,team:[makeChar('luffy',99)],items:{}};const before=JSON.stringify(run);
+   startChallenge('${kind}',${kind==='legends'?"['shanks','roger']":"['zoro']"});playChallengeMatch();`);
+  assert.deepEqual(Array.from(h.exec('battle.pTeam.map(f=>f.lvl)')),kind==='legends'?[47,66]:[12]);
+  assert.equal(h.exec('battle.pTeam.every(f=>f.lvl===startLvlOf(f.id)&&f.hp===f.maxhp)'),true);
+  if(kind==='legends')assert.equal(h.exec('battle.pTeam[0].atk===statAt(CHARS.shanks.base[1],47)+8'),true);
+  assert.equal(h.exec('JSON.stringify(run)===before'),true);
+  h.exec(`battle=null;endChallengeBattle(true);loadedSave=JSON.parse(JSON.stringify(GameSaveStorage.payload(meta,null)));loadMeta();meta.charUpgrades.${kind==='legends'?'shanks':'zoro'}+=3;playChallengeMatch();`);
+  assert.equal(h.exec('battle.pTeam[0].lvl'),kind==='legends'?50:15);
+  assert.equal(h.exec('battle.pTeam.every(f=>f.lvl!==meta.challenge.level)'),true);
+ }
+});
+test('forms follow permanent levels even when the event level is below or above that level',()=>{
+ const h=harness();h.exec(`meta.charUpgrades={luffy:95};`);
+ assert.equal(h.exec(`startChallenge('tournament',['luffy5'])`),true);
+ h.exec('playChallengeMatch();');assert.equal(h.exec('battle.pTeam[0].id'),'luffy5');assert.equal(h.exec('battle.pTeam[0].lvl'),100);
+ const low=harness();low.exec(`meta.charUpgrades={luffy:10};`);
+ assert.equal(low.exec(`challengePool('tournament').includes('luffy')`),true);
+ assert.equal(low.exec(`challengePool('legends').includes('luffy5')`),false);
+});
+test('every challenge rival has its own affinity, without granting relics to the player',()=>{
+ for(const kind of ['tournament','legends']){
+  const h=harness();h.exec(`meta.relics=['relic_roger'];meta.relicEquipment={roger:'relic_roger'};const inventory=JSON.stringify([meta.relics,meta.relicEquipment]);
+   startChallenge('${kind}',${kind==='legends'?"['shanks','roger']":"['zoro']"});playChallengeMatch();`);
+  assert.equal(h.exec('battle.eTeam.every(f=>equippedRelic(f)?.character===baseFormOf(f.id)&&relicStatMult(f)===1.10&&Object.keys(relicRule(f)).length>0)'),true);
+  assert.equal(h.exec('JSON.stringify([meta.relics,meta.relicEquipment])===inventory'),true);
+  assert.equal(h.exec('battle.pTeam[0].battleRelic'),null);
+  if(kind==='legends')assert.equal(h.exec('battle.pTeam[1].battleRelic'),'relic_roger');
+  h.exec('battle=null;endChallengeBattle(true);playChallengeMatch();');
+  assert.equal(h.exec('battle.eTeam.every(f=>equippedRelic(f)?.character===baseFormOf(f.id))'),true);
+ }
+});
+test('affine enemy relic hooks apply to evolved rivals and reset outside challenges',()=>{
+ const h=harness();h.exec(`const enemies=['luffy5','katakuri','brook','aokiji'].map(id=>makeChar(id,65,false,true));
+ const team=[makeChar('shanks',30,false,true)];startBattle(enemies,{challenge:true,team,items:{}});`);
+ assert.equal(h.exec('enemies[0].battleRelic'),'relic_luffy');
+ assert.equal(h.exec('enemies[1].dodgeLeft'),3);assert.equal(h.exec('enemies[2].ultCharge'),68);
+ h.exec(`Math.random=()=>.5;attackWith(enemies[3],team[0],MOVES.punetazo,'player');`);
+ assert.equal(h.exec('team[0].st.slowRate'),.30);
+ h.exec(`run={mode:'classic',saga:0,team,items:{}};team[0].hp=team[0].maxhp;startBattle(enemies,{wild:true});`);
+ assert.equal(h.exec('enemies.every(f=>f.battleRelic===null)'),true);
+});

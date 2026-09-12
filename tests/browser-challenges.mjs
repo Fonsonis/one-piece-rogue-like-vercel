@@ -13,18 +13,45 @@ try{
  await page.waitForSelector('#mode-challenge');
  await page.evaluate(()=>{
    meta.accXp=xpForAccLevel(50);SAGAS.forEach(s=>meta.sagaDiffWins[s.id]={3:true});
-   meta.roster=['luffy','zoro','shanks','roger'];meta.charUpgrades={luffy:95};saveMeta();screenHome();
+   meta.roster=[...new Set(['luffy','zoro','shanks','roger',...Object.keys(CHARS).filter(id=>!BASE_OF[id]&&CHARS[id].rareza===5)])];meta.charUpgrades={luffy:95,shanks:42,roger:61,zoro:7};saveMeta();screenHome();
  });
  await page.locator('#mode-challenge').click();
  await page.screenshot({path:'outputs/challenges/events-desktop.png',fullPage:true});
  await page.locator('[data-challenge="legends"]').click();
- await page.locator('[data-challenge-pick="shanks"]').click();await page.locator('[data-challenge-pick="roger"]').click();
+ await page.locator('[data-challenge-slot="0"]').click();
+ assert.equal(await page.locator('#np-close').evaluate(el=>el===document.activeElement),true);
+ assert.equal(await page.locator('#np-roster .nakama-picker-card').count(),12);
+ await page.locator('#np-next').click();assert.match(await page.locator('#np-page').innerText(),/Página 2/);
+ await page.locator('#np-search').fill('zoro');assert.equal(await page.locator('#np-roster .nakama-picker-card').count(),0);
+ await page.locator('#np-reset').click();await page.locator('#np-search').fill('shanks');
+ await page.locator('#np-roster [data-info="shanks"]').click();await page.keyboard.press('Escape');
+ assert.equal(await page.locator('#np-roster [data-info="shanks"]').evaluate(el=>el===document.activeElement),true);
+ await page.locator('#np-roster [data-id="shanks"]').click();
+ await page.setViewportSize({width:390,height:844});
+ await page.locator('[data-challenge-slot="1"]').click();await page.locator('#np-reset').click();
+ await page.evaluate(()=>{meta.settings.theme='dark';applyDisplayPreferences();});
+ await page.screenshot({path:'outputs/challenges/picker-mobile-dark.png',fullPage:true});
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+ await page.locator('#np-close').focus();await page.keyboard.press('Shift+Tab');
+ assert.equal(await page.locator('#np-next').evaluate(el=>el===document.activeElement),true);
+ await page.keyboard.press('Tab');assert.equal(await page.locator('#np-close').evaluate(el=>el===document.activeElement),true);
+ await page.evaluate(()=>{meta.settings.theme='light';applyDisplayPreferences();});
+ await page.locator('#np-search').fill('roger');await page.locator('#np-roster [data-id="roger"]').click();
+ assert.match(await page.locator('#challenge-slots').innerText(),/Nv. 47/);
+ assert.match(await page.locator('#challenge-slots').innerText(),/Nv. 66/);
+ await page.locator('[data-challenge-info="0"]').click();await page.keyboard.press('Escape');
+ assert.equal(await page.locator('[data-challenge-info="0"]').evaluate(el=>el===document.activeElement),true);
+ await page.screenshot({path:'outputs/challenges/selection-mobile.png',fullPage:true});
+ await page.setViewportSize({width:1360,height:900});
+ await page.screenshot({path:'outputs/challenges/selection-desktop.png',fullPage:true});
  await page.locator('#challenge-start').click();
  assert.equal(await page.locator('.challenge-match').count(),2);
  await page.reload({waitUntil:'domcontentloaded'});await page.locator('#mode-challenge').click();await page.locator('#challenge-resume').click();
  await page.locator('#challenge-fight').click();
  await page.evaluate(()=>{clearTimeout(battle.timer);battle.waiting=true;});
  assert.equal(await page.locator('.fcard:visible').count(),4);
+ assert.deepEqual(await page.evaluate(()=>battle.pTeam.map(f=>f.lvl)),[47,66]);
+ assert.ok(await page.evaluate(()=>battle.eTeam.every(f=>equippedRelic(f)?.character===baseFormOf(f.id))));
  await page.screenshot({path:'outputs/challenges/duos-desktop.png',fullPage:true});
  await page.setViewportSize({width:390,height:844});
  await page.screenshot({path:'outputs/challenges/duos-mobile.png',fullPage:true});
@@ -33,7 +60,7 @@ try{
  // Let actual attacks and timers resolve both rounds; weaken test opponents only.
  const winFight=async()=>{
    await page.evaluate(()=>{clearTimeout(battle.timer);battle.waiting=false;battle.speed=100;
-    battle.eTeam.forEach(f=>{f.hp=1;f.dodgeLeft=0;});battle.pTeam.forEach(f=>{f.atk*=100;f.spatk*=100;});
+    battle.eTeam.forEach(f=>{f.hp=1;f.dodgeLeft=0;f.atk=f.spatk=1;});battle.pTeam.forEach(f=>{f.atk*=100;f.spatk*=100;f.spd=999999;});
     scheduleRound(0);});
    await page.waitForSelector('#challenge-fight, .challenge-result',{timeout:20000});
  };
@@ -47,7 +74,7 @@ try{
  await page.reload({waitUntil:'domcontentloaded'});
  assert.equal(await page.evaluate(()=>meta.relicEquipment.shanks),'relic_shanks');
  assert.equal(await page.evaluate(()=>meta.challenge.pendingRelics.length),0);
- await page.locator('#mode-challenge').click();await page.locator('[data-challenge="tournament"]').click();await page.locator('[data-challenge-pick="zoro"]').click();await page.locator('#challenge-start').click();
+ await page.locator('#mode-challenge').click();await page.locator('[data-challenge="tournament"]').click();await page.locator('[data-challenge-slot="0"]').click();await page.locator('#np-search').fill('zoro');await page.locator('#np-roster [data-id="zoro"]').click();await page.locator('#challenge-start').click();
  await page.screenshot({path:'outputs/challenges/bracket-mobile.png',fullPage:true});
  await page.locator('#challenge-fight').click();await winFight();
  await page.locator('#challenge-fight').click();

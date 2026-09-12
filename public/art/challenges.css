@@ -1,0 +1,41 @@
+/* Match the shared inventory and nakama picker: readable text and touch targets. */
+#app .panel.challenge-panel { max-width:1080px; padding:20px; color:var(--ink); font:14px/1.6 system-ui,sans-serif; }
+#app .challenge-panel h2 { font:700 24px/1.3 system-ui,sans-serif; margin:0 0 16px; text-align:left; }
+#app .challenge-panel h3 { font:700 18px/1.4 system-ui,sans-serif; margin:10px 0; }
+#app .challenge-panel p { font:inherit; margin:12px 0; }
+#app .challenge-panel :is(.btn,input,select,summary) { min-height:44px; font:600 14px/1.5 system-ui,sans-serif; }
+#app .challenge-panel :is(button,input,select,summary):focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+#app .challenge-panel label { font:600 14px/1.4 system-ui,sans-serif; }
+#app .challenge-panel :is(input,select) { color:var(--ink); background:var(--paper); border:1px solid #879d9c; border-radius:6px; }
+#app .challenge-panel :is(.challenge-event,.relic-card,.challenge-launch) { background:var(--paper); color:var(--ink); }
+#app .challenge-panel .challenge-prizes { font:700 16px/1.5 system-ui,sans-serif; }
+#app .challenge-panel .challenge-match { font:14px/1.5 system-ui,sans-serif; background:var(--paper); }
+#app .challenge-panel .challenge-match .winner { background:var(--paper-dark); color:var(--ink); font-weight:700; }
+#app .challenge-panel .challenge-launch { position:static; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-top:20px; border-radius:8px; }
+.challenge-team-slots { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,250px),1fr)); gap:16px; }
+.challenge-slot { min-width:0; padding:16px; border:2px solid #91aaa9; border-radius:8px; background:var(--paper); text-align:center; }
+.challenge-slot-pick { display:flex; flex-direction:column; align-items:center; gap:8px; width:100%; min-height:200px; padding:12px; border:1px dashed #79939c; border-radius:8px; background:var(--paper-dark); color:var(--ink); font:14px/1.5 system-ui,sans-serif; cursor:pointer; }
+.challenge-slot-pick strong { font-size:18px; overflow-wrap:anywhere; }
+.challenge-slot-pick:disabled { cursor:default; opacity:.6; }
+.challenge-slot-plus { font-size:40px; }
+.challenge-slot .type-badges { justify-content:center; flex-wrap:wrap; }
+.challenge-next { padding:16px; border:2px solid var(--sea); border-radius:8px; background:var(--paper); }
+.challenge-rules { margin:12px 0; border-top:1px solid #91aaa9; }
+.challenge-rules summary { display:list-item; padding:12px 4px; cursor:pointer; }
+.challenge-rival-relic + .challenge-rival-relic { margin-top:16px; border-top:1px solid #91aaa9; }
+.challenge-notice { padding:12px; border:1px solid #b68b28; border-radius:8px; background:var(--paper-dark); }
+#app .challenge-panel .relic-card small { font:13px/1.5 system-ui,sans-serif; }
+@media(max-width:540px) {
+  #app .panel.challenge-panel { padding:14px; margin:12px 0; }
+  #app .challenge-panel h2 { font-size:21px; }
+  #app .challenge-panel h3 { font-size:17px; }
+  .challenge-team-slots { grid-template-columns:1fr; }
+  .challenge-slot-pick { min-height:150px; }
+  #app .challenge-panel .challenge-launch { padding:12px 0; }
+  #app .challenge-panel .challenge-launch .btn { width:100%; }
+  .challenge-next > .btn { width:100%; }
+}
+#app:has(.challenge-panel) > .back-btn { position:static; min-height:44px; font:600 14px/1.5 system-ui,sans-serif; }
+html[data-theme="dark"] .challenge-nakama-picker .btn { background:var(--paper-dark); color:var(--ink); border-color:#91aaa9; }
+html[data-theme="dark"] .challenge-nakama-picker .nakama-picker-scopes .btn[aria-pressed="true"] { background:#37677a; color:#fff; }
+html[data-theme="dark"] .challenge-nakama-picker .btn:disabled { opacity:1; color:#a6b6bd; border-color:#526a74; }
