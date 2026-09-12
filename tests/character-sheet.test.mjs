@@ -4,6 +4,7 @@ import {combatHarness} from './balance-harness.mjs';
 
 function modalHarness() {
  const h=combatHarness(),overlays=[];
+ h.ctx.queueMicrotask=fn=>fn();
  h.ctx.document.body={appendChild:ov=>overlays.push(ov)};
  h.ctx.document.createElement=()=>{
   const ov={nodes:new Map(),html:'',remove(){this.removed=true;},querySelector(selector){
@@ -21,7 +22,7 @@ function modalHarness() {
 }
 
 
-test('sheet upgrade spends the current cost, refreshes evolution and keeps its overlay and close callback',()=>{
+test('sheet upgrade spends the current cost, keeps the base phase and preserves its overlay and close callback',()=>{
  const {h,overlays}=modalHarness();
  h.exec(`meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));
  meta.charUpgrades={luffy:14};meta.logPoses=10000;showCharModal('luffy');`);
@@ -33,7 +34,8 @@ test('sheet upgrade spends the current cost, refreshes evolution and keeps its o
  assert.equal(h.exec('meta.logPoses'),10000-cost);
  assert.equal(overlays.length,1);
  assert.equal(ov.querySelector('.modal').scrollTop,140);
- assert.match(ov.html,/Luffy Gear 2/);
+ assert.match(ov.html,/data-character="luffy"/);
+ assert.match(ov.html,/Fase 1 de 5/);
  assert.match(ov.html,/Subir a Nivel 21/);
  ov.querySelector('#sheet-upg-btn').onclick();
  assert.equal(h.exec("startLvlOf('luffy')"),21);

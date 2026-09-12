@@ -68,8 +68,13 @@ try{
  assert.equal(await page.locator('[data-claim-relic]').count(),3);
  await page.screenshot({path:'outputs/challenges/reward-mobile.png',fullPage:true});
  await page.locator('[data-claim-relic="relic_shanks"]').click();await page.locator('#challenge-equip').click();
- await page.locator('[data-equip-relic="relic_shanks"]').selectOption('shanks');
- assert.match(await page.locator('.relic-card').innerText(),/Pasiva de afinidad activa/);
+ assert.equal(await page.locator('[data-equip-relic]').count(),0);
+ await page.keyboard.press('Escape');
+ await page.locator('#btn-back').click();await page.locator('#btn-back').click();
+ await page.locator('#btn-inventory').click();await page.locator('#inv-q').fill('shanks');
+ await page.locator('.btn-info-inv[data-id="shanks"]').click();
+ await page.locator('#sheet-relic-select').selectOption('relic_shanks');
+ assert.match(await page.locator('.sheet-relic-status').innerText(),/Afinidad activa/);
  await page.screenshot({path:'outputs/challenges/equipped-mobile.png',fullPage:true});
  await page.reload({waitUntil:'domcontentloaded'});
  assert.equal(await page.evaluate(()=>meta.relicEquipment.shanks),'relic_shanks');

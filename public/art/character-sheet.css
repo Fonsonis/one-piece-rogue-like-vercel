@@ -92,3 +92,16 @@ html[data-theme="dark"] .char-sheet .char-sheet-hero { background:linear-gradien
 @media(prefers-reduced-motion:reduce) {
   .char-sheet .char-sheet-sprite .dex-sprite { animation:none!important; }
 }
+.char-sheet .sheet-relic h3 { margin:0 0 10px; color:var(--ink); font:750 16px/1.4 system-ui,sans-serif; }
+.char-sheet .sheet-relic label { display:flex; flex-direction:column; gap:6px; margin-top:14px; font-weight:650; }
+.char-sheet .sheet-relic select { width:100%; min-width:0; min-height:44px; padding:9px; border:1px solid var(--sheet-line); border-radius:7px; background:var(--paper); color:var(--ink); font:14px/1.4 system-ui,sans-serif; }
+.char-sheet .sheet-relic select:focus-visible { outline:3px solid var(--accent); outline-offset:3px; }
+.char-sheet .sheet-relic .sheet-relic-help { color:var(--sheet-muted); }
+.char-sheet .sheet-relic { overflow-wrap:anywhere; }
+.char-sheet #sheet-relic-feedback:empty { display:none; }
+.char-sheet .sheet-phase-nav { position:absolute; top:130px; left:8px; right:8px; display:flex; justify-content:space-between; pointer-events:none; z-index:2; }
+.char-sheet .sheet-phase-arrow { display:grid; place-items:center; width:44px; height:44px; padding:0; border:1px solid var(--sheet-line); border-radius:50%; background:var(--paper); color:var(--ink); font:32px/1 system-ui,sans-serif; opacity:.85; cursor:pointer; pointer-events:auto; box-shadow:0 2px 8px #10253324; }
+.char-sheet .sheet-phase-arrow:hover,.char-sheet .sheet-phase-arrow:focus-visible { opacity:1; }
+.char-sheet .sheet-phase-arrow:disabled { opacity:.3; cursor:default; }
+.char-sheet .sheet-phase-caption { margin:12px 0 4px; color:var(--ink); font:650 12px/1.5 system-ui,sans-serif; }
+@media(max-width:600px) { .char-sheet .sheet-phase-nav { top:95px; } }

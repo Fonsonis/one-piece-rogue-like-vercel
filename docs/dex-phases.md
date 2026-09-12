@@ -1,0 +1,11 @@
+# Dex por personaje y fases
+
+La Dex contiene una carta por identidad base (426 entradas en el catálogo actual). Sus 71 transformaciones se consultan dentro de la ficha, siguiendo los enlaces `CHARS[id].evo` en orden. Las cartas muestran la base y el número de fases, y son accesibles con teclado.
+
+Las fichas abiertas desde la Dex, Inventario o selectores empiezan siempre por la base, aunque el nivel permanente permita una forma posterior. Las flechas sobre el sprite recorren sus fases; cada paso reconstruye el nombre, sprite, rareza, tipos, estadísticas, ataques, pasiva, definitiva, descripción y animaciones de vista previa. Los valores se muestran al nivel permanente actual para poder comparar fases. Las formas pendientes se pueden consultar y llevan su requisito de nivel base y de partida. Consultarlas no desbloquea nada, no añade avistamientos ni cambia el equipo real. Las fichas de combatientes mantienen su forma y valores actuales, sin navegación de fases.
+
+Buscar o combinar filtros de nombre, tipo y rareza puede encontrar cualquier fase, pero devuelve una única carta base. El orden se aplica a los datos base. Si un guardado antiguo solo avistó una evolución, su carta base se considera avistada. Los contadores de la Dex y los logros de colección cuentan identidades una sola vez. Se conservan los registros de avistamientos, reclutas, niveles y premios ya reclamados; no se reescribe el guardado para agruparlo.
+
+Las reliquias se asignan exclusivamente desde la ficha. Todas las fases muestran y editan el mismo hueco de la identidad base. Cambiar de reliquia o subir el nivel conserva la fase que se estaba consultando. El inventario de reliquias permanece como colección de consulta; durante combate el equipo no se puede cambiar.
+
+Validación: `tests/dex-phases.test.mjs` verifica la cobertura de todas las formas, requisitos acumulados, compatibilidad de avistamientos y filtros. `tests/browser-dex-phases.mjs` comprueba las flechas, los datos de todas las cadenas, persistencia, teclado, móvil oscuro, mejoras de nivel desde una fase pendiente y la ficha real en combate. Los recorridos de Inventario y Desafíos verifican que el equipamiento pasa por la ficha.

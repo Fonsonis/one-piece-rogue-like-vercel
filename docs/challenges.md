@@ -18,7 +18,7 @@ Cada una de las 426 identidades del catálogo tiene su reliquia; las 71 transfor
 
 Todas las reliquias conceden +10% ATQ, ESP.ATQ, DEF, ESP.DEF y VEL a cualquier portador. La pasiva adicional solo funciona con su identidad afín. Las curaciones respetan el Clímax y las auras necesitan que su portador siga vivo. Los multiplicadores se calculan durante el combate y no se acumulan sobre las estadísticas guardadas. Las reliquias no afectan al multijugador local.
 
-El campeón de Leyendas elige una entre tres reliquias: se priorizan las afinidades de su pareja y las identidades que aún no tenga en su colección. Cuando tiene toda la colección, se registran copias adicionales. Un personaje tiene un hueco y cada ID de reliquia solo puede estar equipado en un portador simultáneamente. El menú Reliquias permite equipar en cualquier nakama desbloqueado o dejar sin equipar; los cambios se aplican al siguiente combate.
+El campeón de Leyendas elige una entre tres reliquias: se priorizan las afinidades de su pareja y las identidades que aún no tenga en su colección. Cuando tiene toda la colección, se registran copias adicionales. Un personaje tiene un hueco y cada ID de reliquia solo puede estar equipado en un portador simultáneamente. El acceso «Reliquias · Ver colección» del Inventario abre la colección de consulta con búsqueda por nombre o afinidad, páginas de 12 reliquias, efectos, portador actual y copias. Para equipar, mover, sustituir o quitar una reliquia se usa exclusivamente el selector de la ficha del personaje (la afinidad aparece primero). Los cambios se guardan para el siguiente combate. Cada tarjeta de nakama muestra su reliquia y si tiene afinidad activa. Cerrar la colección conserva los filtros, página y desplazamiento del inventario y devuelve el foco al acceso. Desafíos y su premio abren el mismo diálogo de consulta.
 
 ## Validación
 
@@ -27,3 +27,9 @@ El campeón de Leyendas elige una entre tres reliquias: se priorizan las afinida
 - `PLAYWRIGHT_MODULE=/ruta/a/playwright node tests/browser-challenges.mjs` con servidor local en el puerto 4175 y Chrome instalado. Usa un contexto de navegador aislado, sin tocar la partida del usuario.
 
 La prueba de navegador recorre selección, guardado y recarga, dos combates reales de parejas (con rivales debilitados en el contexto de prueba), elección de recompensa, equipamiento con afinidad, torneo individual con derrota en semifinal y victoria por el bronce, persistencia del premio y anchura móvil. Capturas en `outputs/challenges/`.
+
+La prueba `tests/browser-inventory-relics.mjs` verifica el acceso desde Inventario, colección vacía, búsqueda, paginación, equipar/mover/sustituir/desequipar, guardado tras recargar, bloqueo durante combate y navegación por teclado en escritorio y móvil oscuro.
+
+La ficha de personaje muestra su reliquia guardada fuera del combate y permite elegir cualquier reliquia obtenida o «Sin equipar». Las opciones priorizan la afinidad e indican si hay otro portador. Las evoluciones usan el equipo de su identidad base; los personajes no reclutados no permiten equipar. Durante combate se consulta la reliquia real de ese combatiente, también en rivales, y el multijugador local conserva la exclusión de reliquias. Al cerrar una ficha desde Inventario, la tarjeta se actualiza y conserva filtros y foco.
+
+En Inventario, el encabezado, la búsqueda, los filtros y la lista comparten una única zona de desplazamiento. Cerrar y la paginación flotan sobre ella. Cambiar de página lleva a la primera fila de nakamas; al volver de una ficha o de Reliquias se conserva la posición. El margen inferior permite descubrir por completo la última fila bajo los controles.
