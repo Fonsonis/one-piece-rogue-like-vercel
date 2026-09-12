@@ -2833,16 +2833,7 @@ function showNakamaPicker(opts) {
       const returnToPicker = () => { sheet.remove(); btn.focus(); };
       closeSheet.onclick = returnToPicker;
       sheet.onclick = e => { if (e.target === sheet) returnToPicker(); };
-      sheet.onkeydown = e => {
-        if (e.key === 'Escape') { e.preventDefault(); returnToPicker(); }
-        if (e.key === 'Tab') {
-          const buttons = [...sheet.querySelectorAll('button:not(:disabled)')];
-          const first = buttons[0], last = buttons[buttons.length - 1];
-          if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
-          else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
-        }
-      };
-      closeSheet.focus();
+      bindCollectionDialog(sheet,returnToPicker,'#sheet-close');
     });
   };
   find('#np-close').onclick = close;
@@ -2942,7 +2933,7 @@ function showInventoryModal(opts = {}) {
     ov.querySelectorAll('.btn-info-inv').forEach(btn=>btn.onclick=()=>{
       showCharModal(btn.dataset.id);
       const sheet=document.querySelector('#sheet-close')?.closest('.overlay');if(!sheet)return;
-      const closeSheet=()=>{sheet.remove();if(btn.isConnected)btn.focus({preventScroll:true});};
+      const closeSheet=()=>{sheet.remove();refresh(`.btn-info-inv[data-id="${btn.dataset.id}"]`);};
       sheet.querySelector('#sheet-close').onclick=closeSheet;
       sheet.onclick=e=>{if(e.target===sheet)closeSheet();};
       sheet.querySelector('.modal').setAttribute('role','dialog');sheet.querySelector('.modal').setAttribute('aria-modal','true');sheet.querySelector('.modal').setAttribute('aria-label',`Ficha de ${CHARS[evolutionFormAt(btn.dataset.id,startLvlOf(btn.dataset.id))].name}`);
@@ -5052,6 +5043,10 @@ function showCharModal(fOrId, existingOverlay = null) {
   const lore = (typeof LORE !== 'undefined' && LORE) ? (LORE[f.id] || LORE[baseFormOf(f.id)] || {}) : {};
   const pInfo = passiveInfo(f);
   const ultMv = getUltimateMove(f);
+  const relicBase=baseFormOf(f.id),ownsCharacter=challengeOwnedBases().includes(relicBase);
+  const inBattle=battle&&(battle.pTeam.includes(f)||battle.eTeam.includes(f));
+  const sheetRelic=inBattle?equippedRelic(f):(ownsCharacter&&meta.relics.includes(meta.relicEquipment?.[relicBase])?RELICS[meta.relicEquipment[relicBase]]:null);
+  const ownedRelics=[...new Set(meta.relics)].filter(id=>RELICS[id]).sort((a,b)=>Number(RELICS[b].character===relicBase)-Number(RELICS[a].character===relicBase)||RELICS[a].name.localeCompare(RELICS[b].name,'es'));
 
   const stats = [
     ['PS', f.maxhp, 45, f.hpBonus || 0],
@@ -5075,7 +5070,8 @@ function showCharModal(fOrId, existingOverlay = null) {
   const isMaxLvl = f.lvl >= cap;
 
   const ov = existingOverlay || document.createElement('div');
-  const closeSheet = existingOverlay?.querySelector('#sheet-close')?.onclick || (() => ov.remove());
+  const previousFocus=document.activeElement;
+  const closeSheet = existingOverlay?.querySelector('#sheet-close')?.onclick || (() => {ov.remove();if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});});
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal char-sheet" role="dialog" aria-modal="true" aria-label="Ficha de ${collectionText(c.name)}">
     <h2><span style="font-size:26px;vertical-align:middle;">${charIcon(f.id, 34)}</span> ${c.name}${rarityTag}${fusionTag} <small>Nv.${f.lvl}</small></h2>
@@ -5088,7 +5084,15 @@ function showCharModal(fOrId, existingOverlay = null) {
     </div>
     ${typeBadges(fTypes)}
     ${isLive ? xpBarHTML(f) : ''}
-    ${equippedRelic(f) ? `<div class="sheet-section">${relicDetailsHTML(equippedRelic(f))}<p>${equippedRelic(f).character===baseFormOf(f.id)?'✨ Afinidad activa':'Boost común activo'}</p></div>` : ''}
+    <section class="sheet-section sheet-relic" aria-labelledby="sheet-relic-title">
+      <h3 id="sheet-relic-title">🏺 Reliquia equipada</h3>
+      ${sheetRelic?`${relicDetailsHTML(sheetRelic)}<p class="sheet-relic-status">${sheetRelic.character===relicBase?'✨ Afinidad activa':'Boost común activo · Pasiva de afinidad inactiva'}</p>`:'<p>Sin reliquia equipada.</p>'}
+      ${ownsCharacter&&!battle?`<label for="sheet-relic-select">Equipar a ${esc(c.name)}<select id="sheet-relic-select" ${ownedRelics.length?'':'disabled'}><option value="">Sin equipar</option>${ownedRelics.map(id=>{
+        const r=RELICS[id],owner=Object.keys(meta.relicEquipment||{}).find(base=>meta.relicEquipment[base]===id);
+        return `<option value="${id}" ${sheetRelic?.id===id?'selected':''}>${esc(r.name)}${r.character===relicBase?' · ✨ AFINIDAD':''}${owner&&owner!==relicBase?` · En ${esc(CHARS[owner].name)}`:''}</option>`;
+      }).join('')}</select></label><p class="sheet-relic-help">${ownedRelics.length?'Los cambios se guardan para el siguiente combate. Elegir una reliquia de otro nakama la mueve a este personaje.':'Gana Batalla de Leyendas en Desafíos para obtener reliquias.'}</p>`:`<p class="sheet-relic-help">${battle?'Termina el combate para cambiar las reliquias.':'Recluta a este personaje para equiparle una reliquia.'}</p>`}
+      <p id="sheet-relic-feedback" role="status" aria-live="polite"></p>
+    </section>
     ${f.stars ? `<div class="sheet-line" style="color:var(--gold);background:rgba(255,215,0,0.1);padding:4px 8px;border-radius:4px;"><b>⭐ Fusión ${f.stars} Estrellas</b> — +${f.stars * 5}% a todas las características en esta partida</div>` : ''}
     ${isLive ? `<div class="sheet-line" style="color:var(--gold);font-weight:bold;">📍 Características reales en combate (Nivel, Fusiones y Barco)</div>` : `<div class="sheet-line" style="color:var(--gold);font-weight:bold;">📍 Nivel base e incentivos del barco actuales${hasUpgrades ? ' (incluye mejoras del barco)' : ''}</div>`}
     ${!isLive ? `
@@ -5142,6 +5146,20 @@ function showCharModal(fOrId, existingOverlay = null) {
     </div>
   </div>`;
   if (!existingOverlay) document.body.appendChild(ov);
+  const relicSelect=ov.querySelector('#sheet-relic-select');
+  if(relicSelect)relicSelect.onchange=()=>{
+    const next=relicSelect.value,current=meta.relicEquipment?.[relicBase];
+    if(!(next?equipRelic(next,relicBase):current&&equipRelic(current,'')))return;
+    const scrollTop=ov.querySelector('.modal').scrollTop;
+    showCharModal(fOrId,ov);
+    // The sheet presentation observer moves these nodes after rendering. Restore focus afterwards.
+    queueMicrotask(()=>{
+      if(!ov.isConnected)return;
+      ov.querySelector('.modal').scrollTop=scrollTop;
+      ov.querySelector('#sheet-relic-select')?.focus({preventScroll:true});
+    });
+    ov.querySelector('#sheet-relic-feedback').textContent=next?`${RELICS[next].name} equipada.`:'Reliquia desequipada.';
+  };
   const upgradeBtn = ov.querySelector('#sheet-upg-btn');
   if (upgradeBtn) {
     let upgrading = false;
@@ -5179,7 +5197,10 @@ function showCharModal(fOrId, existingOverlay = null) {
     };
   }
   ov.querySelector('#sheet-close').onclick = closeSheet;
-  if (!existingOverlay) ov.onclick = e => { if (e.target === ov) closeSheet(); };
+  if (!existingOverlay) {
+    ov.onclick = e => { if (e.target === ov) closeSheet(); };
+    bindCollectionDialog(ov,closeSheet,'#sheet-close');
+  }
 }
 
 // ============ EVENTO: CROSSGUILD ============
