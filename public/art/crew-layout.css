@@ -116,3 +116,17 @@ div:has(> #chk-music-toggle) { flex-direction:column; align-items:stretch!import
   .battle-layout .fcard-stats-mini .combat-stat { display:inline-flex; align-items:center; gap:3px; white-space:nowrap; }
   .battle-layout .battle-sidebar .btn { min-height:44px; font-size:clamp(7px,1.8vw,10px); }
 }
+
+/* En Leyendas luchan las dos parejas: ninguna carta es una reserva oculta. */
+#app .battle-layout.challenge-duos .battle-side .fcard {
+  display:grid; grid-template-columns:minmax(0,1fr);
+  grid-template-rows:auto auto auto minmax(80px,1fr) auto auto;
+  flex:0 0 245px; min-height:245px; margin:4px 0;
+  background:transparent; border:1px solid #9b8a6980;
+}
+#app .battle-layout.challenge-duos .battle-cols { min-height:570px; }
+#app .battle-layout.challenge-duos .fcard-sprite .sprite { --sprite-size:100px; }
+#app .battle-layout.challenge-duos .battle-side { overflow:visible; }
+#app .battle-layout.challenge-duos .xp-progress { display:none; }
+html[data-theme="dark"] .challenge-panel :is(.challenge-event,.relic-card,.challenge-launch) { background:var(--paper); color:var(--ink); }
+#battle-backpack .challenge-no-items { font-size:10px; line-height:1.8; padding:10px; }

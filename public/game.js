@@ -7,6 +7,7 @@ let worldNavigator = null, worldShipLocation = null, worldSelection = null;
 const rnd = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a;
 const pick = arr => arr[Math.floor(Math.random() * arr.length)];
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 // Mapa forma evolucionada -> forma base (para el roster de iniciales)
 const BASE_OF = {};
@@ -206,7 +207,7 @@ function runAutoItems(refresh = true) {
   const config = autoBackpackSettings();
   if (!config.enabled) return false;
   const isCombat = typeof battle !== 'undefined' && battle && !battle.over;
-  if (isCombat && battle.waiting) return false;
+  if (isCombat && (battle.waiting || battle.opts?.challenge)) return false;
   if ((isCombat && config.where === 'map') || (!isCombat && config.where === 'combat')) return false;
   const owner = isCombat && battle.tower ? tower : run;
   const team = isCombat ? battle.pTeam : owner?.team;
@@ -415,6 +416,9 @@ const META_DEFAULTS = () => ({
   stats: { kills: 0, items: 0 },
   sagaStats: {}, // sagaId -> repeatable achievement counters
   relics: [],
+  relicEquipment: {},
+  relicCopies: {},
+  challenge: null,
   soloWins: 0,
   logPoses: 0,
   starPity: 0,
@@ -573,6 +577,17 @@ function importSaveFile(file) {
   reader.readAsText(file);
 }
 function validateGameSave(data) {
+  const progress=data.meta,t=progress.challenge;
+  const equipment=Object.entries(progress.relicEquipment||{});
+  if(equipment.some(([id,r])=>!CHARS[id]||baseFormOf(id)!==id||!RELICS[r]||!progress.relics?.includes(r))||
+    new Set(equipment.map(([,r])=>r)).size!==equipment.length) throw new Error('Equipo de reliquias incompatible.');
+  if(t){
+    const ids=t.entrants.flatMap(e=>e.members);
+    if(ids.some(id=>!CHARS[id]||(t.kind==='legends'&&CHARS[id].rareza!==5))||
+      new Set(ids.map(baseFormOf)).size!==8||t.pendingRelics.some(id=>!RELICS[id])||
+      (t.relicReward&&!RELICS[t.relicReward])) throw new Error('Torneo incompatible.');
+  }
+
   for (const [sagaId, value] of Object.entries(data.meta.pirateKingRewards || {})) {
     if (!SAGAS.some(s => s.id === sagaId) || !data.meta.sagaDiffWins?.[sagaId]?.[5] ||
         (value !== 'pending' && !pirateKingLegendaryPool(sagaId).includes(value))) throw new Error('Recompensa de Rey Pirata inválida.');
@@ -3935,6 +3950,7 @@ function showBackpackItem(owner, id, count, combat, refresh) {
 function refreshBattleBackpack() {
   const el = $('#battle-backpack');
   if (!el || !battle) return;
+  if (battle.opts?.challenge) { el.innerHTML = '<p class="challenge-no-items">🏆 Equipo de evento · sin consumibles</p>'; return; }
   const owner = battle.tower ? tower : run;
   if (!owner) return;
   el.innerHTML = backpackHTML(owner,true);
@@ -5067,6 +5083,7 @@ function showCharModal(fOrId, existingOverlay = null) {
     </div>
     ${typeBadges(fTypes)}
     ${isLive ? xpBarHTML(f) : ''}
+    ${equippedRelic(f) ? `<div class="sheet-section">${relicDetailsHTML(equippedRelic(f))}<p>${equippedRelic(f).character===baseFormOf(f.id)?'✨ Afinidad activa':'Boost común activo'}</p></div>` : ''}
     ${f.stars ? `<div class="sheet-line" style="color:var(--gold);background:rgba(255,215,0,0.1);padding:4px 8px;border-radius:4px;"><b>⭐ Fusión ${f.stars} Estrellas</b> — +${f.stars * 5}% a todas las características en esta partida</div>` : ''}
     ${isLive ? `<div class="sheet-line" style="color:var(--gold);font-weight:bold;">📍 Características reales en combate (Nivel, Fusiones y Barco)</div>` : `<div class="sheet-line" style="color:var(--gold);font-weight:bold;">📍 Nivel base e incentivos del barco actuales${hasUpgrades ? ' (incluye mejoras del barco)' : ''}</div>`}
     ${!isLive ? `
@@ -5936,7 +5953,7 @@ function getUltimateMove(f) {
 }
 
 function enemyUltimatesEnabled(b = battle) {
-  if (b?.opts?.local) return true;
+  if (b?.opts?.local || b?.opts?.challenge) return true;
   const marineford = SAGAS.findIndex(s => s.id === 'marineford');
   return !!b && !b.tower && !!run && marineford >= 0 && run.saga >= marineford;
 }
@@ -5960,12 +5977,12 @@ function useUltimate(f) {
 
 function startBattle(enemies, opts) {
   playMusic('combat');
-  const team = opts.tower ? tower.team : run.team;
-  if (!team.some(f => f.hp > 0)) return opts.tower ? towerGameOver() : gameOver();
+  const team = opts.challenge ? opts.team : opts.tower ? tower.team : run.team;
+  if (!team.some(f => f.hp > 0)) return opts.challenge ? endChallengeBattle(false) : opts.tower ? towerGameOver() : gameOver();
   autoSpeed = preferredCombatSpeed();
   battle = {
     pTeam: team, eTeam: enemies,
-    items: opts.tower ? tower.items : run.items,
+    items: opts.challenge ? opts.items : opts.tower ? tower.items : run.items,
     opts, speed: autoSpeed, over: false, waiting: false,
     tower: !!opts.tower,
     timer: null,
@@ -5977,8 +5994,10 @@ function startBattle(enemies, opts) {
   enemies.forEach(e => registerDex(e.id));
   // reinicia pasivas y estados por-combate
   [...battle.pTeam, ...battle.eTeam].forEach(f => {
-    migrateFighter(f, battle.eTeam.includes(f));
-    f.dodgeLeft = passiveRule(f).dodge || 0;
+    migrateFighter(f, battle.eTeam.includes(f) || !!opts.challenge);
+    f.battleRelic = !opts.local && battle.pTeam.includes(f) && meta.relics.includes(meta.relicEquipment?.[baseFormOf(f.id)]) ? meta.relicEquipment[baseFormOf(f.id)] : null;
+    f.dodgeLeft = (passiveRule(f).dodge || 0) + (relicRule(f).dodge || 0);
+    f.ultCharge = Math.max(f.ultCharge || 0, relicRule(f).charge || 0);
     // Carry timed effects through the journey; reset combat-only passive flags.
     const previous = battle.pTeam.includes(f) ? f.st || {} : {};
     f.st = Object.fromEntries(['burn','burnRate','poison','poisonDefense','slow','slowRate','gust','gustBonus']
@@ -6000,9 +6019,9 @@ function battleItemMult(f, stat) {
   return 1 + ((!battle || battle.over) ? 0 : battle.itemBuffs?.get(f)?.[stat] || 0);
 }
 function combatStatsHTML(f) {
-  return `      <span class="combat-stat">⚔️ ATQ ${Math.floor(f.atk * battleItemMult(f,'atk'))}${battleItemMult(f,'atk') > 1 ? ' ↑' : ''}</span>
-      <span class="combat-stat">🛡️ DEF ${Math.floor(f.def * battleItemMult(f,'def'))}${battleItemMult(f,'def') > 1 ? ' ↑' : ''}</span>
-      <span class="combat-stat">⚡ VEL ${f.spd}</span>`;
+  return `      <span class="combat-stat">⚔️ ATQ ${Math.floor(f.atk * battleItemMult(f,'atk') * relicStatMult(f))}${battleItemMult(f,'atk') > 1 ? ' ↑' : ''}</span>
+      <span class="combat-stat">🛡️ DEF ${Math.floor(f.def * battleItemMult(f,'def') * relicStatMult(f))}${battleItemMult(f,'def') > 1 ? ' ↑' : ''}</span>
+      <span class="combat-stat">⚡ VEL ${Math.floor(f.spd * relicStatMult(f))}</span>${equippedRelic(f) ? `<span class="combat-stat" title="${esc(equippedRelic(f).desc)}">🏺 ${equippedRelic(f).character===baseFormOf(f.id)?'Afinidad':'Reliquia'} +10%</span>` : ''}`;
 }
 function hpBarClass(f) {
   const p = f.hp / f.maxhp;
@@ -6065,7 +6084,7 @@ function showBattleCrew() {
   ov.innerHTML = `<div class="modal battle-crew-modal"><h2>👥 Bandas en combate</h2>
     ${[['Tu banda',b.pTeam,b.curP],['Enemigos',b.eTeam,b.curE]].map(([label,team,active],side)=>`
       <h3>${label}</h3>${team.map((f,index)=>`<button class="battle-crew-row" data-crew-side="${side}" data-crew-index="${index}">
-        ${charIcon(f.id,36)}<span><b>${charName(f)}</b> · Nv${f.lvl}<small>${f.hp}/${f.maxhp} PS · ${f.hp <= 0 ? 'Fuera de combate' : f === active ? 'Activo' : 'En reserva'}</small></span><span>ℹ️</span>
+        ${charIcon(f.id,36)}<span><b>${charName(f)}</b> · Nv${f.lvl}<small>${f.hp}/${f.maxhp} PS · ${f.hp <= 0 ? 'Fuera de combate' : b.opts.duos ? 'En combate' : f === active ? 'Activo' : 'En reserva'}</small></span><span>ℹ️</span>
       </button>`).join('')}`).join('')}
     <div class="actions"><button class="btn green" data-close-crew>VOLVER AL COMBATE</button></div></div>`;
   document.body.appendChild(ov);
@@ -6083,7 +6102,7 @@ function controlsHTML() {
   let html = '<div class="battle-control-row battle-tools" aria-label="Controles del combate">';
   html += `<button class="btn small gray battle-crew-button" data-ctl="crew">👥 BANDAS</button>`;
   html += '</div><div class="battle-control-row battle-exit" aria-label="Salir del combate">';
-  if (b.tower) html += `<button class="btn small red" data-ctl="quit">🏳️ RENDIRSE</button>`;
+  if (b.tower || b.opts?.challenge) html += `<button class="btn small red" data-ctl="quit">🏳️ RENDIRSE</button>`;
   return html + '</div>';
 }
 
@@ -6096,7 +6115,7 @@ function battleTeamCount(side) {
 function switchBattleFighter(index) {
   const b = battle;
   const next = b?.pTeam[index];
-  if (!b || b.over || b.waiting || b.switchUsed || !next || next.hp <= 0 ||
+  if (!b || b.opts?.duos || b.over || b.waiting || b.switchUsed || !next || next.hp <= 0 ||
       next === b.curP || b.curP?.hp <= 0 || b.curE?.hp <= 0) return false;
   b.switchUsed = true;
   const previous = b.curP;
@@ -6108,6 +6127,7 @@ function switchBattleFighter(index) {
 
 function reservesHTML() {
   const b = battle;
+  if (b.opts?.duos) return '<div class="battle-reserve-heading">👥 2 CONTRA 2 · Cada personaje vivo actúa una vez por ronda</div>';
   return `<div class="battle-reserve-heading">🏴‍☠️ TU TRIPULACIÓN <span>${b.switchUsed ? 'Relevo usado · 0/1' : 'Toca una reserva · 1 relevo disponible'}</span></div>
     <div class="battle-reserve-list">${b.pTeam.map((f, index) => {
       const active = f === b.curP;
@@ -6133,9 +6153,9 @@ function battleLayoutHTML(logLines, labels = {}) {
   const b = battle;
   const eHead = b.opts.wild ? '🌊' : b.opts.boss ? '💀' : '⚓';
   return `
-    <div class="battle-layout">
+    <div class="battle-layout ${b.opts.duos ? 'challenge-duos' : ''}">
       <div class="battle-main">
-        <div class="battle-cols" style="--scene:url('${b.opts.local ? (b.opts.coop ? '/art/scenes/wano.webp' : '/art/scenes/eastblue.webp') : b.tower ? '/art/scenes/marineford.webp' : (SAGAS[run?.saga || 0]?.img || '/art/scenes/eastblue.webp')}')">
+        <div class="battle-cols" style="--scene:url('${b.opts.challenge ? '/art/scenes/wano.webp' : b.opts.local ? (b.opts.coop ? '/art/scenes/wano.webp' : '/art/scenes/eastblue.webp') : b.tower ? '/art/scenes/marineford.webp' : (SAGAS[run?.saga || 0]?.img || '/art/scenes/eastblue.webp')}')">
           <div class="battle-side" id="side-p">
             <div class="side-head"><div class="trainer">🏴‍☠️</div>${labels.p || 'TU BANDA'}
               <div class="battle-team-count" id="count-p">${battleTeamCount('p')}</div>
@@ -6164,7 +6184,7 @@ function battleLayoutHTML(logLines, labels = {}) {
 
 function renderBattle(logLines) {
   const b = battle;
-  render(`${topbar(!b.tower, !b.tower, true, b.opts.wild && !b.tower)}${battleLayoutHTML(logLines)}`);
+  render(`${topbar(!b.tower && !b.opts.challenge, !b.tower && !b.opts.challenge, true, b.opts.wild && !b.tower)}${battleLayoutHTML(logLines)}`);
   bindControls();
   refreshReserves();
   // En combate: las cartas enemigas muestran su ficha; las cartas aliadas activan la Ultimate si está lista
@@ -6176,6 +6196,7 @@ function renderBattle(logLines) {
           if (side === 'e') {
             showCharModal(f);
           } else {
+            if (b.opts?.duos) return showCharModal(f);
             if (f === b.curP) {
               if (f.lvl >= 20 && (f.ultCharge || 0) >= 100) {
                 useUltimate(f);
@@ -6310,17 +6331,18 @@ function critChanceFor(att) {
   const tD = synergyTier(team, 'Disparo');
   if (tD) c += synergyBonus(team, 'Disparo', .10, .20);
   c += synergyBonus(team, 'Haki', 0, .10);
+  c += relicRule(att).critical || 0;
   return Math.min(.75, c);
 }
 function critDmgFor(att) {
-  let m = BASE_CRIT_DMG;
+  let m = BASE_CRIT_DMG + (relicRule(att).critDamage || 0);
   if (isP(att, 'oden')) m += 0.20;
   const tC = synergyTier(teamOf(att), 'Corte');
   if (tC) m += synergyBonus(teamOf(att), 'Corte', .15, .35);
   return m;
 }
 function evaChanceFor(dfd) {
-  let e = BASE_EVA + (passiveRule(dfd).evasion || 0);
+  let e = BASE_EVA + (passiveRule(dfd).evasion || 0) + (relicRule(dfd).evasion || 0) + relicTeamBonus(dfd,'teamEvasion');
   // Pasiva Nami: +10% de evasión de equipo
   if (teamOf(dfd).some(x => x.hp > 0 && isP(x, 'nami'))) e += 0.10;
   if (teamOf(dfd).some(x => x.hp > 0 && isP(x, 'dragon'))) e += 0.15;
@@ -6340,6 +6362,10 @@ function calcDamage(att, dfd, mv, crit, variance) {
   // Categoría: físico usa ATQ vs DEF; especial usa ESP_ATQ vs ESP_DEF
   let atkStat = (phys ? att.atk : att.spatk) * nakamaStatMult(atkTeam) * battleItemMult(att,'atk');
   let defStat = (phys ? dfd.def : dfd.spdef) * nakamaStatMult(defTeam) * battleItemMult(dfd,'def');
+  atkStat *= relicStatMult(att);
+  defStat *= relicStatMult(dfd);
+  const relic = relicRule(att);
+  defStat *= 1 - (relic.pierce || 0) - (phys ? relic.physicalPierce || 0 : relic.specialPierce || 0);
   const ar = passiveRule(att), dr = passiveRule(dfd);
   atkStat *= ar.attack || 1;
   defStat *= dr.defense || 1;
@@ -6371,7 +6397,7 @@ function calcDamage(att, dfd, mv, crit, variance) {
 
   const base = ((2 * att.lvl / 5 + 2) * mv.power * atkStat / Math.max(1, defStat)) / 50 + 2;
   const r = variance ?? (0.85 + Math.random() * 0.15);
-  let dmg = base * eff * r;
+  let dmg = base * eff * r * relicDamageMult(att,dfd,mv);
   dmg *= (phys ? ar.physical : ar.special) || 1;
   dmg *= ar.types?.[mv.type] || 1;
   dmg *= dr.reduction || 1;
@@ -6500,6 +6526,9 @@ function attackWith(att, dfd, mv, targetSide) {
   dfd.st ||= {};
   if (dmg > 0) dfd.st.receivedHit = true;
   if (passiveRule(att).slow) dfd.st.slow = 2;
+  const relic = relicRule(att);
+  if (relic.burn && dmg > 0) { dfd.st.burn=3; dfd.st.burnRate=Math.max(dfd.st.burnRate||0,relic.burn); }
+  if (relic.slow && dmg > 0) { dfd.st.slow=2; dfd.st.slowRate=Math.max(dfd.st.slowRate||0,relic.slow); }
   // Recarga de Ultimate al golpear al enemigo (para personajes de nivel base >= 20)
   if (att && att.lvl >= 20 && (b.opts?.local || b.pTeam.includes(att) || (enemyUltimatesEnabled(b) && b.eTeam.includes(att)))) {
     att.ultCharge = Math.min(100, (att.ultCharge || 0) + 34);
@@ -6548,7 +6577,7 @@ function scheduleRound(delay) {
 
 function effectiveSpeed(f) {
   const rule = passiveRule(f);
-  let speed = f.spd * nakamaStatMult(teamOf(f)) * (rule.speed || 1);
+  let speed = f.spd * nakamaStatMult(teamOf(f)) * (rule.speed || 1) * relicStatMult(f) * (relicRule(f).speed || 1);
   const tier = synergyTier(teamOf(f), 'Rayo');
   if (tier) speed *= 1 + synergyBonus(teamOf(f), 'Rayo', .20, .40);
   if (f.st?.slow) speed *= 1 - (f.st.slowRate || .15);
@@ -6563,12 +6592,13 @@ function effectiveSpeed(f) {
 function runRound() {
   const b = battle;
   if (!b || b.over || b.waiting) return;
-  runAutoItems();
+  if (b.opts?.duos) return runChallengeDuoRound();
+  if (!b.opts?.challenge) runAutoItems();
   const p = b.curP, e = b.curE;
   if (!p || !e || p.hp <= 0 || e.hp <= 0) return afterRound();
 
   // Modo auto: tira la Ultimate automáticamente si está cargada
-  if (autoMode && autoSettings.useUltimates !== false && p.lvl >= 20 && (p.ultCharge || 0) >= 100) {
+  if ((b.opts?.challenge || autoMode && autoSettings.useUltimates !== false) && p.lvl >= 20 && (p.ultCharge || 0) >= 100) {
     useUltimate(p);
   }
 
@@ -6602,7 +6632,7 @@ function runRound() {
 function afterRound() {
   const b = battle;
   if (!b || b.over) return;
-  const actors = b.opts?.local && b.localActors ? b.localActors : [b.curP, b.curE];
+  const actors = b.opts?.duos ? [...b.pTeam,...b.eTeam] : b.opts?.local && b.localActors ? b.localActors : [b.curP, b.curE];
   // Daño residual de estados y expiración de contadores
   for (const f of actors) {
     if (!f || !f.st) continue;
@@ -6627,7 +6657,7 @@ function afterRound() {
     const team = teamOf(act), foe = targets[i];
     if (!foe || foe.hp <= 0) return 0;
     const drain = Math.min(foe.hp, Math.floor(foe.maxhp * (passiveRule(act).drain || 0)));
-    let heal = passiveRule(act).regen || 0;
+    let heal = (passiveRule(act).regen || 0) + (relicRule(act).regen || 0) + relicTeamBonus(act,'teamRegen');
     if (team.some(x => x.hp > 0 && isP(x,'marco'))) heal += .06;
     if (team.some(x => x.hp > 0 && isP(x,'ryokugyu'))) heal += .05;
     const water = synergyTier(team,'Agua');
@@ -6649,7 +6679,7 @@ function afterRound() {
   const checkRevive = f => {
     if (!f || f.hp > 0) return;
     const isPlayer = b.pTeam.includes(f) || (run && run.team && run.team.includes(f));
-    if (!b.opts?.local && isPlayer && run && run.mode === 'nuzlocke' && !b.tower) return; // En Nuzlocke los aliados no sobreviven ni reviven
+    if (!b.opts?.local && !b.opts?.challenge && isPlayer && run && run.mode === 'nuzlocke' && !b.tower) return; // En Nuzlocke los aliados no sobreviven ni reviven
     if (isP(f, 'brook') && !f.reviveUsed) {
       f.reviveUsed = true;
       f.hp = Math.max(1, Math.floor(f.maxhp * 0.2));
@@ -6658,11 +6688,12 @@ function afterRound() {
     }
     const guardTeam = teamOf(f).map(ally => ally === f ? {...ally, hp:1} : ally);
     if (synergyTier(guardTeam, 'Nakama') === 2) {
-      const used = b.opts?.local ? b.localGuard[isPlayer ? 'p' : 'e'] : isPlayer
+      const used = b.opts?.challenge ? b.challengeGuardUsed : b.opts?.local ? b.localGuard[isPlayer ? 'p' : 'e'] : isPlayer
         ? (b.tower ? tower && tower.nakamaGuardUsed : run && run.nakamaGuardUsed)
         : b.eGuardUsed;
       if (!used) {
-        if (b.opts?.local) b.localGuard[isPlayer ? 'p' : 'e'] = true;
+        if (b.opts?.challenge) b.challengeGuardUsed = true;
+        else if (b.opts?.local) b.localGuard[isPlayer ? 'p' : 'e'] = true;
         else if (isPlayer) { if (b.tower && tower) tower.nakamaGuardUsed = true; else if (run) { run.nakamaGuardUsed = true; saveRun(); } }
         else b.eGuardUsed = true;
         f.hp = 1;
@@ -6671,6 +6702,7 @@ function afterRound() {
     }
   };
   [...b.pTeam, ...b.eTeam].forEach(checkRevive);
+  if (b.opts?.challenge) return afterChallengeRound(b);
   const deadE = b.curE.hp <= 0, deadP = b.curP.hp <= 0;
   // Las partidas locales nunca conceden EXP, modifican el viaje ni escriben el guardado.
   if (b.opts?.local) {
@@ -6777,6 +6809,13 @@ function bindControls() {
         return;
       }
       if (kind === 'quit') {
+        if (b.opts?.challenge) {
+          modalConfirm('¿Rendirse en este combate?', 'Contará como derrota en este cruce. Si pierdes una semifinal del torneo individual, podrás luchar por el tercer puesto.', () => {
+            if (battle !== b || b.over) return;
+            b.over=true; clearTimeout(b.timer); endBattle(false);
+          });
+          return;
+        }
         modalConfirm('🏳️ ¿Rendirse en la torre?',
           'Terminarás tu ascenso en el piso actual.<br>Conservas la Fama ganada por los pisos superados.',
           () => { if (battle) { battle.over = true; clearTimeout(battle.timer); } towerGameOver(); });
@@ -6830,6 +6869,7 @@ function resumeBattle(delay) {
 }
 
 function useBattleItem(id) {
+  if (battle?.opts?.challenge) return;
   const item = ITEMS[id];
   const b = battle;
   if (!isBattleItem(id) || !b || b.over || b.waiting || !(b.items[id] > 0)) return;
@@ -6903,6 +6943,7 @@ function bossFameReward(diff = 1) {
 }
 
 function endBattle(victory, fled, recruited) {
+  if (battle?.opts?.challenge) { clearTimeout(battle.timer); battle = null; document.querySelectorAll?.('.dmg-pop').forEach(el=>el.remove()); return endChallengeBattle(victory); }
   if (battle && battle.tower) { battle = null; return endTowerBattle(victory); }
   const opts = battle ? battle.opts : {};
   const bossFame = battle?.bossFameEarned || 0;
@@ -7799,132 +7840,311 @@ function screenDex() {
   update();
 }
 
-// ============ OBJETOS RELIQUIA DE PASIVAS (DESAFÍOS NV50) ============
-const RELICS = {
-  sombrero_paja: { id: 'sombrero_paja', name: 'Sombrero de Paja', emoji: '👒', desc: '+20% PS Máximos para todo el equipo' },
-  espada_shusui: { id: 'espada_shusui', name: 'Espada Shusui', emoji: '⚔️', desc: '+25% ATQ Físico y +15% Crítico' },
-  fruta_despertada: { id: 'fruta_despertada', name: 'Esencia Despertada', emoji: '✨', desc: '+25% ESP.ATQ y +15% Evasión' },
-  capa_marina: { id: 'capa_marina', name: 'Capa de Almirante', emoji: '🧥', desc: '+25% DEF y +25% ESP.DEF' },
-  botella_sake: { id: 'botella_sake', name: 'Sake de la Hermandad', emoji: '🍶', desc: '+20% VEL y curación continua' },
-  dial_impacto: { id: 'dial_impacto', name: 'Dial Impacto', emoji: '💥', desc: '+40% Daño Crítico' },
-  mera_mera_core: { id: 'mera_mera_core', name: 'Núcleo Mera Mera', emoji: '🔥', desc: '+30% ATQ y quemadura en ataques' },
-  gura_gura_core: { id: 'gura_gura_core', name: 'Núcleo Gura Gura', emoji: '🌊', desc: 'Ataques ignoran 30% defensa enemiga' },
-};
-
-function screenChallenges() {
-  playMusic('menu');
-  if (accountLevel() < 35) {
-    toast('🔒 El modo Desafíos requiere Nivel de Cuenta 35.');
-    return screenHome();
+// Todos los miembros vivos de una pareja tienen turno, ordenado por velocidad.
+function runChallengeDuoRound() {
+  const b=battle;
+  if(!b||b.over||b.waiting)return;
+  const order=[...b.pTeam,...b.eTeam].filter(f=>f.hp>0).sort((a,c)=>effectiveSpeed(c)-effectiveSpeed(a));
+  let index=0;
+  const step=()=>{
+    if(battle!==b||b.over)return;
+    if(b.waiting){b.pendingStep=step;return;}
+    b.pendingStep=null;
+    if(index>=order.length)return afterRound();
+    const actor=order[index++],isPlayer=b.pTeam.includes(actor);
+    const foes=isPlayer?b.eTeam:b.pTeam;
+    const target=foes.filter(f=>f.hp>0).sort((a,c)=>a.hp/a.maxhp-c.hp/c.maxhp)[0];
+    if(actor.hp>0&&target){
+      if(isPlayer){b.curP=actor;b.curE=target;}else{b.curE=actor;b.curP=target;}
+      refreshHPCards();
+      if(actor.lvl>=20&&(actor.ultCharge||0)>=100)useUltimate(actor);
+      else attackWith(actor,target,chooseMove(actor,target),isPlayer?'enemy':'player');
+    }
+    b.pendingStep=step;b.timer=setTimeout(step,900/b.speed);
+  };
+  step();
+}
+function afterChallengeRound(b) {
+  const p=activeP(),e=activeE();
+  if(!p||!e){
+    b.over=true;refreshHPCards();
+    b.timer=setTimeout(()=>{if(battle===b)endBattle(!!p&&!e);},1300/b.speed);
+    return;
   }
+  b.curP=p;b.curE=e;b.round++;
+  refreshHPCards();scheduleRound(1400);
+}
 
-  meta.relics = meta.relics || [];
-  const bossOptions = ['kaido', 'luffy5', 'shanks', 'newgate', 'sakazuki', 'im'];
-  const bossIds = bossOptions.filter(id => CHARS[id]);
-
-  render(`
-    ${topbar(false)}
-    <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
-    <div class="subtitle">☠️ MODO DESAFÍOS (NV. CUENTA ${accountLevel()})</div>
-    <div class="panel">
-      <h2>🏆 Desafíos de Leyendas 5 Estrellas</h2>
-      <p style="font-size:9px;color:#eee;margin-bottom:12px;">
-        Enfréntate a los guerreros más poderosos del mundo. Cada rival de 5 estrellas cuenta con 3 pasivas potenciadas por Objetos Reliquia.<br>
-        <b>¡Si ganas, podrás escoger 1 de sus 3 Objetos Reliquia para tu colección permanente!</b>
-      </p>
-
-      <div style="font-size:9px;color:var(--gold);margin-bottom:12px;background:rgba(0,0,0,0.3);padding:8px;border-radius:4px;border:1px solid var(--gold);">
-        🎒 <b>TUS RELIQUIAS ADQUIRIDAS (${meta.relics.length}/${Object.keys(RELICS).length}):</b><br>
-        ${meta.relics.length ? meta.relics.map(id => {
-    const r = RELICS[id];
-    return r ? `<span style="background:rgba(255,215,0,0.2);padding:3px 6px;border-radius:4px;margin:3px;display:inline-block;">${r.emoji} <b>${r.name}</b>: <small style="color:#ddd;">${r.desc}</small></span>` : '';
-  }).join('') : '<span style="color:#aaa;">Ninguna reliquia obtenida todavía. ¡Completa un desafío para ganar la primera!</span>'}
-      </div>
-
-      <div class="pick-grid">
-        ${bossIds.map(id => {
-    const c = CHARS[id];
-    return `
-            <div class="pick-row" style="padding:10px;">
-              <span class="emoji">${charIcon(id, 36)}</span>
-              <div class="info">
-                <b style="font-size:11px;">${c.name} ⭐⭐⭐⭐⭐</b><br>
-                <span style="color:var(--gold);font-size:8px;">Jefe Leyenda Nv75 con 3 Pasivas Reliquia</span>
-              </div>
-              <button class="btn red small btn-challenge-boss" data-id="${id}">⚔️ DESAFIAR</button>
-            </div>
-          `;
-  }).join('')}
-      </div>
-    </div>
-  `);
-
-  $('#btn-back').onclick = screenHome;
-  document.querySelectorAll('.btn-challenge-boss').forEach(btn => {
-    btn.onclick = () => startBossChallenge(btn.dataset.id);
+// ============ DESAFÍOS Y RELIQUIAS ============
+const RELIC_BOOST = '+10% ATQ, ESP.ATQ, DEF, ESP.DEF y VEL';
+// Una reliquia por identidad; sus transformaciones comparten afinidad y hueco.
+const SIGNATURE_RELICS = {
+  luffy: ['Sombrero de la Promesa','👒','Libertad sin límites','Con menos del 50% de PS, +30% de daño.', {lowDamage:1.30}],
+  zoro: ['Piedra de afilar de Kuina','⚔️','Promesa del espadachín','+15 puntos de crítico y +25% de daño crítico.', {critical:.15,critDamage:.25}],
+  nami: ['Aguja del Clima-Tact','🌩️','Pronóstico perfecto','+25% de daño de Rayo y +10 puntos de evasión.', {type:'Rayo',damage:1.25,evasion:.10}],
+  usopp: ['Semilla del francotirador','🌱','Disparo preparado','+35% de daño contra rivales con todos sus PS.', {openingDamage:1.35}],
+  sanji: ['Encendedor del All Blue','🔥','Pasión del cocinero','+25% de daño de Fuego; recupera 3% de PS por ronda.', {type:'Fuego',damage:1.25,regen:.03}],
+  chopper: ['Recetario de Hiriluk','💊','Medicina milagrosa','Cura 4% de los PS de cada aliado participante por ronda.', {teamRegen:.04}],
+  robin: ['Fragmento de Ohara','📜','Conocimiento prohibido','Los ataques especiales ignoran 25% de defensa especial.', {specialPierce:.25}],
+  franky: ['Reserva de cola','🥤','Superblindaje','Recibe 20% menos daño con más del 50% de PS.', {healthyReduction:.80}],
+  brook: ['Tone Dial de Laboon','🎻','Canción de regreso','Empieza cada combate con 68% de carga de Ultimate.', {charge:68}],
+  jinbe: ['Copa de los Piratas del Sol','🍶','Corriente protectora','+30% de daño de Agua y -10% de daño recibido.', {type:'Agua',damage:1.30,reduction:.90}],
+  roger: ['Brújula del último viaje','🧭','Herencia del rey','Los aliados vivos infligen 12% más daño.', {teamDamage:1.12}],
+  newgate: ['Fragmento de Murakumogiri','🌊','Terremoto paternal','Con menos del 50% de PS, +35% de daño.', {lowDamage:1.35}],
+  kaido: ['Escama del dragón azul','🐉','Fortaleza de Onigashima','Con menos del 50% de PS recibe 25% menos daño.', {lowReduction:.75}],
+  bigmom: ['Corona de los Homies','👑','Tributo de almas','Recupera 5% de PS por ronda y +20% de daño de Oscuridad.', {regen:.05,type:'Oscuridad',damage:1.20}],
+  shanks: ['Guarda de Gryphon','⚔️','Presencia del emperador','Los aliados reciben 12% menos daño mientras viva.', {teamReduction:.88}],
+  teach: ['Anillo de la oscuridad','🌑','Atracción del abismo','+30% de daño contra usuarios de Fruta.', {fruitDamage:1.30}],
+  mihawk: ['Cruz de Yoru','✝️','Corte sin límites','Los ataques físicos ignoran 25% de defensa.', {physicalPierce:.25}],
+  akainu: ['Corazón de magma','🌋','Justicia abrasadora','Cada golpe causa quemadura: 3% de PS durante 3 rondas.', {burn:.03}],
+  kizaru: ['Lente de luz','✨','Destello encadenado','+25% de velocidad; empieza con 34% de Ultimate.', {speed:1.25,charge:34}],
+  aokiji: ['Cristal de Ice Age','❄️','Frío persistente','Los golpes ralentizan un 30% durante la siguiente ronda.', {slow:.30}],
+  garp: ['Guante del héroe','👊','Impacto galáctico','+25% de daño de Golpe y +10 puntos de crítico.', {type:'Golpe',damage:1.25,critical:.10}],
+  dragon: ['Retazo revolucionario','🌪️','Viento de cambio','+10 puntos de evasión a todos los aliados vivos.', {teamEvasion:.10}],
+  lucci: ['Pluma de Hattori','🕊️','Instinto del depredador','+30% de daño contra rivales con menos del 50% de PS.', {execute:1.30}],
+  oden: ['Vaina de Enma','⚔️','Dos cielos','+25% de daño de Corte y +25% de daño crítico.', {type:'Corte',damage:1.25,critDamage:.25}],
+  katakuri: ['Bufanda del futuro','🧣','Un segundo por delante','Esquiva un ataque adicional al inicio de cada combate.', {dodge:1}],
+  enel: ['Aro de los tambores','🥁','Juicio de Skypiea','+35% de daño de Rayo.', {type:'Rayo',damage:1.35}],
+  moria: ['Tijeras de sombras','✂️','Banquete de sombras','Recupera 5% de PS por ronda; +20% de daño de Oscuridad.', {regen:.05,type:'Oscuridad',damage:1.20}],
+  sengoku: ['Rosario del Buda','📿','Guardia iluminada','Los aliados reciben 12% menos daño mientras viva.', {teamReduction:.88}],
+  fujitora: ['Dado de la justicia','🎲','Órbita pesada','Ignora 20% de ambas defensas y ralentiza al golpear un 20%.', {pierce:.20,slow:.20}],
+  rayleigh: ['Petaca del Rey Oscuro','🍶','Lección de Haki','+30% de daño de Haki y +10 puntos de crítico.', {type:'Haki',damage:1.30,critical:.10}],
+  ryokugyu: ['Semilla del bosque','🌿','Bosque compartido','Cura 4% de los PS de cada aliado participante por ronda.', {teamRegen:.04}],
+  garling: ['Medalla del caballero','🏅','Sentencia celestial','+35% de daño contra rivales con todos sus PS.', {openingDamage:1.35}],
+  saturn: ['Sello del círculo abisal','🕸️','Persistencia abisal','Recupera 6% de PS por ronda.', {regen:.06}],
+  mars: ['Pluma del Itsumade','🪶','Vuelo del presagio','+20% de velocidad y +10 puntos de evasión.', {speed:1.20,evasion:.10}],
+  warcury: ['Colmillo del Hoki','🐗','Muralla viviente','Recibe 20% menos daño con más del 50% de PS.', {healthyReduction:.80}],
+  nusjuro: ['Guarda del Bakotsu','❄️','Escarcha de acero','Los ataques físicos ignoran 20% de defensa y ralentizan un 20%.', {physicalPierce:.20,slow:.20}],
+  jupeter: ['Fósil del gusano de arena','🪨','Hambre ancestral','+25% de daño de Tierra y recupera 4% de PS por ronda.', {type:'Tierra',damage:1.25,regen:.04}],
+  im: ['Astilla del Trono Vacío','🖤','Dominio oculto','Ignora 25% de ambas defensas.', {pierce:.25}],
+  xebec: ['Insignia de Rocks','☠️','Ambición desatada','Con menos del 50% de PS, +35% de daño.', {lowDamage:1.35}],
+  joyboy: ['Tambor de la liberación','🥁','Ritmo de libertad','Los aliados vivos infligen 12% más daño.', {teamDamage:1.12}],
+  smoker: ['Punta del jitte','🌫️','Cerco de humo','+25% de daño contra usuarios de Fruta y +10 puntos de evasión.', {fruitDamage:1.25,evasion:.10}],
+};
+const RELICS = Object.fromEntries(Object.entries(CHARS).filter(([id]) => !BASE_OF[id]).map(([id,c]) => {
+  const moveId = c.ultimate || [...c.learnset].reverse().find(([,m]) => MOVES[m]?.power > 0)?.[1];
+  const move = MOVES[moveId];
+  const [name,emoji,passiveName,passiveDesc,rule] = SIGNATURE_RELICS[id] || [
+    `Emblema de ${c.name}`, c.emoji, `Legado: ${move?.name || c.name}`,
+    `+35% de daño al usar ${move?.name || 'su técnica característica'}.`, {move:moveId,damage:1.35}
+  ];
+  const key = `relic_${id}`;
+  return [key,{id:key,character:id,name,emoji,desc:RELIC_BOOST,passiveName,passiveDesc,rule}];
+}));
+// Conserva objetos obtenidos con versiones anteriores y les da una afinidad real.
+const LEGACY_RELICS = {sombrero_paja:'luffy',espada_shusui:'zoro',fruta_despertada:'robin',capa_marina:'sengoku',botella_sake:'shanks',dial_impacto:'usopp',mera_mera_core:'ace',gura_gura_core:'newgate'};
+for (const [id,character] of Object.entries(LEGACY_RELICS)) RELICS[id] = {...RELICS[`relic_${character}`],id};
+function equippedRelic(f) { return battle?.opts?.local ? null : RELICS[f?.battleRelic] || null; }
+function relicRule(f) {
+  const r = equippedRelic(f);
+  return r && r.character === baseFormOf(f.id) ? r.rule : {};
+}
+function relicStatMult(f) { return equippedRelic(f) ? 1.10 : 1; }
+function relicTeamBonus(f,key) {
+  return teamOf(f).filter(a=>a.hp>0).reduce((n,a)=>n+(relicRule(a)[key] || 0),0);
+}
+function relicDamageMult(att,dfd,mv) {
+  const a = relicRule(att), d = relicRule(dfd);
+  let mult = 1;
+  if ((a.type && a.type === mv.type) || (a.move && MOVES[a.move] === mv)) mult *= a.damage;
+  if (att.hp < att.maxhp*.5) mult *= a.lowDamage || 1;
+  if (dfd.hp < dfd.maxhp*.5) mult *= (a.execute || 1)*(d.lowReduction || 1);
+  if (dfd.hp > dfd.maxhp*.5) mult *= d.healthyReduction || 1;
+  if (dfd.hp === dfd.maxhp) mult *= a.openingDamage || 1;
+  if (hasFruta(dfd)) mult *= a.fruitDamage || 1;
+  mult *= d.reduction || 1;
+  for (const f of teamOf(att).filter(f=>f.hp>0)) mult *= relicRule(f).teamDamage || 1;
+  for (const f of teamOf(dfd).filter(f=>f.hp>0)) mult *= relicRule(f).teamReduction || 1;
+  return mult;
+}
+function equipRelic(id,character) {
+  if (battle || !meta.relics.includes(id) || !RELICS[id]) return false;
+  if (character && !challengeOwnedBases().includes(character)) return false;
+  meta.relicEquipment ||= {};
+  for (const [base,equipped] of Object.entries(meta.relicEquipment)) if (equipped === id) delete meta.relicEquipment[base];
+  if (character) meta.relicEquipment[character] = id;
+  saveMeta();
+  return true;
+}
+function relicDetailsHTML(r) {
+  return `<b>${r.emoji} ${esc(r.name)}</b><p>${r.desc}</p><p class="relic-affinity">Afinidad: ${esc(CHARS[r.character].name)} y sus formas<br><b>${esc(r.passiveName)}</b> · ${esc(r.passiveDesc)}</p>`;
+}
+function showRelicCollection() {
+  const bases = challengeOwnedBases();
+  render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button>
+    <section class="panel challenge-panel"><h2>🎒 Reliquias · ${meta.relics.length}</h2>
+    <p>Una reliquia por personaje, una copia equipada a la vez. El boost funciona en cualquier portador; la pasiva solo con su afinidad. Se aplica al empezar el siguiente combate de aventura, Torre o Desafíos.</p>
+    <label>Buscar reliquia o afinidad<input type="search" id="relic-search"></label>
+    <div class="relic-grid">${meta.relics.filter(id=>RELICS[id]).map(id=>{
+      const r=RELICS[id],owner=Object.keys(meta.relicEquipment||{}).find(base=>meta.relicEquipment[base]===id);
+      return `<article class="relic-card" data-relic-card="${id}">${relicDetailsHTML(r)}
+        <label>Portador<select data-equip-relic="${id}" aria-label="Portador de ${esc(r.name)}"><option value="">Sin equipar</option>${bases.map(base=>`<option value="${base}" ${owner===base?'selected':''}>${esc(CHARS[base].name)}${base===r.character?' · ✨ AFINIDAD':''}</option>`).join('')}</select></label>
+        <small>${owner ? (owner===r.character?'✨ Pasiva de afinidad activa':'Boost común activo') : 'Sin portador'} · Copias: ${meta.relicCopies?.[id] || 1}</small></article>`;
+    }).join('') || '<p>Gana Batalla de Leyendas para conseguir tu primera reliquia.</p>'}</div></section>`);
+  $('#btn-back').onclick=screenChallenges;
+  document.querySelectorAll('[data-equip-relic]').forEach(el=>el.onchange=()=>{equipRelic(el.dataset.equipRelic,el.value);showRelicCollection();});
+  $('#relic-search').oninput=e=>document.querySelectorAll('[data-relic-card]').forEach(el=>{
+    const r=RELICS[el.dataset.relicCard];el.hidden=!`${r.name} ${CHARS[r.character].name}`.toLocaleLowerCase('es').includes(e.target.value.toLocaleLowerCase('es'));
   });
 }
 
-function startBossChallenge(bossId) {
-  const relicKeys = Object.keys(RELICS);
-  const shuffled = [...relicKeys].sort(() => 0.5 - Math.random());
-  const chosenRelics = shuffled.slice(0, 3);
-
-  const boss = makeChar(bossId, 75, true);
-  boss.stars = 5;
-  ['maxhp', 'hp', 'atk', 'def', 'spatk', 'spdef', 'spd'].forEach(k => {
-    boss[k] = Math.floor(boss[k] * 1.35);
-  });
-
-  const pTeam = (run && run.team && run.team.length)
-    ? run.team
-    : STRAW_HAT_MEMBERS.slice(0, 6).map(id => applyUpgrades(makeChar(id, 65)));
-
-  startBattle([boss], {
-    wild: false,
-    tower: true,
-    onWin: () => showRelicRewardModal(chosenRelics)
-  });
+const CHALLENGE_PRIZES = {1:7500,2:5000,3:2500};
+function challengeOwnedBases() { return [...new Set([...SAGAS[0].starters,...meta.roster].filter(id=>CHARS[id]).map(baseFormOf))]; }
+function challengeLevel(kind) {
+  if (kind==='tournament') return 65;
+  const wano=SAGAS.find(s=>s.id==='wano');
+  return Math.max(...wano.islands[Math.floor(wano.islands.length/2)].bossLvl);
 }
-
-function showRelicRewardModal(relicIds) {
-  const ov = document.createElement('div');
-  ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="max-width:480px;">
-    <h2>🏆 ¡DESAFÍO COMPLETADO!</h2>
-    <p style="font-size:9px;text-align:center;margin-bottom:12px;">
-      ¡Has derrotado al Jefe de 5 Estrellas!<br>Elige <b>1 Objeto Reliquia</b> para añadir a tus pasivas permanentes:
-    </p>
-    <div class="pick-grid">
-      ${relicIds.map(id => {
-    const r = RELICS[id];
-    return `
-          <div class="pick-row btn-pick-relic" data-id="${id}" style="cursor:pointer;padding:8px;">
-            <span class="emoji" style="font-size:24px;">${r.emoji}</span>
-            <div class="info">
-              <b>${r.name}</b><br>
-              <small style="color:#ddd;">${r.desc}</small>
-            </div>
-            <button class="btn gold small">ELEGIR</button>
-          </div>
-        `;
-  }).join('')}
-    </div>
-  </div>`;
-  document.body.appendChild(ov);
-  ov.querySelectorAll('.btn-pick-relic').forEach(el => {
-    el.onclick = () => {
-      const relId = el.dataset.id;
-      meta.relics = meta.relics || [];
-      if (!meta.relics.includes(relId)) {
-        meta.relics.push(relId);
-        saveMeta();
+function challengePool(kind) {
+  return challengeOwnedBases().map(id=>evolutionFormAt(id,challengeLevel(kind))).filter(id=>kind!=='legends'||CHARS[id].rareza===5);
+}
+function shuffleChallenge(list) {
+  const out=[...list];
+  for(let i=out.length-1;i>0;i--){const j=rnd(0,i);[out[i],out[j]]=[out[j],out[i]];}
+  return out;
+}
+function challengeMatch(a,b) { return {a,b,winner:null}; }
+function challengeCurrentMatch(t=meta.challenge) {
+  if (!t || t.finished) return null;
+  if (t.bronze) return t.bronze.winner===null?t.bronze:null;
+  return t.rounds[t.stage].matches.find(m=>m.winner===null&&(m.a===0||m.b===0)) || null;
+}
+function challengeCanStart() { return !battle && accountLevel()>=35 && (!meta.challenge || (meta.challenge.finished && !meta.challenge.pendingRelics?.length)); }
+function startChallenge(kind,picked) {
+  if (!['tournament','legends'].includes(kind)||!challengeCanStart()) return false;
+  const count=kind==='legends'?2:1, allowed=challengePool(kind);
+  if (!Array.isArray(picked)||picked.length!==count||new Set(picked.map(baseFormOf)).size!==count||picked.some(id=>!allowed.includes(id))) return false;
+  const level=challengeLevel(kind),excluded=new Set(picked.map(baseFormOf));
+  const candidates=Object.keys(CHARS).filter(id=>!BASE_OF[id]&&!excluded.has(id));
+  const opponents=shuffleChallenge(candidates.map(id=>{
+    if(kind!=='legends')return id;
+    const forms=Object.keys(CHARS).filter(form=>baseFormOf(form)===id&&CHARS[form].rareza===5);
+    return forms.at(-1);
+  }).filter(Boolean)).slice(0,8-count);
+  if(opponents.length!==8-count)return false;
+  const entrants=[{members:[...picked]}];
+  for(let i=0;i<opponents.length;i+=count)entrants.push({members:opponents.slice(i,i+count)});
+  const seeds=shuffleChallenge(entrants.map((_,i)=>i));
+  const matches=[];for(let i=0;i<seeds.length;i+=2)matches.push(challengeMatch(seeds[i],seeds[i+1]));
+  meta.challenge={version:1,kind,level,entrants,stage:0,rounds:[{name:count===1?'Cuartos de final':'Semifinales',matches}],finished:false,placement:null,reward:0,pendingRelics:[]};
+  saveMeta();screenChallengeBracket();return true;
+}
+function simulateChallengeMatch(t,m) {
+  if(m.winner!==null)return;
+  const strength=index=>t.entrants[index].members.reduce((n,id)=>n+CHARS[id].base.reduce((a,b)=>a+b,0),0);
+  const a=strength(m.a),b=strength(m.b);
+  m.winner=Math.random()<a/(a+b)?m.a:m.b;
+}
+function challengeRelicChoices(t) {
+  const keys=Object.keys(RELICS).filter(id=>id.startsWith('relic_'));
+  const unowned=keys.filter(id=>!meta.relics.some(owned=>RELICS[owned]?.character===RELICS[id].character));
+  const pool=unowned.length?unowned:keys;
+  const affinities=t.entrants[0].members.map(id=>`relic_${baseFormOf(id)}`).filter(id=>pool.includes(id));
+  return [...new Set([...affinities,...shuffleChallenge(pool)])].slice(0,3);
+}
+function finishChallenge(placement) {
+  const t=meta.challenge;if(!t||t.finished)return;
+  t.finished=true;t.placement=placement;
+  t.reward=t.kind==='tournament'?(CHALLENGE_PRIZES[placement]||0):0;
+  meta.logPoses=(meta.logPoses||0)+t.reward;
+  if(t.kind==='legends'&&placement===1)t.pendingRelics=challengeRelicChoices(t);
+  saveMeta();
+}
+function endChallengeBattle(victory) {
+  const t=meta.challenge,m=challengeCurrentMatch(t);
+  if(!m)return;
+  m.winner=victory?0:(m.a===0?m.b:m.a);
+  if(t.bronze)finishChallenge(victory?3:4);
+  else {
+    const round=t.rounds[t.stage];
+    round.matches.forEach(match=>simulateChallengeMatch(t,match));
+    if(round.matches.length===1)finishChallenge(victory?1:2);
+    else {
+      const winners=round.matches.map(match=>match.winner);
+      const matches=[];for(let i=0;i<winners.length;i+=2)matches.push(challengeMatch(winners[i],winners[i+1]));
+      t.rounds.push({name:matches.length===1?'Final':'Semifinales',matches});t.stage++;
+      if(!victory){
+        if(t.kind==='tournament'&&round.matches.length===2){
+          const losers=round.matches.map(match=>match.winner===match.a?match.b:match.a);
+          t.bronze=challengeMatch(...losers);matches.forEach(match=>simulateChallengeMatch(t,match));
+        }else{
+          // Completa el cuadro de la IA aunque el jugador ya haya quedado eliminado.
+          while(t.rounds[t.stage].matches.length>1){
+            const current=t.rounds[t.stage];current.matches.forEach(match=>simulateChallengeMatch(t,match));
+            const ws=current.matches.map(match=>match.winner),next=[];
+            for(let i=0;i<ws.length;i+=2)next.push(challengeMatch(ws[i],ws[i+1]));
+            t.rounds.push({name:next.length===1?'Final':'Semifinales',matches:next});t.stage++;
+          }
+          t.rounds[t.stage].matches.forEach(match=>simulateChallengeMatch(t,match));
+          finishChallenge(t.kind==='legends'?3:5);
+        }
       }
-      toast(`🎒 ¡Objeto Reliquia ${RELICS[relId].name} obtenido!`);
-      ov.remove();
-      screenChallenges();
-    };
+    }
+  }
+  saveMeta();screenChallengeBracket();
+}
+function playChallengeMatch() {
+  const t=meta.challenge,m=challengeCurrentMatch(t);
+  if(battle||!m||accountLevel()<35)return;
+  const enemyIndex=m.a===0?m.b:m.a;
+  const enemyLevel=t.kind==='legends'&&t.rounds[t.stage].name==='Final'?Math.max(...SAGAS.find(s=>s.id==='wano').islands.at(-1).bossLvl):t.level;
+  const allies=t.entrants[0].members.map(id=>applyUpgrades(makeChar(id,t.level,false,true)));
+  const enemies=t.entrants[enemyIndex].members.map(id=>makeChar(id,enemyLevel,false,true));
+  startBattle(enemies,{challenge:true,duos:t.kind==='legends',team:allies,items:{},intro:`🏆 ${t.bronze?'Tercer puesto':t.rounds[t.stage].name} · ${t.kind==='legends'?'Batalla de Leyendas · 2 contra 2':'Torneo de 8'} · Nv. rival ${enemyLevel}`});
+}
+function claimChallengeRelic(id) {
+  const t=meta.challenge;
+  if(!t?.finished||t.kind!=='legends'||t.placement!==1||!t.pendingRelics.includes(id)||!RELICS[id])return false;
+  meta.relics.push(id); // Si la colección está completa, se conserva la nueva copia en el inventario.
+  meta.relics=[...new Set(meta.relics)];
+  meta.relicCopies ||= {};meta.relicCopies[id]=(meta.relicCopies[id]||0)+1;
+  t.pendingRelics=[];t.relicReward=id;saveMeta();return true;
+}
+function screenChallenges() {
+  playMusic('menu');if(accountLevel()<35){toast('🔒 Desafíos requiere nivel de cuenta 35.');return screenHome();}
+  render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← PUERTO</button>
+    <section class="panel challenge-panel"><h2>🏆 Desafíos</h2><p>Torneos offline contra la IA. Desbloqueados a nivel de cuenta 35.</p>
+    ${meta.challenge?`<button class="btn gold" id="challenge-resume">${meta.challenge.finished?'VER RESULTADO Y RECOMPENSA':'CONTINUAR TORNEO'}</button>`:''}
+    <div class="challenge-events"><article class="challenge-event"><span class="challenge-emblem">🏆</span><h3>Torneo de los Ocho</h3>
+    <p>8 participantes · duelos 1 contra 1 · Nv.65. Cuartos, semifinales, final y combate por el tercer puesto.</p><div class="challenge-prizes"><span>🥇 7.500</span><span>🥈 5.000</span><span>🥉 2.500</span></div><p>Log Poses por torneo. El resto de puestos no recibe premio.</p><button class="btn blue" data-challenge="tournament" ${challengeCanStart()?'':'disabled'}>ELEGIR LUCHADOR</button></article>
+    <article class="challenge-event legends"><span class="challenge-emblem">👑</span><h3>Batalla de Leyendas</h3><p>8 personajes · 4 parejas · combates 2 contra 2. Solo rareza 5★; las estrellas de fusión no cuentan.</p><p>Dificultad Wano · Nv.${challengeLevel('legends')} y final Nv.${Math.max(...SAGAS.find(s=>s.id==='wano').islands.at(-1).bossLvl)}. Cada personaje vivo actúa por ronda.</p><p>🏺 Campeones: elige una reliquia entre tres, priorizando afinidades de tu pareja y reliquias nuevas.</p><button class="btn gold" data-challenge="legends" ${challengeCanStart()?'':'disabled'}>FORMAR PAREJA</button></article></div>
+    <p>Equipos curados y Ultimate reiniciada en cada ronda. Se mantienen tus mejoras y formas desbloqueadas. Puedes salir al cuadro entre combates y continuar después.</p>
+    <button class="btn gray" id="challenge-relics">🎒 RELIQUIAS (${meta.relics.length})</button></section>`);
+  $('#btn-back').onclick=screenHome;$('#challenge-relics').onclick=showRelicCollection;
+  if(meta.challenge)$('#challenge-resume').onclick=screenChallengeBracket;
+  document.querySelectorAll('[data-challenge]').forEach(el=>el.onclick=()=>screenChallengeSelection(el.dataset.challenge));
+}
+function screenChallengeSelection(kind) {
+  if(!challengeCanStart()||!['tournament','legends'].includes(kind))return screenChallenges();
+  const pool=challengePool(kind),count=kind==='legends'?2:1,picked=[];
+  render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button><section class="panel challenge-panel"><h2>${kind==='legends'?'👑 Forma tu pareja legendaria':'🏆 Elige tu luchador'}</h2>
+    <p>Nv.${challengeLevel(kind)} · ${pool.length} personajes disponibles. ${count===2?'Necesitas dos identidades distintas de rareza 5★.':''}</p>
+    ${pool.length<count?'<p role="status">No tienes suficientes personajes elegibles. Recluta legendarios o desbloquea sus formas de 5★ mejorando su nivel base.</p>':''}
+    <label>Buscar personaje<input type="search" id="challenge-search"></label><div class="tower-roster">${pool.map(id=>`<button class="tower-card" data-challenge-pick="${id}" aria-pressed="false">${charIcon(id,64)}<b>${esc(CHARS[id].name)}</b><span>${'⭐'.repeat(CHARS[id].rareza)}</span></button>`).join('')}</div>
+    <div class="challenge-launch"><p id="challenge-picked" aria-live="polite">Seleccionados: 0/${count}</p><button class="btn blue" id="challenge-start" disabled>COMENZAR TORNEO</button></div></section>`);
+  $('#btn-back').onclick=screenChallenges;
+  document.querySelectorAll('[data-challenge-pick]').forEach(el=>el.onclick=()=>{
+    const id=el.dataset.challengePick,index=picked.indexOf(id);if(index>=0)picked.splice(index,1);else if(picked.length<count)picked.push(id);
+    document.querySelectorAll('[data-challenge-pick]').forEach(card=>{card.setAttribute('aria-pressed',String(picked.includes(card.dataset.challengePick)));card.disabled=picked.length===count&&!picked.includes(card.dataset.challengePick);});
+    $('#challenge-picked').textContent=`Seleccionados: ${picked.length}/${count} · ${picked.map(id=>CHARS[id].name).join(' + ')}`;$('#challenge-start').disabled=picked.length!==count;
   });
+  $('#challenge-search').oninput=e=>document.querySelectorAll('[data-challenge-pick]').forEach(el=>el.hidden=!CHARS[el.dataset.challengePick].name.toLocaleLowerCase('es').includes(e.target.value.toLocaleLowerCase('es')));
+  $('#challenge-start').onclick=()=>startChallenge(kind,picked);
+}
+function screenChallengeBracket() {
+  const t=meta.challenge;if(!t)return screenChallenges();
+  const entrant=index=>t.entrants[index].members.map(id=>esc(CHARS[id].name)).join(' + ');
+  const matchHTML=m=>`<div class="challenge-match">${[m.a,m.b].map(index=>`<div class="${m.winner===index?'winner':''} ${index===0?'your-entry':''}">${index===0?'🏴‍☠️ ':''}${entrant(index)}${m.winner===index?' ✓':''}</div>`).join('')}</div>`;
+  render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button><section class="panel challenge-panel"><h2>${t.kind==='legends'?'👑 Batalla de Leyendas':'🏆 Torneo de los Ocho'}</h2>
+    <p>Tu equipo: ${entrant(0)} · Nv.${t.level}</p><p>Los cruces entre rivales de la IA se simulan según la fuerza de sus equipos.</p>
+    <div class="challenge-bracket">${t.rounds.map(round=>`<section><h3>${round.name}</h3>${round.matches.map(matchHTML).join('')}</section>`).join('')}${t.bronze?`<section><h3>Tercer puesto</h3>${matchHTML(t.bronze)}</section>`:''}</div>
+    ${t.finished?`<div class="challenge-result" role="status"><h3>${t.placement===0?'Torneo abandonado':t.placement===1?'🏆 ¡Campeón!':t.placement===5?'Eliminado en cuartos · puestos 5–8':`Puesto ${t.placement}${t.kind==='legends'&&t.placement===3?'–4':''}`}</h3><p>${t.reward?`🧭 +${t.reward.toLocaleString('es')} Log Poses añadidos a tu cuenta.`:t.pendingRelics.length?'🏺 Elige tu reliquia de campeón.':t.relicReward?`🏺 Reliquia obtenida: ${esc(RELICS[t.relicReward].name)}`:'Sin premio de Log Poses.'}</p></div>`:`<button class="btn blue" id="challenge-fight">⚔️ ${t.bronze?'LUCHAR POR EL TERCER PUESTO':'SIGUIENTE COMBATE'}</button><button class="btn gray" id="challenge-abandon">ABANDONAR TORNEO</button>`}
+    ${t.pendingRelics.length?`<div class="relic-grid">${t.pendingRelics.map(id=>`<article class="relic-card">${relicDetailsHTML(RELICS[id])}<button class="btn gold" data-claim-relic="${id}">ELEGIR</button></article>`).join('')}</div>`:''}
+    ${t.relicReward?'<button class="btn gold" id="challenge-equip">EQUIPAR RELIQUIA</button>':''}</section>`);
+  $('#btn-back').onclick=screenChallenges;
+  if(!t.finished){$('#challenge-fight').onclick=playChallengeMatch;$('#challenge-abandon').onclick=()=>modalConfirm('¿Abandonar torneo?','Terminarás este torneo sin premio.',()=>{finishChallenge(0);screenChallenges();});}
+  document.querySelectorAll('[data-claim-relic]').forEach(el=>el.onclick=()=>{if(claimChallengeRelic(el.dataset.claimRelic))screenChallengeBracket();});
+  if(t.relicReward)$('#challenge-equip').onclick=showRelicCollection;
 }
 
 // ============ INICIO ============
