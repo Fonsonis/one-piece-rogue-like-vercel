@@ -603,7 +603,7 @@ function validateGameSave(data) {
   if(t){
     const ids=t.entrants.flatMap(e=>e.members);
     if(ids.some(id=>!CHARS[id]||(t.kind==='legends'&&CHARS[id].rareza!==5))||
-      new Set(ids.map(baseFormOf)).size!==8||t.pendingRelics.some(id=>!RELICS[id])||
+      new Set(ids.map(baseFormOf)).size!==(t.version===2?16:8)||t.pendingRelics.some(id=>!RELICS[id])||
       (t.relicReward&&!RELICS[t.relicReward])) throw new Error('Torneo incompatible.');
   }
 
@@ -2695,13 +2695,13 @@ function charControlsHTML(st, opts = {}) {
       <option value="name" ${st.sort === 'name' ? 'selected' : ''}>Nombre A-Z</option>
       <option value="rarezaDesc" ${st.sort === 'rarezaDesc' ? 'selected' : ''}>Rareza ⭐ mayor</option>
       <option value="rarezaAsc" ${st.sort === 'rarezaAsc' ? 'selected' : ''}>Rareza ⭐ menor</option>
-      <option value="statTotalDesc" ${st.sort === 'statTotalDesc' ? 'selected' : ''}>Stats Totales ▼</option>
-      <option value="hpDesc" ${st.sort === 'hpDesc' ? 'selected' : ''}>PS base ▼</option>
-      <option value="atkDesc" ${st.sort === 'atkDesc' ? 'selected' : ''}>ATQ base ▼</option>
-      <option value="defDesc" ${st.sort === 'defDesc' ? 'selected' : ''}>DEF base ▼</option>
-      <option value="spatkDesc" ${st.sort === 'spatkDesc' ? 'selected' : ''}>E.ATQ base ▼</option>
-      <option value="spdefDesc" ${st.sort === 'spdefDesc' ? 'selected' : ''}>E.DEF base ▼</option>
-      <option value="spdDesc" ${st.sort === 'spdDesc' ? 'selected' : ''}>VEL base ▼</option>
+      <option value="statTotalDesc" ${st.sort === 'statTotalDesc' ? 'selected' : ''}>Stats actuales ▼</option>
+      <option value="hpDesc" ${st.sort === 'hpDesc' ? 'selected' : ''}>PS actuales ▼</option>
+      <option value="atkDesc" ${st.sort === 'atkDesc' ? 'selected' : ''}>ATQ actual ▼</option>
+      <option value="defDesc" ${st.sort === 'defDesc' ? 'selected' : ''}>DEF actual ▼</option>
+      <option value="spatkDesc" ${st.sort === 'spatkDesc' ? 'selected' : ''}>E.ATQ actual ▼</option>
+      <option value="spdefDesc" ${st.sort === 'spdefDesc' ? 'selected' : ''}>E.DEF actual ▼</option>
+      <option value="spdDesc" ${st.sort === 'spdDesc' ? 'selected' : ''}>VEL actual ▼</option>
     </select>
   </div>`;
 }
@@ -2713,6 +2713,16 @@ function bindCharControls(st, onChange) {
     const el = $(sel);
     if (el) el.onchange = () => { st[prop] = el.value; st.page = 0; onChange(); };
   });
+}
+
+const CHAR_STAT_SORTS = {statTotalDesc:'Total',hpDesc:'PS',atkDesc:'ATQ',defDesc:'DEF',spatkDesc:'E.ATQ',spdefDesc:'E.DEF',spdDesc:'VEL'};
+function characterSortStat(id,sort) {
+  const f=applyUpgrades(makeChar(id,startLvlOf(id),false,true));
+  const keys={hpDesc:'maxhp',atkDesc:'atk',defDesc:'def',spatkDesc:'spatk',spdefDesc:'spdef',spdDesc:'spd'};
+  return sort==='statTotalDesc'?f.maxhp+f.atk+f.def+f.spatk+f.spdef+f.spd:f[keys[sort]];
+}
+function characterSortStatHTML(id,sort) {
+  return CHAR_STAT_SORTS[sort]?`<span class="collection-sort-stat">${CHAR_STAT_SORTS[sort]}: ${characterSortStat(id,sort).toLocaleString('es')}</span>`:'';
 }
 
 // Filtra (nombre, saga, tipo, rareza) y ordena la lista de personajes
@@ -2727,17 +2737,14 @@ function filterSortChars(ids, st, resolve = id => id) {
     return true;
   });
   const byName = (a, b) => CHARS[resolve(a)].name.localeCompare(CHARS[resolve(b)].name);
-  const baseStatSum = id => CHARS[resolve(id)].base.reduce((a, b) => a + b, 0);
-  if (st.sort === 'name') out.sort(byName);
+  const statKey=CHAR_STAT_SORTS[st.sort];
+  if(statKey) {
+    const values=new Map(out.map(id=>[id,characterSortStat(resolve(id),st.sort)]));
+    out.sort((a,b)=>values.get(b)-values.get(a)||byName(a,b));
+  }
+  else if (st.sort === 'name') out.sort(byName);
   else if (st.sort === 'rarezaAsc') out.sort((a, b) => CHARS[resolve(a)].rareza - CHARS[resolve(b)].rareza || byName(a, b));
   else if (st.sort === 'rarezaDesc') out.sort((a, b) => CHARS[resolve(b)].rareza - CHARS[resolve(a)].rareza || byName(a, b));
-  else if (st.sort === 'statTotalDesc') out.sort((a, b) => baseStatSum(b) - baseStatSum(a) || byName(a, b));
-  else if (st.sort === 'hpDesc') out.sort((a, b) => CHARS[resolve(b)].base[0] - CHARS[resolve(a)].base[0] || byName(a, b));
-  else if (st.sort === 'atkDesc') out.sort((a, b) => CHARS[resolve(b)].base[1] - CHARS[resolve(a)].base[1] || byName(a, b));
-  else if (st.sort === 'defDesc') out.sort((a, b) => CHARS[resolve(b)].base[2] - CHARS[resolve(a)].base[2] || byName(a, b));
-  else if (st.sort === 'spatkDesc') out.sort((a, b) => CHARS[resolve(b)].base[3] - CHARS[resolve(a)].base[3] || byName(a, b));
-  else if (st.sort === 'spdefDesc') out.sort((a, b) => CHARS[resolve(b)].base[4] - CHARS[resolve(a)].base[4] || byName(a, b));
-  else if (st.sort === 'spdDesc') out.sort((a, b) => CHARS[resolve(b)].base[5] - CHARS[resolve(a)].base[5] || byName(a, b));
   return out;
 }
 
@@ -2807,7 +2814,7 @@ function showNakamaPicker(opts) {
     <details class="nakama-picker-more"><summary>Tipo, rareza y orden</summary><div class="nakama-picker-extra">
       <label>Tipo<select id="np-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t => `<option value="${esc(t)}" ${st.type === t ? 'selected' : ''}>${TYPES[t].emoji} ${esc(t)}</option>`).join('')}</select></label>
       <label>Rareza<select id="np-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r => `<option value="${r}" ${+st.rarity === r ? 'selected' : ''}>${r} estrellas</option>`).join('')}</select></label>
-      <label>Orden<select id="np-sort">${[['name','Nombre A–Z'],['rarezaDesc','Mayor rareza'],['statTotalDesc','Stats base totales'],['atkDesc','Ataque base'],['spatkDesc','Ataque especial base'],['spdDesc','Velocidad base']].map(([value,label]) => `<option value="${value}" ${st.sort === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+      <label>Orden<select id="np-sort">${[['name','Nombre A–Z'],['rarezaDesc','Mayor rareza'],['statTotalDesc','Stats actuales'],['atkDesc','Ataque actual'],['spatkDesc','Ataque especial actual'],['spdDesc','Velocidad actual']].map(([value,label]) => `<option value="${value}" ${st.sort === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
     </div></details>
     <div class="nakama-picker-summary"><span id="np-count" role="status"></span><button class="btn gray" id="np-reset">Limpiar filtros</button></div>
     <div class="nakama-picker-roster" id="np-roster"></div>
@@ -2832,7 +2839,7 @@ function showNakamaPicker(opts) {
       return `<article class="nakama-picker-card ${team.includes(id) ? 'in-team' : ''}">
         <button class="nakama-picker-pick" data-id="${esc(id)}" aria-label="Elegir a ${esc(c.name)}${current ? ', en este hueco' : team.includes(id) ? ', en el equipo' : ''}">
           <span class="nakama-picker-badge">${current ? 'Este hueco' : team.includes(id) ? 'En equipo' : ''}</span>
-          ${charIcon(display(id), 48)}<strong>${esc(c.name)}</strong><span>Nv. ${startLvlOf(id)} · ${'⭐'.repeat(c.rareza)}</span><span class="type-badges">${typeBadges(c.types)}</span>
+          ${charIcon(display(id), 48)}<strong>${esc(c.name)}</strong>${characterSortStatHTML(display(id),st.sort)}<span>Nv. ${startLvlOf(id)} · ${'⭐'.repeat(c.rareza)}</span><span class="type-badges">${typeBadges(c.types)}</span>
         </button><button class="nakama-picker-info" data-info="${esc(id)}" aria-label="Ver ficha de ${esc(c.name)}" title="Ver ficha">ⓘ</button>
       </article>`;
     }).join('') || '<p class="nakama-picker-empty">No hay nakamas con estos filtros. Prueba otra saga o pulsa «Limpiar filtros».</p>';
@@ -2899,7 +2906,7 @@ function showInventoryModal(opts = {}) {
       return `<article class="inventory-card ${currentTeam.includes(id)?'in-team':''}" data-id="${id}">
         <div class="inventory-card-top"><span>${currentTeam.includes(id)?'En tu equipo':'Nakama'}</span><span class="inventory-rarity" aria-label="Rareza ${c.rareza} de 5 estrellas"><span aria-hidden="true">★</span> ${c.rareza}/5</span></div>
         <button class="inventory-profile btn-info-inv" data-id="${id}" aria-label="Ver ficha de ${collectionText(c.name)}"><span class="inventory-portrait" aria-hidden="true">${charIcon(displayId,80)}</span><strong>${c.name}</strong><span class="inventory-profile-link">Ver ficha ↗</span></button>
-        <div class="inventory-level">Nivel base <strong>${level}</strong></div><div class="type-badges">${typeBadges(c.types)}</div>
+        ${characterSortStatHTML(displayId,invViewState.sort)}<div class="inventory-level">Nivel base <strong>${level}</strong></div><div class="type-badges">${typeBadges(c.types)}</div>
         <p class="inventory-relic">${relic?`🏺 ${esc(relic.name)}<br><span>${relic.character===id?'Afinidad activa':'Boost común activo'}</span>`:'Sin reliquia equipada'}</p>
         <div class="inventory-upgrade">${maxed?`<span class="inventory-limit">Límite de saga: Nv. ${cap}</span><button class="btn btn-upg-inv" data-id="${id}" disabled aria-label="Nivel máximo de saga alcanzado"><span class="inventory-upgrade-label">Nivel máximo</span><span class="inventory-upgrade-short" aria-hidden="true">Máx.</span></button>`:`<span class="inventory-cost" title="${number(cost)} Log Poses">Coste: <strong>${compact(cost)} 🧭</strong></span><button class="btn gold btn-upg-inv" data-id="${id}" ${canAfford?'':'disabled'} aria-label="Mejorar a ${collectionText(c.name)} al nivel base ${level+1} por ${number(cost)} Log Poses"><span class="inventory-upgrade-label">Subir a Nv. ${level+1}</span><span class="inventory-upgrade-short" aria-hidden="true">↑ Lv. ${level+1}</span></button>${canAfford?'':`<span class="inventory-shortfall">Faltan ${compact(cost-(meta.logPoses||0))} 🧭</span>`}`}</div>
       </article>`;
@@ -2913,7 +2920,7 @@ function showInventoryModal(opts = {}) {
         <label for="inv-saga">Saga<select id="inv-saga"><option value="">Todas las sagas</option>${groupUpgradeRoster(allUnlocked).map(g=>`<option value="${g.id}" ${invViewState.saga===g.id?'selected':''}>${g.name}</option>`).join('')}</select></label>
         <label for="inv-type">Tipo<select id="inv-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t=>`<option value="${t}" ${invViewState.type===t?'selected':''}>${t}</option>`).join('')}</select></label>
         <label for="inv-rarity">Rareza<select id="inv-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r=>`<option value="${r}" ${+invViewState.rarity===r?'selected':''}>${r} ${r===1?'estrella':'estrellas'}</option>`).join('')}</select></label>
-        <label for="inv-sort">Ordenar<select id="inv-sort">${[['name','Nombre A–Z'],['rarezaDesc','Mayor rareza'],['rarezaAsc','Menor rareza'],['statTotalDesc','Mayor fuerza base']].map(([v,l])=>`<option value="${v}" ${invViewState.sort===v?'selected':''}>${l}</option>`).join('')}</select></label>
+        <label for="inv-sort">Ordenar<select id="inv-sort">${[['name','Nombre A–Z'],['rarezaDesc','Mayor rareza'],['rarezaAsc','Menor rareza'],['statTotalDesc','Mayor fuerza actual']].map(([v,l])=>`<option value="${v}" ${invViewState.sort===v?'selected':''}>${l}</option>`).join('')}</select></label>
       </div></details>
       <div class="collection-results"><span role="status">${ids.length} nakamas${ids.length?` · ${page*pageSize+1}–${Math.min((page+1)*pageSize,ids.length)}`:''}</span><button class="collection-text-button" id="inv-reset">Limpiar filtros</button></div>
       <div id="inv-cards-grid" class="collection-list inventory-grid" aria-label="Lista de nakamas" tabindex="0">${cards||'<div class="collection-empty"><h3>No hay nakamas con estos filtros</h3><p>Prueba otro nombre o limpia los filtros.</p></div>'}</div>
@@ -7881,6 +7888,7 @@ function dexCardHTML(id) {
     <div>${c.name}</div>
     <div class="dex-rarity" style="font-size:7px;" aria-label="Rareza ${c.rareza} de 5 estrellas"><span class="dex-rarity-full" aria-hidden="true">${'⭐'.repeat(c.rareza)}</span><span class="dex-rarity-compact" aria-hidden="true">★ ${c.rareza}/5</span></div>
     ${vet ? '<div style="color:var(--accent)">🏅 veterano</div>' : got ? '<div style="color:var(--green)">✓ nakama</div>' : (seen ? '<div style="color:#999">visto</div>' : '<div style="color:#aaa">sin avistar</div>')}
+    ${seen?characterSortStatHTML(id,dexView.sort):''}
     ${forms.length>1?`<div class="dex-forms-count">${forms.length} fases</div>`:''}
   </button>`;
 }
@@ -8121,13 +8129,13 @@ function startChallenge(kind,picked) {
     if(kind!=='legends')return id;
     const forms=Object.keys(CHARS).filter(form=>baseFormOf(form)===id&&CHARS[form].rareza===5);
     return forms.at(-1);
-  }).filter(Boolean)).slice(0,8-count);
-  if(opponents.length!==8-count)return false;
+  }).filter(Boolean)).slice(0,16-count);
+  if(opponents.length!==16-count)return false;
   const entrants=[{members:[...picked]}];
   for(let i=0;i<opponents.length;i+=count)entrants.push({members:opponents.slice(i,i+count)});
   const seeds=shuffleChallenge(entrants.map((_,i)=>i));
   const matches=[];for(let i=0;i<seeds.length;i+=2)matches.push(challengeMatch(seeds[i],seeds[i+1]));
-  meta.challenge={version:1,kind,level,entrants,stage:0,rounds:[{name:count===1?'Cuartos de final':'Semifinales',matches}],finished:false,placement:null,reward:0,pendingRelics:[]};
+  meta.challenge={version:2,kind,level,entrants,stage:0,rounds:[{name:challengeRoundName(matches.length),matches}],finished:false,placement:null,reward:0,pendingRelics:[]};
   saveMeta();screenChallengeBracket();return true;
 }
 function simulateChallengeMatch(t,m) {
@@ -8163,7 +8171,7 @@ function endChallengeBattle(victory) {
     else {
       const winners=round.matches.map(match=>match.winner);
       const matches=[];for(let i=0;i<winners.length;i+=2)matches.push(challengeMatch(winners[i],winners[i+1]));
-      t.rounds.push({name:matches.length===1?'Final':'Semifinales',matches});t.stage++;
+      t.rounds.push({name:challengeRoundName(matches.length),matches});t.stage++;
       if(!victory){
         if(t.kind==='tournament'&&round.matches.length===2){
           const losers=round.matches.map(match=>match.winner===match.a?match.b:match.a);
@@ -8174,18 +8182,30 @@ function endChallengeBattle(victory) {
             const current=t.rounds[t.stage];current.matches.forEach(match=>simulateChallengeMatch(t,match));
             const ws=current.matches.map(match=>match.winner),next=[];
             for(let i=0;i<ws.length;i+=2)next.push(challengeMatch(ws[i],ws[i+1]));
-            t.rounds.push({name:next.length===1?'Final':'Semifinales',matches:next});t.stage++;
+            t.rounds.push({name:challengeRoundName(next.length),matches:next});t.stage++;
           }
           t.rounds[t.stage].matches.forEach(match=>simulateChallengeMatch(t,match));
-          finishChallenge(t.kind==='legends'?3:5);
+          finishChallenge(round.matches.length+1);
         }
       }
     }
   }
   saveMeta();screenChallengeBracket();
 }
+function challengeRoundName(matches) { return ({8:'Octavos de final',4:'Cuartos de final',2:'Semifinales',1:'Final'})[matches]; }
+function challengeRoundLevel(t,stage) {
+  if(t.kind==='tournament')return t.level+15*stage;
+  const final=Math.max(...SAGAS.find(s=>s.id==='wano').islands.at(-1).bossLvl);
+  return t.level+Math.round((Math.max(t.level+12,final)-t.level)*stage/(Math.log2(t.entrants.length)-1));
+}
 function challengeEnemyLevel(t) {
-  return t.kind==='legends'&&t.rounds[t.stage].name==='Final'?Math.max(...SAGAS.find(s=>s.id==='wano').islands.at(-1).bossLvl):t.level;
+  return t.bronze?challengeRoundLevel(t,Math.log2(t.entrants.length)-2)-10:challengeRoundLevel(t,t.stage);
+}
+function challengePlacementText(t) {
+  if(t.placement===0)return 'Torneo abandonado';
+  if(t.placement===1)return '🏆 ¡Campeón!';
+  if(t.placement>=5)return `Eliminado en ${challengeRoundName(t.placement-1).toLowerCase()} · puestos ${t.placement}–${(t.placement-1)*2}`;
+  return `Puesto ${t.placement}${t.kind==='legends'&&t.placement===3?'–4':''}`;
 }
 function challengePlayerTeam(t) {
   return t.entrants[0].members.map(id=>applyUpgrades(makeChar(baseFormOf(id),startLvlOf(id))));
@@ -8200,7 +8220,7 @@ function playChallengeMatch() {
   t.entrants[0].members=allies.map(f=>f.id);
   saveMeta();
   const enemies=t.entrants[enemyIndex].members.map(id=>makeChar(id,enemyLevel,false,true));
-  startBattle(enemies,{challenge:true,duos:t.kind==='legends',team:allies,items:{},intro:`🏆 ${t.bronze?'Tercer puesto':t.rounds[t.stage].name} · ${t.kind==='legends'?'Batalla de Leyendas · 2 contra 2':'Torneo de 8'} · Nv. rival ${enemyLevel}`});
+  startBattle(enemies,{challenge:true,duos:t.kind==='legends',team:allies,items:{},intro:`🏆 ${t.bronze?'Tercer puesto':t.rounds[t.stage].name} · ${t.kind==='legends'?'Batalla de Leyendas · 2 contra 2':`Torneo de ${t.entrants.length}`} · Nv. rival ${enemyLevel}`});
 }
 function claimChallengeRelic(id) {
   const t=meta.challenge;
@@ -8215,9 +8235,9 @@ function screenChallenges() {
   render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← PUERTO</button>
     <section class="panel challenge-panel"><h2 id="challenge-title" tabindex="-1">🏆 Desafíos</h2><p>Torneos offline contra la IA. Desbloqueados a nivel de cuenta 35.</p>
     ${meta.challenge?`<button class="btn gold" id="challenge-resume">${meta.challenge.finished?'VER RESULTADO Y RECOMPENSA':'CONTINUAR TORNEO'}</button>`:''}
-    <div class="challenge-events"><article class="challenge-event"><span class="challenge-emblem">🏆</span><h3>Torneo de los Ocho</h3>
-    <p>8 participantes · duelos 1 contra 1 · Rivales Nv.65. Cuartos, semifinales, final y combate por el tercer puesto.</p><div class="challenge-prizes"><span>🥇 7.500</span><span>🥈 5.000</span><span>🥉 2.500</span></div><p>Log Poses por torneo. El resto de puestos no recibe premio.</p><button class="btn blue" data-challenge="tournament" ${challengeCanStart()?'':'disabled'}>ELEGIR LUCHADOR</button></article>
-    <article class="challenge-event legends"><span class="challenge-emblem">👑</span><h3>Batalla de Leyendas</h3><p>8 personajes · 4 parejas · combates 2 contra 2. Solo rareza 5★; las estrellas de fusión no cuentan.</p><p>Rivales de Wano · Nv.${challengeLevel('legends')} y final Nv.${Math.max(...SAGAS.find(s=>s.id==='wano').islands.at(-1).bossLvl)}. Cada personaje vivo actúa por ronda.</p><p>🏺 Campeones: elige una reliquia entre tres, priorizando afinidades de tu pareja y reliquias nuevas.</p><button class="btn gold" data-challenge="legends" ${challengeCanStart()?'':'disabled'}>FORMAR PAREJA</button></article></div>
+    <div class="challenge-events"><article class="challenge-event"><span class="challenge-emblem">🏆</span><h3>Torneo de los Dieciséis</h3>
+    <p>16 participantes · duelos 1 contra 1. Octavos Nv.65 → cuartos Nv.80 → semifinales Nv.95 → final Nv.110. Bronce Nv.85.</p><div class="challenge-prizes"><span>🥇 7.500</span><span>🥈 5.000</span><span>🥉 2.500</span></div><p>Log Poses por torneo. El resto de puestos no recibe premio.</p><button class="btn blue" data-challenge="tournament" ${challengeCanStart()?'':'disabled'}>ELEGIR LUCHADOR</button></article>
+    <article class="challenge-event legends"><span class="challenge-emblem">👑</span><h3>Batalla de Leyendas</h3><p>16 personajes · 8 parejas · combates 2 contra 2. Solo rareza 5★; las estrellas de fusión no cuentan.</p><p>Rivales de Wano · cuartos Nv.${challengeLevel('legends')} → semifinales Nv.${challengeLevel('legends')+12} → final Nv.${Math.max(...SAGAS.find(s=>s.id==='wano').islands.at(-1).bossLvl)}. Cada personaje vivo actúa por ronda.</p><p>🏺 Campeones: elige una reliquia entre tres, priorizando afinidades de tu pareja y reliquias nuevas.</p><button class="btn gold" data-challenge="legends" ${challengeCanStart()?'':'disabled'}>FORMAR PAREJA</button></article></div>
     <p><b>Tus personajes usan su nivel permanente actual.</b> Todos los rivales llevan una reliquia afín con boost y pasiva. Empiezas cada combate con PS completos y conservas tus mejoras y reliquias equipadas.</p><details class="challenge-rules"><summary>Cómo funcionan los torneos</summary><p>Sin consumibles. Ultimate reiniciada en cada combate, salvo la carga inicial de una reliquia. Puedes volver al puerto y continuar el cuadro guardado. Tus niveles se consultan de nuevo al empezar cada combate.</p></details>
     <button class="btn gray" id="challenge-relics">🎒 RELIQUIAS (${meta.relics.length})</button></section>`);
   $('#btn-back').onclick=screenHome;$('#challenge-relics').onclick=showRelicCollection;
@@ -8231,7 +8251,7 @@ function screenChallengeSelection(kind) {
   const pickerState={q:'',saga:'',type:'',rarity:0,sort:'name',scope:'all',page:0};
   render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button>
     <section class="panel challenge-panel challenge-selection"><h2 id="challenge-title" tabindex="-1">${kind==='legends'?'👑 Forma tu pareja legendaria':'🏆 Elige tu luchador'}</h2>
-    <p>Participas con el <b>nivel permanente de cada nakama</b>. Rivales Nv.${challengeLevel(kind)}${kind==='legends'?' · Final Nv.'+Math.max(...SAGAS.find(s=>s.id==='wano').islands.at(-1).bossLvl):''}, todos con reliquia afín.</p>
+    <p>Participas con el <b>nivel permanente de cada nakama</b>. 16 personajes en el cuadro. Rivales ${kind==='legends'?'Nv.266 → 278 → 290':'Nv.65 → 80 → 95 → 110 · Bronce Nv.85'}, todos con reliquia afín.</p>
     ${pool.length<count?'<p class="challenge-notice" role="status">No tienes suficientes personajes elegibles. Recluta legendarios o desbloquea sus formas de 5★ mejorando su nivel base.</p>':''}
     <div class="challenge-team-slots" id="challenge-slots"></div>
     <div id="challenge-selection-synergies"></div>
@@ -8271,20 +8291,43 @@ function screenChallengeSelection(kind) {
   $('#challenge-start').onclick=()=>startChallenge(kind,picked.filter(Boolean).map(id=>evolutionFormAt(id,startLvlOf(id))));
   draw();$('#challenge-title').focus();
 }
+function challengeBracketHTML(t) {
+  const firstCount=t.entrants.length/2,totalRounds=Math.log2(t.entrants.length);
+  const slot=t.kind==='legends'?168:120,cardHeight=slot-24;
+  const player=challengePlayerTeam(t),next=challengeCurrentMatch(t);
+  const entry=(index,placeholder,winner)=>{
+    if(index===null)return `<div class="bracket-entry pending">${placeholder}</div>`;
+    const names=index===0?player.map(charName):t.entrants[index].members.map(id=>CHARS[id].name);
+    return `<div class="bracket-entry ${winner===index?'winner':''} ${index===0?'your-entry':''}">${names.map(name=>`<span>${esc(name)}</span>`).join('')}${winner===index?'<span class="bracket-won" aria-label="Ganador">✓</span>':''}${index===0?'<span class="bracket-you">Tu equipo</span>':''}</div>`;
+  };
+  const match=(m,round,i)=>{
+    const labels=round===0?['Por decidir','Por decidir']:[`Ganador cruce ${i*2+1}`,`Ganador cruce ${i*2+2}`];
+    const top=(i+.5)*2**round*slot-cardHeight/2;
+    return `<article class="challenge-match ${m&&m===next?'current-match':''}" style="top:${top}px;height:${cardHeight}px" ${m&&m===next?'aria-current="step"':''} aria-label="${challengeRoundName(firstCount/2**round)} · Cruce ${i+1}">${[m?.a??null,m?.b??null].map((id,n)=>entry(id,labels[n],m?.winner)).join('')}</article>`;
+  };
+  const rounds=Array.from({length:totalRounds},(_,round)=>{
+    const count=firstCount/2**round;
+    const links=round<totalRounds-1?Array.from({length:count/2},(_,i)=>`<i aria-hidden="true" class="tournament-link" style="top:${(i*2+.5)*2**round*slot}px;height:${2**round*slot}px"></i>`).join(''):'';
+    const inlets=round?Array.from({length:count},(_,i)=>`<i aria-hidden="true" class="tournament-inlet" style="top:${(i+.5)*2**round*slot}px"></i>`).join(''):'';
+    return `<section class="tournament-round"><h3>${challengeRoundName(count)}<small>Rivales Nv.${challengeRoundLevel(t,round)}</small></h3><div class="tournament-matches" style="height:${firstCount*slot}px">${Array.from({length:count},(_,i)=>match(t.rounds[round]?.matches[i],round,i)).join('')}${links}${inlets}</div></section>`;
+  }).join('');
+  const bronze=t.kind==='tournament'?`<section class="tournament-bronze"><h3>Tercer puesto · Nv.${challengeRoundLevel(t,totalRounds-2)-10}</h3><article class="challenge-match ${t.bronze===next?'current-match':''}">${[t.bronze?.a??null,t.bronze?.b??null].map((id,n)=>entry(id,`Perdedor semifinal ${n+1}`,t.bronze?.winner)).join('')}</article></section>`:'';
+  return `<p class="bracket-hint">Desplaza el cuadro para seguir los cruces. Tu equipo está resaltado; ✓ indica quién avanza.</p><div class="tournament-viewport" role="region" aria-label="Cuadro eliminatorio del torneo" tabindex="0"><div class="challenge-bracket tournament-tree">${rounds}</div>${bronze}</div>`;
+}
+
 function screenChallengeBracket() {
   const t=meta.challenge;if(!t)return screenChallenges();
   const playerTeam=challengePlayerTeam(t);
   const entrant=index=>index===0?playerTeam.map(f=>esc(charName(f))).join(' + '):t.entrants[index].members.map(id=>esc(CHARS[id].name)).join(' + ');
   const next=challengeCurrentMatch(t), enemyIndex=next?(next.a===0?next.b:next.a):null;
-  const matchHTML=m=>`<div class="challenge-match">${[m.a,m.b].map(index=>`<div class="${m.winner===index?'winner':''} ${index===0?'your-entry':''}">${index===0?'🏴‍☠️ ':''}${entrant(index)}${m.winner===index?' ✓':''}</div>`).join('')}</div>`;
-  render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button><section class="panel challenge-panel"><h2 id="challenge-title" tabindex="-1">${t.kind==='legends'?'👑 Batalla de Leyendas':'🏆 Torneo de los Ocho'}</h2>
+  render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button><section class="panel challenge-panel"><h2 id="challenge-title" tabindex="-1">${t.kind==='legends'?'👑 Batalla de Leyendas':`🏆 Torneo de ${t.entrants.length}`}</h2>
     <p><b>Tu equipo:</b> ${playerTeam.map(f=>`${esc(charName(f))} · Nv.${f.lvl}`).join(' + ')}</p>
     ${next?`<section class="challenge-next"><h3>Próximo combate · ${t.bronze?'Tercer puesto':t.rounds[t.stage].name}</h3><p>${entrant(enemyIndex)} · Rivales Nv.${challengeEnemyLevel(t)}</p>
       <button class="btn blue" id="challenge-fight">⚔️ ${t.bronze?'LUCHAR POR EL TERCER PUESTO':'SIGUIENTE COMBATE'}</button>
       <details class="challenge-rules"><summary>Ver las reliquias del rival</summary>${t.entrants[enemyIndex].members.map(id=>`<article class="challenge-rival-relic"><h3>${esc(CHARS[id].name)}</h3>${relicDetailsHTML(RELICS[`relic_${baseFormOf(id)}`])}</article>`).join('')}</details></section>`:''}
     <p>Los cruces entre rivales de la IA se simulan según la fuerza de sus equipos.</p>
-    <div class="challenge-bracket">${t.rounds.map(round=>`<section><h3>${round.name}</h3>${round.matches.map(matchHTML).join('')}</section>`).join('')}${t.bronze?`<section><h3>Tercer puesto</h3>${matchHTML(t.bronze)}</section>`:''}</div>
-    ${t.finished?`<div class="challenge-result" role="status"><h3>${t.placement===0?'Torneo abandonado':t.placement===1?'🏆 ¡Campeón!':t.placement===5?'Eliminado en cuartos · puestos 5–8':`Puesto ${t.placement}${t.kind==='legends'&&t.placement===3?'–4':''}`}</h3><p>${t.reward?`🧭 +${t.reward.toLocaleString('es')} Log Poses añadidos a tu cuenta.`:t.pendingRelics.length?'🏺 Elige tu reliquia de campeón.':t.relicReward?`🏺 Reliquia obtenida: ${esc(RELICS[t.relicReward].name)}`:'Sin premio de Log Poses.'}</p></div>`:`<button class="btn gray" id="challenge-abandon">ABANDONAR TORNEO</button>`}
+    ${challengeBracketHTML(t)}
+    ${t.finished?`<div class="challenge-result" role="status"><h3>${challengePlacementText(t)}</h3><p>${t.reward?`🧭 +${t.reward.toLocaleString('es')} Log Poses añadidos a tu cuenta.`:t.pendingRelics.length?'🏺 Elige tu reliquia de campeón.':t.relicReward?`🏺 Reliquia obtenida: ${esc(RELICS[t.relicReward].name)}`:'Sin premio de Log Poses.'}</p></div>`:`<button class="btn gray" id="challenge-abandon">ABANDONAR TORNEO</button>`}
     ${t.pendingRelics.length?`<div class="relic-grid">${t.pendingRelics.map(id=>`<article class="relic-card">${relicDetailsHTML(RELICS[id])}<button class="btn gold" data-claim-relic="${id}">ELEGIR</button></article>`).join('')}</div>`:''}
     ${t.relicReward?'<button class="btn gold" id="challenge-equip">VER RELIQUIA</button>':''}</section>`);
   $('#btn-back').onclick=screenChallenges;

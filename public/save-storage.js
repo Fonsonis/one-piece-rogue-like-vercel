@@ -24,14 +24,15 @@
         Object.values(data.meta.relicCopies || {}).some(n=>!Number.isSafeInteger(n)||n<1)) throw new Error('Inventario de reliquias inválido.');
     const t=data.meta.challenge;
     if(t!==undefined&&t!==null){
-      const size=t.kind==='legends'?4:8;
+      const teamSize=t.kind==='legends'?2:1;
+      const size=(t.version===2?16:8)/teamSize;
       const validMatch=m=>record(m)&&[m.a,m.b].every(i=>Number.isInteger(i)&&i>=0&&i<size)&&m.a!==m.b&&[null,m.a,m.b].includes(m.winner);
-      if(!record(t)||t.version!==1||!['tournament','legends'].includes(t.kind)||
+      if(!record(t)||![1,2].includes(t.version)||!['tournament','legends'].includes(t.kind)||
         !Number.isInteger(t.level)||t.level<1||t.level>1000||typeof t.finished!=='boolean'||
-        !Array.isArray(t.entrants)||t.entrants.length!==size||t.entrants.some(e=>!record(e)||!Array.isArray(e.members)||e.members.length!==(size===4?2:1)||e.members.some(id=>typeof id!=='string'))||
-        !Array.isArray(t.rounds)||!t.rounds.length||t.rounds.length>3||t.rounds.some((r,i)=>!record(r)||typeof r.name!=='string'||!Array.isArray(r.matches)||r.matches.length!==size/2**(i+1)||!r.matches.every(validMatch))||
+        !Array.isArray(t.entrants)||t.entrants.length!==size||t.entrants.some(e=>!record(e)||!Array.isArray(e.members)||e.members.length!==teamSize||e.members.some(id=>typeof id!=='string'))||
+        !Array.isArray(t.rounds)||!t.rounds.length||t.rounds.length>Math.log2(size)||t.rounds.some((r,i)=>!record(r)||typeof r.name!=='string'||!Array.isArray(r.matches)||r.matches.length!==size/2**(i+1)||!r.matches.every(validMatch))||
         !Number.isInteger(t.stage)||t.stage<0||t.stage>=t.rounds.length||(t.bronze!==undefined&&!validMatch(t.bronze))||
-        ![null,0,1,2,3,4,5].includes(t.placement)||!Number.isSafeInteger(t.reward)||t.reward<0||
+        ![null,0,1,2,3,4,5,...(size===16?[9]:[])].includes(t.placement)||!Number.isSafeInteger(t.reward)||t.reward<0||
         !Array.isArray(t.pendingRelics)||t.pendingRelics.length>3||t.pendingRelics.some(id=>typeof id!=='string')||
         (t.relicReward!==undefined&&typeof t.relicReward!=='string')) throw new Error('Torneo guardado inválido.');
     }

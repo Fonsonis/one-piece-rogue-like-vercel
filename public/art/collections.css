@@ -288,3 +288,4 @@ html .inventory-modal #inv-cards-grid { overflow:visible; max-height:none; min-h
 .pirate-dex button.dex-card:disabled { cursor:default; }
 .pirate-dex button.dex-card:focus-visible { outline:3px solid var(--sea); outline-offset:3px; }
 .pirate-dex .dex-forms-count { margin-top:5px; color:var(--sea); font:650 12px/1.4 system-ui,sans-serif; }
+.collection-sort-stat { display:block; margin:5px 0; font:700 12px/1.4 system-ui,sans-serif; color:var(--sea); text-align:center; }

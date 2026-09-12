@@ -45,7 +45,7 @@ try{
  await page.setViewportSize({width:1360,height:900});
  await page.screenshot({path:'outputs/challenges/selection-desktop.png',fullPage:true});
  await page.locator('#challenge-start').click();
- assert.equal(await page.locator('.challenge-match').count(),2);
+ assert.equal(await page.locator('.tournament-tree .challenge-match').count(),7);
  await page.reload({waitUntil:'domcontentloaded'});await page.locator('#mode-challenge').click();await page.locator('#challenge-resume').click();
  await page.locator('#challenge-fight').click();
  await page.evaluate(()=>{clearTimeout(battle.timer);battle.waiting=true;});
@@ -64,7 +64,7 @@ try{
     scheduleRound(0);});
    await page.waitForSelector('#challenge-fight, .challenge-result',{timeout:20000});
  };
- await winFight();await page.locator('#challenge-fight').click();await winFight();
+ await winFight();await page.locator('#challenge-fight').click();await winFight();await page.locator('#challenge-fight').click();await winFight();
  assert.equal(await page.locator('[data-claim-relic]').count(),3);
  await page.screenshot({path:'outputs/challenges/reward-mobile.png',fullPage:true});
  await page.locator('[data-claim-relic="relic_shanks"]').click();await page.locator('#challenge-equip').click();
@@ -81,6 +81,7 @@ try{
  assert.equal(await page.evaluate(()=>meta.challenge.pendingRelics.length),0);
  await page.locator('#mode-challenge').click();await page.locator('[data-challenge="tournament"]').click();await page.locator('[data-challenge-slot="0"]').click();await page.locator('#np-search').fill('zoro');await page.locator('#np-roster [data-id="zoro"]').click();await page.locator('#challenge-start').click();
  await page.screenshot({path:'outputs/challenges/bracket-mobile.png',fullPage:true});
+ await page.locator('#challenge-fight').click();await winFight();
  await page.locator('#challenge-fight').click();await winFight();
  await page.locator('#challenge-fight').click();
  await page.evaluate(()=>{clearTimeout(battle.timer);battle.pTeam.forEach(f=>f.hp=0);battle.speed=100;afterRound();});

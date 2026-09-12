@@ -5,11 +5,11 @@ function harness(){
  const h=combatHarness();h.exec(`accountLevel=()=>35;screenChallengeBracket=()=>{};maxStartLvlCap=()=>100;meta.roster=['luffy','zoro','shanks','roger'];meta.charUpgrades={luffy:95};`);return h;
 }
 function finish(h,outcomes){for(const win of outcomes)h.exec(`endChallengeBattle(${win});`);}
-test('eight entrants, a real bronze match and exactly one placement payout',()=>{
- for(const [outcomes,rank,reward] of [[[true,true,true],1,7500],[[true,true,false],2,5000],[[true,false,true],3,2500],[[true,false,false],4,0],[[false],5,0]]){
+test('sixteen entrants, a real bronze match and exactly one placement payout',()=>{
+ for(const [outcomes,rank,reward] of [[[true,true,true,true],1,7500],[[true,true,true,false],2,5000],[[true,true,false,true],3,2500],[[true,true,false,false],4,0],[[true,false],5,0],[[false],9,0]]){
   const h=harness();assert.equal(h.exec(`startChallenge('tournament',['zoro'])`),true);
-  assert.equal(h.exec('meta.challenge.entrants.length'),8);
-  assert.equal(h.exec('new Set(meta.challenge.entrants.flatMap(e=>e.members.map(baseFormOf))).size'),8);
+  assert.equal(h.exec('meta.challenge.entrants.length'),16);
+  assert.equal(h.exec('new Set(meta.challenge.entrants.flatMap(e=>e.members.map(baseFormOf))).size'),16);
   finish(h,outcomes);
   assert.equal(h.exec('meta.challenge.placement'),rank);assert.equal(h.exec('meta.logPoses'),reward);
   h.exec('endChallengeBattle(true);finishChallenge(1);');assert.equal(h.exec('meta.logPoses'),reward);
@@ -23,12 +23,12 @@ test('eligibility uses unlocked forms and rarity, never fusion or borrowed teams
  h.exec('meta.charUpgrades={luffy:95};');assert.equal(h.exec(`challengePool('legends').includes('luffy5')`),true);
  assert.equal(h.exec(`startChallenge('legends',['luffy5','shanks'])`),true);
  assert.equal(h.exec(`startChallenge('tournament',['zoro'])`),false);
- assert.equal(h.exec('meta.challenge.entrants.length'),4);
+ assert.equal(h.exec('meta.challenge.entrants.length'),8);
  assert.equal(h.exec('meta.challenge.entrants.every(e=>e.members.length===2&&e.members.every(id=>CHARS[id].rareza===5))'),true);
- assert.equal(h.exec('new Set(meta.challenge.entrants.flatMap(e=>e.members.map(baseFormOf))).size'),8);
+ assert.equal(h.exec('new Set(meta.challenge.entrants.flatMap(e=>e.members.map(baseFormOf))).size'),16);
 });
 test('legendary winner gets a persisted choice, affinity priority and a single relic claim',()=>{
- const h=harness();h.exec(`startChallenge('legends',['shanks','roger']);`);finish(h,[true,true]);
+ const h=harness();h.exec(`startChallenge('legends',['shanks','roger']);`);finish(h,[true,true,true]);
  assert.equal(h.exec('meta.challenge.pendingRelics.length'),3);
  assert.equal(h.exec(`meta.challenge.pendingRelics.includes('relic_shanks')&&meta.challenge.pendingRelics.includes('relic_roger')`),true);
  assert.equal(h.exec(`startChallenge('tournament',['zoro'])`),false);
@@ -42,7 +42,7 @@ test('legendary winner gets a persisted choice, affinity priority and a single r
 test('an unfinished bracket resumes without changing its draw',()=>{
  const h=harness();h.exec(`startChallenge('tournament',['zoro']);endChallengeBattle(true);const checkpoint=JSON.stringify(meta.challenge);loadedSave=JSON.parse(JSON.stringify(GameSaveStorage.payload(meta,null)));loadMeta();`);
  assert.equal(h.exec('JSON.stringify(meta.challenge)===checkpoint'),true);
- finish(h,[true,true]);assert.equal(h.exec('meta.logPoses'),7500);
+ finish(h,[true,true,true]);assert.equal(h.exec('meta.logPoses'),7500);
 });
 test('challenge victory, defeat and simultaneous KO never mutate a nuzlocke journey or tower',()=>{
  for(const outcome of ['win','loss','draw']){
@@ -158,4 +158,47 @@ test('affine enemy relic hooks apply to evolved rivals and reset outside challen
  assert.equal(h.exec('team[0].st.slowRate'),.30);
  h.exec(`run={mode:'classic',saga:0,team,items:{}};team[0].hp=team[0].maxhp;startBattle(enemies,{wild:true});`);
  assert.equal(h.exec('enemies.every(f=>f.battleRelic===null)'),true);
+});
+test('rivals level up each round while allies retain permanent levels; bronze is below semifinal difficulty',()=>{
+ for(const [kind,levels,ids] of [['tournament',[65,80,95,110],['zoro']],['legends',[266,278,290],['shanks','roger']]]){
+  const h=harness();h.exec(`meta.charUpgrades={zoro:7,shanks:42,roger:61};startChallenge('${kind}',${JSON.stringify(ids)});`);
+  for(const level of levels){
+   h.exec('playChallengeMatch();');
+   assert.equal(h.exec('battle.eTeam.every(f=>f.lvl==='+level+')'),true);
+   assert.equal(h.exec('battle.pTeam.every(f=>f.lvl===startLvlOf(f.id))'),true);
+   assert.equal(h.exec('battle.eTeam.every(f=>equippedRelic(f)?.character===baseFormOf(f.id))'),true);
+   h.exec('battle=null;endChallengeBattle(true);');
+  }
+  assert.equal(h.exec('meta.challenge.placement'),1);
+ }
+ const h=harness();h.exec("startChallenge('tournament',['zoro']);");finish(h,[true,true,false]);
+ assert.equal(h.exec('challengeEnemyLevel(meta.challenge)'),85);
+ assert.ok(h.exec('challengeEnemyLevel(meta.challenge)<challengeRoundLevel(meta.challenge,2)'));
+});
+
+test('old eight-character brackets remain valid, retain their draw, and finish without duplicate payouts',()=>{
+ for(const kind of ['tournament','legends']){
+  const h=harness();h.exec(`startChallenge('${kind}',${kind==='legends'?"['shanks','roger']":"['zoro']"});
+   const t=meta.challenge;t.version=1;t.entrants=t.entrants.slice(0,${kind==='legends'?4:8});
+   t.rounds=[{name:challengeRoundName(t.entrants.length/2),matches:Array.from({length:t.entrants.length/2},(_,i)=>challengeMatch(i*2,i*2+1))}];
+   const legacy=JSON.stringify(GameSaveStorage.payload(meta,null));validateGameSave(GameSaveStorage.parse(legacy));
+   loadedSave=GameSaveStorage.parse(legacy);loadMeta();`);
+  assert.equal(h.exec('meta.challenge.entrants.length'),kind==='legends'?4:8);
+  finish(h,Array(kind==='legends'?2:3).fill(true));
+  const reward=h.exec('meta.logPoses');h.exec('finishChallenge(1);');assert.equal(h.exec('meta.logPoses'),reward);
+  assert.doesNotThrow(()=>h.exec('validateGameSave(GameSaveStorage.parse(JSON.stringify(GameSaveStorage.payload(meta,null))));'));
+ }
+});
+
+test('all new tournament outcomes validate and render complete future rounds with correct placements',()=>{
+ for(const kind of ['tournament','legends'])for(const outcome of [[false],[true,false],[true,true,false],[true,true,true,false]]){
+  const h=harness();h.exec(`startChallenge('${kind}',${kind==='legends'?"['shanks','roger']":"['zoro']"});`);
+  const initial=h.exec('challengeBracketHTML(meta.challenge)');
+  assert.equal((initial.match(/class="tournament-round"/g)||[]).length,kind==='legends'?3:4);
+  assert.match(initial,/Ganador cruce/);assert.match(initial,/tournament-link/);
+  finish(h,outcome);
+  assert.doesNotThrow(()=>h.exec('validateGameSave(GameSaveStorage.parse(JSON.stringify(GameSaveStorage.payload(meta,null))));'));
+  if(kind==='tournament'&&outcome.length===1)assert.match(h.exec('challengePlacementText(meta.challenge)'),/9–16/);
+  if(kind==='legends'&&outcome.length===1)assert.match(h.exec('challengePlacementText(meta.challenge)'),/5–8/);
+ }
 });
