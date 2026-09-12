@@ -4038,6 +4038,26 @@ function startRun(sagaIdx, starterIds, islandIdx = 0, islandRepeat = null) {
 }
 
 // ============ PANTALLA: MAPA ============
+// Reuse the visible buttons so keyboard and pointer actions share confirmations and rules.
+function handleIslandShortcut(event) {
+  if (event.defaultPrevented || event.repeat || event.isComposing || event.ctrlKey || event.metaKey || event.altKey || event.shiftKey) return;
+  if (event.target?.closest('input, textarea, select, [contenteditable]:not([contenteditable="false"]), [role="textbox"]')) return;
+  if (document.querySelector('.overlay, .local-game, [role="dialog"], dialog[open]') || $('#app')?.inert) return;
+  const restart = $('#btn-restart-island');
+  if (!run || !restart) return;
+  let button;
+  if (event.key.toLowerCase() === 'r') button = restart;
+  else if (/^[1-9]$/.test(event.key)) {
+    const carousel = $('#island-carousel');
+    if (!carousel || carousel.scrollLeft > carousel.clientWidth / 2) return;
+    button = $(`.map-node.reachable[data-route-key="${event.key}"]`);
+  }
+  if (!button || button.disabled) return;
+  event.preventDefault();
+  button.click();
+}
+document.addEventListener('keydown', handleIslandShortcut);
+
 function screenMap(activePageIdx = 0) {
   if(run?.islandRepeat?.result)return showIslandRepeatCheckpoint(autoMode);
   if(run?.islandRepeat && !run.team.some(f=>f.hp>0))return gameOver();
@@ -4069,12 +4089,14 @@ function screenMap(activePageIdx = 0) {
     edgesHTML += `<line x1="${x1}%" y1="${y1}%" x2="${x2}%" y2="${y2}%" stroke="#2b2b2b" stroke-width="2" stroke-dasharray="4 5" opacity="0.5"/>`;
     landscapeEdgesHTML += `<line x1="${100-y1}%" y1="${x1}%" x2="${100-y2}%" y2="${x2}%"/>`;
   }
+  let routeKey = 0;
   rows.forEach((row, r) => row.forEach((n, i) => {
     const [x, y] = posOf(r, i);
     const isReach = reach.some(([rr, ii]) => rr === r && ii === i);
     const isCur = run.pos && run.pos[0] === r && run.pos[1] === i;
+    const shortcut = isReach ? ++routeKey : null;
     nodesHTML += `<button type="button" class="map-node ${n.done ? 'done' : ''} ${isReach ? 'reachable' : ''} ${isCur ? 'current' : ''}"
-      style="--map-x:${x}%;--map-y:${y}%;--map-forward:${100-y}%" data-r="${r}" data-i="${i}" title="${NODE_TYPES[n.type].label}" aria-label="${NODE_TYPES[n.type].label}, etapa ${r+1}${isCur ? ", posición actual" : ''}" ${isReach ? '' : 'disabled'}>${n.type === 'special' ? '<img class="map-event-icon" src="/art/cross-guild-map.png" alt="" aria-hidden="true" draggable="false">' : NODE_TYPES[n.type].emoji}</button>`;
+      style="--map-x:${x}%;--map-y:${y}%;--map-forward:${100-y}%" data-r="${r}" data-i="${i}" title="${NODE_TYPES[n.type].label}${shortcut ? ` · Tecla ${shortcut}` : ''}" aria-label="${NODE_TYPES[n.type].label}, etapa ${r+1}${isCur ? ", posición actual" : ''}${shortcut ? `, ruta ${shortcut}` : ''}" ${isReach ? `data-route-key="${shortcut}" aria-keyshortcuts="${shortcut}"` : 'disabled'}>${n.type === 'special' ? '<img class="map-event-icon" src="/art/cross-guild-map.png" alt="" aria-hidden="true" draggable="false">' : NODE_TYPES[n.type].emoji}${shortcut ? `<kbd class="map-route-key" aria-hidden="true">${shortcut}</kbd>` : ''}</button>`;
   }));
 
   render(`
@@ -4086,8 +4108,8 @@ function screenMap(activePageIdx = 0) {
           <div class="map-board" style="--scene:url('${SAGAS[run.saga]?.img}');--map-rows:${rows.length}">
             <div class="map-heading"><div class="map-title">📍 <b>${saga.name}</b> · Isla ${run.islandIdx + 1}/${saga.islands.length}: <b>${island.name}</b> · Mapa ${(run.mapIdx || 0)+1}/${islandMapCount(island)} (${run.mode === 'nuzlocke' ? 'NUZLOCKE' : 'CLÁSICO'})</div>
             <div class="map-tools">
-              <button class="btn gold small" id="btn-restart-island" aria-label="Reiniciar isla" title="Volver a empezar esta isla con tu equipo inicial" style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
-                ↻ REINICIAR
+              <button class="btn gold small" id="btn-restart-island" aria-label="Reiniciar isla, tecla R" aria-keyshortcuts="r" title="Volver a empezar esta isla con tu equipo inicial · Tecla R" style="font-size:8.5px;padding:4px 8px;box-shadow:0 2px 5px rgba(0,0,0,0.5);font-weight:bold;">
+                ↻ REINICIAR <kbd>R</kbd>
               </button>
             </div></div>
             <div class="map-route">
@@ -6239,6 +6261,7 @@ function battleLayoutHTML(logLines, labels = {}) {
   return `
     <div class="battle-layout ${b.opts.duos ? 'challenge-duos' : ''}">
       <div class="battle-main">
+        <section id="battle-backpack" aria-label="Mochila de combate"></section>
         <div class="battle-cols" style="--scene:url('${b.opts.challenge ? '/art/scenes/wano.webp' : b.opts.local ? (b.opts.coop ? '/art/scenes/wano.webp' : '/art/scenes/eastblue.webp') : b.tower ? '/art/scenes/marineford.webp' : (SAGAS[run?.saga || 0]?.img || '/art/scenes/eastblue.webp')}')">
           <div class="battle-side" id="side-p">
             <div class="side-head"><div class="trainer">🏴‍☠️</div>${labels.p || 'TU BANDA'}
@@ -6257,12 +6280,11 @@ function battleLayoutHTML(logLines, labels = {}) {
         </div>
         <div class="battle-reserves" id="battle-reserves"></div>
         <div class="battle-team-passives" aria-label="Pasivas de los equipos">
-          <section><h3>✨ ${labels.p || 'TU BANDA'}</h3><div id="passives-p">${battleTeamPassivesHTML(b.pTeam)}</div></section>
-          <section><h3>✨ ${labels.e || 'ENEMIGOS'}</h3><div id="passives-e">${battleTeamPassivesHTML(b.eTeam)}</div></section>
+          <section><h3>✨ ${labels.p || 'TU BANDA'}</h3><div id="passives-p" class="team-passive-strip" tabindex="0" role="region" aria-label="Pasivas aliadas, desplaza para ver todas">${battleTeamPassivesHTML(b.pTeam)}</div></section>
+          <section><h3>✨ ${labels.e || 'ENEMIGOS'}</h3><div id="passives-e" class="team-passive-strip" tabindex="0" role="region" aria-label="Pasivas enemigas, desplaza para ver todas">${battleTeamPassivesHTML(b.eTeam)}</div></section>
         </div>
         <div class="battle-lower-panels">
           <section class="battle-log-panel"><h3>REGISTRO</h3><div class="battle-log" id="battle-log">${logLines.map(l => `<div>${l}</div>`).join('')}</div></section>
-          <section id="battle-backpack" aria-label="Mochila de combate"></section>
         </div>
       </div>
       <div class="battle-sidebar" id="battle-controls">${b.opts.local ? '' : controlsHTML()}</div>

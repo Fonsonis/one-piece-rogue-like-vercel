@@ -4,6 +4,8 @@
 .event-art { text-align:center; font-size:64px; line-height:1; margin:10px auto; }
 .map-node .event-sprite { width:80%; height:80%; min-width:0; }
 .map-node .map-event-icon { display:block; width:90%; height:90%; object-fit:contain; image-rendering:pixelated; pointer-events:none; }
+.map-route-key { position:absolute; right:-6px; top:-7px; display:grid; place-items:center; min-width:20px; height:20px; padding:0 3px; border:1px solid var(--ink); border-radius:5px; color:var(--ink); background:var(--paper); font:700 12px/1 system-ui,sans-serif; pointer-events:none; }
+#btn-restart-island kbd { padding:2px 4px; border:1px solid currentColor; border-radius:3px; font:700 11px/1 system-ui,sans-serif; }
 .carteles-menu-icon { width:28px; height:28px; object-fit:contain; vertical-align:middle; image-rendering:pixelated; }
 .world-stop.is-locked { background:#07152199; box-shadow:0 0 32px 20px #07152166; }
 .world-stop.is-locked .island-land img { filter:brightness(0)!important; }

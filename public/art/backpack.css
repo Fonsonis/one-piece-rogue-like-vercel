@@ -47,7 +47,9 @@
 .bag-auto-settings input { width:18px; height:18px; flex:none; accent-color:#b68a40; }
 .bag-auto-settings select { width:100%; min-height:38px; font:12px/1.5 system-ui,sans-serif; padding:6px; }
 .bag-auto-settings p { font:12px/1.5 system-ui,sans-serif; margin:0; opacity:.8; }
-#app .battle-lower-panels { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:10px; flex:none; min-height:220px; margin:8px 0; }
+#app .battle-lower-panels { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; flex:none; min-height:220px; margin:8px 0; }
+#battle-backpack { flex:none; }
+#battle-backpack:empty { display:none; }
 .battle-log-panel,#battle-backpack { min-width:0; background:var(--paper); border:1px solid #79939c; border-radius:6px; padding:10px; }
 .battle-log-panel { display:flex; flex-direction:column; }
 .battle-log-panel > h3 { font-size:10px; margin:0 0 10px; }
