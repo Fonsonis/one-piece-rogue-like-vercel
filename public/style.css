@@ -1151,3 +1151,35 @@ button:focus-visible,[tabindex]:focus-visible {outline:3px solid #fff;outline-of
 #pirate-king-reward .pick-row{display:flex;align-items:center;gap:14px;text-align:left;width:100%;font:13px/1.5 system-ui,sans-serif;padding:12px}
 #pirate-king-reward .pick-row .emoji{flex:none}
 #pirate-king-reward .pick-row .info{flex:1;min-width:0}
+
+/* Desafíos offline: cuadro y equipo legibles también en móvil. */
+.challenge-panel { max-width: 1100px; margin: 12px auto; }
+.challenge-panel p { font-size: 10px; line-height: 1.9; margin: 12px 0; }
+.challenge-panel h3 { font-size: 13px; line-height: 1.8; margin: 12px 0; }
+.challenge-panel label { display: grid; gap: 8px; font-size: 10px; margin: 12px 0; }
+.challenge-panel input, .challenge-panel select { width: 100%; min-height: 44px; min-width: 0; font: inherit; padding: 10px; }
+.challenge-events, .relic-grid { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,290px),1fr)); gap: 16px; margin: 18px 0; }
+.challenge-event, .relic-card { padding: 18px; border: 2px solid var(--blue,#307fc4); background: var(--panel-bg,#fff8e8); border-radius: 8px; min-width: 0; overflow-wrap: anywhere; }
+.challenge-event.legends, .relic-card { border-color: #b68b28; }
+.challenge-emblem { font-size: 36px; }
+.challenge-event .btn { width: 100%; min-height: 48px; }
+.challenge-prizes { display:flex; flex-wrap:wrap; gap:12px; padding:12px 0; font-size:12px; }
+.challenge-bracket { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,225px),1fr)); gap:16px; margin:16px 0; }
+.challenge-bracket section { min-width:0; }
+.challenge-match { border:1px solid #9b8a69; margin:12px 0; border-radius:6px; overflow:hidden; font-size:9px; line-height:1.8; }
+.challenge-match > div { padding:12px; overflow-wrap:anywhere; }
+.challenge-match > div + div { border-top:1px solid #9b8a69; }
+.challenge-match .winner { background:#dcecd5; color:#234923; }
+.challenge-match .your-entry { box-shadow:inset 4px 0 #307fc4; font-weight:bold; }
+.challenge-result { border:2px solid #b68b28; border-radius:8px; padding:16px; margin:20px 0; }
+.relic-affinity { border-top:1px solid #b68b28; padding-top:12px; }
+.challenge-launch { position:sticky; bottom:0; padding:12px; background:var(--panel-bg,#fff8e8); border-top:2px solid #b68b28; z-index:2; }
+.challenge-panel .btn { margin:6px 4px 6px 0; white-space:normal; line-height:1.7; }
+.challenge-panel [hidden] { display:none !important; }
+.challenge-duos .battle-side .fcard:not(.active) { display:flex; opacity:1; }
+.challenge-duos .battle-side { overflow-y:auto; }
+@media(max-width:600px) {
+  .challenge-panel { padding:12px; }
+  .challenge-panel h2 { font-size:15px; line-height:1.8; }
+  .challenge-duos .fcard .fcard-sprite { height:90px; min-height:70px; }
+}

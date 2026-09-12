@@ -1,0 +1,61 @@
+import {createRequire} from 'node:module';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+const require=createRequire(import.meta.url);
+const {chromium}=require(process.env.PLAYWRIGHT_MODULE||'playwright');
+const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL||'chrome',headless:true});
+const page=await browser.newPage({viewport:{width:1360,height:900}}),errors=[];
+page.on('pageerror',e=>errors.push(e.message));
+page.on('response',r=>{if(r.status()>=400&&new URL(r.url()).origin==='http://127.0.0.1:4175')errors.push(`${r.status()} ${r.url()}`);});
+fs.mkdirSync('outputs/challenges',{recursive:true});
+try{
+ await page.goto('http://127.0.0.1:4175/',{waitUntil:'domcontentloaded'});
+ await page.waitForSelector('#mode-challenge');
+ await page.evaluate(()=>{
+   meta.accXp=xpForAccLevel(50);SAGAS.forEach(s=>meta.sagaDiffWins[s.id]={3:true});
+   meta.roster=['luffy','zoro','shanks','roger'];meta.charUpgrades={luffy:95};saveMeta();screenHome();
+ });
+ await page.locator('#mode-challenge').click();
+ await page.screenshot({path:'outputs/challenges/events-desktop.png',fullPage:true});
+ await page.locator('[data-challenge="legends"]').click();
+ await page.locator('[data-challenge-pick="shanks"]').click();await page.locator('[data-challenge-pick="roger"]').click();
+ await page.locator('#challenge-start').click();
+ assert.equal(await page.locator('.challenge-match').count(),2);
+ await page.reload({waitUntil:'domcontentloaded'});await page.locator('#mode-challenge').click();await page.locator('#challenge-resume').click();
+ await page.locator('#challenge-fight').click();
+ await page.evaluate(()=>{clearTimeout(battle.timer);battle.waiting=true;});
+ assert.equal(await page.locator('.fcard:visible').count(),4);
+ await page.screenshot({path:'outputs/challenges/duos-desktop.png',fullPage:true});
+ await page.setViewportSize({width:390,height:844});
+ await page.screenshot({path:'outputs/challenges/duos-mobile.png',fullPage:true});
+ assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'mobile width');
+ assert.equal(await page.locator('.fcard:visible').count(),4);
+ // Let actual attacks and timers resolve both rounds; weaken test opponents only.
+ const winFight=async()=>{
+   await page.evaluate(()=>{clearTimeout(battle.timer);battle.waiting=false;battle.speed=100;
+    battle.eTeam.forEach(f=>{f.hp=1;f.dodgeLeft=0;});battle.pTeam.forEach(f=>{f.atk*=100;f.spatk*=100;});
+    scheduleRound(0);});
+   await page.waitForSelector('#challenge-fight, .challenge-result',{timeout:20000});
+ };
+ await winFight();await page.locator('#challenge-fight').click();await winFight();
+ assert.equal(await page.locator('[data-claim-relic]').count(),3);
+ await page.screenshot({path:'outputs/challenges/reward-mobile.png',fullPage:true});
+ await page.locator('[data-claim-relic="relic_shanks"]').click();await page.locator('#challenge-equip').click();
+ await page.locator('[data-equip-relic="relic_shanks"]').selectOption('shanks');
+ assert.match(await page.locator('.relic-card').innerText(),/Pasiva de afinidad activa/);
+ await page.screenshot({path:'outputs/challenges/equipped-mobile.png',fullPage:true});
+ await page.reload({waitUntil:'domcontentloaded'});
+ assert.equal(await page.evaluate(()=>meta.relicEquipment.shanks),'relic_shanks');
+ assert.equal(await page.evaluate(()=>meta.challenge.pendingRelics.length),0);
+ await page.locator('#mode-challenge').click();await page.locator('[data-challenge="tournament"]').click();await page.locator('[data-challenge-pick="zoro"]').click();await page.locator('#challenge-start').click();
+ await page.screenshot({path:'outputs/challenges/bracket-mobile.png',fullPage:true});
+ await page.locator('#challenge-fight').click();await winFight();
+ await page.locator('#challenge-fight').click();
+ await page.evaluate(()=>{clearTimeout(battle.timer);battle.pTeam.forEach(f=>f.hp=0);battle.speed=100;afterRound();});
+ await page.waitForSelector('#challenge-fight');assert.match(await page.locator('#challenge-fight').innerText(),/TERCER PUESTO/);
+ await page.locator('#challenge-fight').click();await winFight();
+ assert.equal(await page.evaluate(()=>meta.logPoses),2500);
+ await page.reload({waitUntil:'domcontentloaded'});assert.equal(await page.evaluate(()=>meta.logPoses),2500);
+ assert.deepEqual(errors,[]);
+ console.log('PASS: real 2v2 combat, reload/resume, bronze payout, relic selection/equip and mobile layout; no page or asset errors.');
+}finally{await browser.close();}
