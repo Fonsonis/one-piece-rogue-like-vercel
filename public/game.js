@@ -14,6 +14,25 @@ const BASE_OF = {};
 for (const [id, c] of Object.entries(CHARS)) if (c.evo) BASE_OF[c.evo.to] = id;
 function baseFormOf(id) { while (BASE_OF[id]) id = BASE_OF[id]; return id; }
 
+// The Dex groups forms for presentation without rewriting legacy discovery records.
+function characterForms(id) {
+  const forms=[];
+  let form=baseFormOf(id),level=0;
+  while(CHARS[form]&&!forms.some(entry=>entry.id===form)) {
+    forms.push({id:form,level});
+    const evo=CHARS[form].evo;if(!evo)break;
+    level=Math.max(level,evo.lvl);form=evo.to;
+  }
+  return forms;
+}
+function dexBaseIds(ids=[]) { return [...new Set(ids.filter(id=>CHARS[id]).map(baseFormOf))]; }
+function dexEntrySeen(id) { return characterForms(id).some(form=>meta.dex.includes(form.id)); }
+function dexFilteredBases(state) {
+  // A search or combined filters may match any phase, but return its base card only once.
+  const matches=filterSortChars(Object.keys(CHARS),{...state,sort:'default'});
+  return filterSortChars(dexBaseIds(matches),{...state,q:'',saga:'',type:'',rarity:0});
+}
+
 // Las formas requieren tanto el nivel en partida como el nivel base permanente.
 function evolutionFormAt(id, lvl, progress = meta) {
   const baseLevel = startLvlOf(id, progress);
@@ -1465,11 +1484,8 @@ function totalWinsCount() {
 }
 
 function countInDex(ids) {
-  return ids.filter(id =>
-    (meta.dex && meta.dex.includes(id)) ||
-    (meta.recruited && meta.recruited.includes(id)) ||
-    (meta.roster && meta.roster.includes(id))
-  ).length;
+  const known=new Set(dexBaseIds([...(meta.dex||[]),...(meta.recruited||[]),...(meta.roster||[])]));
+  return dexBaseIds(ids).filter(id=>known.has(id)).length;
 }
 
 function isNakamaUnlocked(id) {
@@ -1481,13 +1497,9 @@ function isNakamaUnlocked(id) {
 function bestSagaDexProgress() {
   let maxPct = 0;
   for (const s of SAGAS) {
-    const sagaChars = Object.keys(CHARS).filter(id => CHARS[id].saga === s.id && !CHARS[id].boss);
+    const sagaChars = Object.keys(CHARS).filter(id => !BASE_OF[id] && CHARS[id].saga === s.id && !CHARS[id].boss);
     if (!sagaChars.length) continue;
-    const inDex = sagaChars.filter(id =>
-      (meta.dex && meta.dex.includes(id)) ||
-      (meta.recruited && meta.recruited.includes(id)) ||
-      (meta.roster && meta.roster.includes(id))
-    ).length;
+    const inDex = countInDex(sagaChars);
     const pct = Math.floor((inDex / sagaChars.length) * 100);
     if (pct > maxPct) maxPct = pct;
   }
@@ -1542,7 +1554,7 @@ const PROGRESSIVE_ACHIEVEMENTS = [
     desc: 'Descubre y recluta personajes en la Dex.',
     goals: [10, 25, 50, 100, 150, 200, 300],
     fames: [50, 100, 150, 250, 400, 600, 1000],
-    check: () => (meta.dex ? meta.dex.length : 0),
+    check: () => dexBaseIds(meta.dex).length,
     legacyIds: ['seen_10', 'seen_20', 'seen_40', 'seen_80', 'seen_160', 'seen_320', 'seen_640', 'seen_1000']
   },
   {
@@ -1661,7 +1673,7 @@ const STATIC_ACHIEVEMENTS = [
   { id: 'solo_sailor', title: 'Lobo de Mar Solitario', emoji: '🐺', desc: 'Zarpa y completa una saga con solo 1 personaje.', goal: 1, check: () => (meta.soloWins || 0), fame: 300, cat: 'desafios' },
   { id: 'straw_hats', title: 'Los 10 Sombrero de Paja', emoji: '🏴‍☠️', desc: 'Desbloquea o recluta a los 10 nakamas principales.', goal: 10, check: () => STRAW_HAT_MEMBERS.filter(id => isNakamaUnlocked(id)).length, fame: 250, cat: 'desafios' },
   { id: 'saga_full', title: 'Compendio de Saga', emoji: '📜', desc: 'Completa al 100% los personajes de 1 saga en la Dex.', goal: 100, check: () => bestSagaDexProgress(), fame: 200, cat: 'desafios' },
-  { id: 'dex_full', title: 'Leyenda Viviente', emoji: '📖', desc: 'Consigue a todos los personajes del juego en la Dex.', goal: Object.keys(CHARS).length, check: () => (meta.dex ? meta.dex.length : 0), fame: 1000, cat: 'desafios' },
+  { id: 'dex_full', title: 'Leyenda Viviente', emoji: '📖', desc: 'Consigue a todos los personajes del juego en la Dex.', goal: dexBaseIds(Object.keys(CHARS)).length, check: () => dexBaseIds(meta.dex).length, fame: 1000, cat: 'desafios' },
 ];
 
 const SAGA_DIFF_ACHIEVEMENTS = SAGA_DEFS.flatMap(s =>
@@ -2109,7 +2121,7 @@ function screenHome() {
     <div class="home-main-buttons">
       <button class="btn blue small" id="btn-dex">
         <span>📖 Dex</span>
-        <span style="font-size:8px;opacity:0.85;margin-top:2px;">(${meta.dex.length}/${Object.keys(CHARS).length})</span>
+        <span style="font-size:8px;opacity:0.85;margin-top:2px;">(${dexBaseIds(meta.dex).length}/${dexBaseIds(Object.keys(CHARS)).length})</span>
       </button>
       <button class="btn purple small" id="btn-inventory">
         <span>🎒 Inventario</span>
@@ -2894,7 +2906,7 @@ function showInventoryModal(opts = {}) {
     }).join('');
     const filtered=invViewState.type||+invViewState.rarity||invViewState.saga;
     return `<button class="btn gray collection-close" id="inv-close-x" aria-label="Cerrar inventario">Cerrar <span aria-hidden="true">×</span></button><div class="inventory-scroll"><header class="collection-header"><div><span class="collection-eyebrow">Tu tripulación</span><h2 id="inv-title" tabindex="-1">${collectionText(opts.title || 'Inventario')}</h2></div></header>
-      <button class="btn gray inventory-relics-link" id="inv-relics">🏺 Reliquias (${meta.relics.filter(id=>RELICS[id]).length}) · Ver y equipar →</button>
+      <button class="btn gray inventory-relics-link" id="inv-relics">🏺 Reliquias (${meta.relics.filter(id=>RELICS[id]).length}) · Ver colección →</button>
       <div class="collection-summary"><div><strong>${allUnlocked.length}</strong><span>Nakamas disponibles</span></div><button class="collection-summary-action" id="inv-logpose-info" aria-label="${number(meta.logPoses||0)} Log Poses disponibles. Ver cómo conseguirlos"><strong>${compact(meta.logPoses||0)} 🧭</strong><span>Log Poses · ¿Cómo conseguirlos?</span></button></div>
       <label for="inv-q" class="inventory-search-label">Buscar nakama<input id="inv-q" type="search" placeholder="Nombre del personaje o su forma" value="${collectionText(invViewState.q)}"></label>
       <details class="collection-extra" ${filtersOpen?'open':''}><summary>Filtros y vista${filtered?' · activos':''}</summary><div class="collection-filter-grid inventory-filters">
@@ -2938,7 +2950,7 @@ function showInventoryModal(opts = {}) {
       const closeSheet=()=>{sheet.remove();refresh(`.btn-info-inv[data-id="${btn.dataset.id}"]`);};
       sheet.querySelector('#sheet-close').onclick=closeSheet;
       sheet.onclick=e=>{if(e.target===sheet)closeSheet();};
-      sheet.querySelector('.modal').setAttribute('role','dialog');sheet.querySelector('.modal').setAttribute('aria-modal','true');sheet.querySelector('.modal').setAttribute('aria-label',`Ficha de ${CHARS[evolutionFormAt(btn.dataset.id,startLvlOf(btn.dataset.id))].name}`);
+      sheet.querySelector('.modal').setAttribute('role','dialog');sheet.querySelector('.modal').setAttribute('aria-modal','true');
       bindCollectionDialog(sheet,closeSheet,'#sheet-close');
     });
     ov.querySelector('#inv-logpose-info').onclick=()=>{
@@ -5037,9 +5049,12 @@ function addToTeam(f, done) {
 
 // ============ FICHA DE PERSONAJE ============
 // Muestra las características reales del personaje en la saga (nivel, fusiones y barco).
-function showCharModal(fOrId, existingOverlay = null) {
+function showCharModal(fOrId, existingOverlay = null, selectedForm = null) {
   const isLive = typeof fOrId === 'object';
-  const previewId = !isLive && !BASE_OF[fOrId] ? evolutionFormAt(fOrId, startLvlOf(fOrId)) : fOrId;
+  const forms=characterForms(isLive?fOrId.id:fOrId);
+  const previewId=forms.some(form=>form.id===selectedForm)?selectedForm:forms[0].id;
+  const phaseIndex=forms.findIndex(form=>form.id===previewId);
+  const phase=forms[phaseIndex];
   const f = isLive ? migrateFighter(fOrId, !!battle?.eTeam.includes(fOrId)) : applyUpgrades(makeChar(previewId, startLvlOf(fOrId), false, true));
   const c = CHARS[f.id];
   const lore = (typeof LORE !== 'undefined' && LORE) ? (LORE[f.id] || LORE[baseFormOf(f.id)] || {}) : {};
@@ -5081,8 +5096,10 @@ function showCharModal(fOrId, existingOverlay = null) {
       <div class="char-sheet-sprite" data-character="${f.id}" style="display:inline-block;filter:drop-shadow(3px 5px 8px rgba(0,0,0,0.6));">
         ${charIcon(f.id, 90)}
       </div>
+      ${!isLive&&forms.length>1?`<nav class="sheet-phase-nav" aria-label="Fases de ${esc(CHARS[forms[0].id].name)}"><button type="button" class="sheet-phase-arrow" id="sheet-phase-prev" ${phaseIndex===0?'disabled':''} aria-label="Fase anterior${phaseIndex>0?': '+esc(CHARS[forms[phaseIndex-1].id].name):''}">‹</button><button type="button" class="sheet-phase-arrow" id="sheet-phase-next" ${phaseIndex===forms.length-1?'disabled':''} aria-label="Fase siguiente${phaseIndex<forms.length-1?': '+esc(CHARS[forms[phaseIndex+1].id].name):''}">›</button></nav>`:''}
       <div class="platform" style="width:120px;height:24px;margin:-10px auto 0;background:radial-gradient(ellipse at center, #7ec850 0%, #4aa557 70%, transparent 72%);border-radius:50%;box-shadow:inset 0 0 0 2px rgba(217, 131, 46, 0.35);"></div>
       <div style="margin-top:6px;font-size:9px;color:var(--gold);"><b>Rareza:</b> ${'⭐'.repeat(c.rareza || 1)} (${c.rareza || 1} Estrellas)</div>
+      ${!isLive&&forms.length>1?`<p class="sheet-phase-caption" role="status">Fase ${phaseIndex+1} de ${forms.length} · ${phaseIndex===0?'Forma base':esc(c.name)}<br>${phase.level>startLvlOf(f.id)?`Vista previa · Requiere Nv. ${phase.level} base y en partida`:phaseIndex?'Desbloqueada · Requiere Nv. '+phase.level+' en partida':''}</p>`:''}
     </div>
     ${typeBadges(fTypes)}
     ${isLive ? xpBarHTML(f) : ''}
@@ -5138,8 +5155,8 @@ function showCharModal(fOrId, existingOverlay = null) {
   }).join('')}
       ${future.map(([l, m]) => `<div class="sheet-move future">🔒 Nv${l}${c.evo && l >= c.evo.lvl ? ` · nivel base ${c.evo.lvl}` : ''} — ${MOVES[m] ? MOVES[m].name : m}</div>`).join('')}
     </div>
-    ${pInfo ? `<div class="sheet-section"><b>✨ Pasiva — ${pInfo.label}</b><p>${pInfo.desc}</p></div>` : ''}
-    ${ultMv ? `<div class="sheet-section"><b>💥 Habilidad Definitiva — ${ultMv.name}</b><p>${ultMv.type ? `<span class="type-badge" style="background:${TYPES[ultMv.type]?.color || '#888'}">${ultMv.type.toUpperCase()}</span> ` : ''}${ultMv.power ? ultMv.power + ' PWR · ' + Math.round((ultMv.acc || 0.9) * 100) + '% precisión' : 'MOVIMIENTO DEFINITIVO'}</p></div>` : ''}
+    ${pInfo ? `<div class="sheet-section sheet-passive"><b>✨ Pasiva — ${pInfo.label}</b><p>${pInfo.desc}</p></div>` : ''}
+    ${ultMv ? `<div class="sheet-section sheet-ultimate"><b>💥 Habilidad Definitiva — ${ultMv.name}</b><p>${ultMv.type ? `<span class="type-badge" style="background:${TYPES[ultMv.type]?.color || '#888'}">${ultMv.type.toUpperCase()}</span> ` : ''}${ultMv.power ? ultMv.power + ' PWR · ' + Math.round((ultMv.acc || 0.9) * 100) + '% precisión' : 'MOVIMIENTO DEFINITIVO'}</p></div>` : ''}
     ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>${CHARS[c.evo.to].name} requiere nivel base ${c.evo.lvl} y nivel ${c.evo.lvl} en partida. Tu nivel base: ${startLvlOf(f.id)}. ${startLvlOf(f.id) >= c.evo.lvl ? 'Forma desbloqueada.' : 'Puedes seguir subiendo en partida, pero sus ataques se desbloquean al mejorar el nivel base.'}</p></div>` : ''}
     <p class="sheet-desc">${c.desc}</p>
     <div class="actions" style="flex-direction:column;gap:6px;">
@@ -5148,12 +5165,25 @@ function showCharModal(fOrId, existingOverlay = null) {
     </div>
   </div>`;
   if (!existingOverlay) document.body.appendChild(ov);
+  for(const [selector,step] of [['#sheet-phase-prev',-1],['#sheet-phase-next',1]]) {
+    const arrow=ov.querySelector(selector);
+    if(arrow)arrow.onclick=()=>{
+      if(arrow.disabled)return;
+      showCharModal(fOrId,ov,forms[phaseIndex+step].id);
+      queueMicrotask(()=>{
+        if(!ov.isConnected)return;
+        const target=ov.querySelector(selector+':not(:disabled)')||ov.querySelector(step>0?'#sheet-phase-prev':'#sheet-phase-next');
+        target?.focus({preventScroll:true});
+        ov.querySelector('.modal').scrollTop=0;
+      });
+    };
+  }
   const relicSelect=ov.querySelector('#sheet-relic-select');
   if(relicSelect)relicSelect.onchange=()=>{
     const next=relicSelect.value,current=meta.relicEquipment?.[relicBase];
     if(!(next?equipRelic(next,relicBase):current&&equipRelic(current,'')))return;
     const scrollTop=ov.querySelector('.modal').scrollTop;
-    showCharModal(fOrId,ov);
+    showCharModal(fOrId,ov,previewId);
     // The sheet presentation observer moves these nodes after rendering. Restore focus afterwards.
     queueMicrotask(()=>{
       if(!ov.isConnected)return;
@@ -5170,9 +5200,13 @@ function showCharModal(fOrId, existingOverlay = null) {
       upgrading = true;
       if (!upgradeCharLvl(f.id)) { upgrading = false; return; }
       const scrollTop = ov.querySelector('.modal').scrollTop;
-      showCharModal(fOrId, ov);
+      showCharModal(fOrId, ov,previewId);
       ov.querySelector('.modal').scrollTop = scrollTop;
-      (ov.querySelector('#sheet-upg-btn:not(:disabled)') || ov.querySelector('#sheet-close')).focus?.({preventScroll:true});
+      queueMicrotask(()=>{
+        if(!ov.isConnected)return;
+        ov.querySelector('.modal').scrollTop=scrollTop;
+        (ov.querySelector('#sheet-upg-btn:not(:disabled)') || ov.querySelector('#sheet-close')).focus?.({preventScroll:true});
+      });
     };
   }
   const dismissBtn = ov.querySelector('#sheet-dismiss-btn');
@@ -7837,30 +7871,32 @@ function screenShip() {
 const dexView = { q: '', saga: '', type: '', rarity: 0, sort: 'default', page: 0 };
 
 function dexCardHTML(id) {
-  const c = CHARS[id];
-  const seen = meta.dex.includes(id);
-  const got = meta.recruited.includes(id);
-  const vet = meta.roster.includes(id);
-  return `<div class="dex-card ${seen ? 'seen' : 'unknown'}" data-id="${id}">
+  id=baseFormOf(id);
+  const c = CHARS[id],forms=characterForms(id);
+  const seen = dexEntrySeen(id);
+  const got = dexBaseIds(meta.recruited).includes(id);
+  const vet = dexBaseIds(meta.roster).includes(id);
+  return `<button type="button" class="dex-card ${seen ? 'seen' : 'unknown'}" data-id="${id}" ${seen?'':'disabled'} aria-label="${esc(c.name)}${seen?', ver ficha y fases':', sin avistar'}">
     <div class="emoji">${seen ? charIcon(id, 46) : '❔'}</div>
     <div>${c.name}</div>
     <div class="dex-rarity" style="font-size:7px;" aria-label="Rareza ${c.rareza} de 5 estrellas"><span class="dex-rarity-full" aria-hidden="true">${'⭐'.repeat(c.rareza)}</span><span class="dex-rarity-compact" aria-hidden="true">★ ${c.rareza}/5</span></div>
     ${vet ? '<div style="color:var(--accent)">🏅 veterano</div>' : got ? '<div style="color:var(--green)">✓ nakama</div>' : (seen ? '<div style="color:#999">visto</div>' : '<div style="color:#aaa">sin avistar</div>')}
-  </div>`;
+    ${forms.length>1?`<div class="dex-forms-count">${forms.length} fases</div>`:''}
+  </button>`;
 }
 
 function screenDex() {
   playMusic('menu');
-  const all = Object.keys(CHARS);
+  const all = dexBaseIds(Object.keys(CHARS));
   const sagaOpts = [...SAGAS.map(s => ({ id: s.id, name: s.name }))];
   render(`
     ${topbar(false)}
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
     <div class="panel pirate-dex">
-      <header class="dex-header"><h2>📖 Dex Pirata</h2><div class="dex-progress" aria-label="Progreso de la colección"><span><strong>${meta.dex.length} <small>/ ${all.length}</small></strong>Avistados</span><span><strong>${meta.recruited.length}</strong>Reclutados</span></div></header>
+      <header class="dex-header"><h2>📖 Dex Pirata</h2><div class="dex-progress" aria-label="Progreso de la colección"><span><strong>${dexBaseIds(meta.dex).length} <small>/ ${all.length}</small></strong>Avistados</span><span><strong>${dexBaseIds(meta.recruited).length}</strong>Reclutados</span></div></header>
       ${charControlsHTML(dexView, { sagas: sagaOpts })}
       <div id="char-grid"></div>
-      <p class="dex-help">Toca un personaje avistado para abrir su ficha. Los no avistados solo muestran su nombre.</p>
+      <p class="dex-help">Toca un personaje avistado para abrir su ficha. Cada carta reúne todas sus fases. Busca también por el nombre, tipo o rareza de una transformación. Los no avistados solo muestran su nombre.</p>
     </div>
   `);
   $('#btn-back').onclick = screenHome;
@@ -7868,7 +7904,7 @@ function screenDex() {
   const sagaOrder = {};
   SAGAS.forEach((s, i) => { sagaOrder[s.id] = i; });
   const update = () => {
-    let ids = filterSortChars(all, dexView);
+    let ids = dexFilteredBases(dexView);
     if (dexView.sort === 'default') {
       ids = ids.map((id, i) => [id, i])
         .sort((a, b) => (sagaOrder[CHARS[a[0]].saga] ?? 99) - (sagaOrder[CHARS[b[0]].saga] ?? 99) || a[1] - b[1])
@@ -8016,19 +8052,18 @@ function relicDetailsHTML(r) {
 function showRelicCollection(opts = {}) {
   const previousFocus=document.activeElement;
   const owned=[...new Set(meta.relics)].filter(id=>RELICS[id]);
-  const bases=challengeOwnedBases().sort((a,b)=>CHARS[a].name.localeCompare(CHARS[b].name,'es'));
   let query='',page=0;
   const pageSize=12;
   const ov=document.createElement('div');ov.className='overlay collection-overlay';ov.id='relic-modal-overlay';
   ov.innerHTML=`<section class="modal collection-modal relic-modal" role="dialog" aria-modal="true" aria-labelledby="relic-title">
     <header class="collection-header"><div><span class="collection-eyebrow">Inventario</span><h2 id="relic-title" tabindex="-1">🏺 Reliquias · ${owned.length}</h2></div><button class="btn gray collection-close" id="relic-close" aria-label="Cerrar reliquias">Cerrar <span aria-hidden="true">×</span></button></header>
-    <details class="collection-extra"><summary>Cómo funcionan las reliquias</summary><p class="relic-help">Una reliquia por personaje, una copia equipada a la vez. El boost funciona en cualquier portador; la pasiva solo con su afinidad. Elegir otro portador mueve la reliquia y sustituye la que tuviera equipada. Se aplica al empezar el siguiente combate de aventura, Torre o Desafíos.</p></details>
+    <details class="collection-extra"><summary>Cómo funcionan las reliquias</summary><p class="relic-help">Una reliquia por personaje, una copia equipada a la vez. El boost funciona en cualquier portador; la pasiva solo con su afinidad. Para equipar, cambiar o quitar una reliquia, abre la ficha de tu personaje en la Dex o en el Inventario. Se aplica al empezar el siguiente combate de aventura, Torre o Desafíos.</p></details>
+    <p class="relic-help">Equipa tus reliquias desde la ficha del personaje.</p>
     ${battle?'<p role="status">Puedes consultar las reliquias, pero debes terminar el combate para cambiar su portador.</p>':''}
     <label for="relic-search">Buscar reliquia o afinidad<input type="search" id="relic-search" placeholder="Nombre de la reliquia o personaje"></label>
     <div class="collection-results"><span id="relic-count" role="status"></span><button class="collection-text-button" id="relic-reset">Limpiar búsqueda</button></div>
     <div id="relic-cards" class="collection-list relic-grid" aria-label="Reliquias obtenidas" tabindex="0"></div>
     <nav class="collection-pagination" aria-label="Páginas de reliquias"><button class="btn gray" id="relic-prev" aria-label="Página anterior de reliquias">← Anterior</button><span id="relic-page"></span><button class="btn gray" id="relic-next" aria-label="Página siguiente de reliquias">Siguiente →</button></nav>
-    <p id="relic-feedback" role="status" aria-live="polite"></p>
   </section>`;
   document.body.appendChild(ov);
   const find=selector=>ov.querySelector(selector);
@@ -8041,18 +8076,11 @@ function showRelicCollection(opts = {}) {
     find('#relic-prev').disabled=page===0;find('#relic-next').disabled=page===pages-1;
     find('#relic-cards').innerHTML=ids.slice(page*pageSize,(page+1)*pageSize).map(id=>{
       const r=RELICS[id],owner=Object.keys(meta.relicEquipment||{}).find(base=>meta.relicEquipment[base]===id);
-      const candidates=[...bases].sort((a,b)=>Number(b===r.character)-Number(a===r.character));
       return `<article class="relic-card" data-relic-card="${id}">${relicDetailsHTML(r)}
-        <label>Equipar a<select data-equip-relic="${id}" aria-label="Portador de ${esc(r.name)}" ${battle?'disabled':''}><option value="">Sin equipar</option>${candidates.map(base=>`<option value="${base}" ${owner===base?'selected':''}>${esc(CHARS[base].name)}${base===r.character?' · ✨ AFINIDAD':''}</option>`).join('')}</select></label>
         <p class="relic-owner">${owner?`Portador: ${esc(CHARS[owner].name)} · ${owner===r.character?'✨ Pasiva de afinidad activa':'Boost común activo'}`:'Sin portador'} · Copias: ${meta.relicCopies?.[id]||1}</p></article>`;
     }).join('')||`<div class="collection-empty"><h3>${owned.length?'No hay reliquias con esta búsqueda':'Aún no tienes reliquias'}</h3><p>${owned.length?'Prueba otro nombre o limpia la búsqueda.':'Gana Batalla de Leyendas en Desafíos para conseguir tu primera reliquia.'}</p></div>`;
     find('#relic-cards').scrollTop=0;
-    ov.querySelectorAll('[data-equip-relic]').forEach(el=>el.onchange=()=>{
-      const id=el.dataset.equipRelic,character=el.value,scroll=find('#relic-cards').scrollTop;
-      const equipped=equipRelic(id,character);
-      draw();find('#relic-cards').scrollTop=scroll;find(`[data-equip-relic="${id}"]`).focus({preventScroll:true});
-      find('#relic-feedback').textContent=equipped?(character?`${RELICS[id].name} equipada a ${CHARS[character].name}.`:`${RELICS[id].name} sin equipar.`):'Termina el combate para cambiar las reliquias.';
-    });
+
   };
   find('#relic-close').onclick=close;
   find('#relic-search').oninput=e=>{query=e.target.value;page=0;draw();};
@@ -8258,7 +8286,7 @@ function screenChallengeBracket() {
     <div class="challenge-bracket">${t.rounds.map(round=>`<section><h3>${round.name}</h3>${round.matches.map(matchHTML).join('')}</section>`).join('')}${t.bronze?`<section><h3>Tercer puesto</h3>${matchHTML(t.bronze)}</section>`:''}</div>
     ${t.finished?`<div class="challenge-result" role="status"><h3>${t.placement===0?'Torneo abandonado':t.placement===1?'🏆 ¡Campeón!':t.placement===5?'Eliminado en cuartos · puestos 5–8':`Puesto ${t.placement}${t.kind==='legends'&&t.placement===3?'–4':''}`}</h3><p>${t.reward?`🧭 +${t.reward.toLocaleString('es')} Log Poses añadidos a tu cuenta.`:t.pendingRelics.length?'🏺 Elige tu reliquia de campeón.':t.relicReward?`🏺 Reliquia obtenida: ${esc(RELICS[t.relicReward].name)}`:'Sin premio de Log Poses.'}</p></div>`:`<button class="btn gray" id="challenge-abandon">ABANDONAR TORNEO</button>`}
     ${t.pendingRelics.length?`<div class="relic-grid">${t.pendingRelics.map(id=>`<article class="relic-card">${relicDetailsHTML(RELICS[id])}<button class="btn gold" data-claim-relic="${id}">ELEGIR</button></article>`).join('')}</div>`:''}
-    ${t.relicReward?'<button class="btn gold" id="challenge-equip">EQUIPAR RELIQUIA</button>':''}</section>`);
+    ${t.relicReward?'<button class="btn gold" id="challenge-equip">VER RELIQUIA</button>':''}</section>`);
   $('#btn-back').onclick=screenChallenges;
   if(!t.finished){$('#challenge-fight').onclick=playChallengeMatch;$('#challenge-abandon').onclick=()=>modalConfirm('¿Abandonar torneo?','Terminarás este torneo sin premio.',()=>{finishChallenge(0);screenChallenges();});}
   document.querySelectorAll('[data-claim-relic]').forEach(el=>el.onclick=()=>{if(claimChallengeRelic(el.dataset.claimRelic))screenChallengeBracket();});

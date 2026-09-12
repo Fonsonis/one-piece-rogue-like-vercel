@@ -284,3 +284,7 @@ html .inventory-modal #inv-cards-grid { overflow:visible; max-height:none; min-h
   .inventory-modal #inv-close-x { top:12px; right:14px; }
   .inventory-modal .collection-pagination { left:8px; right:8px; bottom:8px; padding:8px; }
 }
+.pirate-dex button.dex-card { width:100%; color:var(--ink); font:inherit; text-align:center; }
+.pirate-dex button.dex-card:disabled { cursor:default; }
+.pirate-dex button.dex-card:focus-visible { outline:3px solid var(--sea); outline-offset:3px; }
+.pirate-dex .dex-forms-count { margin-top:5px; color:var(--sea); font:650 12px/1.4 system-ui,sans-serif; }
