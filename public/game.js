@@ -2065,7 +2065,7 @@ function screenHome() {
   const accLvl = accountLevel();
   const runnerUnlocked = accLvl >= 1;
   const towerUnlocked = accLvl >= 20;
-  const challengeUnlocked = accLvl >= 50;
+  const challengeUnlocked = accLvl >= 35;
   const { totalCompleted: completedAch, totalAchievements: totalAchCount, hasUnclaimedAch } = getAchievementsInfo();
   render(`
     ${topbar(false)}
@@ -2084,7 +2084,7 @@ function screenHome() {
       <div class="mode-card ${challengeUnlocked ? '' : 'locked'}" id="mode-challenge">
         <div class="mode-art challenge"></div>
         <div class="mode-title">Desafíos</div>
-        <div class="mode-btn">${challengeUnlocked ? 'ENTRAR' : '🔒 NV. CUENTA 50'}</div>
+        <div class="mode-btn">${challengeUnlocked ? 'ENTRAR' : '🔒 NV. CUENTA 35'}</div>
       </div>
     </div>
     <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? 'Doble salto · 25 fama cada 1.000 m' : '🔒 Se desbloquea al nivel 1 de cuenta'}</small></span></button>
@@ -7813,8 +7813,8 @@ const RELICS = {
 
 function screenChallenges() {
   playMusic('menu');
-  if (accountLevel() < 50) {
-    toast('🔒 El modo Desafíos requiere Nivel de Cuenta 50.');
+  if (accountLevel() < 35) {
+    toast('🔒 El modo Desafíos requiere Nivel de Cuenta 35.');
     return screenHome();
   }
 
