@@ -2,11 +2,15 @@
 
 Desbloqueo conservado: nivel de cuenta 35.
 
-- **Torneo de los Ocho:** un personaje desbloqueado frente a siete rivales de la IA; nivel de evento 65, cuartos, semifinales y final. Quien pierde la semifinal disputa el bronce. Premios: 1.º 7.500, 2.º 5.000, 3.º 2.500 Log Poses. Sin premio para los demás. Se interpreta la segunda referencia a «3.º» del encargo como «1.º».
+- **Torneo de los Ocho:** un personaje desbloqueado frente a siete rivales de la IA; rivales de nivel 65, cuartos, semifinales y final. Quien pierde la semifinal disputa el bronce. Premios: 1.º 7.500, 2.º 5.000, 3.º 2.500 Log Poses. Sin premio para los demás. Se interpreta la segunda referencia a «3.º» del encargo como «1.º».
 - **Batalla de Leyendas:** ocho personajes en cuatro parejas. Solo rareza 5, sin contar estrellas de fusión; no se repite una identidad, ni siquiera mediante transformaciones. Dos semifinales y una final. Cada miembro vivo tiene un turno por ronda, por velocidad, y usa su Ultimate cuando está cargada. La IA concentra sus ataques en el rival con menor porcentaje de PS.
-- **Nivel Wano:** nivel de los jefes de la isla central para aliados y semifinales (266 actualmente), y del jefe final para la final (290). No depende de la dificultad de una aventura que esté abierta. La selección respeta las formas desbloqueadas con nivel base permanente.
-- Los equipos empiezan cada cruce curados, sin consumibles, sin EXP ni recompensas de aventura. Conservan mejoras del Barco y reliquias equipadas. Los cruces exclusivos de la IA se simulan con una probabilidad proporcional a la suma de atributos base de cada equipo.
+- **Nivel Wano:** nivel de los jefes de la isla central para los rivales de semifinales (266 actualmente), y del jefe final para la final (290). No depende de la dificultad de una aventura que esté abierta. La selección respeta las formas desbloqueadas con nivel base permanente.
+- Tus personajes usan su nivel base permanente actual (`startLvlOf`), consultado al empezar cada combate, también en cuadros guardados con la versión anterior. Los equipos empiezan cada cruce curados, sin consumibles, sin EXP ni recompensas de aventura. Todos los rivales de ambos eventos llevan automáticamente su reliquia afín, incluido el boost común y los efectos de inicio de combate; no se añaden esas reliquias a tu inventario. Conservan mejoras del Barco y reliquias equipadas. Los cruces exclusivos de la IA se simulan con una probabilidad proporcional a la suma de atributos base de cada equipo.
 - El cuadro se guarda en `meta.challenge`. Volver al puerto o recargar permite continuar; recargar durante un combate reinicia ese cruce. El resultado y el premio se guardan juntos, y una transición resuelta no puede cobrar de nuevo. Una reliquia pendiente bloquea el inicio del siguiente torneo hasta elegirla.
+
+## Interfaz
+
+La selección reutiliza el selector de nakamas con búsqueda, filtros por saga/tipo/rareza, paginación, fichas, controles de teclado y devolución del foco. Los huecos muestran el nivel permanente, estadísticas y reliquia propia; se puede quitar o intercambiar un miembro. El cuadro muestra el próximo combate antes de las rondas y permite consultar las reliquias rivales. Textos legibles, botones de 44 px y colores del tema actual en todos los menús de Desafíos.
 
 ## Reliquias
 
