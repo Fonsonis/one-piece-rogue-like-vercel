@@ -31,7 +31,9 @@ test('restart reuses original team order, island, mode and difficulty with fresh
  h.exec(`run.mapIdx=2;run.team.reverse();run.team[0].lvl=60;run.team[0].stars=2;run.team[0].hp=0;run.team.push(makeChar('buggy',30));run.berries=9999;run.items={};run.nuzCaught={1:true};run.nakamaGuardUsed=true;saveRun();storyMode='classic';selectedDiff=1;retryIsland(islandRetrySpec(run));`);
  assert.equal(h.exec('JSON.stringify(run.team)'),h.exec('initial'));
  assert.equal(h.exec('JSON.stringify(run.items)'),h.exec('initialItems'));
- assert.equal(h.exec('JSON.stringify(meta)'),h.exec('persistent'));
+ const expectedMeta=JSON.parse(h.exec('persistent'));
+ expectedMeta.characterUsage.zoro++;expectedMeta.characterUsage.luffy++;
+ assert.deepEqual(JSON.parse(h.exec('JSON.stringify(meta)')),expectedMeta);
  assert.equal(h.exec('run.mode'),'nuzlocke');assert.equal(h.exec('run.diff'),3);assert.equal(h.exec('run.islandIdx'),1);
  assert.equal(h.exec('run.mapIdx'),0);assert.equal(h.exec('run.pos'),null);assert.equal(h.exec('run.berries'),300);
  assert.equal(h.exec('!!run.nakamaGuardUsed'),false);assert.equal(h.exec('Object.keys(run.nuzCaught).length'),0);

@@ -29,6 +29,15 @@ try {
   if(stage<3)await page.evaluate(()=>endChallengeBattle(true));
  }
  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>{meta.settings.theme='dark';applyDisplayPreferences();});
+ await page.locator('#bracket-fit').click();
+ const fit=await page.locator('.tournament-viewport').evaluate(el=>{
+  const outer=el.getBoundingClientRect(),canvas=el.querySelector('.tournament-canvas').getBoundingClientRect();
+  return {fits:canvas.right<=outer.right&&canvas.bottom<=outer.bottom,height:outer.height};
+ });
+ assert.ok(fit.fits);assert.ok(fit.height<844*.7);
+ await page.locator('.tournament-viewport').scrollIntoViewIfNeeded();
+ await page.screenshot({path:'outputs/challenges/bracket16-entero-mobile.png'});
+ await page.locator('#bracket-detail').click();
  await page.locator('.tournament-viewport').scrollIntoViewIfNeeded();
  await page.locator('.tournament-viewport').evaluate(el=>{el.scrollLeft=el.scrollWidth;el.scrollTop=190;});
  const headerOffset=await page.locator('.tournament-round').last().locator('h3').evaluate(el=>({offset:el.getBoundingClientRect().top-document.querySelector('.tournament-viewport').getBoundingClientRect().top,position:getComputedStyle(el).position}));

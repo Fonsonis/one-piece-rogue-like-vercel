@@ -51,6 +51,14 @@ Detalles y pruebas: `public/local/`, `tests/local-multiplayer.test.mjs` y la pru
 
 Buggy contra Buggy ya no bloquea la partida. Se revisan pasivas y técnicas, se añade EXP visible, se ajustan las escalas de los 434 sprites y se incorporan doce escenarios ilustrados. Se conservan estadísticas base, niveles de enemigos y curvas de progresión. Consulta [la revisión de balance](docs/combat-balance.md), [las 434 fichas](docs/character-balance.csv) y [la dirección visual](docs/art-direction.md).
 
+## Selección de equipos y desafíos
+
+Desafíos muestra Torneo y Batalla de Leyendas en dos tarjetas horizontales, también en móvil. Ambos usan el selector de retratos de historia. Los tres equipos guardados se comparten entre historia, Torre Marine y desafíos: al cargar se conserva el orden, se omiten personajes incompatibles y se usan los huecos disponibles (1 en torneo, 2 de rareza 5★ en Leyendas y 3 en Torre). Guardar en un hueco sustituye ese equipo compartido.
+
+**Más usados** ordena los personajes por partidas iniciadas en historia, Torre Marine y desafíos. Las evoluciones comparten contador; elegir, guardar un equipo o reanudar un torneo no suma usos. Una nueva isla o un reintento sí suma uno. El contador comienza con esta actualización y se conserva en el guardado y las copias JSON; los guardados anteriores siguen siendo compatibles.
+
+El cuadro del torneo se abre en **Ver entero**, ajustado al ancho y alto de la pantalla. **Ampliar** recupera el tamaño de lectura y permite desplazarse por los cruces. Incluye las rondas futuras y el tercer puesto, también para torneos antiguos.
+
 ## Jugar en local
 
 Con Node.js 22 o superior:

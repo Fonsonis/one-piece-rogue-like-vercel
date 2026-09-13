@@ -11,9 +11,10 @@
     for (const key of ['dex', 'recruited', 'roster', 'defeated', 'relics']) {
       if (data.meta[key] !== undefined && (!Array.isArray(data.meta[key]) || data.meta[key].some(id => typeof id !== 'string'))) throw new Error('Progreso inválido.');
     }
-    for (const key of ['wins', 'nuzWins', 'upgrades', 'global', 'stats', 'settings', 'sagaClears', 'sagaDiffWins', 'teamPresets', 'charUpgrades', 'islandProgress', 'sagaStats', 'pirateKingRewards', 'relicEquipment', 'relicCopies']) {
+    for (const key of ['wins', 'nuzWins', 'upgrades', 'global', 'stats', 'settings', 'sagaClears', 'sagaDiffWins', 'teamPresets', 'characterUsage', 'charUpgrades', 'islandProgress', 'sagaStats', 'pirateKingRewards', 'relicEquipment', 'relicCopies']) {
       if (data.meta[key] !== undefined && !record(data.meta[key])) throw new Error('Progreso inválido.');
     }
+    if (Object.values(data.meta.characterUsage || {}).some(n => !Number.isSafeInteger(n) || n < 0)) throw new Error('Contadores de uso inválidos.');
     for (const islands of Object.values(data.meta.islandProgress || {})) {
       if (!Array.isArray(islands) || islands.some(i=>!Number.isInteger(i) || i<0)) throw new Error('Progreso de islas inválido.');
     }

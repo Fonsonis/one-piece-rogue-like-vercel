@@ -432,6 +432,7 @@ const META_DEFAULTS = () => ({
   pirateKingRewards: {}, // sagaId -> 'pending' o ID del legendario elegido
   islandProgress: {}, // saga:mode:difficulty -> completed island indices
   teamPresets: { 1: [], 2: [], 3: [] },
+  characterUsage: {}, // Partidas iniciadas, compartidas entre formas y modos.
   stats: { kills: 0, items: 0 },
   sagaStats: {}, // sagaId -> repeatable achievement counters
   relics: [],
@@ -1048,6 +1049,8 @@ globalThis.visualViewport?.addEventListener('scroll', syncGameViewport);
 syncGameViewport();
 
 function render(html) {
+  challengeBracketObserver?.disconnect();
+  challengeBracketObserver = null;
   worldNavigator?.destroy();
   worldNavigator = null;
   worldSelection = null;
@@ -2693,6 +2696,7 @@ function charControlsHTML(st, opts = {}) {
     <select id="cf-sort" title="Ordenar">
       <option value="default" ${st.sort === 'default' ? 'selected' : ''}>Orden original</option>
       <option value="name" ${st.sort === 'name' ? 'selected' : ''}>Nombre A-Z</option>
+      <option value="usageDesc" ${st.sort === 'usageDesc' ? 'selected' : ''}>Más usados</option>
       <option value="rarezaDesc" ${st.sort === 'rarezaDesc' ? 'selected' : ''}>Rareza ⭐ mayor</option>
       <option value="rarezaAsc" ${st.sort === 'rarezaAsc' ? 'selected' : ''}>Rareza ⭐ menor</option>
       <option value="statTotalDesc" ${st.sort === 'statTotalDesc' ? 'selected' : ''}>Stats actuales ▼</option>
@@ -2722,7 +2726,40 @@ function characterSortStat(id,sort) {
   return sort==='statTotalDesc'?f.maxhp+f.atk+f.def+f.spatk+f.spdef+f.spd:f[keys[sort]];
 }
 function characterSortStatHTML(id,sort) {
+  if (sort === 'usageDesc') return `<span class="collection-sort-stat">${characterUsageCount(id)} partidas</span>`;
   return CHAR_STAT_SORTS[sort]?`<span class="collection-sort-stat">${CHAR_STAT_SORTS[sort]}: ${characterSortStat(id,sort).toLocaleString('es')}</span>`:'';
+}
+
+function characterUsageCount(id) {
+  const count = meta.characterUsage?.[baseFormOf(id)];
+  return Number.isSafeInteger(count) && count > 0 ? count : 0;
+}
+function recordCharacterUsage(ids) {
+  meta.characterUsage ||= {};
+  for (const id of new Set(ids.filter(id => CHARS[id]).map(baseFormOf))) {
+    meta.characterUsage[id] = Math.min(Number.MAX_SAFE_INTEGER, characterUsageCount(id) + 1);
+  }
+}
+
+function eligiblePresetTeam(slot, allowed, limit) {
+  const saved = meta.teamPresets?.[slot];
+  return [...new Set((Array.isArray(saved) ? saved : []).filter(id => CHARS[id]).map(baseFormOf))]
+    .filter(id => allowed.includes(id)).slice(0, limit);
+}
+function renderTeamPresets(container, picked, allowed, limit, onLoad) {
+  container.innerHTML = `<div class="team-presets"><strong>💾 Equipos guardados</strong><div class="team-preset-list">${[1,2,3].map(slot => {
+    const team = eligiblePresetTeam(slot, allowed, limit);
+    return `<div class="team-preset"><span>Equipo ${slot}</span><small>${team.map(id => esc(CHARS[evolutionFormAt(id,startLvlOf(id))].name)).join(' · ') || 'Sin nakamas compatibles'}</small><div><button class="btn gray" data-team-load="${slot}" ${team.length ? '' : 'disabled'}>Cargar (${team.length}/${limit})</button><button class="btn blue" data-team-save="${slot}" ${picked.some(Boolean) ? '' : 'disabled'} aria-label="Guardar en equipo ${slot}">Guardar</button></div></div>`;
+  }).join('')}</div></div>`;
+  container.querySelectorAll('[data-team-load]').forEach(button => button.onclick = () => onLoad(eligiblePresetTeam(button.dataset.teamLoad, allowed, limit)));
+  container.querySelectorAll('[data-team-save]').forEach(button => button.onclick = () => {
+    meta.teamPresets ||= {};
+    meta.teamPresets[button.dataset.teamSave] = [...new Set(picked.filter(Boolean).map(baseFormOf))];
+    saveMeta();
+    renderTeamPresets(container, picked, allowed, limit, onLoad);
+    container.querySelector(`[data-team-save="${button.dataset.teamSave}"]`).focus();
+    toast(`💾 Equipo ${button.dataset.teamSave} guardado`);
+  });
 }
 
 // Filtra (nombre, saga, tipo, rareza) y ordena la lista de personajes
@@ -2742,6 +2779,7 @@ function filterSortChars(ids, st, resolve = id => id) {
     const values=new Map(out.map(id=>[id,characterSortStat(resolve(id),st.sort)]));
     out.sort((a,b)=>values.get(b)-values.get(a)||byName(a,b));
   }
+  else if (st.sort === 'usageDesc') out.sort((a,b) => characterUsageCount(b) - characterUsageCount(a) || byName(a,b));
   else if (st.sort === 'name') out.sort(byName);
   else if (st.sort === 'rarezaAsc') out.sort((a, b) => CHARS[resolve(a)].rareza - CHARS[resolve(b)].rareza || byName(a, b));
   else if (st.sort === 'rarezaDesc') out.sort((a, b) => CHARS[resolve(b)].rareza - CHARS[resolve(a)].rareza || byName(a, b));
@@ -2793,7 +2831,7 @@ function showNakamaPicker(opts) {
   const previousFocus = document.activeElement;
   const st = opts.state || nakamaPickerState;
   const team = opts.currentTeam || [];
-  const unlocked = [...new Set(['luffy', ...(meta.roster || [])])].filter(id => CHARS[id] && isNakamaUnlocked(id) && (!opts.allowedIds || opts.allowedIds.includes(baseFormOf(id))));
+  const unlocked = [...new Set((opts.allowedIds || ['luffy', ...(meta.roster || [])]).filter(id => CHARS[id]).map(baseFormOf))].filter(id => opts.allowedIds || isNakamaUnlocked(id));
   const display = id => evolutionFormAt(id, startLvlOf(id));
   const esc = value => String(value).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const sagaIds = new Set(unlocked.map(id => CHARS[display(id)].saga));
@@ -2814,8 +2852,9 @@ function showNakamaPicker(opts) {
     <details class="nakama-picker-more"><summary>Tipo, rareza y orden</summary><div class="nakama-picker-extra">
       <label>Tipo<select id="np-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t => `<option value="${esc(t)}" ${st.type === t ? 'selected' : ''}>${TYPES[t].emoji} ${esc(t)}</option>`).join('')}</select></label>
       <label>Rareza<select id="np-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r => `<option value="${r}" ${+st.rarity === r ? 'selected' : ''}>${r} estrellas</option>`).join('')}</select></label>
-      <label>Orden<select id="np-sort">${[['name','Nombre A–Z'],['rarezaDesc','Mayor rareza'],['statTotalDesc','Stats actuales'],['atkDesc','Ataque actual'],['spatkDesc','Ataque especial actual'],['spdDesc','Velocidad actual']].map(([value,label]) => `<option value="${value}" ${st.sort === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+      <label>Orden<select id="np-sort">${[['name','Nombre A–Z'],['usageDesc','Más usados'],['rarezaDesc','Mayor rareza'],['statTotalDesc','Stats actuales'],['atkDesc','Ataque actual'],['spatkDesc','Ataque especial actual'],['spdDesc','Velocidad actual']].map(([value,label]) => `<option value="${value}" ${st.sort === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
     </div></details>
+    <button class="btn gray usage-filter" id="np-used" aria-pressed="${st.sort === 'usageDesc'}">Más usados</button>
     <div class="nakama-picker-summary"><span id="np-count" role="status"></span><button class="btn gray" id="np-reset">Limpiar filtros</button></div>
     <div class="nakama-picker-roster" id="np-roster"></div>
     <footer class="nakama-picker-pages"><button class="btn gray" id="np-prev" aria-label="Página anterior">◀</button><span id="np-page" role="status"></span><button class="btn gray" id="np-next" aria-label="Página siguiente">▶</button></footer>
@@ -2828,6 +2867,8 @@ function showNakamaPicker(opts) {
     const pageSize = 12, pages = Math.max(1, Math.ceil(ids.length / pageSize));
     st.page = clamp(st.page, 0, pages - 1);
     find('#np-count').textContent = `${ids.length} de ${unlocked.length} nakamas`;
+    find('#np-used').setAttribute('aria-pressed', String(st.sort === 'usageDesc'));
+    find('#np-sort').value = st.sort;
     find('#np-page').textContent = `Página ${st.page + 1} de ${pages}`;
     find('#np-prev').disabled = st.page === 0;
     find('#np-next').disabled = st.page === pages - 1;
@@ -2856,6 +2897,7 @@ function showNakamaPicker(opts) {
     });
   };
   find('#np-close').onclick = close;
+  find('#np-used').onclick = () => { st.sort = st.sort === 'usageDesc' ? 'name' : 'usageDesc'; st.page = 0; draw(); };
   find('#np-search').oninput = e => { st.q = e.target.value; st.page = 0; draw(); };
   for (const key of ['saga','type','rarity','sort']) find(`#np-${key}`).onchange = e => { st[key] = e.target.value; st.page = 0; draw(); };
   ov.querySelectorAll('[data-scope]').forEach(btn => btn.onclick = () => { st.scope = btn.dataset.scope; st.page = 0; draw(); });
@@ -2864,6 +2906,7 @@ function showNakamaPicker(opts) {
     find('#np-search').value = '';
     for (const key of ['saga','type','rarity','sort']) find(`#np-${key}`).value = st[key];
     draw();
+    find('#np-search').focus();
   };
   for (const [key, step] of [['prev',-1],['next',1]]) find(`#np-${key}`).onclick = () => {
     st.page += step; draw();
@@ -2920,7 +2963,7 @@ function showInventoryModal(opts = {}) {
         <label for="inv-saga">Saga<select id="inv-saga"><option value="">Todas las sagas</option>${groupUpgradeRoster(allUnlocked).map(g=>`<option value="${g.id}" ${invViewState.saga===g.id?'selected':''}>${g.name}</option>`).join('')}</select></label>
         <label for="inv-type">Tipo<select id="inv-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t=>`<option value="${t}" ${invViewState.type===t?'selected':''}>${t}</option>`).join('')}</select></label>
         <label for="inv-rarity">Rareza<select id="inv-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r=>`<option value="${r}" ${+invViewState.rarity===r?'selected':''}>${r} ${r===1?'estrella':'estrellas'}</option>`).join('')}</select></label>
-        <label for="inv-sort">Ordenar<select id="inv-sort">${[['name','Nombre A–Z'],['rarezaDesc','Mayor rareza'],['rarezaAsc','Menor rareza'],['statTotalDesc','Mayor fuerza actual']].map(([v,l])=>`<option value="${v}" ${invViewState.sort===v?'selected':''}>${l}</option>`).join('')}</select></label>
+        <label for="inv-sort">Ordenar<select id="inv-sort">${[['name','Nombre A–Z'],['usageDesc','Más usados'],['rarezaDesc','Mayor rareza'],['rarezaAsc','Menor rareza'],['statTotalDesc','Mayor fuerza actual']].map(([v,l])=>`<option value="${v}" ${invViewState.sort===v?'selected':''}>${l}</option>`).join('')}</select></label>
       </div></details>
       <div class="collection-results"><span role="status">${ids.length} nakamas${ids.length?` · ${page*pageSize+1}–${Math.min((page+1)*pageSize,ids.length)}`:''}</span><button class="collection-text-button" id="inv-reset">Limpiar filtros</button></div>
       <div id="inv-cards-grid" class="collection-list inventory-grid" aria-label="Lista de nakamas" tabindex="0">${cards||'<div class="collection-empty"><h3>No hay nakamas con estos filtros</h3><p>Prueba otro nombre o limpia los filtros.</p></div>'}</div>
@@ -4030,6 +4073,7 @@ function startRun(sagaIdx, starterIds, islandIdx = 0, islandRepeat = null) {
     nuzCaught: {}, // isla -> ya reclutado
   };
   if(islandRepeat)run.islandRepeat={...islandRepeat};
+  recordCharacterUsage(starterIds);
   prepareBackpack(run);
   starterIds.forEach(registerRecruit);
   run.team.forEach(f => registerDex(f.id));
@@ -7312,7 +7356,9 @@ function screenTowerIntro() {
       y recibe 3 Platos de Sanji. ${start50 ? '<b>¡Inicias tu ascenso directamente en el Piso 50!</b>' : '¿Hasta qué piso llegarás?'}</p>
       <p style="margin-top:10px;">Récord actual: <b>${meta.towerRecord}</b> pisos</p>
       <div class="tower-selection-bar"><div id="tower-picked" aria-live="polite"></div><div id="tower-synergies"></div></div>
+      <div id="tower-presets"></div>
       <label class="tower-search" for="tower-search">Buscar nakama<input type="search" id="tower-search" placeholder="Nombre o tipo"></label>
+      <button class="btn gray usage-filter" id="tower-used" aria-pressed="false">Más usados</button>
       <p id="tower-results" role="status">${pool.length} nakamas disponibles</p>
       <div class="tower-roster">
         ${pool.map(id => {
@@ -7334,6 +7380,7 @@ function screenTowerIntro() {
   $('#btn-back').onclick = screenHome;
   const startBtn = $('#btn-start');
   const updateSelection = () => {
+    renderTeamPresets($('#tower-presets'), picked, pool, 3, team => { picked.splice(0,picked.length,...team); updateSelection(); });
     document.querySelectorAll('[data-tower]').forEach(r => {
       const selected = picked.includes(r.dataset.tower);
       r.setAttribute('aria-pressed', String(selected));
@@ -7356,6 +7403,12 @@ function screenTowerIntro() {
     });
     $('#tower-results').textContent = visible ? `${visible} nakamas disponibles` : 'No hay nakamas con esta búsqueda.';
   };
+  $('#tower-used').onclick = () => {
+    const button = $('#tower-used'), active = button.getAttribute('aria-pressed') !== 'true';
+    button.setAttribute('aria-pressed', String(active));
+    const ids = active ? filterSortChars(pool, {sort:'usageDesc'}) : pool;
+    ids.forEach(id => $('.tower-roster').appendChild($(`[data-tower="${id}"]`)));
+  };
   document.querySelectorAll('[data-tower]').forEach(el => {
     el.onclick = () => {
       const id = el.dataset.tower;
@@ -7368,6 +7421,8 @@ function screenTowerIntro() {
   updateSelection();
   startBtn.onclick = () => {
     if (picked.length !== 3) return;
+    recordCharacterUsage(picked);
+    saveMeta();
     tower = { floor: startFloor, team: picked.map(id => applyUpgrades(makeChar(id, startLvl))), items: { bocadillo: 3, sake: 1 } };
     prepareBackpack(tower);
     if (hasPendingLoot(tower)) showTowerBackpack(towerNextBattle); else towerNextBattle();
@@ -8158,6 +8213,7 @@ function startChallenge(kind,picked) {
   const seeds=shuffleChallenge(entrants.map((_,i)=>i));
   const matches=[];for(let i=0;i<seeds.length;i+=2)matches.push(challengeMatch(seeds[i],seeds[i+1]));
   meta.challenge={version:2,kind,level,entrants,stage:0,rounds:[{name:challengeRoundName(matches.length),matches}],finished:false,placement:null,reward:0,pendingRelics:[]};
+  recordCharacterUsage(picked);
   saveMeta();screenChallengeBracket();return true;
 }
 function simulateChallengeMatch(t,m) {
@@ -8255,12 +8311,11 @@ function claimChallengeRelic(id) {
 function screenChallenges() {
   playMusic('menu');if(accountLevel()<35){toast('🔒 Desafíos requiere nivel de cuenta 35.');return screenHome();}
   render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← PUERTO</button>
-    <section class="panel challenge-panel"><h2 id="challenge-title" tabindex="-1">🏆 Desafíos</h2><p>Torneos offline contra la IA. Desbloqueados a nivel de cuenta 35.</p>
+    <section class="panel challenge-panel"><h2 id="challenge-title" tabindex="-1">🏆 Desafíos</h2>
     ${meta.challenge?`<button class="btn gold" id="challenge-resume">${meta.challenge.finished?'VER RESULTADO Y RECOMPENSA':'CONTINUAR TORNEO'}</button>`:''}
-    <div class="challenge-events"><article class="challenge-event"><span class="challenge-emblem">🏆</span><h3>Torneo de los Dieciséis</h3>
-    <p>16 participantes · duelos 1 contra 1. Octavos Nv.65 → cuartos Nv.80 → semifinales Nv.95 → final Nv.110. Bronce Nv.85.</p><div class="challenge-prizes"><span>🥇 7.500</span><span>🥈 5.000</span><span>🥉 2.500</span></div><p>Log Poses por torneo. El resto de puestos no recibe premio.</p><button class="btn blue" data-challenge="tournament" ${challengeCanStart()?'':'disabled'}>ELEGIR LUCHADOR</button></article>
-    <article class="challenge-event legends"><span class="challenge-emblem">👑</span><h3>Batalla de Leyendas</h3><p>16 personajes · 8 parejas · combates 2 contra 2. Solo rareza 5★; las estrellas de fusión no cuentan.</p><p>Rivales de Wano · cuartos Nv.${challengeLevel('legends')} → semifinales Nv.${challengeLevel('legends')+12} → final Nv.${Math.max(...SAGAS.find(s=>s.id==='wano').islands.at(-1).bossLvl)}. Cada personaje vivo actúa por ronda.</p><p>🏺 Campeones: elige una reliquia entre tres, priorizando afinidades de tu pareja y reliquias nuevas.</p><button class="btn gold" data-challenge="legends" ${challengeCanStart()?'':'disabled'}>FORMAR PAREJA</button></article></div>
-    <p><b>Tus personajes usan su nivel permanente actual.</b> Todos los rivales llevan una reliquia afín con boost y pasiva. Empiezas cada combate con PS completos y conservas tus mejoras y reliquias equipadas.</p><details class="challenge-rules"><summary>Cómo funcionan los torneos</summary><p>Sin consumibles. Ultimate reiniciada en cada combate, salvo la carga inicial de una reliquia. Puedes volver al puerto y continuar el cuadro guardado. Tus niveles se consultan de nuevo al empezar cada combate.</p></details>
+    <div class="challenge-events"><article class="challenge-event"><span class="challenge-emblem" aria-hidden="true">🏆</span><h3>Torneo</h3>
+    <span class="challenge-format">1 vs 1 · 16 participantes</span><button class="btn blue" data-challenge="tournament" ${challengeCanStart()?'':'disabled'}>Elegir nakama</button></article>
+    <article class="challenge-event legends"><span class="challenge-emblem" aria-hidden="true">👑</span><h3>Batalla de Leyendas</h3><span class="challenge-format">2 vs 2 · Solo 5★</span><button class="btn gold" data-challenge="legends" ${challengeCanStart()?'':'disabled'}>Formar pareja</button></article></div>
     <button class="btn gray" id="challenge-relics">🎒 RELIQUIAS (${meta.relics.length})</button></section>`);
   $('#btn-back').onclick=screenHome;$('#challenge-relics').onclick=showRelicCollection;
   if(meta.challenge)$('#challenge-resume').onclick=screenChallengeBracket;
@@ -8273,20 +8328,22 @@ function screenChallengeSelection(kind) {
   const pickerState={q:'',saga:'',type:'',rarity:0,sort:'name',scope:'all',page:0};
   render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button>
     <section class="panel challenge-panel challenge-selection"><h2 id="challenge-title" tabindex="-1">${kind==='legends'?'👑 Forma tu pareja legendaria':'🏆 Elige tu luchador'}</h2>
-    <p>Participas con el <b>nivel permanente de cada nakama</b>. 16 personajes en el cuadro. Rivales ${kind==='legends'?'Nv.266 → 278 → 290':'Nv.65 → 80 → 95 → 110 · Bronce Nv.85'}, todos con reliquia afín.</p>
+    <p>${kind==='legends'?'Elige 2 nakamas de 5★':'Elige 1 nakama'} · Tu nivel permanente</p>
     ${pool.length<count?'<p class="challenge-notice" role="status">No tienes suficientes personajes elegibles. Recluta legendarios o desbloquea sus formas de 5★ mejorando su nivel base.</p>':''}
     <div class="challenge-team-slots" id="challenge-slots"></div>
+    <div id="challenge-presets"></div>
     <div id="challenge-selection-synergies"></div>
     <div class="challenge-launch"><p id="challenge-picked" role="status"></p><button class="btn blue" id="challenge-start" disabled>COMENZAR TORNEO</button></div></section>`);
   $('#btn-back').onclick=screenChallenges;
   const draw=()=>{
+    renderTeamPresets($('#challenge-presets'), picked, pool.map(baseFormOf), count, team => { picked.splice(0,count,...Array.from({length:count},(_,i)=>team[i]||null)); draw(); });
     $('#challenge-slots').innerHTML=picked.map((id,index)=>{
       const f=id?applyUpgrades(makeChar(id,startLvlOf(id))):null;
       const relic=id?RELICS[meta.relicEquipment?.[id]]:null;
       return `<article class="challenge-slot"><h3>${count===1?'Tu luchador':`Nakama ${index+1}`}</h3>
         <button class="challenge-slot-pick" data-challenge-slot="${index}" aria-label="${f?'Cambiar a '+esc(charName(f)):'Elegir nakama '+(index+1)}" ${pool.length?'':'disabled'}>
-        ${f?`${charIcon(f.id,80)}<strong>${esc(charName(f))}</strong><span>Nv. ${f.lvl} · ${'⭐'.repeat(CHARS[f.id].rareza)}</span><span class="type-badges">${typeBadges(fighterTypes(f))}</span><span>${f.maxhp} PS · ${f.atk} ATQ</span>`:'<span class="challenge-slot-plus" aria-hidden="true">＋</span><strong>Elegir nakama</strong><span>Buscar, filtrar y consultar fichas</span>'}</button>
-        ${f?`<p>${relic&&meta.relics.includes(relic.id)?`🏺 ${esc(relic.name)} · ${relic.character===id?'Afinidad activa':'Boost común'}`:'Sin reliquia equipada'}</p><button class="btn gray" data-challenge-info="${index}">Ver ficha</button><button class="btn gray" data-challenge-remove="${index}" aria-label="Quitar a ${esc(charName(f))}">Quitar</button>`:''}</article>`;
+        ${f?`${charIcon(f.id,80)}<strong>${esc(charName(f))}</strong><span>Nv. ${f.lvl} · ${'⭐'.repeat(CHARS[f.id].rareza)}</span><span class="type-badges">${typeBadges(fighterTypes(f))}</span>`:'<span class="challenge-slot-plus" aria-hidden="true">＋</span><strong>Añadir nakama</strong><span>Toca para elegir</span>'}</button>
+        ${f?`${relic&&meta.relics.includes(relic.id)?`<p>🏺 ${esc(relic.name)}</p>`:''}<div class="challenge-slot-actions"><button class="btn gray" data-challenge-info="${index}" aria-label="Ver ficha de ${esc(charName(f))}">ⓘ Ficha</button><button class="btn gray" data-challenge-remove="${index}" aria-label="Quitar a ${esc(charName(f))}">× Quitar</button></div>`:''}</article>`;
     }).join('');
     const team=picked.filter(Boolean).map(id=>applyUpgrades(makeChar(id,startLvlOf(id))));
     $('#challenge-picked').textContent=`${team.length} de ${count} seleccionados${team.length===count?' · Equipo listo':''}`;
@@ -8313,6 +8370,31 @@ function screenChallengeSelection(kind) {
   $('#challenge-start').onclick=()=>startChallenge(kind,picked.filter(Boolean).map(id=>evolutionFormAt(id,startLvlOf(id))));
   draw();$('#challenge-title').focus();
 }
+let challengeBracketObserver = null;
+function bindChallengeBracket() {
+  const viewport = $('.tournament-viewport'), canvas = $('.tournament-canvas'), frame = $('.tournament-frame');
+  if (!viewport || !canvas || !frame) return;
+  let fit = true;
+  const resize = () => {
+    viewport.classList.toggle('is-fit', fit);
+    const width = canvas.scrollWidth, height = canvas.offsetHeight;
+    const scale = fit ? Math.min(1, (viewport.clientWidth - 16) / width, Math.max(240, innerHeight * .64) / height) : 1;
+    canvas.style.transform = `scale(${scale})`;
+    frame.style.width = `${width * scale}px`;
+    frame.style.height = `${height * scale}px`;
+    viewport.scrollLeft = viewport.scrollTop = 0;
+    $('#bracket-fit').setAttribute('aria-pressed', String(fit));
+    $('#bracket-detail').setAttribute('aria-pressed', String(!fit));
+  };
+  $('#bracket-fit').onclick = () => { fit = true; resize(); };
+  $('#bracket-detail').onclick = () => { fit = false; resize(); };
+  if (typeof ResizeObserver !== 'undefined') {
+    challengeBracketObserver = new ResizeObserver(resize);
+    challengeBracketObserver.observe(viewport);
+    challengeBracketObserver.observe(canvas);
+  }
+  resize();
+}
 function challengeBracketHTML(t) {
   const firstCount=t.entrants.length/2,totalRounds=Math.log2(t.entrants.length);
   const slot=t.kind==='legends'?168:120,cardHeight=slot-24;
@@ -8334,7 +8416,7 @@ function challengeBracketHTML(t) {
     return `<section class="tournament-round"><h3>${challengeRoundName(count)}<small>Rivales Nv.${challengeRoundLevel(t,round)}</small></h3><div class="tournament-matches" style="height:${firstCount*slot}px">${Array.from({length:count},(_,i)=>match(t.rounds[round]?.matches[i],round,i)).join('')}${links}${inlets}</div></section>`;
   }).join('');
   const bronze=t.kind==='tournament'?`<section class="tournament-bronze"><h3>Tercer puesto · Nv.${challengeRoundLevel(t,totalRounds-2)-10}</h3><article class="challenge-match ${t.bronze===next?'current-match':''}">${[t.bronze?.a??null,t.bronze?.b??null].map((id,n)=>entry(id,`Perdedor semifinal ${n+1}`,t.bronze?.winner)).join('')}</article></section>`:'';
-  return `<p class="bracket-hint">Desplaza el cuadro para seguir los cruces. Tu equipo está resaltado; ✓ indica quién avanza.</p><div class="tournament-viewport" role="region" aria-label="Cuadro eliminatorio del torneo" tabindex="0"><div class="challenge-bracket tournament-tree">${rounds}</div>${bronze}</div>`;
+  return `<div class="bracket-toolbar" role="group" aria-label="Vista del cuadro"><button class="btn blue" id="bracket-fit" aria-pressed="true">Ver entero</button><button class="btn gray" id="bracket-detail" aria-pressed="false">Ampliar</button></div><p class="bracket-hint">Tu equipo en azul · ✓ Ganador</p><div class="tournament-viewport is-fit" role="region" aria-label="Cuadro eliminatorio del torneo" tabindex="0"><div class="tournament-frame"><div class="tournament-canvas"><div class="challenge-bracket tournament-tree">${rounds}</div>${bronze}</div></div></div>`;
 }
 
 function screenChallengeBracket() {
@@ -8356,6 +8438,7 @@ function screenChallengeBracket() {
   if(!t.finished){$('#challenge-fight').onclick=playChallengeMatch;$('#challenge-abandon').onclick=()=>modalConfirm('¿Abandonar torneo?','Terminarás este torneo sin premio.',()=>{finishChallenge(0);screenChallenges();});}
   document.querySelectorAll('[data-claim-relic]').forEach(el=>el.onclick=()=>{if(claimChallengeRelic(el.dataset.claimRelic))screenChallengeBracket();});
   if(t.relicReward)$('#challenge-equip').onclick=showRelicCollection;
+  bindChallengeBracket();
   $('#challenge-title').focus();
 }
 
