@@ -61,3 +61,51 @@ html[data-theme="dark"] .challenge-nakama-picker .btn:disabled { opacity:1; colo
 #app .challenge-panel .tournament-bronze .bracket-entry { min-height:48px; }
 @media(max-width:540px) { .tournament-viewport { max-height:70dvh; } }
 #app .challenge-panel .tournament-round > h3 { position:sticky; top:0; z-index:3; }
+
+/* Keep both events and both team slots visible side by side on a phone. */
+.challenge-events { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.challenge-event { display:flex; flex-direction:column; align-items:center; text-align:center; gap:10px; padding:20px 12px; }
+#app .challenge-panel .challenge-event h3 { margin:0; }
+.challenge-format { font-size:13px; }
+.challenge-event .btn { margin-top:auto; }
+.challenge-team-slots { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.challenge-slot:only-child { grid-column:1/-1; width:min(100%,360px); justify-self:center; box-sizing:border-box; }
+.challenge-slot { padding:10px; }
+.challenge-slot-pick { padding:8px; }
+.challenge-slot-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; margin-top:8px; }
+#app .challenge-panel .challenge-slot-actions .btn { margin:0; padding:6px 3px; font-size:12px; }
+.team-presets { margin:16px 0; padding:12px; border:1px solid #91aaa9; border-radius:8px; color:var(--ink); background:var(--paper-dark); font:14px/1.4 system-ui,sans-serif; }
+.team-preset-list { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-top:10px; }
+.team-preset { min-width:0; display:flex; flex-direction:column; gap:6px; }
+.team-preset > span { font-weight:700; }
+.team-preset small { flex:1; overflow-wrap:anywhere; font:12px/1.4 system-ui,sans-serif; }
+.team-preset > div { display:flex; flex-wrap:wrap; gap:4px; }
+#app .team-preset .btn { min-height:44px; margin:0; padding:6px 8px; font:600 13px/1.4 system-ui,sans-serif; }
+.usage-filter { min-height:44px; font:600 14px/1.4 system-ui,sans-serif; }
+.usage-filter[aria-pressed="true"], .bracket-toolbar .btn[aria-pressed="true"] { background:var(--sea); color:#fff; box-shadow:inset 0 0 0 2px currentColor; }
+.nakama-picker > .usage-filter { align-self:flex-start; flex-shrink:0; margin:4px 0; }
+.bracket-toolbar { display:flex; gap:8px; }
+.tournament-frame { position:relative; }
+.tournament-canvas { position:absolute; top:0; left:0; width:max-content; transform-origin:top left; }
+.tournament-viewport.is-fit { overflow:hidden; max-height:none; }
+.tournament-viewport.is-fit .tournament-round > h3 { position:static !important; }
+@media(max-width:540px) {
+  .challenge-events { gap:8px; }
+  .challenge-event { padding:14px 8px; }
+  #app .challenge-panel .challenge-event h3 { font-size:17px; min-height:48px; display:flex; align-items:center; }
+  #app .challenge-event .btn { padding:8px 5px; margin-bottom:0; }
+  .challenge-format { font-size:12px; }
+  .challenge-team-slots { gap:8px; }
+  .challenge-slot { padding:6px; }
+  .challenge-slot-pick strong { font-size:15px; }
+  .challenge-slot-pick { font-size:12px; }
+  .team-presets { padding:10px; }
+  .team-preset-list { gap:6px; }
+  #app .team-preset .btn { width:100%; font-size:12px; }
+  #app .challenge-panel .is-fit .tournament-tree { gap:16px; }
+  .is-fit .tournament-round { flex-basis:145px; width:145px; }
+  .is-fit .tournament-link, .is-fit .tournament-inlet { width:8px; }
+  #app .challenge-panel .is-fit .bracket-entry { font-size:18px; padding:4px 20px 4px 6px; }
+  .is-fit .bracket-entry > span:not(.bracket-won) { -webkit-line-clamp:1; }
+  .is-fit .bracket-you { font-size:12px; }
+}
