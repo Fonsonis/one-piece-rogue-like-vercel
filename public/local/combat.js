@@ -27,7 +27,7 @@ globalThis.LocalCombat = (() => {
     if (players.length < 2 || players.length > 8) throw new Error('Se necesitan entre 2 y 8 jugadores.');
     const coop = options.mode === 'coop';
     const pTeam = coop ? players.flatMap(crew) : crew(players[0]);
-    const eTeam = coop ? [{ ...makeChar(options.boss || 'kaido', 30, false, true), owner: 'yonko' }] : crew(players[1]);
+    const eTeam = coop ? [{ ...makeEnemy(options.boss || 'kaido', 30), owner: 'yonko' }] : crew(players[1]);
     if (coop) {
       const strength = players.length * players[0].team.length;
       const boss = eTeam[0];

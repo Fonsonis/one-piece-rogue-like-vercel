@@ -44,6 +44,12 @@ function evolutionFormAt(id, lvl, progress = meta) {
   while (CHARS[form].evo && Math.min(lvl, baseLevel) >= CHARS[form].evo.lvl) form = CHARS[form].evo.to;
   return form;
 }
+// Rivals evolve from their combat level alone, regardless of the player's unlocks.
+function enemyFormAt(id, lvl) {
+  let form = baseFormOf(id);
+  while (CHARS[form].evo && lvl >= CHARS[form].evo.lvl) form = CHARS[form].evo.to;
+  return form;
+}
 function formMovesAt(id, lvl, exactForm = false, progress = meta) {
   const c = CHARS[id];
   const limit = !exactForm && c.evo && startLvlOf(id, progress) < c.evo.lvl ? c.evo.lvl - 1 : lvl;
@@ -778,6 +784,11 @@ function makeChar(id, lvl, isEnemy = false, exactForm = false) {
     ...(!isEnemy && !exactForm ? {evolutionRulesVersion:2} : {}),
   };
 }
+// AI forms follow combat level; only story encounters apply difficulty scaling.
+function makeEnemy(id, lvl, scaleDifficulty = false) {
+  return makeChar(enemyFormAt(id, lvl), lvl, scaleDifficulty, true);
+}
+
 // Aplica las mejoras permanentes del Barco (solo a personajes del jugador)
 function applyUpgrades(f) {
   const u = meta.upgrades[baseFormOf(f.id)];
@@ -4686,7 +4697,7 @@ function enterNode(r, i) {
       const id = pickWildEnemy(island.pool);
       let lvl = rnd(island.lvl[0], island.lvl[1]);
       if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
-      wildEncounter(makeChar(id, lvl, true));
+      wildEncounter(makeEnemy(id, lvl, true));
       break;
     }
     case 'marine': {
@@ -4696,13 +4707,13 @@ function enterNode(r, i) {
         const id = pickWildEnemy(island.pool);
         let lvl = rnd(island.lvl[0], island.lvl[1] + 1);
         if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
-        enemies.push(makeChar(id, lvl, true));
+        enemies.push(makeEnemy(id, lvl, true));
       }
       startBattle(enemies, { wild: false, marine: true });
       break;
     }
     case 'boss': {
-      const enemies = island.boss.map((id, k) => makeChar(id, island.bossLvl[k], false, true));
+      const enemies = island.boss.map((id, k) => makeEnemy(id, island.bossLvl[k]));
       startBattle(enemies, { wild: false, boss: true, reward: 400 * (run.islandIdx + 1) });
       break;
     }
@@ -4760,7 +4771,7 @@ function doMystery(island) {
         const id = pickWildEnemy(island.pool);
         let lvl = rnd(island.lvl[0] + 1, island.lvl[1] + 2);
         if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
-        startBattle([makeChar(id, lvl, true)], { wild: true });
+        startBattle([makeEnemy(id, lvl, true)], { wild: true });
       });
       break;
     }
@@ -4876,7 +4887,7 @@ function wildEncounter(wild) {
         if (run.mode === 'nuzlocke') run.nuzCaught[run.islandIdx] = true;
         registerRecruit(f.id);
         saveRun();
-        modalInfo('🎉 ¡Nuevo nakama!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(f.id, 44)}</span><br><b>${c.name}</b> Nv${f.lvl} se une a tu banda.</div>`, screenMap);
+        modalInfo('🎉 ¡Nuevo nakama!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(f.id, 44)}</span><br><b>${charName(f)}</b> Nv${f.lvl} se une a tu banda.</div>`, screenMap);
       } else {
         modalInfo('🌊 Se marcha', '<div class="reward-list">Dejas marchar al pirata con un saludo.</div>', screenMap);
       }
@@ -5433,7 +5444,7 @@ function doSpecialPirate(island) {
 function renderSpecialCatalog(lvl) {
   // solo puedes contratar a quienes ya venciste en el modo historia
   const ids = basePirateIds()
-    .filter(id => CHARS[id].rareza < 5 && meta.defeated.includes(id))
+    .filter(id => CHARS[id].rareza < 5 && meta.defeated.some(defeated => baseFormOf(defeated) === baseFormOf(id)))
     .sort((a, b) => CHARS[a].rareza - CHARS[b].rareza || CHARS[a].name.localeCompare(CHARS[b].name));
   const ov = document.createElement('div');
   ov.className = 'overlay';
@@ -7441,16 +7452,16 @@ function towerNextBattle() {
   let highestSaga = 0;
   SAGAS.forEach((_, i) => { if (sagaUnlocked(i)) highestSaga = i; });
   const availableSagas = new Set(SAGAS.slice(0, highestSaga + 1).map(s => s.id));
-  // sin formas evolucionadas; solo personajes de las sagas desbloqueadas
+  // Draw identities from unlocked sagas, then evolve them at the floor's level.
   const pool = Object.keys(CHARS).filter(id => !BASE_OF[id] && availableSagas.has(CHARS[id].saga));
   const lvl = 13 + tower.floor * 2;
   const isBossFloor = tower.floor % 5 === 0;
-  const bossIds = Object.keys(CHARS).filter(id => CHARS[id].boss && availableSagas.has(CHARS[id].saga));
+  const bossIds = Object.keys(CHARS).filter(id => !BASE_OF[id] && CHARS[id].boss && availableSagas.has(CHARS[id].saga));
   const id = isBossFloor ? pick(bossIds) : pick(pool);
-  const enemy = makeChar(id, lvl + (isBossFloor ? 2 : 0), false, true);
+  const enemy = makeEnemy(id, lvl + (isBossFloor ? 2 : 0));
   startBattle([enemy], {
     wild: false, tower: true,
-    intro: `🗼 Piso ${tower.floor} — ¡${CHARS[id].name} te desafía!`,
+    intro: `🗼 Piso ${tower.floor} — ¡${charName(enemy)} te desafía!`,
   });
 }
 
@@ -8240,7 +8251,9 @@ function startChallenge(kind,picked) {
 }
 function simulateChallengeMatch(t,m) {
   if(m.winner!==null)return;
-  const strength=index=>t.entrants[index].members.reduce((n,id)=>n+CHARS[id].base.reduce((a,b)=>a+b,0),0);
+  const stage=t.rounds.findIndex(round=>round.matches.includes(m));
+  const level=m===t.bronze?challengeRoundLevel(t,Math.log2(t.entrants.length)-2)-10:challengeRoundLevel(t,stage);
+  const strength=index=>t.entrants[index].members.reduce((n,id)=>n+CHARS[index===0?id:enemyFormAt(id,level)].base.reduce((a,b)=>a+b,0),0);
   const a=strength(m.a),b=strength(m.b);
   m.winner=Math.random()<a/(a+b)?m.a:m.b;
 }
@@ -8319,7 +8332,7 @@ function playChallengeMatch() {
   if(t.kind==='legends'&&allies.some(f=>CHARS[f.id].rareza!==5))return toast('Tu pareja debe conservar dos personajes de rareza 5★. Revisa sus niveles base o inicia un nuevo torneo.');
   t.entrants[0].members=allies.map(f=>f.id);
   saveMeta();
-  const enemies=t.entrants[enemyIndex].members.map(id=>makeChar(id,enemyLevel,false,true));
+  const enemies=t.entrants[enemyIndex].members.map(id=>makeEnemy(id,enemyLevel));
   startBattle(enemies,{challenge:true,duos:t.kind==='legends',team:allies,items:{},intro:`🏆 ${t.bronze?'Tercer puesto':t.rounds[t.stage].name} · ${t.kind==='legends'?'Batalla de Leyendas · 2 contra 2':`Torneo de ${t.entrants.length}`} · Nv. rival ${enemyLevel}`});
 }
 function claimChallengeRelic(id) {
@@ -8421,15 +8434,15 @@ function challengeBracketHTML(t) {
   const firstCount=t.entrants.length/2,totalRounds=Math.log2(t.entrants.length);
   const slot=t.kind==='legends'?168:120,cardHeight=slot-24;
   const player=challengePlayerTeam(t),next=challengeCurrentMatch(t);
-  const entry=(index,placeholder,winner)=>{
+  const entry=(index,placeholder,winner,level)=>{
     if(index===null)return `<div class="bracket-entry pending">${placeholder}</div>`;
-    const names=index===0?player.map(charName):t.entrants[index].members.map(id=>CHARS[id].name);
+    const names=index===0?player.map(charName):t.entrants[index].members.map(id=>CHARS[enemyFormAt(id,level)].name);
     return `<div class="bracket-entry ${winner===index?'winner':''} ${index===0?'your-entry':''}">${names.map(name=>`<span>${esc(name)}</span>`).join('')}${winner===index?'<span class="bracket-won" aria-label="Ganador">✓</span>':''}${index===0?'<span class="bracket-you">Tu equipo</span>':''}</div>`;
   };
   const match=(m,round,i)=>{
     const labels=round===0?['Por decidir','Por decidir']:[`Ganador cruce ${i*2+1}`,`Ganador cruce ${i*2+2}`];
     const top=(i+.5)*2**round*slot-cardHeight/2;
-    return `<article class="challenge-match ${m&&m===next?'current-match':''}" style="top:${top}px;height:${cardHeight}px" ${m&&m===next?'aria-current="step"':''} aria-label="${challengeRoundName(firstCount/2**round)} · Cruce ${i+1}">${[m?.a??null,m?.b??null].map((id,n)=>entry(id,labels[n],m?.winner)).join('')}</article>`;
+    return `<article class="challenge-match ${m&&m===next?'current-match':''}" style="top:${top}px;height:${cardHeight}px" ${m&&m===next?'aria-current="step"':''} aria-label="${challengeRoundName(firstCount/2**round)} · Cruce ${i+1}">${[m?.a??null,m?.b??null].map((id,n)=>entry(id,labels[n],m?.winner,challengeRoundLevel(t,round))).join('')}</article>`;
   };
   const rounds=Array.from({length:totalRounds},(_,round)=>{
     const count=firstCount/2**round;
@@ -8437,7 +8450,7 @@ function challengeBracketHTML(t) {
     const inlets=round?Array.from({length:count},(_,i)=>`<i aria-hidden="true" class="tournament-inlet" style="top:${(i+.5)*2**round*slot}px"></i>`).join(''):'';
     return `<section class="tournament-round"><h3>${challengeRoundName(count)}<small>Rivales Nv.${challengeRoundLevel(t,round)}</small></h3><div class="tournament-matches" style="height:${firstCount*slot}px">${Array.from({length:count},(_,i)=>match(t.rounds[round]?.matches[i],round,i)).join('')}${links}${inlets}</div></section>`;
   }).join('');
-  const bronze=t.kind==='tournament'?`<section class="tournament-bronze"><h3>Tercer puesto · Nv.${challengeRoundLevel(t,totalRounds-2)-10}</h3><article class="challenge-match ${t.bronze===next?'current-match':''}">${[t.bronze?.a??null,t.bronze?.b??null].map((id,n)=>entry(id,`Perdedor semifinal ${n+1}`,t.bronze?.winner)).join('')}</article></section>`:'';
+  const bronze=t.kind==='tournament'?`<section class="tournament-bronze"><h3>Tercer puesto · Nv.${challengeRoundLevel(t,totalRounds-2)-10}</h3><article class="challenge-match ${t.bronze===next?'current-match':''}">${[t.bronze?.a??null,t.bronze?.b??null].map((id,n)=>entry(id,`Perdedor semifinal ${n+1}`,t.bronze?.winner,challengeRoundLevel(t,totalRounds-2)-10)).join('')}</article></section>`:'';
   return `<div class="bracket-toolbar" role="group" aria-label="Vista del cuadro"><button class="btn blue" id="bracket-fit" aria-pressed="true">Ver entero</button><button class="btn gray" id="bracket-detail" aria-pressed="false">Ampliar</button></div><p class="bracket-hint">Tu equipo en azul · ✓ Ganador</p><div class="tournament-viewport is-fit" role="region" aria-label="Cuadro eliminatorio del torneo" tabindex="0"><div class="tournament-frame"><div class="tournament-canvas"><div class="challenge-bracket tournament-tree">${rounds}</div>${bronze}</div></div></div>`;
 }
 
@@ -8449,7 +8462,7 @@ function screenChallengeBracket() {
   const t=meta.challenge;if(!t)return screenChallenges();
   const playerTeam=challengePlayerTeam(t),next=challengeCurrentMatch(t);
   const enemyIndex=next?(next.a===0?next.b:next.a):null;
-  const enemyTeam=next?t.entrants[enemyIndex].members.map(id=>makeChar(id,challengeEnemyLevel(t),false,true)):[];
+  const enemyTeam=next?t.entrants[enemyIndex].members.map(id=>makeEnemy(id,challengeEnemyLevel(t))):[];
   const name=t.kind==='legends'?'Batalla de Leyendas':'Torneo';
   const round=t.bronze?'Tercer puesto':t.rounds[t.stage].name;
   const totalRounds=Math.log2(t.entrants.length);
@@ -8461,7 +8474,7 @@ function screenChallengeBracket() {
       <div id="challenge-fight-view">
         ${next?`<section class="challenge-next"><div class="challenge-duel">${challengeVersusTeamHTML(playerTeam,'Tu equipo',true)}<span class="challenge-vs" aria-hidden="true">VS</span>${challengeVersusTeamHTML(enemyTeam,'Rivales')}</div>
           <button class="btn blue" id="challenge-fight">⚔️ ${t.bronze?'Luchar por el tercer puesto':'Luchar · '+round}</button>
-          <details class="challenge-rules"><summary>Reliquias de los rivales</summary>${t.entrants[enemyIndex].members.map(id=>`<article class="challenge-rival-relic"><h3>${esc(CHARS[id].name)}</h3>${relicDetailsHTML(RELICS['relic_'+baseFormOf(id)])}</article>`).join('')}</details></section>`:''}
+          <details class="challenge-rules"><summary>Reliquias de los rivales</summary>${t.entrants[enemyIndex].members.map(id=>`<article class="challenge-rival-relic"><h3>${esc(CHARS[enemyFormAt(id,challengeEnemyLevel(t))].name)}</h3>${relicDetailsHTML(RELICS['relic_'+baseFormOf(id)])}</article>`).join('')}</details></section>`:''}
         ${t.finished?`<div class="challenge-result" role="status"><span class="challenge-result-emblem" aria-hidden="true">${t.placement===1?'🏆':t.placement===2?'🥈':t.placement===3?'🥉':'⚓'}</span><h3>${challengePlacementText(t)}</h3><p>${t.reward?'🧭 +'+t.reward.toLocaleString('es')+' Log Poses añadidos a tu cuenta.':t.pendingRelics.length?'Elige tu reliquia de campeón.':t.relicReward?'🏺 '+esc(RELICS[t.relicReward].name)+' obtenida.':'La próxima victoria te espera.'}</p></div>`:''}
         ${t.pendingRelics.length?`<div class="relic-grid">${t.pendingRelics.map(id=>`<article class="relic-card">${relicDetailsHTML(RELICS[id])}<button class="btn gold" data-claim-relic="${id}">ELEGIR</button></article>`).join('')}</div>`:''}
       </div>
