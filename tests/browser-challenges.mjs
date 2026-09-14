@@ -46,7 +46,7 @@ try{
  await page.screenshot({path:'outputs/challenges/selection-desktop.png',fullPage:true});
  await page.locator('#challenge-start').click();
  assert.equal(await page.locator('.tournament-tree .challenge-match').count(),7);
- await page.reload({waitUntil:'domcontentloaded'});await page.locator('#mode-challenge').click();await page.locator('#challenge-resume').click();
+ await page.reload({waitUntil:'domcontentloaded'});await page.locator('#mode-challenge').click();await page.locator('[data-challenge="legends"]').click();
  await page.locator('#challenge-fight').click();
  await page.evaluate(()=>{clearTimeout(battle.timer);battle.waiting=true;});
  assert.equal(await page.locator('.fcard:visible').count(),4);
@@ -67,9 +67,8 @@ try{
  await winFight();await page.locator('#challenge-fight').click();await winFight();await page.locator('#challenge-fight').click();await winFight();
  assert.equal(await page.locator('[data-claim-relic]').count(),3);
  await page.screenshot({path:'outputs/challenges/reward-mobile.png',fullPage:true});
- await page.locator('[data-claim-relic="relic_shanks"]').click();await page.locator('#challenge-equip').click();
- assert.equal(await page.locator('[data-equip-relic]').count(),0);
- await page.keyboard.press('Escape');
+ await page.locator('[data-claim-relic="relic_shanks"]').click();
+ assert.equal(await page.locator('#challenge-equip').count(),0);
  await page.locator('#btn-back').click();await page.locator('#btn-back').click();
  await page.locator('#btn-inventory').click();await page.locator('#inv-q').fill('shanks');
  await page.locator('.btn-info-inv[data-id="shanks"]').click();

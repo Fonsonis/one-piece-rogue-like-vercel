@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {combatHarness} from './balance-harness.mjs';
 function harness(){
- const h=combatHarness();h.exec(`accountLevel=()=>35;screenChallengeBracket=()=>{};maxStartLvlCap=()=>100;meta.roster=['luffy','zoro','shanks','roger'];meta.charUpgrades={luffy:95};`);return h;
+ const h=combatHarness();h.exec(`accountLevel=()=>35;screenChallengeBracket=()=>{};maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.roster=['luffy','zoro','shanks','roger'];meta.charUpgrades={luffy:95};`);return h;
 }
 function finish(h,outcomes){for(const win of outcomes)h.exec(`endChallengeBattle(${win});`);}
 test('sixteen entrants, a real bronze match and exactly one placement payout',()=>{
