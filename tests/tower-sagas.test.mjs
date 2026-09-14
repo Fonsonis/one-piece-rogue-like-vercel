@@ -13,8 +13,8 @@ test('tower opponents and bosses never exceed the furthest unlocked saga',()=>{
   tower={floor:${floor}};`);
   const expected=JSON.parse(h.exec(`JSON.stringify(Object.keys(CHARS).filter(id=>{
    const index=SAGAS.findIndex(s=>s.id===CHARS[id].saga);
-   return index>=0&&index<=${saga}&&(${floor}%5===0?CHARS[id].boss:!BASE_OF[id]);
-  }))`));
+   return !BASE_OF[id]&&index>=0&&index<=${saga}&&(${floor}%5!==0||CHARS[id].boss);
+  }).map(id=>enemyFormAt(id,13+${floor}*2+(${floor}%5===0?2:0))))`));
   assert.ok(expected.length>0);
   const offered=expected.map((_,i)=>h.exec(`Math.random=()=>${(i+.5)/expected.length};towerNextBattle();encounter.enemy.id;`));
   assert.deepEqual(offered,expected);
@@ -32,6 +32,6 @@ test('tower limit follows global progress regardless of selected difficulty, mod
  for(const mode of ['classic','nuzlocke'])for(const diff of [1,2,3,4,5]){
   h.exec(`storyMode='${mode}';selectedDiff=${diff};run={saga:0,mode:'${mode}',diff:${diff}};towerNextBattle();`);
   assert.equal(h.exec('SAGAS.findIndex(s=>s.id===CHARS[enemy.id].saga)<=3'),true);
-  assert.equal(h.exec('enemy.id'),h.exec('Object.keys(CHARS).filter(id=>CHARS[id].boss&&SAGAS.slice(0,4).some(s=>s.id===CHARS[id].saga)).at(-1)'));
+  assert.equal(h.exec('enemy.id'),h.exec('enemyFormAt(Object.keys(CHARS).filter(id=>!BASE_OF[id]&&CHARS[id].boss&&SAGAS.slice(0,4).some(s=>s.id===CHARS[id].saga)).at(-1),25)'));
  }
 });
