@@ -32,11 +32,11 @@
     safe(()=>{
       const heroes=document.querySelectorAll('.char-sheet-hero'),hero=heroes[heroes.length-1];
       const stage=hero?.querySelector('.char-sheet-sprite');
-      const id=stage?.dataset.character;if(!id||!CHARS[id]||hero.querySelector('.ultimate-preview-button'))return;
+      const id=stage?.dataset.character;if(!id||!CHARS[id]||hero.dataset.phaseLocked==='true'||hero.querySelector('.ultimate-preview-button'))return;
       const f={id,lvl:typeof fOrId==='object'?fOrId.lvl:startLvlOf(fOrId)};
       const button=document.createElement('button');button.type='button';button.className='ultimate-preview-button';
       button.textContent='✦ Ver ultimate';button.setAttribute('aria-label',`Ver ultimate de ${CHARS[id].name}`);
-      button.onclick=()=>safe(()=>UltimateFX.play({profile:profileFor(f,true),source:stage,owner:hero,preview:true}));
+      button.onclick=()=>safe(()=>{if(hero.isConnected&&hero.dataset.phaseLocked!=='true')UltimateFX.play({profile:profileFor(f,true),source:stage,owner:hero,preview:true});});
       hero.appendChild(button);
     });
     return result;

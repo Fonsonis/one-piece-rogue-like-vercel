@@ -44,7 +44,7 @@ try {
  await page.screenshot({path:'outputs/challenges/equipo-mobile.png',fullPage:true});
  await page.locator('#challenge-start').click();
  assert.deepEqual(await page.evaluate(()=>meta.characterUsage),{shanks:9,roger:4,zoro:2});
- await page.reload();await page.locator('#mode-challenge').click();await page.locator('#challenge-resume').click();
+ await page.reload();await page.locator('#mode-challenge').click();await page.locator('[data-challenge="legends"]').click();
  assert.equal(await page.evaluate(()=>meta.characterUsage.shanks),9);
  await page.evaluate(()=>{finishChallenge(0);screenStarter(0,0);});
  await page.locator('.empty-slot').first().click();

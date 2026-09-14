@@ -105,3 +105,10 @@ html[data-theme="dark"] .char-sheet .char-sheet-hero { background:linear-gradien
 .char-sheet .sheet-phase-arrow:disabled { opacity:.3; cursor:default; }
 .char-sheet .sheet-phase-caption { margin:12px 0 4px; color:var(--ink); font:650 12px/1.5 system-ui,sans-serif; }
 @media(max-width:600px) { .char-sheet .sheet-phase-nav { top:95px; } }
+.char-sheet.phase-locked .char-sheet-hero { background:#15252e!important; border-color:#485964!important; }
+.char-sheet.phase-locked .char-sheet-sprite { filter:brightness(0)!important; opacity:.65; }
+.char-sheet.phase-locked .char-sheet-sprite .dex-sprite { animation:none!important; }
+.char-sheet.phase-locked .platform, .char-sheet.phase-locked .char-sheet-hero > div:last-of-type { visibility:hidden; }
+.char-sheet.phase-locked .sheet-phase-caption { color:#e0e8ee; }
+.sheet-locked-notice { margin:18px 0; padding:18px; border:1px solid var(--sheet-line); border-radius:10px; background:var(--sheet-card); text-align:center; }
+.sheet-locked-notice h3 { margin:0 0 8px; font:750 18px/1.4 system-ui,sans-serif; }

@@ -109,3 +109,67 @@ html[data-theme="dark"] .challenge-nakama-picker .btn:disabled { opacity:1; colo
   .is-fit .bracket-entry > span:not(.bracket-won) { -webkit-line-clamp:1; }
   .is-fit .bracket-you { font-size:12px; }
 }
+
+/* One clear task at a time: matchup first, the complete draw in its own view. */
+#app .panel.challenge-arena { max-width:960px; padding:24px; }
+.challenge-arena { --arena-accent:#36758b; --arena-soft:#e4eff1; }
+#app .challenge-panel #challenge-title:focus { outline:none; }
+.challenge-arena.legends-arena { --arena-accent:#967022; --arena-soft:#f3ecd9; }
+.challenge-arena-header { display:flex; justify-content:space-between; align-items:center; gap:16px; padding-bottom:18px; border-bottom:1px solid #91aaa960; }
+.challenge-eyebrow { display:block; margin-bottom:6px; color:var(--arena-accent); font:750 11px/1.5 system-ui,sans-serif; letter-spacing:.12em; }
+#app .challenge-arena .challenge-arena-header h2 { margin:0; font-size:28px; }
+.challenge-round-badge { border:1px solid var(--arena-accent); border-radius:20px; padding:6px 12px; color:var(--arena-accent); font-weight:700; white-space:nowrap; }
+.challenge-progress { list-style:none; display:flex; gap:8px; padding:16px 0; margin:0; }
+.challenge-progress li { display:flex; align-items:center; gap:6px; flex:1; color:var(--ink); opacity:.55; font-size:12px; }
+.challenge-progress li > span { display:grid; place-items:center; width:24px; height:24px; flex:none; border:1px solid currentColor; border-radius:50%; }
+.challenge-progress li[aria-current], .challenge-progress li.complete { opacity:1; color:var(--arena-accent); font-weight:750; }
+.challenge-progress li[aria-current] > span { background:var(--arena-accent); color:#fff; }
+.challenge-view-tabs { display:grid; grid-template-columns:1fr 1fr; gap:4px; border-radius:10px; background:var(--paper-dark); padding:4px; margin-bottom:18px; }
+#app .challenge-view-tabs .btn { margin:0; border:0; box-shadow:none; color:var(--ink); background:transparent; border-radius:7px; }
+#app .challenge-view-tabs .btn[aria-pressed="true"] { background:var(--paper); color:var(--arena-accent); box-shadow:0 2px 6px #10253318; }
+.challenge-arena .challenge-next { border:0; padding:0; background:transparent; }
+.challenge-duel { display:grid; grid-template-columns:minmax(0,1fr) 36px minmax(0,1fr); align-items:stretch; gap:12px; }
+.challenge-contender { min-width:0; border:1px solid #91aaa960; border-radius:12px; padding:14px; background:var(--paper); text-align:center; }
+.challenge-contender.own-contender { border-color:var(--arena-accent); background:var(--arena-soft); }
+#app .challenge-contender h3 { margin:0 0 14px; text-transform:uppercase; font-size:12px; letter-spacing:.1em; }
+.challenge-contender-crew { display:flex; justify-content:center; gap:16px; }
+.challenge-contender figure { flex:1; min-width:0; margin:0; }
+.challenge-portrait { display:grid; place-items:center; min-height:115px; background:radial-gradient(ellipse at center,#fff6,transparent 70%); }
+.challenge-contender figcaption { display:flex; flex-direction:column; gap:4px; margin-top:8px; }
+.challenge-contender figcaption strong { overflow-wrap:anywhere; font-size:15px; }
+.challenge-contender figcaption span { opacity:.75; font-size:13px; }
+.challenge-vs { align-self:center; text-align:center; color:var(--arena-accent); font:850 17px/1 system-ui,sans-serif; font-style:italic; }
+#app .challenge-arena #challenge-fight { display:block; width:100%; margin:18px 0 0; min-height:52px; border-radius:8px; background:var(--arena-accent); color:#fff; }
+.challenge-arena .challenge-rules { border:0; margin:10px 0 0; }
+.challenge-arena .challenge-rules summary { text-align:center; font-size:12px!important; opacity:.8; }
+.challenge-arena-footer { margin-top:16px; padding-top:12px; border-top:1px solid #91aaa940; display:flex; justify-content:center; }
+#app .challenge-arena-footer #challenge-abandon { font-size:12px; background:transparent; border:0; box-shadow:none; opacity:.75; }
+.challenge-arena .challenge-result { border:0; margin:0; padding:22px; text-align:center; background:var(--arena-soft); border-radius:12px; }
+.challenge-result-emblem { font-size:48px; }
+.challenge-arena .bracket-toolbar { justify-content:center; }
+#app .challenge-arena .bracket-hint { text-align:center; margin:6px 0 12px; font-size:12px; }
+html[data-theme="dark"] .challenge-arena { --arena-accent:#84c8e0; --arena-soft:#254754; }
+html[data-theme="dark"] .challenge-arena.legends-arena { --arena-accent:#ebc66c; --arena-soft:#403b29; }
+html[data-theme="dark"] #app .challenge-arena #challenge-fight { color:#172c35; }
+@media(max-width:540px) {
+  #app .panel.challenge-arena { padding:14px; }
+  .challenge-arena-header { flex-wrap:wrap; gap:10px; padding-bottom:12px; }
+  #app .challenge-arena .challenge-arena-header h2 { font-size:23px; }
+  .challenge-round-badge { font-size:12px; padding:4px 10px; }
+  .challenge-progress { gap:4px; padding:12px 0; }
+  .challenge-progress li { flex-direction:column; text-align:center; font-size:10px; gap:4px; }
+  .challenge-duel { grid-template-columns:minmax(0,1fr) 24px minmax(0,1fr); gap:6px; }
+  .challenge-contender { padding:10px 6px; }
+  .challenge-contender-crew { flex-direction:column; gap:14px; }
+  .challenge-contender figure + figure { padding-top:10px; border-top:1px solid #91aaa940; }
+  .challenge-portrait { min-height:84px; }
+  .challenge-portrait .dex-sprite { max-width:76px!important; max-height:76px!important; }
+  .challenge-contender figcaption strong { font-size:13px; }
+  #app .challenge-contender h3 { font-size:10px; margin-bottom:8px; }
+  #app .challenge-view-tabs .btn { font-size:12px; padding:8px 4px; }
+  .legends-arena .challenge-contender figure { display:grid; grid-template-columns:48px minmax(0,1fr); gap:4px; align-items:center; text-align:left; }
+  .legends-arena .challenge-portrait { min-height:64px; }
+  .legends-arena .challenge-portrait .dex-sprite { width:48px!important; height:48px!important; }
+  .legends-arena .challenge-contender figcaption { margin:0; }
+  .legends-arena .challenge-contender figcaption strong { font-size:12px; }
+}

@@ -18,27 +18,27 @@ try {
  assert.equal(await page.locator('.tournament-tree .challenge-match').count(),15);
  assert.equal(await page.locator('.tournament-link').count(),7);
  const initial=await page.evaluate(()=>JSON.stringify(meta.challenge.entrants));
- await page.locator('.tournament-viewport').scrollIntoViewIfNeeded();
+ await page.locator('#challenge-tab-draw').click();await page.locator('.tournament-viewport').scrollIntoViewIfNeeded();
  await page.screenshot({path:'outputs/challenges/bracket16-desktop.png'});
  for(const [stage,level] of [[0,65],[1,80],[2,95],[3,110]]) {
-  assert.match(await page.locator('.challenge-next > p').innerText(),new RegExp('Nv.'+level));
+  assert.match(await page.locator('.challenge-contender:not(.own-contender)').innerText(),new RegExp('Nv. '+level));
   assert.equal(await page.locator('.tournament-round').nth(stage).locator('.current-match').count(),1);
-  await page.reload();await page.locator('#mode-challenge').click();await page.locator('#challenge-resume').click();
+  await page.reload();await page.locator('#mode-challenge').click();await page.locator('[data-challenge="tournament"]').click();
   assert.equal(await page.evaluate(()=>JSON.stringify(meta.challenge.entrants)),initial);
-  assert.match(await page.locator('.challenge-next > p').innerText(),new RegExp('Nv.'+level));
+  assert.match(await page.locator('.challenge-contender:not(.own-contender)').innerText(),new RegExp('Nv. '+level));
   if(stage<3)await page.evaluate(()=>endChallengeBattle(true));
  }
  await page.setViewportSize({width:390,height:844});await page.evaluate(()=>{meta.settings.theme='dark';applyDisplayPreferences();});
- await page.locator('#bracket-fit').click();
+ await page.locator('#challenge-tab-draw').click();await page.locator('#bracket-fit').click();
  const fit=await page.locator('.tournament-viewport').evaluate(el=>{
   const outer=el.getBoundingClientRect(),canvas=el.querySelector('.tournament-canvas').getBoundingClientRect();
   return {fits:canvas.right<=outer.right&&canvas.bottom<=outer.bottom,height:outer.height};
  });
  assert.ok(fit.fits);assert.ok(fit.height<844*.7);
- await page.locator('.tournament-viewport').scrollIntoViewIfNeeded();
+ await page.locator('#challenge-tab-draw').click();await page.locator('.tournament-viewport').scrollIntoViewIfNeeded();
  await page.screenshot({path:'outputs/challenges/bracket16-entero-mobile.png'});
  await page.locator('#bracket-detail').click();
- await page.locator('.tournament-viewport').scrollIntoViewIfNeeded();
+ await page.locator('#challenge-tab-draw').click();await page.locator('.tournament-viewport').scrollIntoViewIfNeeded();
  await page.locator('.tournament-viewport').evaluate(el=>{el.scrollLeft=el.scrollWidth;el.scrollTop=190;});
  const headerOffset=await page.locator('.tournament-round').last().locator('h3').evaluate(el=>({offset:el.getBoundingClientRect().top-document.querySelector('.tournament-viewport').getBoundingClientRect().top,position:getComputedStyle(el).position}));
  console.log('Round header after scrolling:',headerOffset);
@@ -49,13 +49,13 @@ try {
  await page.evaluate(()=>endChallengeBattle(false));assert.match(await page.locator('.challenge-result').innerText(),/Puesto 2/);
  assert.equal(await page.evaluate(()=>meta.logPoses),5000);
  await page.evaluate(()=>{startChallenge('tournament',['zoro']);endChallengeBattle(true);endChallengeBattle(true);endChallengeBattle(false);});
- assert.match(await page.locator('.challenge-next > p').innerText(),/Nv.85/);
+ assert.match(await page.locator('.challenge-contender:not(.own-contender)').innerText(),/Nv. 85/);
  assert.equal(await page.locator('.tournament-bronze .current-match').count(),1);
  await page.evaluate(()=>endChallengeBattle(true));assert.equal(await page.evaluate(()=>meta.logPoses),7500);
  await page.evaluate(()=>{startChallenge('legends',['shanks','roger']);});
  assert.equal(await page.locator('.tournament-round').count(),3);
  assert.equal(await page.evaluate(()=>meta.challenge.entrants.flatMap(e=>e.members).length),16);
- await page.locator('.tournament-viewport').scrollIntoViewIfNeeded();
+ await page.locator('#challenge-tab-draw').click();await page.locator('.tournament-viewport').scrollIntoViewIfNeeded();
  await page.screenshot({path:'outputs/challenges/bracket-legends-mobile.png'});
  // UI sorting must match the values shown in character sheets, not catalog constants.
  await page.evaluate(()=>{finishChallenge(0);meta.charUpgrades={luffy:9,shanks:0,zoro:0};meta.upgrades={zoro:{atk:90}};meta.dex=['luffy','zoro','shanks'];screenHome();});

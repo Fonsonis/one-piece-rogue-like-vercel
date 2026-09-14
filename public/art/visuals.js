@@ -154,13 +154,14 @@
       const sheets = document.querySelectorAll('.char-sheet-hero');
       const hero = sheets[sheets.length - 1];
       const sprite = hero?.querySelector('.dex-sprite');
-      if (!sprite || hero.querySelector('.art-preview-button')) return;
+      if (!sprite || hero.dataset.phaseLocked === 'true' || hero.querySelector('.art-preview-button')) return;
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'art-preview-button';
       button.textContent = '▶ Ver ataque';
       button.setAttribute('aria-label', `Ver animación de ataque de ${CHARS[sprite.dataset.character].name}`);
       button.onclick = () => safe(() => {
+        if (!hero.isConnected || hero.dataset.phaseLocked === 'true') return;
         animateSprite(sprite, 'attack', .75);
         burst(hero.querySelector('.char-sheet-sprite'), CHARS[sprite.dataset.character].types[0], false);
       });

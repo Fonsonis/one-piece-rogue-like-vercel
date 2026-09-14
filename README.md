@@ -57,7 +57,11 @@ Desafíos muestra Torneo y Batalla de Leyendas en dos tarjetas horizontales, tam
 
 **Más usados** ordena los personajes por partidas iniciadas en historia, Torre Marine y desafíos. Las evoluciones comparten contador; elegir, guardar un equipo o reanudar un torneo no suma usos. Una nueva isla o un reintento sí suma uno. El contador comienza con esta actualización y se conserva en el guardado y las copias JSON; los guardados anteriores siguen siendo compatibles.
 
-El cuadro del torneo se abre en **Ver entero**, ajustado al ancho y alto de la pantalla. **Ampliar** recupera el tamaño de lectura y permite desplazarse por los cruces. Incluye las rondas futuras y el tercer puesto, también para torneos antiguos.
+Torneo y Leyendas abren en **Próximo combate**, con los equipos enfrentados, sus niveles, la ronda y un botón principal para luchar. **Cuadro completo** muestra todas las rondas y el tercer puesto, ajustados al ancho y alto de la pantalla; **Ampliar** permite leer y recorrer los cruces. Las reliquias rivales quedan dentro de un desplegable. La tarjeta de cada modo permite continuar una partida o recuperar un premio pendiente, sin botones adicionales de resultado ni colección de reliquias en el menú. Las reliquias se siguen equipando desde las fichas de los personajes.
+
+Los nuevos sorteos solo incluyen rivales de la saga más avanzada desbloqueada o de las anteriores, aunque la cuenta tenga personajes de sagas posteriores. Los Gears de Luffy respetan su aparición en historia. Si no hay suficientes legendarios distintos para 16 personajes, Leyendas usa 8 personajes (4 parejas). Los cuadros ya guardados conservan sus participantes, resultados y premios.
+
+Las fichas muestran las fases cuyo nivel base todavía no se ha alcanzado como siluetas oscuras, con candado y el requisito de nivel. Sus estadísticas, movimientos y botones de probar ataque o definitiva permanecen ocultos hasta desbloquearlas. Las flechas permiten volver a las fases disponibles; las fichas de luchadores presentes en combate conservan su información real.
 
 ## Jugar en local
 

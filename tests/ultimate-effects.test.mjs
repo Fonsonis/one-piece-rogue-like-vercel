@@ -166,7 +166,7 @@ test('invalid or unavailable sprite textures leave the original visible and rele
 
 test('Luffy sheet previews use the ultimate of the displayed Gear',()=>{
  const h=integrationHarness(true);
- h.exec(`let previewButton;const stage={dataset:{character:'luffy'}},hero={querySelector(selector){return selector==='.char-sheet-sprite'?stage:null;},appendChild(button){previewButton=button;}};
+ h.exec(`let previewButton;const stage={dataset:{character:'luffy'}},hero={dataset:{},isConnected:true,querySelector(selector){return selector==='.char-sheet-sprite'?stage:null;},appendChild(button){previewButton=button;}};
  document.querySelectorAll=()=>[hero];document.createElement=()=>({setAttribute(){}});
  `);
  // Install a no-op sheet renderer first so this test exercises only the sheet adapter.
@@ -175,4 +175,6 @@ test('Luffy sheet previews use the ultimate of the displayed Gear',()=>{
   h.exec(`stage.dataset.character='${id}';showCharModal({id:'${id}',lvl:100});previewButton.onclick();`);
   assert.equal(h.exec('effects.at(-1).technique'),h.exec(`getUltimateMove({id:'${id}',lvl:(CHARS['${id}'].evo?.lvl||101)-1}).name`));
  }
+ h.exec(`hero.dataset.phaseLocked='true';previewButton=null;showCharModal('luffy5');`);
+ assert.equal(h.exec('previewButton'),null);
 });

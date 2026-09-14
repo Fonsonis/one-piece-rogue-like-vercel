@@ -25,6 +25,10 @@ function characterForms(id) {
   }
   return forms;
 }
+function characterPhaseUnlocked(id) {
+  const phase = characterForms(id).find(form => form.id === id);
+  return !!phase && phase.level <= startLvlOf(id);
+}
 function dexBaseIds(ids=[]) { return [...new Set(ids.filter(id=>CHARS[id]).map(baseFormOf))]; }
 function dexEntrySeen(id) { return characterForms(id).some(form=>meta.dex.includes(form.id)); }
 function dexFilteredBases(state) {
@@ -5128,6 +5132,7 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null) {
   const previewId=forms.some(form=>form.id===selectedForm)?selectedForm:forms[0].id;
   const phaseIndex=forms.findIndex(form=>form.id===previewId);
   const phase=forms[phaseIndex];
+  const phaseLocked = !isLive && !characterPhaseUnlocked(previewId);
   const f = isLive ? migrateFighter(fOrId, !!battle?.eTeam.includes(fOrId)) : applyUpgrades(makeChar(previewId, startLvlOf(fOrId), false, true));
   const c = CHARS[f.id];
   const lore = (typeof LORE !== 'undefined' && LORE) ? (LORE[f.id] || LORE[baseFormOf(f.id)] || {}) : {};
@@ -5163,17 +5168,19 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null) {
   const previousFocus=document.activeElement;
   const closeSheet = existingOverlay?.querySelector('#sheet-close')?.onclick || (() => {ov.remove();if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});});
   ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal char-sheet" role="dialog" aria-modal="true" aria-label="Ficha de ${collectionText(c.name)}">
-    <h2><span style="font-size:26px;vertical-align:middle;">${charIcon(f.id, 34)}</span> ${c.name}${rarityTag}${fusionTag} <small>Nv.${f.lvl}</small></h2>
-    <div class="char-sheet-hero" style="text-align:center;padding:12px;margin:8px 0 12px;background:radial-gradient(ellipse at center, rgba(232, 200, 50, 0.22) 0%, rgba(0,0,0,0.35) 75%);border:2px solid var(--gold);border-radius:8px;position:relative;">
+  ov.innerHTML = `<div class="modal char-sheet ${phaseLocked?'phase-locked':''}" role="dialog" aria-modal="true" aria-label="Ficha de ${collectionText(c.name)}">
+    <h2><span style="font-size:26px;vertical-align:middle;">${phaseLocked?'🔒':charIcon(f.id, 34)}</span> ${c.name}${phaseLocked?'':rarityTag+fusionTag} <small>${phaseLocked?'Bloqueada':'Nv.'+f.lvl}</small></h2>
+    <div class="char-sheet-hero" data-phase-locked="${phaseLocked}" style="text-align:center;padding:12px;margin:8px 0 12px;background:radial-gradient(ellipse at center, rgba(232, 200, 50, 0.22) 0%, rgba(0,0,0,0.35) 75%);border:2px solid var(--gold);border-radius:8px;position:relative;">
       <div class="char-sheet-sprite" data-character="${f.id}" style="display:inline-block;filter:drop-shadow(3px 5px 8px rgba(0,0,0,0.6));">
         ${charIcon(f.id, 90)}
       </div>
       ${!isLive&&forms.length>1?`<nav class="sheet-phase-nav" aria-label="Fases de ${esc(CHARS[forms[0].id].name)}"><button type="button" class="sheet-phase-arrow" id="sheet-phase-prev" ${phaseIndex===0?'disabled':''} aria-label="Fase anterior${phaseIndex>0?': '+esc(CHARS[forms[phaseIndex-1].id].name):''}">‹</button><button type="button" class="sheet-phase-arrow" id="sheet-phase-next" ${phaseIndex===forms.length-1?'disabled':''} aria-label="Fase siguiente${phaseIndex<forms.length-1?': '+esc(CHARS[forms[phaseIndex+1].id].name):''}">›</button></nav>`:''}
       <div class="platform" style="width:120px;height:24px;margin:-10px auto 0;background:radial-gradient(ellipse at center, #7ec850 0%, #4aa557 70%, transparent 72%);border-radius:50%;box-shadow:inset 0 0 0 2px rgba(217, 131, 46, 0.35);"></div>
       <div style="margin-top:6px;font-size:9px;color:var(--gold);"><b>Rareza:</b> ${'⭐'.repeat(c.rareza || 1)} (${c.rareza || 1} Estrellas)</div>
-      ${!isLive&&forms.length>1?`<p class="sheet-phase-caption" role="status">Fase ${phaseIndex+1} de ${forms.length} · ${phaseIndex===0?'Forma base':esc(c.name)}<br>${phase.level>startLvlOf(f.id)?`Vista previa · Requiere Nv. ${phase.level} base y en partida`:phaseIndex?'Desbloqueada · Requiere Nv. '+phase.level+' en partida':''}</p>`:''}
+      ${!isLive&&forms.length>1?`<p class="sheet-phase-caption" role="status">Fase ${phaseIndex+1} de ${forms.length} · ${phaseIndex===0?'Forma base':esc(c.name)}<br>${phaseLocked?`🔒 Bloqueada · Requiere nivel base ${phase.level}`:phaseIndex?'Desbloqueada · Requiere Nv. '+phase.level+' en partida':''}</p>`:''}
     </div>
+    ${phaseLocked?`<section class="sheet-locked-notice"><h3>Fase bloqueada</h3><p>Sube el nivel base de ${esc(CHARS[forms[0].id].name)} a <strong>${phase.level}</strong> para descubrir esta forma y probar sus ataques.</p><p>Tu nivel base: <strong>${startLvlOf(f.id)}</strong></p></section>`:''}
+    ${phaseLocked?'':`
     ${typeBadges(fTypes)}
     ${isLive ? xpBarHTML(f) : ''}
     <section class="sheet-section sheet-relic" aria-labelledby="sheet-relic-title">
@@ -5232,6 +5239,7 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null) {
     ${ultMv ? `<div class="sheet-section sheet-ultimate"><b>💥 Habilidad Definitiva — ${ultMv.name}</b><p>${ultMv.type ? `<span class="type-badge" style="background:${TYPES[ultMv.type]?.color || '#888'}">${ultMv.type.toUpperCase()}</span> ` : ''}${ultMv.power ? ultMv.power + ' PWR · ' + Math.round((ultMv.acc || 0.9) * 100) + '% precisión' : 'MOVIMIENTO DEFINITIVO'}</p></div>` : ''}
     ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>${CHARS[c.evo.to].name} requiere nivel base ${c.evo.lvl} y nivel ${c.evo.lvl} en partida. Tu nivel base: ${startLvlOf(f.id)}. ${startLvlOf(f.id) >= c.evo.lvl ? 'Forma desbloqueada.' : 'Puedes seguir subiendo en partida, pero sus ataques se desbloquean al mejorar el nivel base.'}</p></div>` : ''}
     <p class="sheet-desc">${c.desc}</p>
+    `}
     <div class="actions" style="flex-direction:column;gap:6px;">
       ${isLive && (!battle || battle.over) && run && run.team && run.team.includes(f) ? `<button class="btn red small" id="sheet-dismiss-btn" style="width:100%;">🗑️ EXPULSAR DE LA BANDA</button>` : ''}
       <button class="btn gray" id="sheet-close" style="width:100%;">CERRAR</button>
@@ -8184,6 +8192,24 @@ function challengeLevel(kind) {
 function challengePool(kind) {
   return challengeOwnedBases().map(id=>evolutionFormAt(id,startLvlOf(id))).filter(id=>kind!=='legends'||CHARS[id].rareza===5);
 }
+function challengeSagaLimit(progress = meta) {
+  let highest = 0;
+  SAGAS.forEach((_,i) => { if (sagaUnlocked(i,progress)) highest = i; });
+  return highest;
+}
+function challengeOpponentPool(kind, picked = []) {
+  const limit = challengeSagaLimit(), excluded = new Set(picked.map(baseFormOf));
+  const available = id => {
+    // The catalog groups every Gear under East Blue; rivals follow its story debut.
+    const saga = ({luffy2:'water7',luffy3:'water7',luffy4:'dressrosa',luffy5:'wano'})[id] || CHARS[id].saga;
+    const index = SAGAS.findIndex(s => s.id === saga);
+    return index >= 0 && index <= limit;
+  };
+  return Object.keys(CHARS).filter(id => !BASE_OF[id] && !excluded.has(id) && available(id)).map(id => {
+    if (kind !== 'legends') return id;
+    return characterForms(id).map(f => f.id).filter(form => CHARS[form].rareza === 5 && available(form)).at(-1);
+  }).filter(Boolean);
+}
 function shuffleChallenge(list) {
   const out=[...list];
   for(let i=out.length-1;i>0;i--){const j=rnd(0,i);[out[i],out[j]]=[out[j],out[i]];}
@@ -8200,19 +8226,15 @@ function startChallenge(kind,picked) {
   if (!['tournament','legends'].includes(kind)||!challengeCanStart()) return false;
   const count=kind==='legends'?2:1, allowed=challengePool(kind);
   if (!Array.isArray(picked)||picked.length!==count||new Set(picked.map(baseFormOf)).size!==count||picked.some(id=>!allowed.includes(id))) return false;
-  const level=challengeLevel(kind),excluded=new Set(picked.map(baseFormOf));
-  const candidates=Object.keys(CHARS).filter(id=>!BASE_OF[id]&&!excluded.has(id));
-  const opponents=shuffleChallenge(candidates.map(id=>{
-    if(kind!=='legends')return id;
-    const forms=Object.keys(CHARS).filter(form=>baseFormOf(form)===id&&CHARS[form].rareza===5);
-    return forms.at(-1);
-  }).filter(Boolean)).slice(0,16-count);
-  if(opponents.length!==16-count)return false;
+  const level=challengeLevel(kind), candidates=challengeOpponentPool(kind,picked);
+  const size = candidates.length >= 16-count ? 16 : 8;
+  const opponents=shuffleChallenge(candidates).slice(0,size-count);
+  if(opponents.length!==size-count){toast('Necesitas avanzar de saga para reunir suficientes rivales.');return false;}
   const entrants=[{members:[...picked]}];
   for(let i=0;i<opponents.length;i+=count)entrants.push({members:opponents.slice(i,i+count)});
   const seeds=shuffleChallenge(entrants.map((_,i)=>i));
   const matches=[];for(let i=0;i<seeds.length;i+=2)matches.push(challengeMatch(seeds[i],seeds[i+1]));
-  meta.challenge={version:2,kind,level,entrants,stage:0,rounds:[{name:challengeRoundName(matches.length),matches}],finished:false,placement:null,reward:0,pendingRelics:[]};
+  meta.challenge={version:size===16?2:1,kind,level,entrants,stage:0,rounds:[{name:challengeRoundName(matches.length),matches}],finished:false,placement:null,reward:0,pendingRelics:[]};
   recordCharacterUsage(picked);
   saveMeta();screenChallengeBracket();return true;
 }
@@ -8310,18 +8332,18 @@ function claimChallengeRelic(id) {
 }
 function screenChallenges() {
   playMusic('menu');if(accountLevel()<35){toast('🔒 Desafíos requiere nivel de cuenta 35.');return screenHome();}
+  const active = meta.challenge && (!meta.challenge.finished || meta.challenge.pendingRelics?.length) ? meta.challenge : null;
+  const eventButton = (kind,label) => `<button class="btn ${kind==='legends'?'gold':'blue'}" data-challenge="${kind}" ${active&&active.kind!==kind?'disabled':''}>${active?.kind===kind ? (active.finished?'Entrar':'Continuar') : label}</button>`;
   render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← PUERTO</button>
-    <section class="panel challenge-panel"><h2 id="challenge-title" tabindex="-1">🏆 Desafíos</h2>
-    ${meta.challenge?`<button class="btn gold" id="challenge-resume">${meta.challenge.finished?'VER RESULTADO Y RECOMPENSA':'CONTINUAR TORNEO'}</button>`:''}
+    <section class="panel challenge-panel challenge-hub"><h2 id="challenge-title" tabindex="-1">🏆 Desafíos</h2>
     <div class="challenge-events"><article class="challenge-event"><span class="challenge-emblem" aria-hidden="true">🏆</span><h3>Torneo</h3>
-    <span class="challenge-format">1 vs 1 · 16 participantes</span><button class="btn blue" data-challenge="tournament" ${challengeCanStart()?'':'disabled'}>Elegir nakama</button></article>
-    <article class="challenge-event legends"><span class="challenge-emblem" aria-hidden="true">👑</span><h3>Batalla de Leyendas</h3><span class="challenge-format">2 vs 2 · Solo 5★</span><button class="btn gold" data-challenge="legends" ${challengeCanStart()?'':'disabled'}>Formar pareja</button></article></div>
-    <button class="btn gray" id="challenge-relics">🎒 RELIQUIAS (${meta.relics.length})</button></section>`);
-  $('#btn-back').onclick=screenHome;$('#challenge-relics').onclick=showRelicCollection;
-  if(meta.challenge)$('#challenge-resume').onclick=screenChallengeBracket;
-  document.querySelectorAll('[data-challenge]').forEach(el=>el.onclick=()=>screenChallengeSelection(el.dataset.challenge));
+    <span class="challenge-format">1 vs 1 · 16 participantes</span>${eventButton('tournament','Elegir nakama')}</article>
+    <article class="challenge-event legends"><span class="challenge-emblem" aria-hidden="true">👑</span><h3>Batalla de Leyendas</h3><span class="challenge-format">2 vs 2 · Solo 5★</span>${eventButton('legends','Formar pareja')}</article></div></section>`);
+  $('#btn-back').onclick=screenHome;
+  document.querySelectorAll('[data-challenge]').forEach(el=>el.onclick=()=>active?.kind===el.dataset.challenge?screenChallengeBracket():screenChallengeSelection(el.dataset.challenge));
   $('#challenge-title').focus();
 }
+
 function screenChallengeSelection(kind) {
   if(!challengeCanStart()||!['tournament','legends'].includes(kind))return screenChallenges();
   const pool=challengePool(kind), count=kind==='legends'?2:1, picked=Array(count).fill(null);
@@ -8419,26 +8441,46 @@ function challengeBracketHTML(t) {
   return `<div class="bracket-toolbar" role="group" aria-label="Vista del cuadro"><button class="btn blue" id="bracket-fit" aria-pressed="true">Ver entero</button><button class="btn gray" id="bracket-detail" aria-pressed="false">Ampliar</button></div><p class="bracket-hint">Tu equipo en azul · ✓ Ganador</p><div class="tournament-viewport is-fit" role="region" aria-label="Cuadro eliminatorio del torneo" tabindex="0"><div class="tournament-frame"><div class="tournament-canvas"><div class="challenge-bracket tournament-tree">${rounds}</div>${bronze}</div></div></div>`;
 }
 
+
+function challengeVersusTeamHTML(members, label, own = false) {
+  return `<section class="challenge-contender ${own?'own-contender':''}"><h3>${label}</h3><div class="challenge-contender-crew">${members.map(f => `<figure><div class="challenge-portrait">${charIcon(f.id,80)}</div><figcaption><strong>${esc(charName(f))}</strong><span>Nv. ${f.lvl}</span></figcaption></figure>`).join('')}</div></section>`;
+}
 function screenChallengeBracket() {
   const t=meta.challenge;if(!t)return screenChallenges();
-  const playerTeam=challengePlayerTeam(t);
-  const entrant=index=>index===0?playerTeam.map(f=>esc(charName(f))).join(' + '):t.entrants[index].members.map(id=>esc(CHARS[id].name)).join(' + ');
-  const next=challengeCurrentMatch(t), enemyIndex=next?(next.a===0?next.b:next.a):null;
-  render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button><section class="panel challenge-panel"><h2 id="challenge-title" tabindex="-1">${t.kind==='legends'?'👑 Batalla de Leyendas':`🏆 Torneo de ${t.entrants.length}`}</h2>
-    <p><b>Tu equipo:</b> ${playerTeam.map(f=>`${esc(charName(f))} · Nv.${f.lvl}`).join(' + ')}</p>
-    ${next?`<section class="challenge-next"><h3>Próximo combate · ${t.bronze?'Tercer puesto':t.rounds[t.stage].name}</h3><p>${entrant(enemyIndex)} · Rivales Nv.${challengeEnemyLevel(t)}</p>
-      <button class="btn blue" id="challenge-fight">⚔️ ${t.bronze?'LUCHAR POR EL TERCER PUESTO':'SIGUIENTE COMBATE'}</button>
-      <details class="challenge-rules"><summary>Ver las reliquias del rival</summary>${t.entrants[enemyIndex].members.map(id=>`<article class="challenge-rival-relic"><h3>${esc(CHARS[id].name)}</h3>${relicDetailsHTML(RELICS[`relic_${baseFormOf(id)}`])}</article>`).join('')}</details></section>`:''}
-    <p>Los cruces entre rivales de la IA se simulan según la fuerza de sus equipos.</p>
-    ${challengeBracketHTML(t)}
-    ${t.finished?`<div class="challenge-result" role="status"><h3>${challengePlacementText(t)}</h3><p>${t.reward?`🧭 +${t.reward.toLocaleString('es')} Log Poses añadidos a tu cuenta.`:t.pendingRelics.length?'🏺 Elige tu reliquia de campeón.':t.relicReward?`🏺 Reliquia obtenida: ${esc(RELICS[t.relicReward].name)}`:'Sin premio de Log Poses.'}</p></div>`:`<button class="btn gray" id="challenge-abandon">ABANDONAR TORNEO</button>`}
-    ${t.pendingRelics.length?`<div class="relic-grid">${t.pendingRelics.map(id=>`<article class="relic-card">${relicDetailsHTML(RELICS[id])}<button class="btn gold" data-claim-relic="${id}">ELEGIR</button></article>`).join('')}</div>`:''}
-    ${t.relicReward?'<button class="btn gold" id="challenge-equip">VER RELIQUIA</button>':''}</section>`);
+  const playerTeam=challengePlayerTeam(t),next=challengeCurrentMatch(t);
+  const enemyIndex=next?(next.a===0?next.b:next.a):null;
+  const enemyTeam=next?t.entrants[enemyIndex].members.map(id=>makeChar(id,challengeEnemyLevel(t),false,true)):[];
+  const name=t.kind==='legends'?'Batalla de Leyendas':'Torneo';
+  const round=t.bronze?'Tercer puesto':t.rounds[t.stage].name;
+  const totalRounds=Math.log2(t.entrants.length);
+  render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button>
+    <section class="panel challenge-panel challenge-arena ${t.kind==='legends'?'legends-arena':''}">
+      <header class="challenge-arena-header"><div><span class="challenge-eyebrow">${t.kind==='legends'?'2 CONTRA 2':'1 CONTRA 1'} · ${t.entrants.length} ${t.kind==='legends'?'PAREJAS':'PARTICIPANTES'}</span><h2 id="challenge-title" tabindex="-1">${name}</h2></div><span class="challenge-round-badge">${t.finished?'Finalizado':round}</span></header>
+      <ol class="challenge-progress" aria-label="Progreso del torneo">${Array.from({length:totalRounds},(_,i)=>`<li ${!t.bronze&&i===t.stage?'aria-current="step"':''} class="${i<t.stage?'complete':''}"><span>${i<t.stage?'✓':i+1}</span>${challengeRoundName(t.entrants.length/2**(i+1)).replace(' de final','')}</li>`).join('')}</ol>
+      <nav class="challenge-view-tabs" aria-label="Vista del torneo"><button class="btn" id="challenge-tab-fight" aria-pressed="true" aria-controls="challenge-fight-view">${t.finished?'Resultado':'Próximo combate'}</button><button class="btn" id="challenge-tab-draw" aria-pressed="false" aria-controls="challenge-draw-view">Cuadro completo</button></nav>
+      <div id="challenge-fight-view">
+        ${next?`<section class="challenge-next"><div class="challenge-duel">${challengeVersusTeamHTML(playerTeam,'Tu equipo',true)}<span class="challenge-vs" aria-hidden="true">VS</span>${challengeVersusTeamHTML(enemyTeam,'Rivales')}</div>
+          <button class="btn blue" id="challenge-fight">⚔️ ${t.bronze?'Luchar por el tercer puesto':'Luchar · '+round}</button>
+          <details class="challenge-rules"><summary>Reliquias de los rivales</summary>${t.entrants[enemyIndex].members.map(id=>`<article class="challenge-rival-relic"><h3>${esc(CHARS[id].name)}</h3>${relicDetailsHTML(RELICS['relic_'+baseFormOf(id)])}</article>`).join('')}</details></section>`:''}
+        ${t.finished?`<div class="challenge-result" role="status"><span class="challenge-result-emblem" aria-hidden="true">${t.placement===1?'🏆':t.placement===2?'🥈':t.placement===3?'🥉':'⚓'}</span><h3>${challengePlacementText(t)}</h3><p>${t.reward?'🧭 +'+t.reward.toLocaleString('es')+' Log Poses añadidos a tu cuenta.':t.pendingRelics.length?'Elige tu reliquia de campeón.':t.relicReward?'🏺 '+esc(RELICS[t.relicReward].name)+' obtenida.':'La próxima victoria te espera.'}</p></div>`:''}
+        ${t.pendingRelics.length?`<div class="relic-grid">${t.pendingRelics.map(id=>`<article class="relic-card">${relicDetailsHTML(RELICS[id])}<button class="btn gold" data-claim-relic="${id}">ELEGIR</button></article>`).join('')}</div>`:''}
+      </div>
+      <div id="challenge-draw-view" hidden>${challengeBracketHTML(t)}</div>
+      <footer class="challenge-arena-footer">${!t.finished?'<button class="btn gray" id="challenge-abandon">Abandonar torneo</button>':!t.pendingRelics.length?'<button class="btn blue" id="challenge-again">Jugar de nuevo</button>':''}</footer>
+    </section>`);
   $('#btn-back').onclick=screenChallenges;
-  if(!t.finished){$('#challenge-fight').onclick=playChallengeMatch;$('#challenge-abandon').onclick=()=>modalConfirm('¿Abandonar torneo?','Terminarás este torneo sin premio.',()=>{finishChallenge(0);screenChallenges();});}
+  if(next)$('#challenge-fight').onclick=playChallengeMatch;
+  if(!t.finished)$('#challenge-abandon').onclick=()=>modalConfirm('¿Abandonar torneo?','Terminarás este torneo sin premio.',()=>{finishChallenge(0);screenChallenges();});
+  if($('#challenge-again'))$('#challenge-again').onclick=()=>screenChallengeSelection(t.kind);
   document.querySelectorAll('[data-claim-relic]').forEach(el=>el.onclick=()=>{if(claimChallengeRelic(el.dataset.claimRelic))screenChallengeBracket();});
-  if(t.relicReward)$('#challenge-equip').onclick=showRelicCollection;
-  bindChallengeBracket();
+  const switchView = draw => {
+    if (draw === !$('#challenge-draw-view').hidden) return;
+    $('#challenge-fight-view').hidden=draw;$('#challenge-draw-view').hidden=!draw;
+    $('#challenge-tab-fight').setAttribute('aria-pressed',String(!draw));$('#challenge-tab-draw').setAttribute('aria-pressed',String(draw));
+    challengeBracketObserver?.disconnect();challengeBracketObserver=null;
+    if(draw)bindChallengeBracket();
+  };
+  $('#challenge-tab-fight').onclick=()=>switchView(false);$('#challenge-tab-draw').onclick=()=>switchView(true);
   $('#challenge-title').focus();
 }
 

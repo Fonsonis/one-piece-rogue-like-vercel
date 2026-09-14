@@ -21,7 +21,7 @@ test('usage counts actual starts, groups forms, composes with filters and surviv
 
 test('challenge rejection and resume do not inflate usage; each new tournament counts once',()=>{
   const h=combatHarness();
-  h.exec(`accountLevel=()=>35;screenChallengeBracket=()=>{};meta.roster=['luffy','shanks','roger'];`);
+  h.exec(`accountLevel=()=>35;screenChallengeBracket=()=>{};meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.roster=['luffy','shanks','roger'];`);
   assert.equal(h.exec(`startChallenge('legends',['luffy','shanks'])`),false);
   assert.equal(h.exec(`characterUsageCount('shanks')`),0);
   assert.equal(h.exec(`startChallenge('legends',['shanks','roger'])`),true);

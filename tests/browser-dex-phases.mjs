@@ -55,14 +55,17 @@ try {
  await page.locator('.dex-card').click();assert.equal(await page.locator('.char-sheet-sprite').getAttribute('data-character'),'luffy');
  await page.keyboard.press('Escape');await page.locator('#cf-q').fill('chopper');await page.locator('.dex-card').click();
  await page.locator('#sheet-phase-next').click();
- assert.match(await page.locator('.sheet-phase-caption').innerText(),/Vista previa/);
+ assert.match(await page.locator('.sheet-phase-caption').innerText(),/Bloqueada/);
+ assert.equal(await page.locator('.art-preview-button,.ultimate-preview-button,.sheet-stats').count(),0);
  assert.equal(await page.evaluate(()=>startLvlOf('chopper')),5);
  const chopperPhase=await page.locator('.char-sheet-sprite').getAttribute('data-character');
- await page.evaluate(()=>{meta.logPoses=1000;showCharModal('chopper',document.querySelector('.char-sheet').closest('.overlay'),characterForms('chopper')[1].id);});
+ await page.evaluate(()=>{meta.logPoses=10000;meta.charUpgrades.chopper=14;showCharModal('chopper',document.querySelector('.char-sheet').closest('.overlay'));});
  await page.locator('#sheet-upg-btn').click();
- assert.equal(await page.evaluate(()=>startLvlOf('chopper')),6);
+ assert.equal(await page.evaluate(()=>startLvlOf('chopper')),20);
  assert.equal(await page.locator('#sheet-upg-btn').evaluate(el=>el===document.activeElement),true);
+ await page.locator('#sheet-phase-next').click();
  assert.equal(await page.locator('.char-sheet-sprite').getAttribute('data-character'),chopperPhase);
+ assert.equal(await page.locator('.art-preview-button,.ultimate-preview-button').count(),2);
 
  await page.keyboard.press('Escape');
  assert.equal(await page.locator('.char-sheet').count(),0);
@@ -70,6 +73,7 @@ try {
  const catalog=await page.evaluate(async()=>{
    const issues=[];let phases=0;
    for(const base of dexBaseIds(Object.keys(CHARS)).filter(id=>CHARS[id].evo)) {
+     meta.charUpgrades[base]=95;
      showCharModal(base);await Promise.resolve();
      const chain=characterForms(base);
      for(let i=0;i<chain.length;i++) {
