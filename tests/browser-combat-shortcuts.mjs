@@ -49,8 +49,8 @@ try {
  for(const width of [1360,390]) {
   await page.setViewportSize({width,height:900});
   await page.locator('#battle-backpack').scrollIntoViewIfNeeded();
-  const bag=await page.locator('#battle-backpack').boundingBox(),arena=await page.locator('.battle-cols').boundingBox();
-  assert.ok(bag.y+bag.height<=arena.y+1);assert.ok(bag.y>=0&&bag.y<300);
+  const bag=await page.locator('#battle-backpack').boundingBox(),crew=await page.locator('#battle-reserves').boundingBox(),passives=await page.locator('.battle-team-passives').boundingBox();
+  assert.ok(crew.y+crew.height<=bag.y+1);assert.ok(bag.y+bag.height<=passives.y+1);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   await page.screenshot({path:`outputs/combat-shortcuts/battle-top-${width}.png`});
   await page.locator('.battle-team-passives').scrollIntoViewIfNeeded();
@@ -69,5 +69,5 @@ try {
  await page.keyboard.press('r');assert.equal(await page.locator('#mc-yes').count(),0);
  await page.evaluate(()=>{clearTimeout(battle.timer);});
  assert.deepEqual(errors,[]);
- console.log('PASS: R confirms/restarts; numbered routes advance in visual order; dialogs, editing, modifiers and repeat are guarded; horizontal passives and top backpack work at 390/1360px; normal and quick item use heal and consume one unit.');
+ console.log('PASS: R confirms/restarts; numbered routes advance in visual order; dialogs, editing, modifiers and repeat are guarded; backpack sits between crew and horizontal passives at 390/1360px; normal and quick item use heal and consume one unit.');
 } finally {await browser.close();}
