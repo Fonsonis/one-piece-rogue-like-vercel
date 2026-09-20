@@ -31,6 +31,12 @@
       const teamSize=t.kind==='legends'?2:1;
       const size=(t.version===2?16:8)/teamSize;
       const validMatch=m=>record(m)&&[m.a,m.b].every(i=>Number.isInteger(i)&&i>=0&&i<size)&&m.a!==m.b&&[null,m.a,m.b].includes(m.winner);
+      const series=t.series;
+      const validSeries=series===undefined||(record(series)&&Number.isInteger(series.total)&&series.total>=1&&series.total<=1000&&
+        Number.isInteger(series.completed)&&series.completed>=0&&series.completed<=series.total&&Number.isInteger(series.wins)&&series.wins>=0&&
+        Number.isInteger(series.losses)&&series.losses>=0&&series.wins+series.losses===series.completed&&Array.isArray(series.members)&&
+        series.members.length===teamSize&&new Set(series.members).size===teamSize&&series.members.every(id=>typeof id==='string')&&
+        (!t.finished?series.completed<series.total:series.completed>0&&(t.placement===1?series.wins>0:series.losses>0)));
       if(!record(t)||![1,2].includes(t.version)||!['tournament','legends'].includes(t.kind)||
         !Number.isInteger(t.level)||t.level<1||t.level>1000||typeof t.finished!=='boolean'||
         !Array.isArray(t.entrants)||t.entrants.length!==size||t.entrants.some(e=>!record(e)||!Array.isArray(e.members)||e.members.length!==teamSize||e.members.some(id=>typeof id!=='string'))||
@@ -38,7 +44,7 @@
         !Number.isInteger(t.stage)||t.stage<0||t.stage>=t.rounds.length||(t.bronze!==undefined&&!validMatch(t.bronze))||
         ![null,0,1,2,3,4,5,...(size===16?[9]:[])].includes(t.placement)||!Number.isSafeInteger(t.reward)||t.reward<0||
         !Array.isArray(t.pendingRelics)||t.pendingRelics.length>3||t.pendingRelics.some(id=>typeof id!=='string')||
-        (t.relicReward!==undefined&&typeof t.relicReward!=='string')) throw new Error('Torneo guardado inválido.');
+        (t.relicReward!==undefined&&typeof t.relicReward!=='string')||!validSeries) throw new Error('Torneo guardado inválido.');
     }
     const bagTier = data.meta.global?.backpackTier;
     if (bagTier !== undefined && (!Number.isInteger(bagTier) || bagTier < 0 || bagTier > 17)) throw new Error('Ampliación de mochila inválida.');
