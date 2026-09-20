@@ -4,6 +4,8 @@
   const KEY = 'oplike_save';
   const MAX_BYTES = 5 * 1024 * 1024;
   const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
+  const SAGA_ORDER = ['eastblue','alabasta','skypiea','water7','thriller','sabaody','marineford','gyojin','punkhazard','dressrosa','zou','wholecake','wano','egghead','elbaph'];
+  const LEGACY_SAGA_ORDER = SAGA_ORDER.filter(id=>id!=='sabaody'&&id!=='zou'&&id!=='punkhazard');
   function validate(data) {
     if (!record(data) || data.game !== 'grandlinelike' || data.version !== 1 || !record(data.meta)) {
       throw new Error('Ese archivo no es un guardado compatible de GrandLineLike.');
@@ -95,7 +97,59 @@
       }
     }
     inspect(data);
+    migrateSagaOrder(data);
     return migrateRetiredContent(data);
+  }
+  function migrateSagaOrder(data) {
+    const previous=data.sagaOrder === undefined ? LEGACY_SAGA_ORDER : data.sagaOrder;
+    if(!Array.isArray(previous)||!previous.length||previous.some(id=>typeof id!=='string'||!SAGA_ORDER.includes(id))||new Set(previous).size!==previous.length)
+      throw new Error('Orden de sagas incompatible.');
+    const remap=index=>{
+      const next=SAGA_ORDER.indexOf(previous[index]);
+      if(!Number.isInteger(index)||next<0)throw new Error('Saga guardada inválida.');
+      return next;
+    };
+    if(data.run)data.run.saga=remap(data.run.saga);
+    const recent=data.meta.lastCompletedIsland;
+    if(recent&&Number.isInteger(recent.saga))recent.saga=remap(recent.saga);
+    if(!previous.includes('punkhazard')){
+      const m=data.meta, dress=SAGA_ORDER.indexOf('dressrosa'), punk=SAGA_ORDER.indexOf('punkhazard');
+      const wins=m.sagaDiffWins || {};
+      if(Object.entries(wins.gyojin || {}).some(([diff,won])=>won&&Number(diff)>=3)||
+          Object.keys(wins).some(id=>SAGA_ORDER.indexOf(id)>=dress&&Object.values(wins[id]||{}).some(Boolean))||
+          (data.run&&data.run.saga>=dress))m.legacyDressrosaAccess=true;
+      if(data.run?.saga===dress){
+        const r=data.run;
+        if(r.islandIdx===0){r.saga=punk;r.badges=[];}
+        else {r.islandIdx--;r.badges=r.badges.filter(i=>i>0).map(i=>i-1);}
+      }
+      if(recent?.saga===dress&&Number.isInteger(recent.index)){if(recent.index===0)recent.saga=punk;else recent.index--;}
+      for(const [key,indices] of Object.entries(m.islandProgress || {})){
+        if(!key.startsWith('dressrosa:'))continue;
+        if(indices.includes(0))m.islandProgress[key.replace('dressrosa:','punkhazard:')]=[0];
+        m.islandProgress[key]=indices.filter(i=>i>0).map(i=>i-1);
+      }
+      const claims=Object.entries(m.claimedAch || {}).filter(([key])=>/^island_diff_dressrosa_\d+_[1-5]$/.test(key));
+      for(const [key] of claims)delete m.claimedAch[key];
+      for(const [key,value] of claims){
+        const [,index,diff]=key.match(/^island_diff_dressrosa_(\d+)_([1-5])$/);
+        m.claimedAch[Number(index)===0?`island_diff_punkhazard_0_${diff}`:`island_diff_dressrosa_${Number(index)-1}_${diff}`]=value;
+      }
+    }
+    if(!previous.includes('sabaody')) {
+      // Preserve already-earned Marineford access without inventing Sabaody wins.
+      const wins=data.meta.sagaDiffWins || {};
+      if(Object.entries(wins.thriller || {}).some(([diff,won])=>won&&Number(diff)>=3)||
+          Object.keys(wins).some(id=>SAGA_ORDER.indexOf(id)>=6&&Object.values(wins[id]||{}).some(Boolean))||
+          (data.run&&data.run.saga>=6))data.meta.legacyMarinefordAccess=true;
+    }
+    if(!previous.includes('zou')){
+      const wins=data.meta.sagaDiffWins || {};
+      if(Object.entries(wins.dressrosa || {}).some(([diff,won])=>won&&Number(diff)>=3)||
+          Object.keys(wins).some(id=>SAGA_ORDER.indexOf(id)>=SAGA_ORDER.indexOf('wholecake')&&Object.values(wins[id]||{}).some(Boolean))||
+          (data.run&&data.run.saga>=SAGA_ORDER.indexOf('wholecake')))data.meta.legacyWholeCakeAccess=true;
+    }
+    data.sagaOrder=[...SAGA_ORDER];
   }
   // IDs conservados solo para importar guardados anteriores a la retirada de estos personajes.
   const retired = new Set(['naruto','narutokurama','sasuke','kakashi','madara','orochimaru','itadori','yuta','gojo','sukuna','tanjiro','zenitsu','inosuke','nezuko','kibutsuji','goku','vegeta','gohan','gokuui','jiren','cell','frieza','zenosama','saitama','genos','garou','tatsumaki']);
@@ -136,7 +190,7 @@
     return validate(JSON.parse(text));
   }
   function payload(meta, run) {
-    return { game: 'grandlinelike', version: 1, date: new Date().toISOString(), user: 'local', meta, run: run || null };
+    return { game: 'grandlinelike', version: 1, sagaOrder:[...SAGA_ORDER], date: new Date().toISOString(), user: 'local', meta, run: run || null };
   }
   function create(getStorage) {
     return {
@@ -146,7 +200,10 @@
         if (current !== null) return parse(current);
         const oldMeta = storage.getItem('oplike_meta');
         const oldRun = storage.getItem('oplike_run');
-        return oldMeta ? validate(payload(JSON.parse(oldMeta), oldRun ? JSON.parse(oldRun) : null)) : null;
+        if(!oldMeta)return null;
+        const legacy=payload(JSON.parse(oldMeta),oldRun?JSON.parse(oldRun):null);
+        delete legacy.sagaOrder;
+        return validate(legacy);
       },
       write(data) {
         // setItem replaces the entire JSON atomically; failed writes retain the previous save.

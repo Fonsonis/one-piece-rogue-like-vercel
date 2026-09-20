@@ -5,20 +5,22 @@ import {combatHarness} from './balance-harness.mjs';
 test('new draws never use later sagas, even with later characters in the owned roster',()=>{
  const h=combatHarness();
  h.exec(`screenChallengeBracket=()=>{};meta.accXp=xpForAccLevel(35);meta.roster=['shanks','mihawk','roger','kaido','luffy'];`);
- for(let saga=5;saga<=10;saga++)for(const kind of ['tournament','legends'])for(let attempt=0;attempt<12;attempt++) {
+ const firstChallengeSaga=h.exec(`SAGAS.findIndex(s=>s.id==='marineford')`);
+ const lastChallengeSaga=h.exec(`SAGAS.findIndex(s=>s.id==='egghead')`);
+ for(let saga=firstChallengeSaga;saga<=lastChallengeSaga;saga++)for(const kind of ['tournament','legends'])for(let attempt=0;attempt<12;attempt++) {
   h.exec(`meta.challenge=null;meta.sagaDiffWins=Object.fromEntries(SAGAS.slice(0,${saga}).map(s=>[s.id,{3:true}]));`);
   assert.equal(h.exec(`challengeSagaLimit()`),saga);
   assert.equal(h.exec(`startChallenge('${kind}',${kind==='tournament'?"['shanks']":"['shanks','mihawk']"})`),true);
   assert.equal(h.exec(`meta.challenge.entrants.slice(1).flatMap(e=>e.members).every(id=>SAGAS.findIndex(s=>s.id===CHARS[id].saga)<=${saga})`),true);
   assert.equal(h.exec(`new Set(meta.challenge.entrants.flatMap(e=>e.members.map(baseFormOf))).size`),h.exec(`meta.challenge.entrants.flatMap(e=>e.members).length`));
-  if(saga<9)assert.equal(h.exec(`meta.challenge.entrants.slice(1).some(e=>e.members.includes('luffy5'))`),false);
+  if(saga<h.exec(`SAGAS.findIndex(s=>s.id==='wano')`))assert.equal(h.exec(`meta.challenge.entrants.slice(1).some(e=>e.members.includes('luffy5'))`),false);
   assert.doesNotThrow(()=>h.exec(`validateGameSave(GameSaveStorage.parse(JSON.stringify(GameSaveStorage.payload(meta,null))))`));
  }
 });
 
 test('a smaller legendary draw completes and preserves the pending reward on reload',()=>{
  const h=combatHarness();
- h.exec(`screenChallengeBracket=()=>{};meta.accXp=xpForAccLevel(35);meta.roster=['shanks','mihawk'];meta.sagaDiffWins=Object.fromEntries(SAGAS.slice(0,5).map(s=>[s.id,{3:true}]));startChallenge('legends',['shanks','mihawk']);`);
+ h.exec(`screenChallengeBracket=()=>{};meta.accXp=xpForAccLevel(35);meta.roster=['shanks','mihawk'];meta.sagaDiffWins=Object.fromEntries(SAGAS.slice(0,SAGAS.findIndex(s=>s.id==='marineford')).map(s=>[s.id,{3:true}]));const fullOpponentPool=challengeOpponentPool;challengeOpponentPool=(...args)=>fullOpponentPool(...args).slice(0,6);startChallenge('legends',['shanks','mihawk']);`);
  assert.equal(h.exec('meta.challenge.entrants.length'),4);
  h.exec(`endChallengeBattle(true);endChallengeBattle(true);loadedSave=GameSaveStorage.parse(JSON.stringify(GameSaveStorage.payload(meta,null)));loadMeta();`);
  assert.equal(h.exec('meta.challenge.placement'),1);

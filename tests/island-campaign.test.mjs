@@ -8,7 +8,7 @@ function harness() {
   return h;
 }
 
-test('all 57 islands have 3–5 maps, exactly one boss encounter and unchanged enemy definitions',()=>{
+test('all saga islands have 3–5 maps, exactly one boss encounter and unchanged enemy definitions',()=>{
   const h=harness();
   assert.equal(h.exec(`(()=>{
     const before=JSON.stringify(SAGAS);
@@ -116,4 +116,17 @@ test('flee confirmation pauses between hits, cancellation resumes one pending st
   assert.equal(h.exec('hits'),2);
   h.exec(`let attempts=0;tryFlee=()=>{attempts++;};confirmBattleFlee();yes();yes();`);
   assert.equal(h.exec('attempts'),1);
+});
+
+test('wild escape flag lives next to encounter title and is absent from restricted battles',()=>{
+ const h=combatHarness();
+ h.exec(`run={saga:0,mode:'classic',berries:0,team:[makeChar('luffy',5)],items:{}};startBattle([makeChar('bandido',5,true)],{wild:true});`);
+ const html=h.exec('battleLayoutHTML([])');
+ assert.match(html, /battle-event-title[^]*?SALVAJE[^]*?class="btn small battle-flee"[^]*?aria-label="Intentar huir del combate"/);
+ assert.equal((html.match(/data-ctl="run"/g)||[]).length,1);
+ assert.ok(!h.exec('topbar(true,true,true,true)').includes('data-ctl="run"'));
+ for(const kind of ['boss','marine','challenge','local']){
+  h.exec(`battle.opts={${kind}:true};`);assert.ok(!h.exec('battleLayoutHTML([])').includes('battle-flee'));
+ }
+ h.exec('battle.opts={wild:true};battle.tower=true;');assert.ok(!h.exec('battleLayoutHTML([])').includes('battle-flee'));
 });

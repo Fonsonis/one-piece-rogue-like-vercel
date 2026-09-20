@@ -4,11 +4,12 @@ import {createRequire} from 'node:module';
 import {createHash} from 'node:crypto';
 const require=createRequire(import.meta.url);
 const sharp=require(process.env.SHARP_MODULE||'sharp');
-const prefix=process.argv.includes('--luffy')?'luffy-animation':'zoan-art';
+const artModes={'--redraw':'legacy-redraw','--zou':'zou-art','--strawhat':'strawhat-art','--sabaody':'sabaody-art','--elbaph':'elbaph-art','--luffy':'luffy-animation'};
+const prefix=Object.entries(artModes).find(([flag])=>process.argv.includes(flag))?.[1] || 'zoan-art';
 const report=JSON.parse(fs.readFileSync(`docs/${prefix}-import.json`));
 const prompts=JSON.parse(fs.readFileSync(`docs/${prefix}-prompts.json`));
 const manifest=JSON.parse(fs.readFileSync('public/art/manifest.json'));
-assert.equal(Object.keys(report).length,Object.keys(prompts.assets).length);
+if(!process.argv.includes('--partial'))assert.equal(Object.keys(report).length,Object.keys(prompts.assets).length);
 const cards=[];
 for(const [id,entry] of Object.entries(report)){
   const path=`public/art/characters/${id}.png`,file=fs.readFileSync(path);

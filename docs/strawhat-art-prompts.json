@@ -1,0 +1,14 @@
+{
+  "mode": "built-in image_gen",
+  "prefix": "Production game asset, One Piece browser RPG. ONE character sprite sheet. Subject: ",
+  "suffix": " FOUR distinct full-body poses in ONE horizontal row: idle guard, ready, attack, hurt. All face right, feet aligned. Crisp detailed 16-bit pixel art with black outlines and limited shading. Each pose fits wholly inside its own equal cell with generous TRANSPARENT gaps; no touching or overlap. Entire weapons, hair, tails and accessories visible. Actual transparent RGBA background. No text, labels, border, ground or watermark. No blood. Match a classic pixel fighting-game sprite, not a portrait.",
+  "assets": {
+    "zoro-enma": "Roronoa Zoro from One Piece, muscular adult swordsman, short green hair, scar over closed left eye, dark green open kimono and red waist sash, three distinct katana including purple-hilt Enma, one sword held in mouth. Black armament blades, restrained purple Haki aura.",
+    "zoro-kingofhell": "Roronoa Zoro King of Hell from One Piece, green hair, black bandana tied on head, closed scarred left eye, dark green open robe red sash, three katana one in mouth, green Haki flame trails and small black lightning surrounding swords. Entire blades visible.",
+    "nami-sorcery": "Adult post-timeskip Nami from One Piece, long flowing orange hair, green and white bikini top, fitted blue jeans and sandals, blue tattoo on upper left arm, long blue three-section Sorcery Clima-Tact staff. Small weather bubbles, no Zeus cloud.",
+    "nami-zeus": "Adult Nami with Zeus from One Piece, long orange hair, red sleeveless Wano kunoichi dress with pink sash and shorts, sandals, blue tattoo upper left arm, blue Clima-Tact staff. Small sentient dark thundercloud with expressive eyes floats beside her staff and yellow lightning, same cloud in every pose.",
+    "sanji-diable": "Sanji Diable Jambe from One Piece, slim blond adult cook with hair covering one eye and spiral eyebrow, black double-breasted suit and blue shirt, black shoes. Hands in pockets, fighting entirely with kicks, one lower leg glowing orange-red with compact orange fire.",
+    "sanji-raid": "Sanji Stealth Black Raid Suit from One Piece, blond swept hair, black eye mask and dark bandana over mouth, black Germa 66 armored suit with gold belt and boots, flowing black cape with large white number 3, red scarf. Kicking poses, hands never punching.",
+    "sanji-ifrit": "Sanji Ifrit Jambe from One Piece, slim blond adult with spiral eyebrow and short goatee, hair covers right eye, burgundy double-breasted suit black shirt, both lower legs surrounded by compact bright BLUE-white flames and blue sparks. Elegant kicking poses hands kept in pockets, no orange fire."
+  }
+}

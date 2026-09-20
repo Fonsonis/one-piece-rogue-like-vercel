@@ -5,8 +5,8 @@ import {combatHarness} from './balance-harness.mjs';
 test('repeatable tracks retain their original tiers and reach 10,000 in every saga',()=>{
  const h=combatHarness();
  assert.equal(h.exec(`GLOBAL_PROGRESSIVE_ACHIEVEMENTS.filter(p=>p.id!=='dex').every(p=>p.goals.at(-1)===10000&&p.goals.length===p.fames.length&&p.goals.every((v,i)=>!i||v>p.goals[i-1])&&p.fames.every((v,i)=>!i||v>p.fames[i-1]))`),true);
- assert.equal(h.exec('SAGA_PROGRESSIVE_ACHIEVEMENTS.length'),143);
- assert.equal(h.exec('ISLAND_DIFF_ACHIEVEMENTS.length'),285);
+ assert.equal(h.exec('SAGA_PROGRESSIVE_ACHIEVEMENTS.length'),195);
+ assert.equal(h.exec('ISLAND_DIFF_ACHIEVEMENTS.length'),350);
  assert.equal(h.exec('new Set(PROGRESSIVE_ACHIEVEMENTS.map(p=>p.id)).size===PROGRESSIVE_ACHIEVEMENTS.length'),true);
  h.exec('meta.claimedProg={kills:7};meta.stats.kills=2000;');
  assert.equal(h.exec("claimAchievement('kills',true)"),1350);
@@ -41,7 +41,7 @@ test('island and difficulty achievements recognize saved wins and pay once acros
  assert.equal(h.exec('meta.fame'),25);
  h.exec('meta.sagaDiffWins[SAGAS[1].id]={2:true};migrateLegacyIslandWins(meta);');
  assert.equal(h.exec("ISLAND_DIFF_ACHIEVEMENTS.find(a=>a.id==='island_diff_'+SAGAS[1].id+'_0_2').check()"),1);
- for(let saga=0;saga<11;saga++)for(let diff=1;diff<=5;diff++)assert.equal(h.exec(`ISLAND_DIFF_ACHIEVEMENTS.find(a=>a.id==='island_diff_'+SAGAS[${saga}].id+'_0_${diff}').fame`),25*(saga+1)*diff*diff);
+ for(let saga=0;saga<15;saga++)for(let diff=1;diff<=5;diff++)assert.equal(h.exec(`ISLAND_DIFF_ACHIEVEMENTS.find(a=>a.id==='island_diff_'+SAGAS[${saga}].id+'_0_${diff}').fame`),25*(saga+1)*diff*diff);
 });
 
 test('actual island completion advances the saga track and unlocks its first-clear achievement',()=>{

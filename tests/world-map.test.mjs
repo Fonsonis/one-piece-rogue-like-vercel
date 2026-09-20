@@ -15,16 +15,16 @@ function setup() {
 
 test('one chart renders every saga and island in reverse order, preserving modes and information',()=>{
  const {h}=setup();h.exec('screenSagas()');const html=h.exec('html');
- assert.equal((html.match(/class="world-saga"/g)||[]).length,11);
- assert.equal((html.match(/data-world-island=/g)||[]).length,57);
+ assert.equal((html.match(/class="world-saga"/g)||[]).length,15);
+ assert.equal((html.match(/data-world-island=/g)||[]).length,70);
  assert.equal((html.match(/data-island-info=/g)||[]).length,0);
- assert.equal((html.match(/data-saga-info=/g)||[]).length,11);
- assert.ok(html.indexOf('id="world-saga-10"')<html.indexOf('id="world-saga-0"'));
+ assert.equal((html.match(/data-saga-info=/g)||[]).length,15);
+ assert.ok(html.indexOf('id="world-saga-14"')<html.indexOf('id="world-saga-0"'));
  assert.ok(html.indexOf('id="world-island-0-5"')<html.indexOf('id="world-island-0-0"'));
  assert.ok(html.indexOf('id="world-saga-1"')<html.indexOf('RED LINE · REVERSE MOUNTAIN'));
  assert.ok(html.indexOf('RED LINE · REVERSE MOUNTAIN')<html.indexOf('id="world-saga-0"'));
- assert.ok(html.indexOf('id="world-saga-7"')<html.indexOf('RED LINE · NUEVO MUNDO'));
- assert.ok(html.indexOf('RED LINE · NUEVO MUNDO')<html.indexOf('id="world-saga-6"'));
+ assert.ok(html.indexOf('id="world-saga-8"')<html.indexOf('RED LINE · NUEVO MUNDO'));
+ assert.ok(html.indexOf('RED LINE · NUEVO MUNDO')<html.indexOf('id="world-saga-7"'));
  for(const id of ['tab-classic','tab-nuz','btn-diff-trigger','btn-saga-probs-all'])assert.ok(html.includes(`id="${id}"`));
 });
 

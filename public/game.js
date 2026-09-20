@@ -662,7 +662,7 @@ function validateGameSave(data) {
 
   for (const [sagaId, value] of Object.entries(data.meta.pirateKingRewards || {})) {
     if (!SAGAS.some(s => s.id === sagaId) || !data.meta.sagaDiffWins?.[sagaId]?.[5] ||
-        (value !== 'pending' && !pirateKingLegendaryPool(sagaId).includes(value))) throw new Error('Recompensa de Rey Pirata inválida.');
+        (value !== 'pending' && !pirateKingRewardIsValid(sagaId,value))) throw new Error('Recompensa de Rey Pirata inválida.');
   }
   if (Object.keys(data.meta.sagaStats || {}).some(id => !SAGAS.some(s => s.id === id))) throw new Error('Contadores de saga incompatibles.');
   for (const key of ['dex', 'recruited', 'roster', 'defeated']) {
@@ -693,7 +693,7 @@ function validateGameSave(data) {
 }
 
 // Nivel de cuenta: sube de forma exponencial con los PX de cuenta (se ganan a la par que la Fama)
-const SAGA_LEVEL_CAPS = [7, 15, 20, 25, 30, 35, 40, 45, 50, 55, 100];
+const SAGA_LEVEL_CAPS = {eastblue:7,alabasta:15,skypiea:20,water7:25,thriller:30,sabaody:30,marineford:35,gyojin:40,punkhazard:40,dressrosa:45,zou:45,wholecake:50,wano:55,egghead:100,elbaph:100};
 
 function getMaxAccountLevelCap() {
   if (typeof SAGAS === 'undefined' || !SAGAS.length) return 7;
@@ -703,7 +703,7 @@ function getMaxAccountLevelCap() {
       highest = i;
     }
   }
-  return SAGA_LEVEL_CAPS[highest] !== undefined ? SAGA_LEVEL_CAPS[highest] : 100;
+  return SAGA_LEVEL_CAPS[SAGAS[highest].id] ?? 100;
 }
 
 function xpForAccLevel(lvl) {
@@ -1187,7 +1187,6 @@ function topbar(showBerries = false, showAuto = showBerries, showSpeed = false, 
       ${showSpeed ? `<button class="btn small gray" id="btn-map-speed" title="Velocidad de combate: x1, x2 o x4" aria-label="Velocidad de combate x${combatSpeed}" aria-live="polite">⏩ x${combatSpeed}</button>` : ''}
       <button class="btn small green" id="btn-save" title="Guardar partida como JSON" aria-label="Guardar partida como JSON">💾</button>
       ${showBerries && showAuto && run && !showFlee ? '<button class="btn small red" id="btn-abandon" title="Abandonar el viaje" aria-label="Abandonar el viaje"><span aria-hidden="true">🏳️</span></button>' : ''}
-      ${showFlee ? '<button class="btn small red" data-ctl="run">🏃 HUIR</button>' : ''}
     </div>
   </div>${islandRepeatStatusHTML()}`;
 }
@@ -2289,6 +2288,9 @@ function sagaMaxDiffCleared(sagaId, progress = meta) {
 function sagaUnlocked(i, progress = meta) {
   if (i === 0) return true;
   const prevSaga = SAGAS[i - 1];
+  if(SAGAS[i]?.id==='dressrosa'&&progress.legacyDressrosaAccess)return true;
+  if(SAGAS[i]?.id==='wholecake'&&progress.legacyWholeCakeAccess)return true;
+  if(SAGAS[i]?.id==='marineford'&&progress.legacyMarinefordAccess)return true;
   return sagaMaxDiffCleared(prevSaga.id, progress) >= 3;
 }
 
@@ -3172,7 +3174,7 @@ function worldSagaHTML(sagaIdx) {
       </div>`;
     }).reverse().join('')}</div>
     <header class="world-saga-heading">
-      <span class="atlas-eyebrow">${sagaIdx === 0 ? 'EAST BLUE · COMIENZA AQUÍ' : sagaIdx <= 5 ? 'GRAND LINE · PARADISE' : sagaIdx === 6 ? 'BAJO LA RED LINE · 10.000 M' : 'GRAND LINE · NUEVO MUNDO'}</span>
+      <span class="atlas-eyebrow">${sagaIdx === 0 ? 'EAST BLUE · COMIENZA AQUÍ' : sagaIdx <= SAGAS.findIndex(s=>s.id==='marineford') ? 'GRAND LINE · PARADISE' : saga.id === 'gyojin' ? 'BAJO LA RED LINE · 10.000 M' : 'GRAND LINE · NUEVO MUNDO'}</span>
       <h2>${saga.name}</h2>
       <p>${done.length}/${saga.islands.length} islas completadas ${wins[selectedDiff] ? '· ★ Dificultad superada' : ''}</p>
       ${entry.reason ? `<p class="world-lock">🔒 ${entry.reason}</p>` : ''}
@@ -5154,7 +5156,9 @@ function addToTeam(f, done) {
   ov.innerHTML = `<div class="modal">
     <h2>👥 ¡Banda llena!</h2>
     <p style="font-size:9px;text-align:center;margin-bottom:10px;">
-      ${charData(f).emoji} <b>${charName(f)}</b> Nv${f.lvl} quiere unirse.<br>Elige a quién despedir para hacerle sitio.</p>
+      ${charData(f).emoji} <b>${charName(f)}</b> Nv${f.lvl} quiere unirse.</p>
+    <div class="type-badges recruit-candidate-types" aria-label="Tipos del personaje a reclutar" style="justify-content:center;margin-bottom:10px;">${typeBadges(fighterTypes(f))}</div>
+    <p style="font-size:9px;text-align:center;">Elige a quién despedir para hacerle sitio.</p>
     <div class="pick-grid">
       ${run.team.map((m, i) => {
         const mc = CHARS[m.id] || {};
@@ -6383,7 +6387,7 @@ function battleLayoutHTML(logLines, labels = {}) {
             ${b.pTeam.map((f, i) => fighterCardHTML(f, 'p', i, b.curP)).join('')}
           </div>
           <div class="battle-side" id="side-e">
-            <div class="side-head"><div class="trainer">${eHead}</div>${labels.e || (b.opts.wild ? 'SALVAJE' : 'ENEMIGO')}
+            <div class="side-head"><div class="trainer">${eHead}</div><div class="battle-event-title"><span>${labels.e || (b.opts.wild ? 'SALVAJE' : 'ENEMIGO')}</span>${b.opts.wild && !b.tower && !b.opts.local && !b.opts.challenge ? '<button type="button" class="btn small battle-flee" data-ctl="run" title="Intentar huir" aria-label="Intentar huir del combate"><span aria-hidden="true">🏳️</span></button>' : ''}</div>
               <div class="battle-team-count" id="count-e">${battleTeamCount('e')}</div>
               <div class="syn-chips" id="syn-e">${synChipsHTML(b.eTeam)}</div>
             </div>
@@ -7231,6 +7235,10 @@ function endBattle(victory, fled, recruited) {
   screenMap();
 }
 
+function pirateKingRewardIsValid(sagaId,id) {
+  const previous={marineford:['kizaru','rayleigh'],egghead:['garling','im','xebec']};
+  return pirateKingLegendaryPool(sagaId).includes(id) || (previous[sagaId] || []).includes(id);
+}
 function pirateKingLegendaryPool(sagaId) {
   return Object.keys(CHARS).filter(id => CHARS[id].saga === sagaId && CHARS[id].rareza === 5 && !BASE_OF[id]);
 }
@@ -8311,6 +8319,10 @@ function challengeCanStart(continuingSeries=false) {
 function startChallenge(kind,picked,series=null) {
   if (!['tournament','legends'].includes(kind)||!challengeCanStart(!!series)) return false;
   const count=kind==='legends'?2:1, allowed=challengePool(kind);
+  // Existing selections may still name a base that now has historical phases.
+  // Resolve owned base IDs to their unlocked form; explicit locked forms still fail.
+  if (Array.isArray(picked)) picked=picked.map(id=>CHARS[id]&&baseFormOf(id)===id
+    ? evolutionFormAt(id,startLvlOf(id)) : id);
   if (!Array.isArray(picked)||picked.length!==count||new Set(picked.map(baseFormOf)).size!==count||picked.some(id=>!allowed.includes(id))) return false;
   if(series&&(!Number.isInteger(series.total)||series.total<1||series.total>1000||!Number.isInteger(series.completed)||series.completed<0||series.completed>=series.total||
       !Number.isInteger(series.wins)||!Number.isInteger(series.losses)||series.wins<0||series.losses<0||series.wins+series.losses!==series.completed||

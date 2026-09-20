@@ -5,8 +5,8 @@ const metrics=JSON.parse(fs.readFileSync('docs/motion-bounds.json','utf8'));
 const sizing=JSON.parse(fs.readFileSync('docs/sprite-sizing.json','utf8'));
 const css=fs.readFileSync('public/art/motion-bounds.css','utf8');
 
-test('all 497 sprites fit the stage throughout attack, recoil and KO, including mirrored enemies',()=>{
- assert.equal(Object.keys(metrics).length,497);
+test('all catalog sprites fit the stage throughout attack, recoil and KO, including mirrored enemies',()=>{
+ assert.equal(Object.keys(metrics).length,587);
  let checked=0;
  for(const [id,m] of Object.entries(metrics)){
    assert.ok(css.includes(`[data-character="${id}"]`));
@@ -47,7 +47,7 @@ test('all island routes retain every node, edge and reachable choice in both ori
   const before=JSON.stringify(run),nodes=run.map.rows.flat().length,edges=run.map.edges.length,reachable=reachableNodes().length;
   screenMap();return {before,after:JSON.stringify(run),nodes,edges,reachable,html:capturedHTML};
  })))`));
- assert.equal(results.length,57);
+ assert.equal(results.length,70);
  for(const r of results){
   assert.equal(r.before,r.after);
   const nodes=[...r.html.matchAll(/<button type="button" class="map-node[^>]+>/g)].map(m=>m[0]);

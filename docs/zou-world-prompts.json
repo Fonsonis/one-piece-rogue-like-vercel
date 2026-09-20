@@ -1,0 +1,8 @@
+{
+  "mode": "built-in image_gen",
+  "assets": {
+    "zou-0": "ONE standalone isometric location icon for a One Piece pixel-art world map: ancient circular Mokomo city with rounded colorful houses and a central stone plaza, lush jungle and ruins situated upon a small curved patch of giant elephant back with gray wrinkled skin underneath. Crisp 16-bit pixel art black outlines, three-quarter overhead view, actual transparent RGBA background, entire compact landscape vignette with generous margins, no text or characters.",
+    "zou-1": "ONE standalone isometric location icon for a One Piece pixel-art world map: enormous ancient tree whose canopy has the recognizable silhouette of a WHALE, dense dark green jungle and ancient stone shrine hidden among giant roots, small red rectangular poneglyph within shrine. On elephant-back grassland. Crisp detailed 16-bit pixel art, black outlines, overhead isometric view, actual transparent RGBA background, compact vignette generous margins, no text characters or borders.",
+    "zou-scene": "Wide 16:9 pixel-art battle background of One Piece Zou Mokomo kingdom on Zunesha back: lush primeval jungle, enormous whale-shaped tree canopy towering in distance, round houses and ancient stone ruins, mossy walkway and open grassy foreground for fighters. Warm green light, crisp 16-bit pixel art dark outlines, opaque background, no characters text or UI."
+  }
+}
