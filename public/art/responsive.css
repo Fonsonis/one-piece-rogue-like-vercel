@@ -74,6 +74,8 @@ body:has(#island-carousel) .toast { max-width:calc(var(--game-view-width,100vw) 
   }
   #app:has(:is(.map-wrap,.battle-layout)) > .topbar { min-height:40px; flex:none; margin:0; gap:4px; flex-wrap:nowrap; }
   #app:has(:is(.map-wrap,.battle-layout)) > .topbar .logo { display:none; }
+  #app:has(:is(.map-wrap,.battle-layout)) > .topbar .daily-steps { flex:none; padding:4px 6px; font-size:10px; }
+  #app:has(:is(.map-wrap,.battle-layout)) > .topbar .daily-steps span:last-child { display:none; }
   #app:has(:is(.map-wrap,.battle-layout)) .floating-controls { gap:4px; flex-wrap:nowrap; min-width:0; }
   #app:has(:is(.map-wrap,.battle-layout)) .floating-controls .btn { min-height:40px; padding:6px; font-size:clamp(6px,1.8vw,9px); }
   #app:has(:is(.map-wrap,.battle-layout)) .floating-berries { flex:none; }

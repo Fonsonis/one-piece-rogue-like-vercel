@@ -16,6 +16,8 @@ Revisión en navegador con ventanas de 320×568, 360×640, 390×844, 430×932, 5
 
 Ventanas comprobadas: menú, sagas y selección de banda, inventario de dos/tres columnas, Dex, ajustes, logros, tipos/sinergias, tienda permanente, tienda de isla, fichas, equipo y mochila, confirmación de nodo, reclutamiento con banda llena, carteles y presentación del recluta, descanso, recompensa, Torre Marine, Desafíos y Luffy Run. Se revisaron las paletas clara y oscura, el cambio de orientación, el cambio de luchador activo y el regreso al mapa desde una tienda con scroll.
 
+Las vistas generales, los botones «Volver» pegajosos y el botón absoluto del selector de banda respetan `safe-area-inset-*`. En iPhone con notch o Dynamic Island, los controles superiores permanecen por debajo de la zona reservada y siguen siendo pulsables incluso cuando el foco desplaza el contenido.
+
 Las pruebas automáticas verifican que las 57 islas mantienen cada nodo, conexión y opción alcanzable; que la consulta de bandas no altera la partida; y 26.652.240 muestras de esquinas de las cuatro poses de los 457 personajes, incluyendo movimiento y reflexión del enemigo. Las pruebas existentes siguen comparando combate con/sin presentación y el balance.
 
 Estos son tamaños de navegador verificados, no una afirmación de pruebas físicas en todos los modelos de teléfono. Los contenidos extensos conservan scroll deliberado; no se ocultan para simular que caben.

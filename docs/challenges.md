@@ -12,6 +12,8 @@ Desbloqueo conservado: nivel de cuenta 35.
 
 La selección reutiliza el selector de nakamas con búsqueda, filtros por saga/tipo/rareza, paginación, fichas, controles de teclado y devolución del foco. Los huecos muestran el nivel permanente, estadísticas y reliquia propia; se puede quitar o intercambiar un miembro. El cuadro muestra el próximo combate antes del árbol completo de eliminatorias: columnas por ronda, niveles, líneas de avance, huecos para futuros ganadores y un cruce separado por el tercer puesto. Se puede desplazar horizontal y verticalmente, con cabeceras de ronda fijas, equipo propio resaltado y marcas de ganador. También permite consultar las reliquias rivales. Textos legibles, botones de 44 px y colores del tema actual en todos los menús de Desafíos.
 
+El cuadro permite activar **AUTO** para iniciar el siguiente cruce y continuar mientras el torneo siga abierto. Cada combate iniciado así consume 1 Paso 👢; el botón muestra el saldo restante y se detiene al finalizar, abandonar, salir de Desafíos o quedarse sin pasos. Pulsar **Luchar** manualmente no consume pasos. El modo AUTO no se reactiva tras recargar la página, aunque el cuadro y el saldo sí se conservan.
+
 ## Reliquias
 
 Cada una de las 426 identidades del catálogo tiene su reliquia; las 71 transformaciones comparten la afinidad de su forma base. Los legendarios y los Sombrero de Paja cuentan con diseños individuales en `SIGNATURE_RELICS`. Para los demás, su emblema aumenta el daño de su Ultimate o técnica característica en un 35%. Los ocho IDs antiguos de reliquias siguen siendo compatibles.

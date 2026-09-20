@@ -193,6 +193,17 @@ function advanceAutoNode(r,i) {
     toast(`🤖 Pausa antes de ${NODE_TYPES[run.map.rows[r][i].type].label}. Elige cuándo entrar.`);
     return;
   }
+  const mapIdx=run.mapIdx || 0;
+  if(run.autoPaidMapIdx!==mapIdx) {
+    const previous=run.autoPaidMapIdx;
+    run.autoPaidMapIdx=mapIdx;
+    if(!spendDailyStep('recorrer este mapa en automático',saveRun)) {
+      if(previous===undefined)delete run.autoPaidMapIdx;else run.autoPaidMapIdx=previous;
+      pauseAutoForChoice();screenMap();
+      return;
+    }
+    toast(`👢 Mapa automático iniciado · ${dailyStepsRemaining()} pasos restantes.`);
+  }
   enterNode(r,i);
 }
 
@@ -434,6 +445,17 @@ const DIFFICULTIES = [
 let selectedDiff = 1;
 
 // ---------- Meta persistente ----------
+const DAILY_STEPS_LIMIT = 1000;
+function dailyStepsDayKey(now = new Date()) {
+  const pad = value => String(value).padStart(2, '0');
+  return `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+}
+function normalizeDailySteps(value, now = new Date()) {
+  const date = dailyStepsDayKey(now);
+  if (!value || value.date !== date) return { date, remaining: DAILY_STEPS_LIMIT };
+  const remaining = Number.isSafeInteger(value.remaining) ? value.remaining : DAILY_STEPS_LIMIT;
+  return { date, remaining: clamp(remaining, 0, DAILY_STEPS_LIMIT) };
+}
 const META_DEFAULTS = () => ({
   wins: {}, nuzWins: {}, dex: [], recruited: [], roster: [], towerRecord: 0,
   fame: 0, upgrades: {}, accXp: 0, global: {}, defeated: [],
@@ -453,6 +475,7 @@ const META_DEFAULTS = () => ({
   logPoses: 0,
   starPity: 0,
   charUpgrades: {},
+  dailySteps: { date: dailyStepsDayKey(), remaining: DAILY_STEPS_LIMIT },
   settings: { showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 },
 });
 let meta = META_DEFAULTS();
@@ -464,6 +487,7 @@ function loadMeta() {
   meta.logPoses = meta.logPoses || 0;
   meta.starPity = meta.starPity || 0;
   meta.charUpgrades = meta.charUpgrades || {};
+  meta.dailySteps = normalizeDailySteps(meta.dailySteps);
   meta.roster = meta.roster || [];
   if (!meta.roster.includes('luffy')) {
     meta.roster.push('luffy');
@@ -522,6 +546,22 @@ function persistLocalSave(journey = savedRun, explicit = false) {
   }
 }
 function saveMeta() { return persistLocalSave(); }
+function dailyStepsState() {
+  meta.dailySteps = normalizeDailySteps(meta.dailySteps);
+  return meta.dailySteps;
+}
+function dailyStepsRemaining() { return dailyStepsState().remaining; }
+function spendDailyStep(action = 'continuar', persist = saveMeta) {
+  const steps = dailyStepsState();
+  if (steps.remaining < 1) {
+    toast(`👢 No te quedan pasos para ${action}. Mañana volverás a tener ${DAILY_STEPS_LIMIT}.`);
+    return false;
+  }
+  steps.remaining--;
+  if (persist()) return true;
+  steps.remaining++;
+  return false;
+}
 function manualSave() {
   if (battle) return toast('💾 Termina el combate para guardar el viaje. El progreso se conserva en cada punto de guardado.');
   const write = () => {
@@ -1137,6 +1177,7 @@ function topbar(showBerries = false, showAuto = showBerries, showSpeed = false, 
   const combatSpeed = battle?.speed ?? preferredCombatSpeed();
   return `<div class="topbar">
     <div class="logo">ONE PIECE <span>ROGUE LIKE</span></div>
+    <div class="daily-steps" title="Se recargan cada día"><span aria-hidden="true">👢</span><strong>${dailyStepsRemaining()}</strong><span>/ ${DAILY_STEPS_LIMIT} pasos</span></div>
     ${showBerries && run ? `<div class="floating-berries"><div class="berries">${berriesHTML(run.berries)}</div></div>` : ''}
     <div class="floating-controls">
       ${showAuto ? `<button class="btn small ${autoBtnClass}" id="btn-topbar-auto" title="Cambiar velocidad o activar/pausar modo auto">${autoLabel}</button>` : ''}
@@ -6255,6 +6296,7 @@ function controlsHTML() {
   const b = battle;
   let html = '<div class="battle-control-row battle-tools" aria-label="Controles del combate">';
   html += `<button class="btn small gray battle-crew-button" data-ctl="crew">👥 BANDAS</button>`;
+  if (b.opts?.challenge && challengeAutoMode) html += `<button class="btn small gray" data-ctl="challenge-auto-stop">⏹ PARAR AUTO</button>`;
   html += '</div><div class="battle-control-row battle-exit" aria-label="Salir del combate">';
   if (b.tower || b.opts?.challenge) html += `<button class="btn small red" data-ctl="quit">🏳️ RENDIRSE</button>`;
   return html + '</div>';
@@ -6978,10 +7020,17 @@ function bindControls() {
         showSynergyModal(b.pTeam);
         return;
       }
+      if (kind === 'challenge-auto-stop') {
+        stopChallengeAuto();
+        refreshControls();
+        toast('🤖 Modo automático de Desafíos pausado.');
+        return;
+      }
       if (kind === 'quit') {
         if (b.opts?.challenge) {
           modalConfirm('¿Rendirse en este combate?', 'Contará como derrota en este cruce. Si pierdes una semifinal del torneo individual, podrás luchar por el tercer puesto.', () => {
             if (battle !== b || b.over) return;
+            stopChallengeAuto();
             b.over=true; clearTimeout(b.timer); endBattle(false);
           });
           return;
@@ -8194,6 +8243,13 @@ function showRelicCollection(opts = {}) {
 }
 
 const CHALLENGE_PRIZES = {1:7500,2:5000,3:2500};
+let challengeAutoMode = false;
+let challengeAutoTimer = null;
+function stopChallengeAuto() {
+  challengeAutoMode=false;
+  if(challengeAutoTimer)clearTimeout(challengeAutoTimer);
+  challengeAutoTimer=null;
+}
 function challengeOwnedBases() { return [...new Set([...SAGAS[0].starters,...meta.roster].filter(id=>CHARS[id]).map(baseFormOf))]; }
 function challengeLevel(kind) {
   if (kind==='tournament') return 65;
@@ -8266,6 +8322,7 @@ function challengeRelicChoices(t) {
 }
 function finishChallenge(placement) {
   const t=meta.challenge;if(!t||t.finished)return;
+  stopChallengeAuto();
   t.finished=true;t.placement=placement;
   t.reward=t.kind==='tournament'?(CHALLENGE_PRIZES[placement]||0):0;
   meta.logPoses=(meta.logPoses||0)+t.reward;
@@ -8323,17 +8380,21 @@ function challengePlacementText(t) {
 function challengePlayerTeam(t) {
   return t.entrants[0].members.map(id=>applyUpgrades(makeChar(baseFormOf(id),startLvlOf(id))));
 }
-function playChallengeMatch() {
+function playChallengeMatch(automatic = false) {
   const t=meta.challenge,m=challengeCurrentMatch(t);
-  if(battle||!m||accountLevel()<35)return;
+  if(battle||!m||accountLevel()<35)return false;
   const enemyIndex=m.a===0?m.b:m.a;
   const enemyLevel=challengeEnemyLevel(t);
   const allies=challengePlayerTeam(t);
-  if(t.kind==='legends'&&allies.some(f=>CHARS[f.id].rareza!==5))return toast('Tu pareja debe conservar dos personajes de rareza 5★. Revisa sus niveles base o inicia un nuevo torneo.');
+  if(t.kind==='legends'&&allies.some(f=>CHARS[f.id].rareza!==5)){toast('Tu pareja debe conservar dos personajes de rareza 5★. Revisa sus niveles base o inicia un nuevo torneo.');return false;}
+  if(automatic&&!spendDailyStep('iniciar un combate automático de Desafíos')) {
+    stopChallengeAuto();screenChallengeBracket();return false;
+  }
   t.entrants[0].members=allies.map(f=>f.id);
   saveMeta();
   const enemies=t.entrants[enemyIndex].members.map(id=>makeEnemy(id,enemyLevel));
   startBattle(enemies,{challenge:true,duos:t.kind==='legends',team:allies,items:{},intro:`🏆 ${t.bronze?'Tercer puesto':t.rounds[t.stage].name} · ${t.kind==='legends'?'Batalla de Leyendas · 2 contra 2':`Torneo de ${t.entrants.length}`} · Nv. rival ${enemyLevel}`});
+  return true;
 }
 function claimChallengeRelic(id) {
   const t=meta.challenge;
@@ -8344,6 +8405,7 @@ function claimChallengeRelic(id) {
   t.pendingRelics=[];t.relicReward=id;saveMeta();return true;
 }
 function screenChallenges() {
+  stopChallengeAuto();
   playMusic('menu');if(accountLevel()<35){toast('🔒 Desafíos requiere nivel de cuenta 35.');return screenHome();}
   const active = meta.challenge && (!meta.challenge.finished || meta.challenge.pendingRelics?.length) ? meta.challenge : null;
   const eventButton = (kind,label) => `<button class="btn ${kind==='legends'?'gold':'blue'}" data-challenge="${kind}" ${active&&active.kind!==kind?'disabled':''}>${active?.kind===kind ? (active.finished?'Entrar':'Continuar') : label}</button>`;
@@ -8459,6 +8521,8 @@ function challengeVersusTeamHTML(members, label, own = false) {
   return `<section class="challenge-contender ${own?'own-contender':''}"><h3>${label}</h3><div class="challenge-contender-crew">${members.map(f => `<figure><div class="challenge-portrait">${charIcon(f.id,80)}</div><figcaption><strong>${esc(charName(f))}</strong><span>Nv. ${f.lvl}</span></figcaption></figure>`).join('')}</div></section>`;
 }
 function screenChallengeBracket() {
+  if(challengeAutoTimer)clearTimeout(challengeAutoTimer);
+  challengeAutoTimer=null;
   const t=meta.challenge;if(!t)return screenChallenges();
   const playerTeam=challengePlayerTeam(t),next=challengeCurrentMatch(t);
   const enemyIndex=next?(next.a===0?next.b:next.a):null;
@@ -8473,7 +8537,8 @@ function screenChallengeBracket() {
       <nav class="challenge-view-tabs" aria-label="Vista del torneo"><button class="btn" id="challenge-tab-fight" aria-pressed="true" aria-controls="challenge-fight-view">${t.finished?'Resultado':'Próximo combate'}</button><button class="btn" id="challenge-tab-draw" aria-pressed="false" aria-controls="challenge-draw-view">Cuadro completo</button></nav>
       <div id="challenge-fight-view">
         ${next?`<section class="challenge-next"><div class="challenge-duel">${challengeVersusTeamHTML(playerTeam,'Tu equipo',true)}<span class="challenge-vs" aria-hidden="true">VS</span>${challengeVersusTeamHTML(enemyTeam,'Rivales')}</div>
-          <button class="btn blue" id="challenge-fight">⚔️ ${t.bronze?'Luchar por el tercer puesto':'Luchar · '+round}</button>
+          <div class="challenge-fight-actions"><button class="btn blue" id="challenge-fight">⚔️ ${t.bronze?'Luchar por el tercer puesto':'Luchar · '+round}</button><button class="btn ${challengeAutoMode?'green':'gray'}" id="challenge-auto" aria-pressed="${String(challengeAutoMode)}">🤖 AUTO ${challengeAutoMode?'ACTIVO':'PAUSADO'} · 👢 ${dailyStepsRemaining()}</button></div>
+          <p class="challenge-auto-hint">Encadena los cruces y consume 1 paso por combate. Luchar manualmente no consume pasos.</p>
           <details class="challenge-rules"><summary>Reliquias de los rivales</summary>${t.entrants[enemyIndex].members.map(id=>`<article class="challenge-rival-relic"><h3>${esc(CHARS[enemyFormAt(id,challengeEnemyLevel(t))].name)}</h3>${relicDetailsHTML(RELICS['relic_'+baseFormOf(id)])}</article>`).join('')}</details></section>`:''}
         ${t.finished?`<div class="challenge-result" role="status"><span class="challenge-result-emblem" aria-hidden="true">${t.placement===1?'🏆':t.placement===2?'🥈':t.placement===3?'🥉':'⚓'}</span><h3>${challengePlacementText(t)}</h3><p>${t.reward?'🧭 +'+t.reward.toLocaleString('es')+' Log Poses añadidos a tu cuenta.':t.pendingRelics.length?'Elige tu reliquia de campeón.':t.relicReward?'🏺 '+esc(RELICS[t.relicReward].name)+' obtenida.':'La próxima victoria te espera.'}</p></div>`:''}
         ${t.pendingRelics.length?`<div class="relic-grid">${t.pendingRelics.map(id=>`<article class="relic-card">${relicDetailsHTML(RELICS[id])}<button class="btn gold" data-claim-relic="${id}">ELEGIR</button></article>`).join('')}</div>`:''}
@@ -8482,7 +8547,17 @@ function screenChallengeBracket() {
       <footer class="challenge-arena-footer">${!t.finished?'<button class="btn gray" id="challenge-abandon">Abandonar torneo</button>':!t.pendingRelics.length?'<button class="btn blue" id="challenge-again">Jugar de nuevo</button>':''}</footer>
     </section>`);
   $('#btn-back').onclick=screenChallenges;
-  if(next)$('#challenge-fight').onclick=playChallengeMatch;
+  if(next){
+    $('#challenge-fight').onclick=()=>playChallengeMatch(false);
+    $('#challenge-auto').onclick=()=>{
+      if(!challengeAutoMode&&dailyStepsRemaining()<1){toast('👢 No te quedan pasos hoy para iniciar un combate automático.');return;}
+      challengeAutoMode=!challengeAutoMode;screenChallengeBracket();
+    };
+    if(challengeAutoMode)challengeAutoTimer=setTimeout(()=>{
+      challengeAutoTimer=null;
+      if(meta.challenge===t&&challengeAutoMode&&challengeCurrentMatch(t)&&!battle&&$('#challenge-auto'))playChallengeMatch(true);
+    },700);
+  }
   if(!t.finished)$('#challenge-abandon').onclick=()=>modalConfirm('¿Abandonar torneo?','Terminarás este torneo sin premio.',()=>{finishChallenge(0);screenChallenges();});
   if($('#challenge-again'))$('#challenge-again').onclick=()=>screenChallengeSelection(t.kind);
   document.querySelectorAll('[data-claim-relic]').forEach(el=>el.onclick=()=>{if(claimChallengeRelic(el.dataset.claimRelic))screenChallengeBracket();});

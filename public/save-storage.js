@@ -23,6 +23,9 @@
     }
     if (Object.values(data.meta.relicEquipment || {}).some(id=>typeof id!=='string') ||
         Object.values(data.meta.relicCopies || {}).some(n=>!Number.isSafeInteger(n)||n<1)) throw new Error('Inventario de reliquias inválido.');
+    const dailySteps=data.meta.dailySteps;
+    if(dailySteps!==undefined&&(!record(dailySteps)||!/^\d{4}-\d{2}-\d{2}$/.test(dailySteps.date)||
+        !Number.isSafeInteger(dailySteps.remaining)||dailySteps.remaining<0||dailySteps.remaining>1000)) throw new Error('Pasos diarios inválidos.');
     const t=data.meta.challenge;
     if(t!==undefined&&t!==null){
       const teamSize=t.kind==='legends'?2:1;
@@ -60,6 +63,7 @@
             !r.startingTeam?.length || new Set(r.startingTeam).size!==r.startingTeam.length || ![1,2,3,4,5].includes(r.diff)) throw new Error('Repeticiones de isla inválidas.');
       }
       if (r?.mapIdx !== undefined && (!Number.isInteger(r.mapIdx) || r.mapIdx<0 || r.mapIdx>4)) throw new Error('Mapa de isla inválido.');
+      if (r?.autoPaidMapIdx !== undefined && (!Number.isInteger(r.autoPaidMapIdx) || r.autoPaidMapIdx<0 || r.autoPaidMapIdx>4 || r.autoPaidMapIdx>(r.mapIdx||0))) throw new Error('Consumo automático inválido.');
       if (r?.campaignVersion !== undefined && r.campaignVersion !== 1) throw new Error('Campaña incompatible.');
       if (!record(r) || !Number.isInteger(r.saga) || !Number.isInteger(r.islandIdx) ||
           !['classic', 'nuzlocke'].includes(r.mode) || !Array.isArray(r.team) || !record(r.items) ||
