@@ -12,7 +12,7 @@ Desbloqueo conservado: nivel de cuenta 35.
 
 La selección reutiliza el selector de nakamas con búsqueda, filtros por saga/tipo/rareza, paginación, fichas, controles de teclado y devolución del foco. Los huecos muestran el nivel permanente, estadísticas y reliquia propia; se puede quitar o intercambiar un miembro. El cuadro muestra el próximo combate antes del árbol completo de eliminatorias: columnas por ronda, niveles, líneas de avance, huecos para futuros ganadores y un cruce separado por el tercer puesto. Se puede desplazar horizontal y verticalmente, con cabeceras de ronda fijas, equipo propio resaltado y marcas de ganador. También permite consultar las reliquias rivales. Textos legibles, botones de 44 px y colores del tema actual en todos los menús de Desafíos.
 
-El cuadro permite activar **AUTO** para iniciar el siguiente cruce y continuar mientras el torneo siga abierto. Cada combate iniciado así consume 1 Paso 👢; el botón muestra el saldo restante y se detiene al finalizar, abandonar, salir de Desafíos o quedarse sin pasos. Pulsar **Luchar** manualmente no consume pasos. El modo AUTO no se reactiva tras recargar la página, aunque el cuadro y el saldo sí se conservan.
+El cuadro permite configurar **AUTO** con entre 1 y 1.000 torneos. El torneo actual cuenta como el primero y la serie conserva equipo, evento, torneos completados, campeonatos y derrotas. Cada combate automático consume 1 Paso 👢; pulsar **Luchar** manualmente no consume pasos. La serie se pausa al salir, recargar o quedarse sin pasos y puede reanudarse sin perder el contador. En Batalla de Leyendas, una victoria automática reclama la primera reliquia ofrecida, que ya prioriza las afinidades de la pareja. Al terminar el número elegido, AUTO se detiene.
 
 ## Reliquias
 

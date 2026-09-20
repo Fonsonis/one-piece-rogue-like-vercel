@@ -63,6 +63,59 @@ test('challenge auto can be stopped in battle and surrender cancels the chain',(
  const quit={dataset:{ctl:'quit'}};h.ctx.document.querySelectorAll=()=>[quit];h.exec('bindControls()');quit.onclick();
  assert.equal(h.exec('challengeAutoMode'),false);
 });
+test('automatic challenge series repeat the selected tournament and stop at the requested total',()=>{
+ const h=harness();h.exec(`saveMeta=()=>true;startChallenge('tournament',['zoro']);`);
+ assert.equal(h.exec('startChallengeSeries(3)'),true);
+ assert.equal(h.exec('challengeAutoMode'),true);
+ finish(h,[true,true,true,true]);
+ assert.deepEqual(Array.from(h.exec('[meta.challenge.series.completed,meta.challenge.series.wins,meta.challenge.series.losses]')),[1,1,0]);
+ h.ctx.document.querySelector=()=>({focus(){}});h.ctx.document.querySelectorAll=()=>[];h.exec(`let seriesHub='';render=html=>seriesHub=html;screenChallenges();`);
+ assert.match(h.exec('seriesHub'),/Continuar serie/);
+ assert.equal(h.exec('challengeCanStart()'),false);
+ assert.equal(h.exec("startChallenge('legends',['shanks','roger'])"),false);
+ const steps=h.exec('meta.dailySteps.remaining');assert.equal(h.exec('startNextChallengeTournament()'),true);
+ assert.equal(h.exec('meta.dailySteps.remaining'),steps);
+ assert.deepEqual(Array.from(h.exec('meta.challenge.series.members')),['zoro']);
+ finish(h,[false]);
+ assert.deepEqual(Array.from(h.exec('[meta.challenge.series.completed,meta.challenge.series.wins,meta.challenge.series.losses]')),[2,1,1]);
+ assert.equal(h.exec('startNextChallengeTournament()'),true);
+ finish(h,[true,true,true,true]);
+ assert.deepEqual(Array.from(h.exec('[meta.challenge.series.completed,meta.challenge.series.wins,meta.challenge.series.losses]')),[3,2,1]);
+ assert.equal(h.exec('challengeAutoMode'),false);
+ assert.equal(h.exec('startNextChallengeTournament()'),false);
+ assert.doesNotThrow(()=>h.exec('GameSaveStorage.validate(GameSaveStorage.payload(meta,null))'));
+});
+test('automatic legendary series claim the first offered relic and persist paused progress',()=>{
+ const h=harness();h.exec(`saveMeta=()=>true;startChallenge('legends',['shanks','roger']);startChallengeSeries(2);`);
+ finish(h,[true,true,true]);
+ assert.equal(h.exec('meta.challenge.pendingRelics.length'),0);
+ assert.equal(h.exec('typeof meta.challenge.relicReward'),'string');
+ assert.equal(h.exec('meta.challenge.series.completed'),1);
+ const saved=h.exec('JSON.stringify(GameSaveStorage.payload(meta,null))');
+ const fresh=harness();fresh.ctx.seriesSave=JSON.parse(saved);fresh.exec('loadedSave=seriesSave;loadMeta();');
+ assert.equal(fresh.exec('meta.challenge.series.completed'),1);
+ assert.equal(fresh.exec('challengeAutoMode'),false);
+ assert.equal(fresh.exec('startNextChallengeTournament()'),true);
+ assert.deepEqual(Array.from(fresh.exec('meta.challenge.series.members')),['shanks','roger']);
+});
+test('challenge series reject invalid totals and malformed saved counters',()=>{
+ const h=harness();h.exec(`startChallenge('tournament',['zoro']);`);
+ for(const total of [0,-1,1.5,1001,'3']){h.ctx.total=total;assert.equal(h.exec('startChallengeSeries(total)'),false);}
+ h.exec('startChallengeSeries(3);');
+ for(const mutation of [
+  'meta.challenge.series.completed=4',
+  'meta.challenge.series.wins=1',
+  "meta.challenge.series.members=['zoro','luffy']",
+  'meta.challenge.finished=true'
+ ]){
+  const bad=harness();bad.exec(`startChallenge('tournament',['zoro']);startChallengeSeries(3);${mutation}`);
+  assert.throws(()=>bad.exec('GameSaveStorage.validate(GameSaveStorage.payload(meta,null))'));
+ }
+ for(const members of [['missing'],['zoro2'],['luffy']]){
+  const bad=harness();bad.ctx.members=members;bad.exec(`startChallenge('tournament',['zoro']);startChallengeSeries(3);meta.challenge.series.members=members;`);
+  assert.throws(()=>bad.exec('validateGameSave(GameSaveStorage.payload(meta,null))'));
+ }
+});
 test('challenge victory, defeat and simultaneous KO never mutate a nuzlocke journey or tower',()=>{
  for(const outcome of ['win','loss','draw']){
   const h=harness();h.exec(`run={mode:'nuzlocke',saga:9,diff:5,team:[makeChar('zoro',20)],items:{carne:9}};tower={floor:12,team:[makeChar('luffy',15)],items:{}};const before=JSON.stringify([run,tower]);

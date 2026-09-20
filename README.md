@@ -55,7 +55,7 @@ Buggy contra Buggy ya no bloquea la partida. Se revisan pasivas y técnicas, se 
 
 Desafíos muestra Torneo y Batalla de Leyendas en dos tarjetas horizontales, también en móvil. Ambos usan el selector de retratos de historia. Los tres equipos guardados se comparten entre historia, Torre Marine y desafíos: al cargar se conserva el orden, se omiten personajes incompatibles y se usan los huecos disponibles (1 en torneo, 2 de rareza 5★ en Leyendas y 3 en Torre). Guardar en un hueco sustituye ese equipo compartido.
 
-El piloto automático usa **Pasos 👢**: cada día se recargan 1.000. En Historia se consume 1 al comenzar a recorrer automáticamente cada mapa de una isla, nunca por cada nodo; en Desafíos, el botón **AUTO** encadena los cruces y consume 1 por combate. Los mapas y combates iniciados manualmente no gastan pasos. El saldo se conserva en el guardado local y en las copias JSON.
+El piloto automático usa **Pasos 👢**: cada día se recargan 1.000. En Historia se consume 1 al comenzar a recorrer automáticamente cada mapa de una isla, nunca por cada nodo; en Desafíos, el botón **AUTO** permite elegir entre 1 y 1.000 torneos consecutivos y consume 1 por combate. Los mapas y combates iniciados manualmente no gastan pasos. La serie y el saldo se conservan en el guardado local y en las copias JSON; salir, recargar o agotar los pasos pausa la serie para reanudarla después.
 
 **Más usados** ordena los personajes por partidas iniciadas en historia, Torre Marine y desafíos. Las evoluciones comparten contador; elegir, guardar un equipo o reanudar un torneo no suma usos. Una nueva isla o un reintento sí suma uno. El contador comienza con esta actualización y se conserva en el guardado y las copias JSON; los guardados anteriores siguen siendo compatibles.
 

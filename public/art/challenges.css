@@ -124,6 +124,7 @@ html[data-theme="dark"] .challenge-nakama-picker .btn:disabled { opacity:1; colo
 .challenge-progress li > span { display:grid; place-items:center; width:24px; height:24px; flex:none; border:1px solid currentColor; border-radius:50%; }
 .challenge-progress li[aria-current], .challenge-progress li.complete { opacity:1; color:var(--arena-accent); font-weight:750; }
 .challenge-progress li[aria-current] > span { background:var(--arena-accent); color:#fff; }
+.challenge-series-status { display:flex; justify-content:space-between; gap:12px; margin:10px 0 0; padding:9px 12px; border:1px solid #91aaa960; border-radius:9px; background:var(--arena-soft); font-size:12px; }
 .challenge-view-tabs { display:grid; grid-template-columns:1fr 1fr; gap:4px; border-radius:10px; background:var(--paper-dark); padding:4px; margin-bottom:18px; }
 #app .challenge-view-tabs .btn { margin:0; border:0; box-shadow:none; color:var(--ink); background:transparent; border-radius:7px; }
 #app .challenge-view-tabs .btn[aria-pressed="true"] { background:var(--paper); color:var(--arena-accent); box-shadow:0 2px 6px #10253318; }
@@ -145,7 +146,7 @@ html[data-theme="dark"] .challenge-nakama-picker .btn:disabled { opacity:1; colo
 #app .challenge-arena .challenge-auto-hint { margin:8px 0 0; color:#58717e; font-size:12px; text-align:center; }
 .challenge-arena .challenge-rules { border:0; margin:10px 0 0; }
 .challenge-arena .challenge-rules summary { text-align:center; font-size:12px!important; opacity:.8; }
-.challenge-arena-footer { margin-top:16px; padding-top:12px; border-top:1px solid #91aaa940; display:flex; justify-content:center; }
+.challenge-arena-footer { margin-top:16px; padding-top:12px; border-top:1px solid #91aaa940; display:flex; justify-content:center; flex-wrap:wrap; gap:8px; }
 #app .challenge-arena-footer #challenge-abandon { font-size:12px; background:transparent; border:0; box-shadow:none; opacity:.75; }
 .challenge-arena .challenge-result { border:0; margin:0; padding:22px; text-align:center; background:var(--arena-soft); border-radius:12px; }
 .challenge-result-emblem { font-size:48px; }
