@@ -3603,7 +3603,13 @@ function maxStartLvlCap(progress = meta) {
 
 function logPoseUpgradeCost(currentLvl) {
   const diff = Math.max(0, currentLvl - 5);
-  return Math.floor(3 * Math.pow(1.5, diff) + diff * 2 + 3);
+  // Conserva los costes originales hasta Nv.30. Después, repite el último
+  // incremento como cantidad fija para mantener un crecimiento lineal.
+  const originalCost = steps => Math.floor(3 * Math.pow(1.5, steps) + steps * 2 + 3);
+  if (diff <= 25) return originalCost(diff);
+  const baseCost = originalCost(25);
+  const increment = baseCost - originalCost(24);
+  return baseCost + (diff - 25) * increment;
 }
 
 function startLvlOf(id, progress = meta) {
