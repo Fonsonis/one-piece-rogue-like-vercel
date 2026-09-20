@@ -6366,7 +6366,6 @@ function battleLayoutHTML(logLines, labels = {}) {
   return `
     <div class="battle-layout ${b.opts.duos ? 'challenge-duos' : ''}">
       <div class="battle-main">
-        <section id="battle-backpack" aria-label="Mochila de combate"></section>
         <div class="battle-cols" style="--scene:url('${b.opts.challenge ? '/art/scenes/wano.webp' : b.opts.local ? (b.opts.coop ? '/art/scenes/wano.webp' : '/art/scenes/eastblue.webp') : b.tower ? '/art/scenes/marineford.webp' : (SAGAS[run?.saga || 0]?.img || '/art/scenes/eastblue.webp')}')">
           <div class="battle-side" id="side-p">
             <div class="side-head"><div class="trainer">🏴‍☠️</div>${labels.p || 'TU BANDA'}
@@ -6384,6 +6383,7 @@ function battleLayoutHTML(logLines, labels = {}) {
           </div>
         </div>
         <div class="battle-reserves" id="battle-reserves"></div>
+        <section id="battle-backpack" aria-label="Mochila de combate"></section>
         <div class="battle-team-passives" aria-label="Pasivas de los equipos">
           <section><h3>✨ ${labels.p || 'TU BANDA'}</h3><div id="passives-p" class="team-passive-strip" tabindex="0" role="region" aria-label="Pasivas aliadas, desplaza para ver todas">${battleTeamPassivesHTML(b.pTeam)}</div></section>
           <section><h3>✨ ${labels.e || 'ENEMIGOS'}</h3><div id="passives-e" class="team-passive-strip" tabindex="0" role="region" aria-label="Pasivas enemigas, desplaza para ver todas">${battleTeamPassivesHTML(b.eTeam)}</div></section>
