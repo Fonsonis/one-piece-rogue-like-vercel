@@ -40,7 +40,7 @@ button { font-family: inherit; cursor: pointer; }
   filter: drop-shadow(2px 2px 0 rgba(0,0,0,.25));
 }
 
-#app { max-width: 900px; margin: 0 auto; padding: 16px; min-height: 100vh; }
+#app { max-width:900px; margin:0 auto; padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left)); min-height:100vh; }
 
 /* --- Cabecera y Elementos Superpuestos (Floating Overlay) --- */
 .topbar {
@@ -690,7 +690,7 @@ button { font-family: inherit; cursor: pointer; }
 
 .back-btn {
   position: sticky;
-  top: 10px;
+  top: max(10px, env(safe-area-inset-top));
   z-index: 100;
   margin-bottom: 12px;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
@@ -740,11 +740,11 @@ button { font-family: inherit; cursor: pointer; }
     background-attachment: scroll;
     font-size: 10px;
   }
-  #app { padding: 10px; }
+  #app { padding:max(10px,env(safe-area-inset-top)) max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)) max(10px,env(safe-area-inset-left)); }
   .logo { font-size: 18px; }
   .topbar { margin-bottom: 10px; }
-  .back-btn { top: 8px; }
-  .floating-controls { top: 8px; right: 8px; gap: 4px; }
+  .back-btn { top:max(8px,env(safe-area-inset-top)); }
+  .floating-controls { top:max(8px,env(safe-area-inset-top)); right:max(8px,env(safe-area-inset-right)); gap:4px; }
   .floating-controls .btn { padding: 4px 6px; font-size: 7.5px; }
   .floating-berries { top: 38px; left: 8px; }
   .floating-berries .berries { padding: 4px 8px; font-size: 9px; }

@@ -1353,7 +1353,7 @@ const SAGA_FIXES = {
   // Wano
   hera: 'wano', ryokugyu: 'wano',
   // Saga Final — Elbaf
-  oimo: 'egghead', kashi: 'egghead',
+  oimo: 'egghead', kashi: 'egghead', joyboy: 'egghead',
 };
 for (const [id, s] of Object.entries(SAGA_FIXES)) if (CHARS[id]) CHARS[id].saga = s;
 for (const c of Object.values(CHARS)) if (c.zoanBase) c.saga = CHARS[c.zoanBase].saga;

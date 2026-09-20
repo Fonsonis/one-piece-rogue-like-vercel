@@ -28,9 +28,24 @@ test('revival is independent from healing and always respects Nuzlocke',()=>{
 test('configured event stops do not enter or consume the node; normal advancement does',()=>{
  const h=combatHarness();let entered=0;h.ctx.enterNode=()=>entered++;
  h.ctx.document.querySelector=()=>null;
- h.exec("screenMap=()=>{};autoMode=true;run={map:{rows:[[{type:'boss',done:false}]]}};autoSettings.pauseEvents=['boss'];advanceAutoNode(0,0)");
+ h.exec("screenMap=()=>{};saveRun=()=>true;autoMode=true;run={mapIdx:0,map:{rows:[[{type:'boss',done:false}]]}};autoSettings.pauseEvents=['boss'];advanceAutoNode(0,0)");
  assert.equal(entered,0);assert.equal(h.exec('autoMode'),false);assert.equal(h.exec('run.map.rows[0][0].done'),false);
  h.exec("autoMode=true;autoSettings.pauseEvents=[];advanceAutoNode(0,0)");assert.equal(entered,1);
+ assert.equal(h.exec('meta.dailySteps.remaining'),999);assert.equal(h.exec('run.autoPaidMapIdx'),0);
+ h.exec('advanceAutoNode(0,0)');assert.equal(entered,2);assert.equal(h.exec('meta.dailySteps.remaining'),999);
+ h.exec('run.mapIdx=1;advanceAutoNode(0,0)');assert.equal(entered,3);assert.equal(h.exec('meta.dailySteps.remaining'),998);
+ h.exec('meta.dailySteps.remaining=0;run.mapIdx=2;advanceAutoNode(0,0)');
+ assert.equal(entered,3);assert.equal(h.exec('autoMode'),false);assert.equal(h.exec('run.autoPaidMapIdx'),1);
+});
+
+test('a failed automatic map save restores both the step and the map marker',()=>{
+ const h=combatHarness();let entered=0;h.ctx.enterNode=()=>entered++;
+ h.ctx.document.querySelector=()=>null;
+ h.exec("screenMap=()=>{};saveRun=()=>false;autoMode=true;run={mapIdx:0,map:{rows:[[{type:'combat',done:false}]]}};advanceAutoNode(0,0)");
+ assert.equal(entered,0);
+ assert.equal(h.exec('meta.dailySteps.remaining'),1000);
+ assert.equal(h.exec('run.autoPaidMapIdx'),undefined);
+ assert.equal(h.exec('autoMode'),false);
 });
 
 test('automatic spending preserves the reserve and settings survive save normalization',()=>{

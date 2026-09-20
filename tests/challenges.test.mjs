@@ -44,6 +44,25 @@ test('an unfinished bracket resumes without changing its draw',()=>{
  assert.equal(h.exec('JSON.stringify(meta.challenge)===checkpoint'),true);
  finish(h,[true,true,true]);assert.equal(h.exec('meta.logPoses'),7500);
 });
+test('automatic challenge fights spend one daily step while manual fights stay free',()=>{
+ const manual=harness();manual.exec(`saveMeta=()=>true;startChallenge('tournament',['zoro']);playChallengeMatch(false);`);
+ assert.equal(manual.exec('meta.dailySteps.remaining'),1000);
+ const automatic=harness();automatic.exec(`saveMeta=()=>true;startChallenge('tournament',['zoro']);challengeAutoMode=true;playChallengeMatch(true);`);
+ assert.equal(automatic.exec('meta.dailySteps.remaining'),999);
+ assert.equal(automatic.exec('!!battle'),true);
+ automatic.exec(`battle=null;endChallengeBattle(true);meta.dailySteps.remaining=0;challengeAutoMode=true;playChallengeMatch(true);`);
+ assert.equal(automatic.exec('battle'),null);assert.equal(automatic.exec('challengeAutoMode'),false);
+});
+test('challenge auto can be stopped in battle and surrender cancels the chain',()=>{
+ const h=harness();h.exec(`saveMeta=()=>true;startChallenge('tournament',['zoro']);challengeAutoMode=true;playChallengeMatch(true);`);
+ assert.match(h.exec('controlsHTML()'),/data-ctl="challenge-auto-stop"/);
+ const stop={dataset:{ctl:'challenge-auto-stop'}};h.ctx.document.querySelectorAll=()=>[stop];h.exec('bindControls()');stop.onclick();
+ assert.equal(h.exec('challengeAutoMode'),false);
+
+ h.exec(`battle=null;challengeAutoMode=true;playChallengeMatch(false);modalConfirm=(_title,_body,confirm)=>confirm();`);
+ const quit={dataset:{ctl:'quit'}};h.ctx.document.querySelectorAll=()=>[quit];h.exec('bindControls()');quit.onclick();
+ assert.equal(h.exec('challengeAutoMode'),false);
+});
 test('challenge victory, defeat and simultaneous KO never mutate a nuzlocke journey or tower',()=>{
  for(const outcome of ['win','loss','draw']){
   const h=harness();h.exec(`run={mode:'nuzlocke',saga:9,diff:5,team:[makeChar('zoro',20)],items:{carne:9}};tower={floor:12,team:[makeChar('luffy',15)],items:{}};const before=JSON.stringify([run,tower]);
