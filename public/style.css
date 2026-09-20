@@ -1183,3 +1183,8 @@ button:focus-visible,[tabindex]:focus-visible {outline:3px solid #fff;outline-of
   .challenge-panel h2 { font-size:15px; line-height:1.8; }
   .challenge-duos .fcard .fcard-sprite { height:90px; min-height:70px; }
 }
+
+/* Escape stays beside the encounter title, within reach above the fighters. */
+.battle-event-title { display:flex; align-items:center; justify-content:center; gap:8px; }
+.battle-layout .btn.battle-flee { flex:0 0 44px; width:44px; min-height:44px; padding:6px; font-size:21px; line-height:1; }
+.battle-flee:focus-visible { outline:3px solid var(--gold); outline-offset:3px; }

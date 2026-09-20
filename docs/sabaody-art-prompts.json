@@ -1,0 +1,16 @@
+{
+  "mode": "built-in image_gen",
+  "prefix": "Production game asset, One Piece browser RPG. ONE character sprite sheet. Subject: ",
+  "suffix": " FOUR distinct full-body poses in ONE horizontal row: idle guard, ready, attack, hurt. All face right, feet aligned. Crisp detailed 16-bit pixel art with black outlines and limited shading. Each pose fits wholly inside its own equal cell with generous TRANSPARENT gaps; no touching or overlap. Entire weapons, hair, tails and accessories visible. Actual transparent RGBA background. No text, labels, border, ground or watermark. No blood. Match a classic pixel fighting-game sprite, not a portrait.",
+  "assets": {
+    "sentomaru": "Sentomaru from One Piece: heavyset muscular young man, straight black bob haircut, scar on face, red sleeveless sumo-style apron with three black tomoe marks over his chest, bandaged forearms, sandals, oversized double-edged battle axe. Powerful palm-strike stance.",
+    "pacifista": "Pacifista PX cyborg from One Piece: extremely tall broad Kuma-like humanoid, white bear-ear hat with dark spots, curly black hair, dark high-collar jacket with large pale target cross circle on chest, pale trousers with dark spots and boots. Open metal palm glowing yellow laser, emotionless face. No Bible.",
+    "duval": "Duval from One Piece after his face correction: tall muscular handsome blond adult man with short styled hair and sunglasses, open biker jacket with fur collar, brown trousers and boots, harpoon rifle. Stylish confident grin, no helmet.",
+    "disco": "Disco, auction-house presenter from One Piece: lanky adult man with purple hair, star-shaped sunglasses and flamboyant tall dark top hat, purple coat with fur collar, yellow patterned scarf and trousers, black boots, microphone and cane.",
+    "peterman": "Peterman from One Piece: slim adult male bounty hunter with long sharp nose and mustache, red-and-white vertically striped cap and matching striped outfit, dark gloves, boots and a large rope capture net. Sneaky crouching stance.",
+    "bege": "Capone Gang Bege from One Piece: short stocky mafia pirate, slicked black hair, thin mustache and pointed beard, black fedora, striped dark suit and white shirt with tie, big fur-trimmed dark cape, cigar in mouth, small cannons extending from castle openings in his arms.",
+    "urouge": "Urouge the Mad Monk from One Piece: very large muscular dark-skinned man, black hair and short dark beard, broad fixed grin, small white feather wings on back, huge bead necklace, bare muscular arms and torso, monk robe around waist, sandals, enormous hexagonal metal pillar held like a club.",
+    "bepo": "Bepo from One Piece: friendly stocky anthropomorphic WHITE POLAR BEAR, small round ears, black nose, orange high-collar jumpsuit of the Heart Pirates with black heart insignia, dark boots, martial arts stance. Normal bear form, not Sulong.",
+    "jeanbart": "Jean Bart from One Piece after rescue in Sabaody: huge muscular bald adult pirate with dark short beard and stern eyes, dark sleeveless vest, light sash and baggy trousers, heavy boots and large clenched fists. No chains or injuries."
+  }
+}

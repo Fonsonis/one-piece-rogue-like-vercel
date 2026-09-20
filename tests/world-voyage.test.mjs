@@ -25,7 +25,7 @@ test('location names preserve every encounter, stable index and progression valu
  const before=JSON.parse(vm.runInContext('JSON.stringify(SAGAS)',c));
  vm.runInContext(fs.readFileSync('public/art/world-locations.js','utf8'),c);
  const after=JSON.parse(vm.runInContext('JSON.stringify(SAGAS)',c));
- assert.equal(after.flatMap(s=>s.islands).length,57);
+ assert.equal(after.flatMap(s=>s.islands).length,70);
  for(let s=0;s<before.length;s++)for(let i=0;i<before[s].islands.length;i++){
    const {name,location,...rest}=after[s].islands[i],{name:oldName,...oldRest}=before[s].islands[i];
    assert.deepEqual(rest,oldRest);
@@ -34,7 +34,7 @@ test('location names preserve every encounter, stable index and progression valu
    assert.equal(name,`${location.place} · ${location.zone}`);
  }
  assert.equal(after[0].islands[3].location.kind,'Barco');
- assert.equal(after[10].islands[5].location.place,'Mary Geoise');
+ assert.equal(after[13].islands[5].location.place,'Egghead');
 });
 
 function mounted({reduce=false}={}){

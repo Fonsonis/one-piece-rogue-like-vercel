@@ -21,6 +21,32 @@
   const group=(ids,family,motif,opts={})=>ids.split(' ').forEach(id=>{overrides[id]={family,motif,...opts};});
   // The same material can have different choreography: blade count, silhouette,
   // sweep, projectile, pressure wave and secondary accent are authored here.
+  group('roddy blackback miyagi tristan sheepshead ginrummy','impact','resolve');
+  group('giovanni concelot','slash','rapier');
+  group('momonosuke-adult','slash','shogun');
+  group('momonosuke-dragon','dragon','flame-clouds',{color:'#ff9fcf'});
+  group('kuma-young','paw','palm');
+  group('ivankov-young','impact','resolve');
+  group('ginny-young dragon-young','shot','volley');
+  group('sentomaru urouge bepo jeanbart','impact','fist');
+  group('pacifista','laser','beam');
+  group('duval disco peterman bege','shot','volley');
+  group('zoro-enma zoro-kingofhell','slash','three-swords',{count:3});
+  group('nami-sorcery nami-zeus','lightning','storm',{count:6});
+  group('sanji-diable sanji-raid','flame','kick');
+  group('sanji-ifrit','flame','kick',{color:'#61cfff',accent:'#e7fcff'});
+  group('loki','lightning','hammer',{count:6});
+  group('loki-animal','dragon','lightning',{color:'#b69cf0',count:7});
+  group('shamrock','slash','cerberus',{count:3});
+  group('gunko gunko-young','shot','arrow',{color:'#80c8e5',count:5});
+  group('sommers sommers-young','forest','thorns',{color:'#bd779d',count:7});
+  group('killingham killingham-animal killingham-hybrid','dark','nightmare',{count:6});
+  group('im-gunko im-revealed','dark','domi-reversi',{color:'#ae5572',count:8});
+  group('harald saul jarul ripley colon','impact','giant',{count:5});
+  group('road gerd','slash','axe',{count:2});
+  group('goldberg','impact','shield');group('stansen','impact','hammer');
+  group('ange','impact','resolve');group('biblo','portal','books');
+  group('shakky shakky-young','impact','kuja');group('ginny ginny-young','shot','rifle');
   group('luffy','rubber','gatling',{count:7});
   group('luffy2','rubber','jet',{count:10,color:'#ff8a91'});
   group('luffy3','rubber','giant',{count:1});
@@ -169,7 +195,7 @@
     return 'cast';
   }
   function resolve(id, character, move, baseId=id) {
-    const rule=overrides[id] || overrides[baseId];
+    const rule=character?.sulongBase ? {family:'lightning',motif:'electro',color:'#d9f4ff',count:7} : overrides[id] || overrides[baseId] || overrides[character?.historicalBase];
     const family=rule?.family || typeFamily[move?.type] || typeFamily[character?.types?.[0]] || 'impact';
     const seed=hash(id+':'+(move?.name||'')), palette=styles[family];
     return Object.freeze({id,family,motif:rule?.motif || 'technique',

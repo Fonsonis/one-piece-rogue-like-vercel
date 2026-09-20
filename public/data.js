@@ -1148,6 +1148,99 @@ defineGenChars('egghead', [
   ['emeth','Emeth','🤖',4,['Golpe','Tierra'],''],
 ]);
 
+
+// Archipiélago Sabaody: el reparto previo mantiene sus IDs y sus sprites.
+defineGenChars('sabaody', [
+  ['sentomaru','Sentomaru','🪓',4,['Golpe','Haki'],'b'],
+  ['pacifista','Pacifista PX','🤖',3,['Disparo','Fruta'],'b'],
+  ['duval','Duval','🏍️',2,['Disparo','Golpe'],''],
+  ['disco','Disco','🎩',1,['Golpe'],'b'],
+  ['peterman','Peterman','🕸️',1,['Disparo'],'b'],
+  ['bege','Capone Bege','🏰',4,['Disparo','Fruta'],''],
+  ['urouge','Urouge','💪',4,['Golpe','Fruta'],''],
+  ['bepo','Bepo','🐻‍❄️',3,['Golpe'],''],
+  ['jeanbart','Jean Bart','⚓',3,['Golpe'],''],
+]);
+const SABAODY_TECHNIQUES={
+  sentomaru:['ashigaradokkoi','Ashigara Dokkoi','Golpe',85],
+  pacifista:['pxlaser','Láser Pacifista','Disparo',80],
+  duval:['duvalharpoon','Arpón de Duval','Disparo',65],
+  disco:['auctionguard','Guardia de la subasta','Golpe',55],
+  peterman:['capturenet','Red de captura','Disparo',55],
+  bege:['castlefire','Artillería del castillo','Disparo',85],
+  urouge:['causalimpact','Impacto del monje','Golpe',85],
+  bepo:['polarmartial','Artes marciales del oso polar','Golpe',75],
+  jeanbart:['captainsfist','Puño del capitán','Golpe',75],
+};
+for(const [id,[move,name,type,power]] of Object.entries(SABAODY_TECHNIQUES)){
+  MOVES[move]={name,type,power,acc:.95};
+  CHARS[id].learnset[2]=[20,move];CHARS[id].ultimate=move;
+}
+
+// Elbaph y personajes de los recuerdos de God Valley (fuentes en docs/elbaph-content.md).
+defineGenChars('zou', [
+  ['roddy','Roddy','🐂',3,['Golpe','Rayo'],''], ['blackback','Blackback','🦍',3,['Golpe','Rayo'],''],
+  ['giovanni','Giovanni','🦓',3,['Corte','Rayo'],''], ['concelot','Concelot','🦊',3,['Corte','Rayo'],''],
+  ['miyagi','Miyagi','🐐',2,['Golpe'],''], ['tristan','Tristan','🐿️',2,['Golpe'],''],
+  ['sheepshead','Sheepshead','🐏',3,['Golpe'],'b'], ['ginrummy','Ginrummy','🦌',2,['Golpe'],'b'],
+]);
+
+defineGenChars('elbaph', [
+  ['loki','Loki','🔨',5,['Rayo','Golpe'],''],
+  ['shamrock','Figarland Shamrock','⚔️',5,['Corte','Haki'],'b'],
+  ['gunko','Manmayer Gunko','🏹',4,['Fruta','Golpe'],'b'],
+  ['sommers','Shepherd Sommers','🌹',4,['Fruta','Corte'],'b'],
+  ['killingham','Rimoshifu Killingham','💤',4,['Fruta','Oscuridad'],'b'],
+  ['harald','Rey Harald','👑',5,['Golpe','Haki'],''],
+  ['road','Road','☀️',3,['Corte','Golpe'],''],
+  ['gerd','Gerd','🪓',3,['Corte','Golpe'],''],
+  ['goldberg','Goldberg','🛡️',3,['Golpe','Tierra'],''],
+  ['stansen','Stansen','🔨',3,['Golpe','Tierra'],''],
+  ['saul','Jaguar D. Saul','📚',4,['Golpe','Tierra'],''],
+  ['jarul','Jarul','⛰️',4,['Corte','Haki'],''],
+  ['ripley','Ripley','🌿',3,['Golpe','Corte'],''],
+  ['colon','Colon','🪓',2,['Golpe'],''],
+  ['ange','Ange','📖',2,['Golpe'],''],
+  ['biblo','Biblo','🦉',2,['Fruta','Viento'],''],
+  ['shakky','Shakuyaku','🕷️',4,['Golpe','Haki'],''],
+  ['ginny','Ginny','📡',2,['Disparo'],''],
+]);
+const ELBAPH_TECHNIQUES = {
+  loki:['ragnir','Ragnir · Trueno de Elbaph','Rayo',90],
+  shamrock:['cerberus','Cerberus','Corte',90],
+  gunko:['arrows','Trayectoria de flechas','Fruta',80],
+  sommers:['thorncage','Prisión de espinas','Fruta',80],
+  killingham:['nightmare','Manifestación de pesadillas','Oscuridad',80],
+  harald:['giantking','Impacto del rey gigante','Golpe',90],
+  road:['sungodaxe','Hacha del falso Dios del Sol','Corte',75],
+  gerd:['giantaxe','Hacha de guerrera gigante','Corte',75],
+  goldberg:['giantshield','Golpe de escudo gigante','Golpe',75],
+  stansen:['gianthammer','Martillo de gigante','Golpe',75],
+  saul:['giantresolve','Determinación de Saul','Golpe',80],
+  jarul:['mountainbeard','Fuerza del Barba Montaña','Corte',80],
+  ripley:['giantwarrior','Golpe de guerrera','Golpe',75],
+  colon:['younggiant','Embate del joven gigante','Golpe',65],
+  ange:['libraryguard','Defensa de la biblioteca','Golpe',65],
+  biblo:['bookgrowth','Crecimiento de los libros','Fruta',65],
+  shakky:['kujastrike','Golpe de las Kuja','Haki',80],
+  ginny:['freedomsignal','Señal de libertad','Disparo',65],
+  im:['domireversi','Domi Reversi','Oscuridad',95],
+};
+for (const [id,[move,name,type,power]] of Object.entries(ELBAPH_TECHNIQUES)) {
+  MOVES[move]={name,type,power,acc:.95};
+  CHARS[id].ultimate=move;
+  CHARS[id].learnset=[...CHARS[id].learnset.filter(([lvl])=>lvl<20),[20,move]];
+}
+Object.assign(CHARS.loki,{desc:'Príncipe de Elbaph, portador de Ragnir y de la fruta mítica Nidhöggr.'});
+Object.assign(CHARS.harald,{desc:'Rey de Elbaph en los recuerdos del manga. Soñaba con abrir su país al mundo.'});
+Object.assign(CHARS.gunko,{desc:'Caballera de Dios que controla trayectorias mediante flechas. Su identidad es independiente de la posesión de Im.'});
+Object.assign(CHARS.sommers,{desc:'Caballero de Dios que crea y controla espinas.'});
+Object.assign(CHARS.killingham,{desc:'Caballero de Dios con la fruta mítica Kirin; materializa sueños y pesadillas.'});
+Object.assign(CHARS.saul,{desc:'Superviviente de Ohara y guardián de su legado en Elbaph.'});
+Object.assign(CHARS.biblo,{desc:'Búho de la biblioteca que agranda los libros para los gigantes.'});
+Object.assign(CHARS.shakky,{desc:'Shakuyaku, antigua emperatriz Kuja. Su pasado está ligado a God Valley.'});
+Object.assign(CHARS.ginny,{desc:'Experta en comunicaciones y futura comandante revolucionaria; escapó de God Valley junto a Kuma e Ivankov.'});
+
 // Cualquier personaje sin saga (formas evolucionadas, etc.) hereda la de su base o East Blue
 for (const [id, c] of Object.entries(CHARS)) {
   if (!c.saga) {
@@ -1202,6 +1295,10 @@ const SAGA_DEFS = [
     ['Niebla Fantasma', ['hildon', 'tararan']], ['Mansión Hogback', ['hogback', 'absalom']],
     ['Jardín Helado', ['ryuma', 'perona']], ['Mástil Mayor', ['oars', 'moria']],
   ]},
+  { id:'sabaody', name:'ARCHIPIÉLAGO SABAODY', color:'#58aaa0', islands:[
+    ['Casa de Subastas', ['duval','disco','charlos']],
+    ['Separación de la banda', ['sentomaru','pacifista','kizaru','kuma']],
+  ]},
   { id: 'marineford', name: 'MARINEFORD', img: 'Images/portada-saga-marine-fort.jpg', color: '#c45a5a', islands: [
     ['Amazon Lily', ['sadie', 'domino']], ['Impel Down Nv1-3', ['saldeath', 'minotauros', 'hannyabal']],
     ['Impel Down Nv4-6', ['magellan']], ['Bahía de Marineford', ['momonga', 'onigumo', 'johngiant']],
@@ -1211,10 +1308,18 @@ const SAGA_DEFS = [
     ['Bosque Marino', ['hammond', 'hyouzou']], ['Distrito Gyojin', ['dosun', 'zeo', 'daruma']],
     ['Palacio Ryugu', ['ikaros', 'decken']], ['Plaza Gyoncorde', ['wadatsumi', 'hody']],
   ]},
+  {id:'punkhazard',name:'PUNK HAZARD',color:'#a78db6',islands:[
+    ['Laboratorio de Caesar',['monet','vergo','caesar']],
+    ['Huida del laboratorio',['baby5','buffalo']],
+  ]},
   { id: 'dressrosa', name: 'DRESSROSA', img: 'Images/portada-saga-dressrossa.jpg', color: '#d96a8a', islands: [
-    ['Punk Hazard', ['monet', 'vergo', 'caesar']], ['Puerto de Acacia', ['sugar', 'jora', 'buffalo']],
+    ['Puerto de Acacia', ['sugar', 'jora', 'buffalo']],
     ['Coliseo Corrida', ['dellinger', 'laog', 'machvise']], ['Palacio Real', ['gladius', 'senorpink', 'diamante']],
     ['Campo de Flores', ['pica', 'trebol', 'doflamingo']], ['Puerto Final', ['fujitora']],
+  ]},
+  {id:'zou',name:'ZOU',color:'#6b9d83',islands:[
+    ['Reino de Mokomo',['sheepshead','ginrummy']],
+    ['Árbol Ballena',['inuarashi','nekomamushi','jack']],
   ]},
   { id: 'wholecake', name: 'WHOLE CAKE', color: '#e88ab0', islands: [
     ['Bosque Seductor', ['brulee', 'kingbaum2'] ], ['Ciudad Dulce', ['bobbin', 'cracker']],
@@ -1230,7 +1335,17 @@ const SAGA_DEFS = [
   { id: 'egghead', name: 'EGGHEAD', img: 'Images/portada-saga-egghead.jpg', color: '#7a5ad9', islands: [
     ['Laboratorio', ['ssnake', 'shawk', 'sshark']], ['Fábrica', ['sbear', 'sflamingo', 'sgecko']],
     ['Ciudad Futura', ['scroc', 'york']], ['Asalto Marine', ['ryokugyu', 'kizaru']],
-    ['Los Cinco Ancianos', ['saturn', 'mars', 'warcury']], ['Trono Vacío', ['nusjuro', 'jupeter', 'im']],
+    ['Los Cinco Ancianos', ['saturn', 'mars', 'warcury']], ['Huida de Egghead', ['nusjuro', 'jupeter']],
+  ]},
+  { id:'elbaph', name:'ELBAPH', img:'art/scenes/elbaph.webp', color:'#668b48', islands:[
+    ['País de los Dioses', ['road']],
+    ['Inframundo', ['loki']],
+    ['Aldea del Oeste', ['gaban']],
+    ['Biblioteca del Búho', ['gunko']],
+    ['Escuela de la Morsa', ['killingham']],
+    ['Castillo Aurust', ['shamrock']],
+    ['Árbol Adam', ['sommers']],
+    ['Batalla de Elbaph', ['im']],
   ]},
 ];
 
@@ -1242,6 +1357,8 @@ const BOSS_ALIASES = { kingbaum2: 'brulee', speed2: 'holdem' };
 // Formas mostradas de los usuarios Zoan del catálogo. No se inventan despertares.
 // Chopper ya comienza en Brain Point (híbrida); Heavy Point es su siguiente forma de combate.
 const ZOAN_FORMS = {
+  loki: [['animal','Nidhöggr']],
+  killingham: [['animal','Kirin'],['hybrid','Kirin híbrido']],
   chopper: [['animal','Walk Point'],['hybrid','Heavy Point'],['monster','Monster Point']],
   lucci: [['animal','Leopardo'],['hybrid','Leopardo híbrido'],['awakened','Leopardo despertado']],
   kaku: [['animal','Jirafa'],['hybrid','Jirafa híbrida'],['awakened','Jirafa despertada']],
@@ -1309,6 +1426,160 @@ for (const id of ['chopper','chopper-animal','chopper-hybrid']) {
   CHARS[id].ultimate = 'cabezazo';
 }
 SIGNATURE_MOVES.chopper = CHARS.chopper.ultimate;
+// Versiones históricas: adaptación jugable, no rejuvenecimiento canónico.
+// Los bebés de God Valley no se convierten en mejoras de combate.
+const GOD_VALLEY_FORMS = Object.freeze([
+  'garp','roger','rayleigh','gaban','newgate','bigmom','kaido','shiki',
+  'xebec','garling','bogard','bakkin','gloriosa','john','streusen',
+  'shakky','saturn','gunko','sommers',
+]);
+for (const baseId of GOD_VALLEY_FORMS) {
+  const base=CHARS[baseId], id=`${baseId}-young`, next=base.evo;
+  const signature=base.ultimate || base.learnset.at(-1)[1];
+  const move=`godvalley_${baseId}`;
+  MOVES[move]={name:`${base.name} · voluntad de God Valley`,type:base.types[0],power:80,acc:.95};
+  CHARS[id]={...base,name:`${base.name} · God Valley`,
+    base:base.base.map((n,i)=>n+(i===0?4:2)),types:[...base.types],
+    learnset:[[25,move],[25,signature]],ultimate:signature,generated:false,
+    historicalBase:baseId,formLevel:25,
+    desc:'Versión de hace 38 años, durante God Valley. Requiere nivel base y nivel en partida 25. Adaptación de progreso del juego.',
+    evo:next ? {...next,lvl:30} : undefined,
+  };
+  // La fase joven ocupa Nv.25; las formas Zoan previas continúan desde Nv.30/40.
+  if(next){
+    let form=CHARS[next.to], level=30;
+    while(form){
+      form.formLevel=level;
+      form.base=form.base.map((n,i)=>n+(i===0?4:2));
+      form.learnset=form.learnset.map(([,m])=>[level,m]);
+      form.desc=form.desc.replace(/nivel en partida \d+/,`nivel en partida ${level}`);
+      if(!form.evo)break;
+      level+=10;form.evo={...form.evo,lvl:level};form=CHARS[form.evo.to];
+    }
+  }
+  base.evo={lvl:25,to:id};
+}
+// Infancias de God Valley: cartas independientes, no evoluciones ni fases del adulto.
+// Se conservan los IDs de los sprites ya creados; su identidad jugable es propia.
+const GOD_VALLEY_COLLECTIBLES=Object.freeze({
+  'kuma-young':['kuma','Kuma niño', ['Golpe','Fruta'], 'Manos de liberación'],
+  'ivankov-young':['ivankov','Ivankov adolescente', ['Golpe'], 'Voluntad de escapar'],
+  'ginny-young':['ginny','Ginny niña', ['Disparo'], 'Señal de huida'],
+  'dragon-young':['dragon','Dragon cadete', ['Disparo','Golpe'], 'Rescate del cadete'],
+});
+for(const [id,[adult,name,types,technique]] of Object.entries(GOD_VALLEY_COLLECTIBLES)){
+  const move=`collection_${adult}`;
+  MOVES[move]={name:technique,type:types[0],power:70,acc:.95};
+  CHARS[id]={name:`${name} · God Valley`,emoji:CHARS[adult].emoji,
+    types,base:[23,11,9,12],rareza:3,generated:false,boss:false,saga:'elbaph',
+    collectionOf:adult,learnset:[[1,TYPE_LADDER[types[0]][0]],[10,TYPE_LADDER[types[0]][1]],[20,move]],
+    ultimate:move,desc:'Carta coleccionable de God Valley. Identidad y mejoras independientes de su versión adulta; no es una evolución.'};
+}
+
+// Im conserva su ID de las partidas existentes. La posesión pertenece a su cadena,
+// no a la de Gunko, para no mezclar reclutamientos ni mejoras permanentes.
+for (const [id,label,level,bonus] of [
+  ['im-gunko','Posesión de Gunko',25,2],
+  ['im-revealed','Forma revelada',40,4],
+]) {
+  const base=CHARS.im;
+  CHARS[id]={...base,name:`Im · ${label}`,base:base.base.map((n,i)=>n+bonus*(i===0?3:1)),
+    types:[...base.types],learnset:[[level,'domireversi'],[level,TYPE_LADDER.Haki[2]]],
+    ultimate:'domireversi',generated:false,formLevel:level,
+    desc:`${label}, mostrada en el manga de Elbaph. Requiere nivel base y nivel en partida ${level}.`,
+    evo:id==='im-gunko'?{lvl:40,to:'im-revealed'}:undefined};
+}
+CHARS.im.evo={lvl:25,to:'im-gunko'};
+
+// Formas mostradas del Gorosei: no se atribuye una fruta o despertar sin confirmar.
+const GOROSEI_FORMS = Object.freeze({
+  saturn:[['hybrid','Gyūki híbrido',30],['beast','Gyūki',40]],
+  mars:[['beast','Itsumade',40]],
+  warcury:[['beast','Hōki',40]],
+  nusjuro:[['hybrid','Bakotsu híbrido',25],['beast','Bakotsu',40]],
+  jupeter:[['beast','Sand Wyrm',40]],
+});
+for(const [baseId,forms] of Object.entries(GOROSEI_FORMS)) {
+  const base=CHARS[baseId];
+  let previous=base;
+  while(previous.evo)previous=CHARS[previous.evo.to];
+  for(const [kind,label,level] of forms){
+    const id=`${baseId}-${kind}`,rank=kind==='beast'?3:2,move=`gorosei_${baseId}_${kind}`;
+    MOVES[move]={name:label,type:base.types[0],power:kind==='beast'?95:85,acc:.95};
+    CHARS[id]={...base,name:`${base.name} · ${label}`,types:[...base.types],
+      base:base.base.map((n,i)=>n+rank*(i===0?3:2)),
+      learnset:[[level,move],[level,TYPE_LADDER[base.types[1]||base.types[0]][2]]],
+      ultimate:move,evo:undefined,generated:false,formLevel:level,goroseiBase:baseId,
+      desc:`${label}, transformación mostrada en el manga. Requiere nivel base y nivel en partida ${level}.`};
+    previous.evo={lvl:level,to:id};previous=CHARS[id];
+  }
+}
+
+// Progresión de combate de los tres nakamas; ambas barras de nivel desbloquean cada fase.
+const STRAW_HAT_COMBAT_FORMS = {
+  zoro2: [
+    ['zoro-enma', 'Zoro · Enma', 30, ['Corte','Haki'], [33,20,13,14], 'enmacut', 'Corte de Enma', 'Enma pone a prueba su control del Haki.'],
+    ['zoro-kingofhell', 'Zoro · Rey del Infierno', 40, ['Corte','Haki'], [38,24,16,17], 'dragondamnation', 'Dragón de los Tres Estilos', 'Tres espadas revestidas con Haki del conquistador.'],
+  ],
+  nami2: [
+    ['nami-sorcery', 'Nami · Sorcery Clima-Tact', 30, ['Rayo','Viento'], [30,18,11,19], 'weatheregg', 'Weather Egg', 'La ciencia de Weatheria amplía su dominio del clima.'],
+    ['nami-zeus', 'Nami · Zeus', 40, ['Rayo','Viento'], [35,22,14,22], 'zeusbreeze', 'Zeus Breeze Tempo', 'Zeus habita en el Clima-Tact y dirige sus rayos.'],
+  ],
+  sanji: [
+    ['sanji-diable', 'Sanji · Diable Jambe', 20, ['Golpe','Fuego'], [28,16,10,16], 'diablejambe', 'Diable Jambe', 'La pierna al rojo vivo potencia sus patadas.'],
+    ['sanji-raid', 'Sanji · Stealth Black', 30, ['Golpe','Fuego'], [32,19,13,19], 'shootingstar', 'Shooting Star! Soba Mask!', 'El Raid Suit de Germa aporta invisibilidad y movilidad. Etapa histórica anterior a su destrucción.'],
+    ['sanji-ifrit', 'Sanji · Ifrit Jambe', 40, ['Golpe','Fuego','Haki'], [37,23,16,23], 'boeufburst', 'Bœuf Burst', 'Exoesqueleto, Haki y llamas azules potencian sus patadas.'],
+  ],
+};
+for(const [start,forms] of Object.entries(STRAW_HAT_COMBAT_FORMS)){
+  let previous=CHARS[start];
+  for(const [id,name,level,types,base,move,label,desc] of forms){
+    if(!MOVES[move])MOVES[move]={name:label,type:types[0],power:level===40?95:80,acc:.95};
+    CHARS[id]={...CHARS[start],name,types,base,rareza:level===40?5:4,
+      learnset:[[level,move]],ultimate:move,evo:undefined,generated:false,formLevel:level,
+      desc:`${desc} Requiere nivel base y nivel en partida ${level}.`};
+    previous.evo={lvl:level,to:id};previous=CHARS[id];
+  }
+}
+
+// Técnicas reservadas para la fase que las desbloquea.
+CHARS.zoro2.ultimate=SIGNATURE_MOVES.zoro2='santoryuogi';
+CHARS.zoro2.learnset=CHARS.zoro2.learnset.filter(([level])=>level<30);
+CHARS['zoro-enma'].learnset.push([30,'ashura']);
+CHARS.sanji.ultimate=SIGNATURE_MOVES.sanji='mutonshoot';
+CHARS.sanji.learnset=CHARS.sanji.learnset.filter(([level])=>level<20);
+
+// Sulong mostrado en el manga. El umbral sustituye a la luna como adaptación jugable.
+const SULONG_FORMS=['carrot','wanda','inuarashi','nekomamushi','shishilian','giovanni','concelot','roddy','blackback','pekoms','bepo'];
+for(const baseId of SULONG_FORMS){
+  const base=CHARS[baseId],id=`${baseId}-sulong`,move=`sulong_${baseId}`;
+  MOVES[move]={name:`${base.name} · Electro Sulong`,type:'Rayo',power:90,acc:.95};
+  CHARS[id]={...base,name:`${base.name} · Sulong`,types:[...new Set([...base.types,'Rayo'])],
+    base:base.base.map((n,i)=>n+(i===0?9:i===3?6:4)),rareza:Math.min(5,base.rareza+1),
+    learnset:[[40,move]],ultimate:move,evo:undefined,generated:false,zoan:false,zoanForm:undefined,
+    sulongBase:baseId,formLevel:40,
+    desc:'Transformación Sulong mostrada en el manga. No es un despertar de fruta. Requiere nivel base y en partida 40.'};
+  let previous=base;while(previous.evo)previous=CHARS[previous.evo.to];
+  previous.evo={lvl:40,to:id};
+}
+// Momo conserva su pequeño dragón de Nv.20 antes del envejecimiento físico de Shinobu.
+for(const [id,name,level,types,bonus,move,label] of [
+  ['momonosuke-adult','Momonosuke · Shogun adulto',30,['Corte','Fruta'],6,'momoshogun','Voluntad del Shogun'],
+  ['momonosuke-dragon','Momonosuke · Gran dragón rosa',40,['Fruta','Fuego'],10,'momoborobreath','Bolo Breath'],
+]){
+ const base=CHARS.momonosuke;
+ MOVES[move]={name:label,type:types[0],power:level===40?95:75,acc:.95};
+ CHARS[id]={...base,name,types,base:base.base.map((n,i)=>n+(i===0?bonus*2:bonus)),rareza:level===40?5:4,
+   learnset:[[level,move]],ultimate:move,evo:undefined,generated:false,formLevel:level,zoanForm:level===40?'animal':undefined,
+   desc:'Momonosuke tras el envejecimiento físico de Shinobu. Su mente conserva su edad. Requiere nivel base y en partida '+level+'.'};
+}
+CHARS['momonosuke-animal'].evo={lvl:30,to:'momonosuke-adult'};
+CHARS['momonosuke-adult'].evo={lvl:40,to:'momonosuke-dragon'};
+
+// Recompensas de colección de las nuevas sagas, sin recalcular atributos existentes.
+CHARS.caesar.rareza=5;CHARS.caesar.bossLevelRarity=3;
+CHARS.zunesha.rareza=5;
+
 const EVOLVED_FORMS = new Set(Object.values(CHARS).filter(c => c.evo).map(c => c.evo.to));
 
 // ============ EXTENSIÓN DE STATS ============
@@ -1334,29 +1605,38 @@ const SAGA_FIXES = {
   tashigi: 'alabasta', smoker: 'alabasta', fullbody: 'alabasta', jango: 'alabasta',
   // Skypiea — Piratas de Barbanegra en Jaya
   docq: 'skypiea', stronger: 'skypiea', lafitte: 'skypiea', burgess: 'skypiea', vanaugur: 'skypiea',
-  // Marineford — Sabaody, Barbablanca, Barbanegra, Marina, Tenryuubito y flashbacks
-  kid: 'marineford', killer: 'marineford', drake: 'marineford', hawkins: 'marineford', apoo: 'marineford',
-  bonney: 'marineford', rayleigh: 'marineford', camie: 'marineford', pappag: 'marineford',
+  // Sabaody — Supernovas, aliados locales y asalto de la Marina
+  kid: 'sabaody', killer: 'sabaody', drake: 'sabaody', hawkins: 'sabaody', apoo: 'sabaody', law:'sabaody',
+  bonney: 'sabaody', rayleigh: 'sabaody', camie: 'sabaody', pappag: 'sabaody', kuma:'sabaody',
+  // Marineford — Barbablanca, Barbanegra y Marina
   newgate: 'marineford', marco: 'marineford', ace: 'marineford', teach: 'marineford',
-  akainu: 'marineford', kizaru: 'marineford', aokiji: 'marineford', garp: 'marineford',
+  akainu: 'marineford', kizaru: 'sabaody', aokiji: 'marineford', garp: 'marineford',
   bogard: 'marineford', brandnew: 'marineford', coby: 'marineford', coby2: 'marineford', helmeppo: 'marineford',
-  rosward: 'marineford', charlos: 'marineford', shalria: 'marineford', sabo: 'marineford',
+  rosward: 'sabaody', charlos: 'sabaody', shalria: 'sabaody', sabo: 'marineford',
   // Isla Gyojin — Piratas del Sol
   jinbe: 'gyojin',
+  // Punk Hazard — laboratorio, supervivientes y samuráis
+  caesar:'punkhazard', monet:'punkhazard', vergo:'punkhazard', brownbeard:'punkhazard', mocha:'punkhazard',
+  baby5:'punkhazard', buffalo:'punkhazard', kinemon:'punkhazard', momonosuke:'punkhazard',
   // Dressrosa — Familia Donquixote
   doflamingo: 'dressrosa', rocinante: 'dressrosa', homing: 'dressrosa',
   // Whole Cake — Zou y Levely
-  inuarashi: 'wholecake', nekomamushi: 'wholecake', carrot: 'wholecake', wanda: 'wholecake',
-  pedro: 'wholecake', shishilian: 'wholecake', zunesha: 'wholecake',
+  inuarashi: 'zou', nekomamushi: 'zou', carrot: 'zou', wanda: 'zou',
+  pedro: 'zou', shishilian: 'zou', zunesha: 'zou', raizo:'zou',
   koala: 'wholecake', hack: 'wholecake', mjosgard: 'wholecake',
   karasu: 'wholecake', betty: 'wholecake', morley: 'wholecake', lindbergh: 'wholecake',
   // Wano
   hera: 'wano', ryokugyu: 'wano',
   // Saga Final — Elbaf
-  oimo: 'egghead', kashi: 'egghead', joyboy: 'egghead',
+  oimo: 'elbaph', kashi: 'elbaph', joyboy: 'egghead',
+  im:'elbaph', gaban:'elbaph', garling:'elbaph', xebec:'elbaph',
+  shakky:'sabaody', ginny:'egghead',
 };
 for (const [id, s] of Object.entries(SAGA_FIXES)) if (CHARS[id]) CHARS[id].saga = s;
-for (const c of Object.values(CHARS)) if (c.zoanBase) c.saga = CHARS[c.zoanBase].saga;
+// Every evolution inherits its base saga, including historical and Im phases.
+for (let pass=0;pass<5;pass++) for (const c of Object.values(CHARS)) {
+  if(c.evo) CHARS[c.evo.to].saga=c.saga;
+}
 // 'whitebeard2' era un duplicado sin nombre de Barbablanca: newgate ocupa su sitio
 delete CHARS.whitebeard2;
 
@@ -1367,7 +1647,10 @@ const STRAW_HAT_MEMBERS = ['luffy', 'zoro', 'nami', 'usopp', 'sanji',
 
 const SAGAS = SAGA_DEFS.map((d, i) => {
   // Dificultad entre sagas aumenta de forma exponencial (East Blue: 8, Alabasta: 15, Skypiea: 22...)
-  const startLvl = Math.round(8 + 7 * i + (i >= 3 ? Math.pow(i - 2, 2.2) * 2.2 : 0));
+  // Insertar Sabaody no eleva los niveles de las sagas que ya existían.
+  const originalOrder=['eastblue','alabasta','skypiea','water7','thriller','marineford','gyojin','dressrosa','wholecake','wano','egghead','elbaph'];
+  const difficultyIndex=({sabaody:4.5,punkhazard:7,zou:7.5})[d.id] ?? originalOrder.indexOf(d.id);
+  const startLvl = Math.round(8 + 7 * difficultyIndex + (difficultyIndex >= 3 ? Math.pow(difficultyIndex - 2, 2.2) * 2.2 : 0));
   const totalIslands = d.islands.length;
   const mobs = Object.keys(CHARS).filter(id =>
     CHARS[id].saga === d.id && (!CHARS[id].boss || CHARS[id].rareza === 5) && !CHARS[id].nakama && !EVOLVED_FORMS.has(id));
@@ -1380,11 +1663,12 @@ const SAGAS = SAGA_DEFS.map((d, i) => {
     islands: d.islands.map(([name, bossesRaw], k) => {
       const bosses = bossesRaw.map(b => BOSS_ALIASES[b] || b).filter(b => CHARS[b]);
       // Dificultad entre islas dentro de una saga aumenta de forma lineal pero considerable (+8 niveles por isla)
-      const lvl0 = startLvl + k * 8;
-      const rowsCount = totalIslands === 1 ? 14 : (6 + Math.min(3, Math.floor(k / 2)));
+      const originalIslandIndex=k+(d.id==='dressrosa'?1:0);
+      const lvl0 = startLvl + originalIslandIndex * 8;
+      const rowsCount = totalIslands === 1 ? 14 : (6 + Math.min(3, Math.floor(originalIslandIndex / 2)));
       return {
         name, boss: bosses,
-        bossLvl: bosses.map((b, j) => lvl0 + 6 + j + CHARS[b].rareza),
+        bossLvl: bosses.map((b, j) => lvl0 + 6 + j + (CHARS[b].bossLevelRarity ?? CHARS[b].rareza)),
         pool, lvl: [lvl0, lvl0 + 6],
         rows: rowsCount,
         singleIslandSaga: totalIslands === 1,

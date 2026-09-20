@@ -5,7 +5,7 @@ import {combatHarness} from './balance-harness.mjs';
 test('Zoan roster covers secondary characters and only confirmed awakenings',()=>{
   const h=combatHarness();
   const bases=Array.from(h.exec('Object.keys(ZOAN_FORMS)'));
-  assert.deepEqual(bases.sort(),['chopper','lucci','kaku','kaido','yamato','king','queen','marco','chaka','pell','dalton','merrychristmas','jabra','sandersonia','marigold','sengoku','momonosuke','drake','orochi','jack','ulti','pageone','whoswho','sasaki','blackmaria','devon','stronger','onigumo','pierre','pekoms','morgans','tamago'].sort());
+  assert.deepEqual(bases.sort(),['loki','killingham','chopper','lucci','kaku','kaido','yamato','king','queen','marco','chaka','pell','dalton','merrychristmas','jabra','sandersonia','marigold','sengoku','momonosuke','drake','orochi','jack','ulti','pageone','whoswho','sasaki','blackmaria','devon','stronger','onigumo','pierre','pekoms','morgans','tamago'].sort());
   assert.deepEqual(Array.from(h.exec("Object.entries(CHARS).filter(([,c])=>c.zoanForm==='awakened').map(([id])=>id)")).sort(),['kaku-awakened','lucci-awakened','minotauros']);
   assert.equal(h.exec("CHARS['chopper-monster'].zoanForm"),'monster');
   assert.equal(h.exec('CHARS.minotauros.evo'),undefined);

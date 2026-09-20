@@ -168,7 +168,7 @@ test('upgrade saga groups cover every owned character once and in saga order',()
  const groups=JSON.parse(h.run('JSON.stringify(groupUpgradeRoster(Object.keys(CHARS)))'));
  const ids=groups.flatMap(g=>g.ids);
  assert.equal(ids.length,h.run('Object.keys(CHARS).length'));assert.equal(new Set(ids).size,ids.length);
- assert.equal(groups[0].id,'eastblue');assert.equal(groups.at(-1).id,'egghead');
+ assert.equal(groups[0].id,'eastblue');assert.equal(groups.at(-1).id,'elbaph');
  assert.deepEqual(JSON.parse(h.run('JSON.stringify(groupUpgradeRoster([]))')),[]);
 });
 
@@ -183,4 +183,58 @@ test('runner milestone fame is saved immediately and survives leaving and reload
  assert.equal(harness(h.memory).run('meta.fame'),25);
  g.start();g.spawnIn=999;g.distance=14000;g.update(1/120);
  assert.equal(harness(h.memory).run('meta.fame'),50);
+});
+
+test('Sabaody insertion migrates old journey and last port exactly once and preserves earned access',()=>{
+ for(const [oldIndex,newIndex] of [[0,0],[4,4],[5,6],[10,13],[11,14]]){
+  const h=harness();h.ctx.oldIndex=oldIndex;
+  h.run(`const old={game:'grandlinelike',version:1,meta:{lastCompletedIsland:{saga:oldIndex,island:0},sagaDiffWins:{thriller:{3:true}}},run:sampleRun()};old.run.saga=oldIndex;
+  const migrated=GameSaveStorage.parse(JSON.stringify(old));const twice=GameSaveStorage.parse(JSON.stringify(migrated));`);
+  assert.equal(h.run('migrated.run.saga'),newIndex);
+  assert.equal(h.run('migrated.meta.lastCompletedIsland.saga'),newIndex);
+  assert.equal(h.run('JSON.stringify(migrated)===JSON.stringify(twice)'),true);
+  assert.equal(h.run('migrated.meta.legacyMarinefordAccess'),true);
+  assert.equal(h.run('migrated.meta.sagaDiffWins.sabaody'),undefined);
+ }
+ const h=harness();h.run(`const current=GameSaveStorage.payload({},sampleRun());current.run.saga=5;const parsed=GameSaveStorage.parse(JSON.stringify(current));`);
+ assert.equal(h.run('parsed.run.saga'),5);
+ assert.equal(h.run('parsed.meta.legacyMarinefordAccess'),undefined);
+ for(const value of ['null','[]','["sabaody","sabaody"]','["unknown"]'])assert.throws(()=>h.run(`GameSaveStorage.validate({...current,sagaOrder:${value}})`));
+ h.run(`meta.legacyMarinefordAccess=true`);assert.equal(h.run('sagaUnlocked(6)'),true);
+ h.run(`delete meta.legacyMarinefordAccess`);assert.equal(h.run('sagaUnlocked(6)'),false);
+});
+
+test('Zou migration preserves old Whole Cake access and understands explicit intermediate saga orders',()=>{
+ const h=harness();
+ h.run(`const beforeZou=GameSaveStorage.payload({sagaDiffWins:{dressrosa:{3:true}},lastCompletedIsland:{saga:10,index:0}},sampleRun());beforeZou.sagaOrder=beforeZou.sagaOrder.filter(id=>id!=='zou');beforeZou.run.saga=10;
+ const restored=GameSaveStorage.parse(JSON.stringify(beforeZou));`);
+ assert.equal(h.run('restored.run.saga'),11);assert.equal(h.run('restored.meta.lastCompletedIsland.saga'),11);
+ assert.equal(h.run('restored.meta.legacyWholeCakeAccess'),true);
+ assert.equal(h.run('restored.meta.sagaDiffWins.zou'),undefined);
+ h.run('meta=restored.meta');assert.equal(h.run('sagaUnlocked(11)'),true);
+});
+
+test('separating Punk Hazard preserves active map, Dressrosa ports, completed islands and claimed rewards',()=>{
+ for(const [oldIsland,newSaga,newIsland] of [[0,8,0],[1,9,0],[5,9,4]]){
+  const h=harness();h.ctx.oldIsland=oldIsland;
+  h.run(`const old={game:'grandlinelike',version:1,meta:{lastCompletedIsland:{saga:7,index:oldIsland},islandProgress:{'dressrosa:classic:3':[0,1,5]},claimedAch:{island_diff_dressrosa_0_3:true,island_diff_dressrosa_1_3:true,island_diff_dressrosa_5_3:true}},run:sampleRun()};
+  old.run.saga=7;old.run.islandIdx=oldIsland;old.run.badges=[0,1,2];const mapBefore=JSON.stringify(old.run.map);const migrated=GameSaveStorage.parse(JSON.stringify(old));`);
+  assert.equal(h.run('migrated.run.saga'),newSaga);assert.equal(h.run('migrated.run.islandIdx'),newIsland);
+  assert.equal(h.run('migrated.meta.lastCompletedIsland.saga'),newSaga);assert.equal(h.run('migrated.meta.lastCompletedIsland.index'),newIsland);
+  assert.equal(h.run('JSON.stringify(migrated.run.map)===mapBefore'),true);
+  assert.deepEqual(Array.from(h.run("migrated.meta.islandProgress['punkhazard:classic:3']")),[0]);
+  assert.deepEqual(Array.from(h.run("migrated.meta.islandProgress['dressrosa:classic:3']")),[0,4]);
+  assert.equal(h.run('migrated.meta.claimedAch.island_diff_punkhazard_0_3'),true);
+  assert.equal(h.run('migrated.meta.claimedAch.island_diff_dressrosa_4_3'),true);
+  assert.equal(h.run('migrated.meta.legacyDressrosaAccess'),true);
+  assert.equal(h.run('JSON.stringify(GameSaveStorage.parse(JSON.stringify(migrated)))===JSON.stringify(migrated)'),true);
+ }
+});
+
+test('legendary choices already claimed survive relocation of their characters',()=>{
+ const h=harness();
+ for(const [saga,id] of [['marineford','kizaru'],['marineford','rayleigh'],['egghead','im'],['egghead','garling'],['egghead','xebec']]){
+  h.ctx.rewardSaga=saga;h.ctx.rewardId=id;
+  assert.doesNotThrow(()=>h.run('validateGameSave(GameSaveStorage.payload({sagaDiffWins:{[rewardSaga]:{5:true}},pirateKingRewards:{[rewardSaga]:rewardId}},null))'));
+ }
 });

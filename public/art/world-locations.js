@@ -274,14 +274,6 @@ const catalog={
   "dressrosa": [
     {
       "id": "dressrosa-0",
-      "place": "Punk Hazard",
-      "zone": "Laboratorio de Caesar",
-      "kind": "Isla",
-      "source": "https://onepiece.fandom.com/wiki/Punk_Hazard",
-      "description": "Fuego y hielo parten la isla alrededor del laboratorio."
-    },
-    {
-      "id": "dressrosa-1",
       "place": "Dressrosa",
       "zone": "Acacia",
       "kind": "Isla",
@@ -289,7 +281,7 @@ const catalog={
       "description": "Un puerto de tejados mediterráneos y flores."
     },
     {
-      "id": "dressrosa-2",
+      "id": "dressrosa-1",
       "place": "Dressrosa",
       "zone": "Coliseo Corrida",
       "kind": "Isla",
@@ -297,7 +289,7 @@ const catalog={
       "description": "Un anfiteatro circular junto a las calles de la ciudad."
     },
     {
-      "id": "dressrosa-3",
+      "id": "dressrosa-2",
       "place": "Dressrosa",
       "zone": "Palacio Real",
       "kind": "Isla",
@@ -305,7 +297,7 @@ const catalog={
       "description": "El palacio corona una alta formación rocosa."
     },
     {
-      "id": "dressrosa-4",
+      "id": "dressrosa-3",
       "place": "Dressrosa",
       "zone": "Colina de las Flores",
       "kind": "Isla",
@@ -313,7 +305,7 @@ const catalog={
       "description": "Girasoles amarillos cubren la colina elevada."
     },
     {
-      "id": "dressrosa-5",
+      "id": "dressrosa-4",
       "place": "Dressrosa",
       "zone": "Puerto oriental",
       "kind": "Isla",
@@ -472,11 +464,131 @@ const catalog={
     },
     {
       "id": "egghead-5",
-      "place": "Mary Geoise",
-      "zone": "Castillo Pangaea · Trono Vacío",
-      "kind": "Ciudad",
-      "source": "https://onepiece.fandom.com/wiki/Empty_Throne",
-      "description": "El castillo se alza sobre la cima de la Red Line."
+      "place": "Egghead",
+      "zone": "Costa · evacuación",
+      "kind": "Isla",
+      "source": "https://onepiece.fandom.com/wiki/Egghead",
+      "description": "La costa de la isla del futuro es la última ruta de escape frente a los Ancianos."
+    }
+  ],
+  "elbaph": [
+    {
+      "id": "elbaph-0",
+      "place": "País de los Dioses",
+      "zone": "Castillo Bigstein",
+      "kind": "Terrario",
+      "source": "https://onepiece.fandom.com/wiki/Land_of_Gods",
+      "description": "El mundo en miniatura construido por Road dentro de su castillo."
+    },
+    {
+      "id": "elbaph-1",
+      "place": "Elbaph",
+      "zone": "Inframundo",
+      "kind": "Región",
+      "source": "https://onepiece.fandom.com/wiki/Elbaph",
+      "description": "Raíces nevadas del Árbol Adam, donde Loki permanecía encadenado."
+    },
+    {
+      "id": "elbaph-2",
+      "place": "Elbaph",
+      "zone": "Aldea del Oeste",
+      "kind": "Aldea",
+      "source": "https://onepiece.fandom.com/wiki/Elbaph",
+      "description": "Casas y salones de gigantes sobre las ramas de Adam."
+    },
+    {
+      "id": "elbaph-3",
+      "place": "Elbaph",
+      "zone": "Biblioteca del Búho",
+      "kind": "Biblioteca",
+      "source": "https://onepiece.fandom.com/wiki/Owl_Library",
+      "description": "Los libros de Ohara encuentran refugio junto a Saul y Biblo."
+    },
+    {
+      "id": "elbaph-4",
+      "place": "Elbaph",
+      "zone": "Escuela de la Morsa",
+      "kind": "Escuela",
+      "source": "https://onepiece.fandom.com/wiki/Walrus_School",
+      "description": "La escuela de los niños gigantes, amenazada por los Caballeros de Dios."
+    },
+    {
+      "id": "elbaph-5",
+      "place": "Elbaph",
+      "zone": "Castillo Aurust",
+      "kind": "Castillo",
+      "source": "https://onepiece.fandom.com/wiki/Aurust_Castle",
+      "description": "El castillo real guarda el pasado de Harald y Loki."
+    },
+    {
+      "id": "elbaph-6",
+      "place": "Elbaph",
+      "zone": "Árbol Adam",
+      "kind": "Región",
+      "source": "https://onepiece.fandom.com/wiki/Treasure_Tree_Adam",
+      "description": "Ramas y caminos gigantescos conectan el Mundo del Sol."
+    },
+    {
+      "id": "elbaph-7",
+      "place": "Elbaph",
+      "zone": "Mundo del Sol · batalla final",
+      "kind": "Región",
+      "source": "https://onepiece.fandom.com/wiki/Elbaph",
+      "description": "Los gigantes resisten el asalto de Im y los Caballeros de Dios."
+    }
+  ],
+  "sabaody": [
+    {
+      "id": "sabaody-0",
+      "place": "Archipiélago Sabaody",
+      "zone": "Grove 1 · Casa de Subastas",
+      "kind": "Edificio",
+      "source": "https://onepiece.fandom.com/wiki/Sabaody_Archipelago",
+      "description": "El rescate de Camie provoca el choque con los Nobles Mundiales."
+    },
+    {
+      "id": "sabaody-1",
+      "place": "Archipiélago Sabaody",
+      "zone": "Grove 27 · Separación de la banda",
+      "kind": "Región",
+      "source": "https://onepiece.fandom.com/wiki/Sabaody_Archipelago",
+      "description": "La llegada de Kizaru y Kuma cambia el destino de la tripulación."
+    }
+  ],
+  "zou": [
+    {
+      "id": "zou-0",
+      "place": "Zou",
+      "zone": "Reino de Mokomo",
+      "kind": "Reino sobre Zunesha",
+      "source": "https://onepiece.fandom.com/wiki/Zou",
+      "description": "El hogar de los minks sobre el lomo de Zunesha."
+    },
+    {
+      "id": "zou-1",
+      "place": "Zou",
+      "zone": "Árbol Ballena",
+      "kind": "Reino sobre Zunesha",
+      "source": "https://onepiece.fandom.com/wiki/Zou",
+      "description": "El árbol sagrado guarda el secreto de Raizo y el Road Poneglyph."
+    }
+  ],
+  "punkhazard": [
+    {
+      "id": "punkhazard-0",
+      "place": "Punk Hazard",
+      "zone": "Laboratorio de Caesar",
+      "kind": "Isla",
+      "source": "https://onepiece.fandom.com/wiki/Punk_Hazard",
+      "description": "Fuego y hielo parten la isla alrededor del laboratorio."
+    },
+    {
+      "id": "punkhazard-1",
+      "place": "Punk Hazard",
+      "zone": "Huida del laboratorio",
+      "kind": "Isla",
+      "source": "https://onepiece.fandom.com/wiki/Punk_Hazard",
+      "description": "La salida del laboratorio entre nieve, ruinas y gas venenoso."
     }
   ]
 };

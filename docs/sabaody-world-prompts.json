@@ -1,0 +1,8 @@
+{
+  "mode": "built-in image_gen",
+  "assets": {
+    "sabaody-0": "ONE standalone isometric location icon for a One Piece pixel-art world map: Dark red auction house with ornate arched entrance beneath massive mangrove roots, elegant sloped roof, small plaza and soap bubbles, no text. Crisp colorful detailed 16-bit pixel art, black outlines, three-quarter overhead view. Entire landscape as a small cutaway vignette on a genuinely transparent RGBA background. Readable at 320x240, generous transparent margins. No characters, lettering, labels or borders.",
+    "sabaody-1": "ONE standalone isometric location icon for a One Piece pixel-art world map: Twisting mangrove roots forming a wide clearing, scattered palm trees and grass, forest of giant mangrove trunks, golden sunlight and floating blue soap bubbles. Crisp colorful detailed 16-bit pixel art, black outlines, three-quarter overhead view. Entire landscape as a small cutaway vignette on a genuinely transparent RGBA background. Readable at 320x240, generous transparent margins. No characters, lettering, labels or borders.",
+    "sabaody-scene": "Wide 16:9 16-bit pixel-art battle background for One Piece Sabaody Archipelago: gigantic Yarukiman mangrove trunks and tangled pale roots towering above a wide grass clearing, pastel houses in the distance, turquoise sea between roots, dozens of translucent soap bubbles catching rainbow light, warm sunlight filtering through lush green canopy. Readable open foreground for fighters. Crisp pixel clusters and dark outlines, colorful retro RPG style. No characters, text or UI, opaque background."
+  }
+}

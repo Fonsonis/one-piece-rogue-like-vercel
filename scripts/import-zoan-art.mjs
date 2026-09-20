@@ -6,7 +6,8 @@ import {createHash} from 'node:crypto';
 const require = createRequire(import.meta.url);
 const sharp = require(process.env.SHARP_MODULE || 'sharp');
 const luffyMode=process.argv.includes('--luffy');
-const prefix=luffyMode?'luffy-animation':'zoan-art';
+const artModes={'--redraw':'legacy-redraw','--zou':'zou-art','--strawhat':'strawhat-art','--sabaody':'sabaody-art','--elbaph':'elbaph-art','--luffy':'luffy-animation'};
+const prefix=Object.entries(artModes).find(([flag])=>process.argv.includes(flag))?.[1] || 'zoan-art';
 const spec = JSON.parse(fs.readFileSync(`docs/${prefix}-prompts.json`));
 const ratios = JSON.parse(fs.readFileSync(`docs/${prefix}-ratios.json`));
 const manifest = JSON.parse(fs.readFileSync('public/art/manifest.json'));
@@ -48,11 +49,11 @@ function separatePoses(data,width,height) {
   for(let p=0;p<labels.length;p++)if(labels[p]>=0){const out=buffers[owners[labels[p]]];data.copy(out,p*4,p*4,p*4+4);}
   return buffers;
 }
-const requested=process.argv.slice(2).filter(arg=>arg!=='--luffy');
+const requested=process.argv.slice(2).filter(arg=>!Object.hasOwn(artModes,arg));
 for(const sourceId of Object.keys(spec.assets)) {
   if(requested.length&&!requested.includes(sourceId))continue;
   const id=sourceId==='minotauros-awakened'?'minotauros':sourceId.endsWith('-human')?sourceId.slice(0,-6):sourceId;
-  const source=`docs/${prefix}-sources/${sourceId}.png`;
+  const source=`${spec.sourceDirectory || `docs/${prefix}-sources`}/${sourceId}.png`;
   if(!fs.existsSync(source)){console.log('Pending',id);continue;}
   const {data,info}=await sharp(source).ensureAlpha().raw().toBuffer({resolveWithObject:true});
   const {width,height}=info;
@@ -85,7 +86,7 @@ for(const sourceId of Object.keys(spec.assets)) {
   fs.writeFileSync(`public/art/portraits/${id}.png`,portrait);
   const pb=bounds(await sharp(portrait).ensureAlpha().raw().toBuffer(),192,192);
   const baseId=id.split('-')[0];
-  const ratio=(ratios[baseId]||1)*(id.endsWith('-animal')?1.05:id.endsWith('-monster')?1.3:id.includes('-')?1.1:1);
+  const ratio=ratios[id] ?? (ratios[baseId]||1)*(id.endsWith('-animal')?1.05:id.endsWith('-monster')?1.3:id.includes('-')?1.1:1);
   const as=128*ratio/(g[3]-g[1]),ps=132*ratio/(pb[3]-pb[1]);
   sizing[id]={ratio,guardBounds:g,portraitBounds:pb,atlasScale:as,portraitScale:ps};
   css=css.split('\n').filter(line=>!line.includes(`[data-character="${id}"]`)).join('\n').trimEnd()+`\n.dex-sprite[data-character="${id}"]{--atlas-scale:${as.toFixed(4)};--portrait-scale:${ps.toFixed(4)};--atlas-shift:${((96-(g[0]+g[2])/2)*as/192).toFixed(4)};--portrait-shift:${((96-(pb[0]+pb[2])/2)*ps/192).toFixed(4)}}\n`;

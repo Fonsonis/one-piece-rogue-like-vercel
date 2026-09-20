@@ -304,15 +304,6 @@
   "dressrosa": [
     {
       "id": "dressrosa-0",
-      "place": "Punk Hazard",
-      "zone": "Laboratorio de Caesar",
-      "kind": "Isla",
-      "source": "https://onepiece.fandom.com/wiki/Punk_Hazard",
-      "description": "Fuego y hielo parten la isla alrededor del laboratorio.",
-      "artBrief": "Island split sharply into orange flaming volcano on left and blue snowy glaciers on right, lab between"
-    },
-    {
-      "id": "dressrosa-1",
       "place": "Dressrosa",
       "zone": "Acacia",
       "kind": "Isla",
@@ -321,7 +312,7 @@
       "artBrief": "Sunny limestone harbor, red terracotta Mediterranean roofs, flower planters and wooden dock"
     },
     {
-      "id": "dressrosa-2",
+      "id": "dressrosa-1",
       "place": "Dressrosa",
       "zone": "Coliseo Corrida",
       "kind": "Isla",
@@ -330,7 +321,7 @@
       "artBrief": "Massive round stone Roman colosseum, open arena, moat, terracotta rooftops"
     },
     {
-      "id": "dressrosa-3",
+      "id": "dressrosa-2",
       "place": "Dressrosa",
       "zone": "Palacio Real",
       "kind": "Isla",
@@ -339,7 +330,7 @@
       "artBrief": "Tall flower-shaped rocky plateau, flamboyant pink fairy-tale royal palace, white walls"
     },
     {
-      "id": "dressrosa-4",
+      "id": "dressrosa-3",
       "place": "Dressrosa",
       "zone": "Colina de las Flores",
       "kind": "Isla",
@@ -348,7 +339,7 @@
       "artBrief": "Green limestone hill covered with large bright yellow sunflowers, distant royal plateau"
     },
     {
-      "id": "dressrosa-5",
+      "id": "dressrosa-4",
       "place": "Dressrosa",
       "zone": "Puerto oriental",
       "kind": "Isla",
@@ -526,12 +517,146 @@
     },
     {
       "id": "egghead-5",
-      "place": "Mary Geoise",
-      "zone": "Castillo Pangaea · Trono Vacío",
-      "kind": "Ciudad",
-      "source": "https://onepiece.fandom.com/wiki/Empty_Throne",
-      "description": "El castillo se alza sobre la cima de la Red Line.",
-      "artBrief": "Pristine white European castle with many narrow spires atop enormous RED LINE cliff, formal gardens, not a science dome"
+      "place": "Egghead",
+      "zone": "Costa · evacuación",
+      "kind": "Isla",
+      "source": "https://onepiece.fandom.com/wiki/Egghead",
+      "description": "La costa de la isla del futuro es la última ruta de escape frente a los Ancianos.",
+      "artBrief": "Futuristic tropical island coast, egg-shaped laboratory in distance, giant pirate sailboat leaving harbor, ocean waves"
+    }
+  ],
+  "elbaph": [
+    {
+      "id": "elbaph-0",
+      "place": "País de los Dioses",
+      "zone": "Castillo Bigstein",
+      "kind": "Terrario",
+      "source": "https://onepiece.fandom.com/wiki/Land_of_Gods",
+      "description": "El mundo en miniatura construido por Road dentro de su castillo.",
+      "artBrief": "Viking toy-block miniature village inside a gigantic stone castle, colorful block houses, fake sun overhead, towering furniture outside its walls"
+    },
+    {
+      "id": "elbaph-1",
+      "place": "Elbaph",
+      "zone": "Inframundo",
+      "kind": "Región",
+      "source": "https://onepiece.fandom.com/wiki/Elbaph",
+      "description": "Raíces nevadas del Árbol Adam, donde Loki permanecía encadenado.",
+      "artBrief": "Snow-covered colossal tree roots, dark rocky ravine, enormous broken iron chains, mist and tiny pine trees"
+    },
+    {
+      "id": "elbaph-2",
+      "place": "Elbaph",
+      "zone": "Aldea del Oeste",
+      "kind": "Aldea",
+      "source": "https://onepiece.fandom.com/wiki/Elbaph",
+      "description": "Casas y salones de gigantes sobre las ramas de Adam.",
+      "artBrief": "Warm Viking giant village with enormous timber longhouses and red roofs on a broad living tree branch, bridge and waterfalls"
+    },
+    {
+      "id": "elbaph-3",
+      "place": "Elbaph",
+      "zone": "Biblioteca del Búho",
+      "kind": "Biblioteca",
+      "source": "https://onepiece.fandom.com/wiki/Owl_Library",
+      "description": "Los libros de Ohara encuentran refugio junto a Saul y Biblo.",
+      "artBrief": "Huge cozy wooden library built into a giant tree, round owl-shaped windows, enormous bookshelves, books and vines, no lettering"
+    },
+    {
+      "id": "elbaph-4",
+      "place": "Elbaph",
+      "zone": "Escuela de la Morsa",
+      "kind": "Escuela",
+      "source": "https://onepiece.fandom.com/wiki/Walrus_School",
+      "description": "La escuela de los niños gigantes, amenazada por los Caballeros de Dios.",
+      "artBrief": "Cheerful giant timber schoolhouse with carved walrus ornament and tusks above entrance, green schoolyard on gigantic tree branch"
+    },
+    {
+      "id": "elbaph-5",
+      "place": "Elbaph",
+      "zone": "Castillo Aurust",
+      "kind": "Castillo",
+      "source": "https://onepiece.fandom.com/wiki/Aurust_Castle",
+      "description": "El castillo real guarda el pasado de Harald y Loki.",
+      "artBrief": "Ancient ruined Viking royal castle with immense stone arches and a broken royal throne, suspended above clouds on a giant tree branch"
+    },
+    {
+      "id": "elbaph-6",
+      "place": "Elbaph",
+      "zone": "Árbol Adam",
+      "kind": "Región",
+      "source": "https://onepiece.fandom.com/wiki/Treasure_Tree_Adam",
+      "description": "Ramas y caminos gigantescos conectan el Mundo del Sol.",
+      "artBrief": "Enormous living tree trunk and crossing giant branches with rope bridges, patches of dark thorn vines, tiny Viking village, sunlight through green foliage"
+    },
+    {
+      "id": "elbaph-7",
+      "place": "Elbaph",
+      "zone": "Mundo del Sol · batalla final",
+      "kind": "Región",
+      "source": "https://onepiece.fandom.com/wiki/Elbaph",
+      "description": "Los gigantes resisten el asalto de Im y los Caballeros de Dios.",
+      "artBrief": "Dramatic giant Viking settlement on a colossal tree branch under dark red storm clouds, lightning and dark magical ring in sky, no characters"
+    }
+  ],
+  "sabaody": [
+    {
+      "id": "sabaody-0",
+      "place": "Archipiélago Sabaody",
+      "zone": "Grove 1 · Casa de Subastas",
+      "kind": "Edificio",
+      "source": "https://onepiece.fandom.com/wiki/Sabaody_Archipelago",
+      "description": "El rescate de Camie provoca el choque con los Nobles Mundiales.",
+      "artBrief": "Dark red auction house with ornate arched entrance beneath massive mangrove roots, elegant sloped roof, small plaza and soap bubbles, no text"
+    },
+    {
+      "id": "sabaody-1",
+      "place": "Archipiélago Sabaody",
+      "zone": "Grove 27 · Separación de la banda",
+      "kind": "Región",
+      "source": "https://onepiece.fandom.com/wiki/Sabaody_Archipelago",
+      "description": "La llegada de Kizaru y Kuma cambia el destino de la tripulación.",
+      "artBrief": "Twisting mangrove roots forming a wide clearing, scattered palm trees and grass, forest of giant mangrove trunks, golden sunlight and floating blue soap bubbles"
+    }
+  ],
+  "zou": [
+    {
+      "id": "zou-0",
+      "place": "Zou",
+      "zone": "Reino de Mokomo",
+      "kind": "Reino sobre Zunesha",
+      "source": "https://onepiece.fandom.com/wiki/Zou",
+      "description": "El hogar de los minks sobre el lomo de Zunesha.",
+      "artBrief": "ONE standalone isometric location icon for a One Piece pixel-art world map: ancient circular Mokomo city with rounded colorful houses and a central stone plaza, lush jungle and ruins situated upon a small curved patch of giant elephant back with gray wrinkled skin underneath. Crisp 16-bit pixel art black outlines, three-quarter overhead view, actual transparent RGBA background, entire compact landscape vignette with generous margins, no text or characters."
+    },
+    {
+      "id": "zou-1",
+      "place": "Zou",
+      "zone": "Árbol Ballena",
+      "kind": "Reino sobre Zunesha",
+      "source": "https://onepiece.fandom.com/wiki/Zou",
+      "description": "El árbol sagrado guarda el secreto de Raizo y el Road Poneglyph.",
+      "artBrief": "ONE standalone isometric location icon for a One Piece pixel-art world map: enormous ancient tree whose canopy has the recognizable silhouette of a WHALE, dense dark green jungle and ancient stone shrine hidden among giant roots, small red rectangular poneglyph within shrine. On elephant-back grassland. Crisp detailed 16-bit pixel art, black outlines, overhead isometric view, actual transparent RGBA background, compact vignette generous margins, no text characters or borders."
+    }
+  ],
+  "punkhazard": [
+    {
+      "id": "punkhazard-0",
+      "place": "Punk Hazard",
+      "zone": "Laboratorio de Caesar",
+      "kind": "Isla",
+      "source": "https://onepiece.fandom.com/wiki/Punk_Hazard",
+      "description": "Fuego y hielo parten la isla alrededor del laboratorio.",
+      "artBrief": "Island split sharply into orange flaming volcano on left and blue snowy glaciers on right, lab between"
+    },
+    {
+      "id": "punkhazard-1",
+      "place": "Punk Hazard",
+      "zone": "Huida del laboratorio",
+      "kind": "Isla",
+      "source": "https://onepiece.fandom.com/wiki/Punk_Hazard",
+      "description": "La salida del laboratorio entre nieve, ruinas y gas venenoso.",
+      "artBrief": "Snowbound research facility exit with destroyed steel doors, purple poison gas behind and tiny harbor"
     }
   ]
 }

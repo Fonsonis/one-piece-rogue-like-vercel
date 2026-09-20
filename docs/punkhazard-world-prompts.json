@@ -1,0 +1,8 @@
+{
+  "mode": "built-in image_gen; punkhazard-0 reuses the original island artwork",
+  "assets": {
+    "punkhazard-0": "Existing generated Punk Hazard split fire/ice island icon, retained from the former Dressrosa first stage.",
+    "punkhazard-1": "ONE standalone isometric location icon for a One Piece pixel-art world map: snowbound futuristic laboratory with enormous shattered steel exit gates, rail tracks leaving tunnel to small frosty harbor, violet poison gas billowing BEHIND the facility, pale snowy mountains, volcanic red glow far in background. Three-quarter overhead view, crisp colorful 16-bit pixel art dark outlines, entire compact vignette on ACTUAL TRANSPARENT RGBA background, no characters text labels or borders. Large transparent margins.",
+    "punkhazard-scene": "Wide 16:9 pixel-art battle background for One Piece Punk Hazard: a ruined high-tech laboratory wall and steel gate at the boundary of a frozen snow-covered research compound and distant burning volcanic wasteland. Snowy foreground runway for fighters, steam, distant purple poison gas, contrasting blue ice and orange lava. Crisp detailed 16-bit pixel art black outlines. No characters text UI or borders, opaque background."
+  }
+}
