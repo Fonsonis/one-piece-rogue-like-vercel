@@ -173,16 +173,21 @@ test('upgrade saga groups cover every owned character once and in saga order',()
 });
 
 
-test('runner milestone fame is saved immediately and survives leaving and reloading',()=>{
+test('runner milestone steps are capped, saved immediately and never grant fame or account XP',()=>{
  const h=harness();
- const g=new RunnerEngine({onEvent:(type,data)=>{if(type==='reward')h.run(`gainFame(${data.fame})`);}});
+ h.run('meta.dailySteps.remaining=900;saveMeta();');
+ const g=new RunnerEngine({onEvent:(type,data)=>{if(type==='reward')h.run(`grantDailySteps(${data.steps})`);}});
  g.start();g.spawnIn=999;g.distance=14000;g.update(1/120);
- assert.equal(harness(h.memory).run('meta.fame'),25);
- assert.equal(harness(h.memory).run('meta.accXp'),25);
+ assert.equal(harness(h.memory).run('meta.dailySteps.remaining'),925);
+ assert.equal(harness(h.memory).run('meta.fame'),0);
+ assert.equal(harness(h.memory).run('meta.accXp'),0);
  g.pause();g.update(1);g.resume();g.update(1/120);g.status='over';g.update(1);
- assert.equal(harness(h.memory).run('meta.fame'),25);
+ assert.equal(harness(h.memory).run('meta.dailySteps.remaining'),925);
  g.start();g.spawnIn=999;g.distance=14000;g.update(1/120);
- assert.equal(harness(h.memory).run('meta.fame'),50);
+ assert.equal(harness(h.memory).run('meta.dailySteps.remaining'),950);
+ h.run('meta.dailySteps.remaining=990;');assert.equal(h.run('grantDailySteps(25)'),10);
+ assert.equal(harness(h.memory).run('meta.dailySteps.remaining'),1000);
+ assert.equal(h.run('grantDailySteps(25)'),0);
 });
 
 test('Sabaody insertion migrates old journey and last port exactly once and preserves earned access',()=>{

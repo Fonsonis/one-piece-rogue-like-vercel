@@ -1515,7 +1515,7 @@ for(const [baseId,forms] of Object.entries(GOROSEI_FORMS)) {
   }
 }
 
-// Progresión de combate de los tres nakamas; ambas barras de nivel desbloquean cada fase.
+// Progresión de combate de los nakamas; ambas barras de nivel desbloquean cada fase.
 const STRAW_HAT_COMBAT_FORMS = {
   zoro2: [
     ['zoro-enma', 'Zoro · Enma', 30, ['Corte','Haki'], [33,20,13,14], 'enmacut', 'Corte de Enma', 'Enma pone a prueba su control del Haki.'],
@@ -1529,6 +1529,12 @@ const STRAW_HAT_COMBAT_FORMS = {
     ['sanji-diable', 'Sanji · Diable Jambe', 20, ['Golpe','Fuego'], [28,16,10,16], 'diablejambe', 'Diable Jambe', 'La pierna al rojo vivo potencia sus patadas.'],
     ['sanji-raid', 'Sanji · Stealth Black', 30, ['Golpe','Fuego'], [32,19,13,19], 'shootingstar', 'Shooting Star! Soba Mask!', 'El Raid Suit de Germa aporta invisibilidad y movilidad. Etapa histórica anterior a su destrucción.'],
     ['sanji-ifrit', 'Sanji · Ifrit Jambe', 40, ['Golpe','Fuego','Haki'], [37,23,16,23], 'boeufburst', 'Bœuf Burst', 'Exoesqueleto, Haki y llamas azules potencian sus patadas.'],
+  ],
+  robin: [
+    ['robin-demoniofleur', 'Robin · Demonio Fleur', 40, ['Fruta','Oscuridad'], [32,19,15,17], 'demoniofleur', 'Demonio Fleur', 'Un gigantesco doble demoníaco brota con cuernos, alas y múltiples brazos para inmovilizar al rival.'],
+  ],
+  franky: [
+    ['franky-shogun', 'Franky · General Franky', 40, ['Disparo','Golpe'], [39,23,18,11], 'generalcannon', 'General Cannon', 'El Battle Franky 38 concentra la potencia de sus armas en un disparo colosal.'],
   ],
 };
 for(const [start,forms] of Object.entries(STRAW_HAT_COMBAT_FORMS)){
@@ -1548,6 +1554,8 @@ CHARS.zoro2.learnset=CHARS.zoro2.learnset.filter(([level])=>level<30);
 CHARS['zoro-enma'].learnset.push([30,'ashura']);
 CHARS.sanji.ultimate=SIGNATURE_MOVES.sanji='mutonshoot';
 CHARS.sanji.learnset=CHARS.sanji.learnset.filter(([level])=>level<20);
+CHARS.robin.ultimate=SIGNATURE_MOVES.robin='clutch';
+CHARS.robin.learnset=CHARS.robin.learnset.filter(([,move])=>move!=='demoniofleur');
 
 // Sulong mostrado en el manga. El umbral sustituye a la luna como adaptación jugable.
 const SULONG_FORMS=['carrot','wanda','inuarashi','nekomamushi','shishilian','giovanni','concelot','roddy','blackback','pekoms','bepo'];

@@ -121,6 +121,8 @@ html[data-theme="dark"] :is(.team-synergy-summary,.tower-selection) { --collecti
 .collection-summary > * > span { display:block; margin-top:3px; color:var(--collection-muted); font-size:13px; }
 .collection-summary-action { padding:0; border:0; background:none; text-align:left; color:inherit; border-radius:3px; }
 .collection-summary-action:hover span { text-decoration:underline; }
+.achievement-summary-actions { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:12px; }
+.achievement-summary-actions #ach-claim-all { white-space:normal; }
 .collection-modal label { display:flex; flex-direction:column; min-width:0; gap:5px; font-size:13px; font-weight:650; }
 .collection-modal :is(input,select) { min-height:44px; width:100%; min-width:0; padding:9px 11px; border:1px solid #8ba3a6; border-radius:8px; background:var(--collection-surface); color:var(--collection-ink); }
 .collection-modal input::placeholder { color:var(--collection-muted); opacity:1; }
@@ -187,15 +189,41 @@ html .collection-modal #inv-cards-grid { display:grid; grid-template-columns:rep
 .inventory-cost strong { color:var(--collection-ink); }
 .inventory-shortfall { font-size:11px; }
 .collection-modal .inventory-filters { grid-template-columns:repeat(3,minmax(0,1fr)); }
-.dex-header { margin-bottom:12px; font-family:system-ui,sans-serif; }
-.pirate-dex .dex-header h2 { margin:0 0 10px; padding:0; border:0; font:750 24px/1.25 system-ui,sans-serif; color:var(--ink); }
-.dex-progress { display:grid; grid-template-columns:1fr 1fr; gap:10px; padding:10px 12px; background:var(--paper-dark); border:1px solid #8ba3a6; border-radius:9px; }
-.dex-progress > span { font:12px/1.4 system-ui,sans-serif; color:var(--ink); }
-.dex-progress strong { display:block; font-size:20px; line-height:1.2; }
-.dex-progress small { font-size:13px; font-weight:500; }
-.pirate-dex .dex-help { margin:10px 0 0; font:12px/1.45 system-ui,sans-serif; color:var(--ink); text-align:center; }
+.panel.pirate-dex.collection-page {
+  --collection-ink:#203c48; --collection-muted:#52646b; --collection-line:#c6d3cf;
+  --collection-surface:#fffdf6; --collection-soft:#eef3ef; --collection-ready:#166447;
+  max-width:960px; margin:0 auto; padding:22px; border:1px solid var(--collection-line); border-top:5px solid #d9ab52;
+  border-radius:20px; background:var(--collection-surface); color:var(--collection-ink); box-shadow:0 16px 44px #08283335;
+  font:15px/1.5 system-ui,-apple-system,'Segoe UI',sans-serif;
+}
+.pirate-dex > * + * { margin-top:12px; }
+.pirate-dex .dex-header { margin:0; }
+.pirate-dex .dex-header h2 { margin:2px 0 0; padding:0; border:0; font:750 27px/1.2 system-ui,sans-serif; color:var(--collection-ink); text-align:left; }
+.pirate-dex .dex-progress { background:var(--collection-soft); border-color:var(--collection-line); }
+.pirate-dex .dex-progress > span { color:var(--collection-ink); font:13px/1.4 system-ui,sans-serif; }
+.pirate-dex .dex-progress > span:last-child { border-left:1px solid var(--collection-line); padding-left:16px; }
+.pirate-dex .dex-progress strong { display:block; font-size:24px; line-height:1.2; }
+.pirate-dex .dex-progress small { font-size:15px; font-weight:500; }
+.pirate-dex .dex-progress span span { display:block; margin-top:3px; color:var(--collection-muted); }
+.dex-filter-panel { padding:12px; border:1px solid var(--collection-line); border-radius:10px; background:var(--collection-soft); }
+.dex-filter-panel .char-controls { margin:7px 0 0; }
+.pirate-dex .char-controls :is(input,select) { min-height:44px; padding:9px 11px; border:1px solid #8ba3a6; border-radius:8px; background:var(--collection-surface); color:var(--collection-ink); font:14px/1.4 system-ui,sans-serif; }
+.pirate-dex #char-grid { overflow:visible; padding:0; }
+.pirate-dex .grid-nav { justify-content:space-between; padding:8px 0; margin:0; border-bottom:1px solid var(--collection-line); color:var(--collection-muted); font:13px/1.4 system-ui,sans-serif; }
+.pirate-dex .grid-nav .btn { min-width:44px; min-height:44px; padding:8px; border:1px solid var(--collection-line); border-radius:9px; color:var(--collection-ink); background:var(--collection-soft); box-shadow:none; font:650 14px/1 system-ui,sans-serif; }
+.pirate-dex .mobile-columns-control { color:var(--collection-muted); font:13px/1.4 system-ui,sans-serif; }
+.pirate-dex .grid9 { align-items:stretch; gap:12px; margin:10px 0; }
+.pirate-dex button.dex-card.inventory-card { display:flex; width:100%; min-width:0; padding:12px; border:1px solid var(--collection-line); border-radius:12px; background:var(--collection-surface); color:var(--collection-ink); box-shadow:none; font:14px/1.4 system-ui,sans-serif; text-align:center; }
+.pirate-dex button.dex-card.seen:hover { border-color:#508b78; box-shadow:inset 0 3px #508b78; }
+.pirate-dex .dex-card .inventory-card-top { width:100%; }
+.pirate-dex .dex-card .inventory-profile { pointer-events:none; }
+.pirate-dex .dex-card .inventory-portrait { height:80px; font-size:34px; }
+.pirate-dex .dex-card-footer { display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%; min-height:28px; margin-top:auto; padding-top:7px; border-top:1px solid var(--collection-line); color:var(--collection-muted); font-size:11px; }
+.pirate-dex .dex-rarity-full { margin:2px 0 5px; font-size:10px; }
+.pirate-dex .dex-help { margin:10px 0 0; font:13px/1.5 system-ui,sans-serif; color:var(--collection-muted); text-align:center; }
 
 html[data-theme="dark"] .collection-modal { --collection-ink:#eff6f4; --collection-muted:#c1d0d1; --collection-line:#50676b; --collection-surface:#182e38; --collection-soft:#253f49; --collection-ready:#94e0b7; border-top-color:#d9ab52; }
+html[data-theme="dark"] .panel.pirate-dex.collection-page { --collection-ink:#eff6f4; --collection-muted:#c1d0d1; --collection-line:#50676b; --collection-surface:#182e38; --collection-soft:#253f49; --collection-ready:#94e0b7; }
 html[data-theme="dark"] .achievement-card.ready { background:linear-gradient(90deg,#1c4436,var(--collection-surface) 75%); border-color:#65ac87; }
 html[data-theme="dark"] .achievement-progress { background:#496365; } html[data-theme="dark"] .achievement-progress i { background:#6ccca2; }
 html[data-theme="dark"] .inventory-rarity { background:#503f1b; color:#ffe2a0; }
@@ -223,6 +251,7 @@ html[data-theme="dark"] .collection-modal :is(button,input,select,summary):focus
   .collection-summary > :last-child { padding-left:12px; }
   .collection-summary strong { font-size:21px; }
   .collection-summary > * > span { font-size:12px; }
+  .achievement-summary-actions { grid-template-columns:1fr; gap:6px; }
   .collection-modal .collection-search { gap:8px; grid-template-columns:minmax(0,1.2fr) minmax(120px,1fr); }
   .collection-modal .inventory-filters { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .achievement-card { grid-template-columns:34px minmax(0,1fr); gap:10px; padding:12px; }
@@ -251,10 +280,13 @@ html[data-theme="dark"] .collection-modal :is(button,input,select,summary):focus
   .inventory-cost,.inventory-limit,.inventory-shortfall { overflow-wrap:anywhere; }
   .collection-modal .collection-pagination .btn { padding:8px; font-size:13px; }
   .collection-pagination { gap:6px; }
+  .panel.pirate-dex.collection-page { padding:14px; border-radius:14px; }
+  .pirate-dex .dex-header h2 { font-size:21px; }
   .pirate-dex .dex-card { padding:6px 4px; font:12px/1.25 system-ui,sans-serif; }
   .pirate-dex .dex-card .emoji { display:flex; align-items:center; justify-content:center; height:52px; min-height:0; margin:0 0 3px; }
   html .pirate-dex .grid9 .dex-sprite { --sprite-size:52px!important; }
-  .pirate-dex .dex-card > div:nth-child(2) { font-weight:700; }
+  .pirate-dex .inventory-profile strong { font-size:12px; }
+  .pirate-dex .inventory-profile-link { display:none; }
   .pirate-dex .dex-card > div:last-child { font-size:10px; margin-top:3px; }
   .pirate-dex .dex-rarity { margin-top:3px; }
   .pirate-dex .dex-rarity-full { display:none; }
@@ -284,8 +316,8 @@ html .inventory-modal #inv-cards-grid { overflow:visible; max-height:none; min-h
   .inventory-modal #inv-close-x { top:12px; right:14px; }
   .inventory-modal .collection-pagination { left:8px; right:8px; bottom:8px; padding:8px; }
 }
-.pirate-dex button.dex-card { width:100%; color:var(--ink); font:inherit; text-align:center; }
+.pirate-dex button.dex-card { width:100%; color:var(--collection-ink); font:inherit; text-align:center; }
 .pirate-dex button.dex-card:disabled { cursor:default; }
 .pirate-dex button.dex-card:focus-visible { outline:3px solid var(--sea); outline-offset:3px; }
-.pirate-dex .dex-forms-count { margin-top:5px; color:var(--sea); font:650 12px/1.4 system-ui,sans-serif; }
+.pirate-dex .dex-forms-count { margin:0; color:var(--collection-ready); font:650 11px/1.4 system-ui,sans-serif; }
 .collection-sort-stat { display:block; margin:5px 0; font:700 12px/1.4 system-ui,sans-serif; color:var(--sea); text-align:center; }

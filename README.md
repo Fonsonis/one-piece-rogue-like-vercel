@@ -1,6 +1,6 @@
 # One Piece Rogue Like — edición estática para Vercel
 
-Juego fan de One Piece, sin ánimo de lucro. La edición Egghead actualiza el balance y la interfaz, conservando música, sprites, 434 personajes de One Piece, 11 sagas, 57 islas, logros y el minijuego Luffy Run de la versión mejorada.
+Juego fan de One Piece, sin ánimo de lucro. La edición actual reúne música, sprites, 589 personajes y formas de One Piece, 15 sagas, 70 islas, logros y el minijuego Luffy Run.
 
 Todo se ejecuta en el navegador. No necesita Next.js, Cloudflare, cuentas, cookies de sesión, API, base de datos, Vercel Blob ni otro servicio de almacenamiento. Node.js solo prepara los archivos y las pruebas. Las dos bibliotecas QR se incluyen localmente y sus versiones están fijadas como dependencias de desarrollo.
 
@@ -49,7 +49,7 @@ Detalles y pruebas: `public/local/`, `tests/local-multiplayer.test.mjs` y la pru
 
 ## Edición Egghead
 
-Buggy contra Buggy ya no bloquea la partida. Se revisan pasivas y técnicas, se añade EXP visible, se ajustan las escalas de los 434 sprites y se incorporan doce escenarios ilustrados. Se conservan estadísticas base, niveles de enemigos y curvas de progresión. Consulta [la revisión de balance](docs/combat-balance.md), [las 434 fichas](docs/character-balance.csv) y [la dirección visual](docs/art-direction.md).
+Buggy contra Buggy ya no bloquea la partida. Se revisan pasivas y técnicas, se añade EXP visible, se ajustan las escalas de los 589 sprites y se incorporan escenarios ilustrados. Se conservan estadísticas base, niveles de enemigos y curvas de progresión. Consulta [la revisión de balance](docs/combat-balance.md), [las fichas](docs/character-balance.csv) y [la dirección visual](docs/art-direction.md).
 
 ## Selección de equipos y desafíos
 
@@ -113,7 +113,7 @@ Huir requiere confirmación y pausa el combate mientras se decide. Los sprites d
 - **Importar JSON**: tras confirmar, valida el archivo y sustituye el progreso del dispositivo. Un archivo inválido o un fallo de escritura conserva la partida anterior.
 - Se recuperan las antiguas claves locales `oplike_meta` y `oplike_run` si todavía no existe el nuevo guardado. Las copias JSON con `game: "grandlinelike"` y `version: 1` siguen siendo compatibles. No hay inicio de sesión ni recuperación desde servidores antiguos.
 - En Ajustes puedes elegir aspecto claro/oscuro y 2 o 3 columnas de nakamas en móvil. Estas preferencias viajan en el mismo JSON local.
-- Luffy Run está disponible desde el nivel 1 de cuenta: máximo dos saltos antes de aterrizar y 25 de fama por cada 1.000 metros completos de una carrera. Los golpes suman puntos, pero no metros ni fama adicional. La recompensa se guarda al alcanzar el tramo; empezar otra carrera reinicia la distancia.
+- Luffy Run está disponible desde el nivel 1 de cuenta: máximo dos saltos antes de aterrizar y hasta 25 pasos recuperados por cada 1.000 metros completos de una carrera, sin superar el máximo diario de 1.000. Los golpes suman puntos, pero no metros ni pasos adicionales. La recompensa se guarda al alcanzar el tramo; empezar otra carrera reinicia la distancia.
 - La tienda agrupa las mejoras de veteranos en listas desplegables por saga, con búsqueda por nombre.
 - Los récords y recompensas de Torre Marine, Desafíos y Luffy Run se conservan en el progreso permanente. Sus sesiones en curso siguen siendo temporales, como en el motor original.
 
@@ -142,7 +142,7 @@ npm test
 npm run lint
 ```
 
-Las pruebas verifican contenido del juego, los 434 atlas y retratos, escenarios con/sin efectos visuales, Nuzlocke, Luffy Run, JSON local, recuperación, importaciones inválidas, almacenamiento bloqueado y copia exacta de todos los recursos al despliegue. También validan 188.356 emparejamientos y simulan 2.604 combates. Las pruebas no requieren red ni dependencias. Para reproducir la comparación con la revisión anterior: `node scripts/audit-balance.mjs 607b860`.
+Las pruebas verifican contenido del juego, los 589 atlas y retratos, escenarios con/sin efectos visuales, Nuzlocke, Luffy Run, JSON local, recuperación, importaciones inválidas, almacenamiento bloqueado y copia exacta de todos los recursos al despliegue. Las pruebas no requieren red. Para reproducir la comparación histórica: `node scripts/audit-balance.mjs 607b860`.
 
 ## Estructura
 

@@ -6,7 +6,7 @@ const sizing=JSON.parse(fs.readFileSync('docs/sprite-sizing.json','utf8'));
 const css=fs.readFileSync('public/art/motion-bounds.css','utf8');
 
 test('all catalog sprites fit the stage throughout attack, recoil and KO, including mirrored enemies',()=>{
- assert.equal(Object.keys(metrics).length,587);
+ assert.equal(Object.keys(metrics).length,589);
  let checked=0;
  for(const [id,m] of Object.entries(metrics)){
    assert.ok(css.includes(`[data-character="${id}"]`));
@@ -27,6 +27,13 @@ test('all catalog sprites fit the stage throughout attack, recoil and KO, includ
    }
  }
  console.log('Motion corner samples contained:',checked);
+});
+
+test('island app uses the stable layout viewport instead of transient visual viewport dimensions',()=>{
+ const responsive=fs.readFileSync('public/art/responsive.css','utf8');
+ const block=responsive.match(/@media\(pointer:coarse\)[\s\S]*?#app:has\(#island-carousel\)\s*\{([^}]*)\}/)?.[1] || '';
+ assert.match(block,/width:100%/);assert.match(block,/height:100dvh/);
+ assert.doesNotMatch(block,/--game-view-(?:width|height|left|top)/);
 });
 
 async function viewHarness(){

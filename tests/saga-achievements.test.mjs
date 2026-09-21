@@ -15,6 +15,30 @@ test('repeatable tracks retain their original tiers and reach 10,000 in every sa
  assert.equal(h.exec('getClaimedProgTier(GLOBAL_PROGRESSIVE_ACHIEVEMENTS[0])'),7);
 });
 
+test('Sabaody, Punk Hazard and Zou expose every progressive, saga and island achievement',()=>{
+ const h=combatHarness();
+ for(const id of ['sabaody','punkhazard','zou']){
+  h.ctx.sagaId=id;
+  assert.equal(h.exec('SAGA_PROGRESSIVE_ACHIEVEMENTS.filter(a=>a.sagaId===sagaId).length'),13);
+  assert.equal(h.exec('SAGA_DIFF_ACHIEVEMENTS.filter(a=>a.sagaId===sagaId).length'),5);
+  assert.equal(h.exec('ISLAND_DIFF_ACHIEVEMENTS.filter(a=>a.sagaId===sagaId).length'),h.exec('SAGAS.find(s=>s.id===sagaId).islands.length*5'));
+ }
+});
+
+test('claim all collects every reached tier and static reward once, with rollback on save failure',()=>{
+ const h=combatHarness();
+ h.exec("meta.stats.kills=50;meta.sagaDiffWins.eastblue={1:true};const pending=claimableAchievementRewards();const expected={count:pending.length,total:pending.reduce((sum,reward)=>sum+reward.fame,0)};let saves=0;const result=claimAllAchievements(()=>{saves++;return true;});");
+ assert.equal(h.exec("pending.filter(reward=>reward.id==='kills').length"),3);
+ assert.equal(h.exec("pending.some(reward=>reward.id==='saga_diff_eastblue_1')"),true);
+ assert.deepEqual(JSON.parse(h.exec('JSON.stringify(result)')),JSON.parse(h.exec('JSON.stringify(expected)')));
+ assert.equal(h.exec('meta.fame'),h.exec('expected.total'));assert.equal(h.exec('meta.accXp'),h.exec('expected.total'));assert.equal(h.exec('saves'),1);
+ assert.deepEqual(JSON.parse(h.exec('JSON.stringify(claimAllAchievements(()=>{saves++;return true;}))')),{count:0,total:0});
+ assert.equal(h.exec('saves'),1);
+ h.exec("meta.claimedAch={};meta.claimedProg={};meta.fame=7;meta.accXp=9;const before=JSON.stringify(meta);const failed=claimAllAchievements(()=>false);");
+ assert.deepEqual(JSON.parse(h.exec('JSON.stringify(failed)')),{count:0,total:0});
+ assert.equal(h.exec('JSON.stringify(meta)'),h.exec('before'));
+});
+
 test('saga counters follow the current adventure, exclude tower and persist through JSON',()=>{
  const h=combatHarness();
  h.exec("run={mode:'classic',saga:0};trackKills(10);trackItemCollected(3);trackStat('mystery_visit',5);run.saga=1;trackKills(25);battle={tower:true};trackKills(4);battle=null;run=null;trackStat('items',2);");

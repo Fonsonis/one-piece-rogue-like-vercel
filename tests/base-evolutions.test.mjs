@@ -6,7 +6,7 @@ test('every evolution requires both permanent and journey levels at its exact th
  const h=combatHarness();
  h.exec('maxStartLvlCap=()=>100;');
  const chains=JSON.parse(h.exec('JSON.stringify(Object.entries(CHARS).filter(([,c])=>c.evo).map(([id,c])=>[id,baseFormOf(id),c.evo.lvl,c.evo.to]))'));
- assert.equal(chains.length,122);
+ assert.equal(chains.length,124);
  for(const [id,base,level,to] of chains){
   h.exec(`meta.charUpgrades={${base}:${level-6}};`);
   assert.equal(h.exec(`makeChar('${to}',100).id`),id,`${to} locked one permanent level before threshold`);
@@ -15,6 +15,17 @@ test('every evolution requires both permanent and journey levels at its exact th
   assert.equal(h.exec(`makeChar('${base}',${level}).id`),to);
   assert.equal(h.exec(`(()=>{const f=makeChar('${base}',${level-1});gainXP(f,xpForLevel(f.lvl));return f.id;})()`),to);
  }
+});
+
+test('Robin and Franky unlock their faithful level 40 combat forms and reserved techniques',()=>{
+ const h=combatHarness();h.exec('maxStartLvlCap=()=>100;meta.charUpgrades={robin:35,franky:35};');
+ assert.equal(h.exec("makeChar('robin',39).id"),'robin');
+ assert.equal(h.exec("makeChar('robin',39).moves.includes('demoniofleur')"),false);
+ assert.equal(h.exec("makeChar('robin',40).id"),'robin-demoniofleur');
+ assert.equal(h.exec("makeChar('robin',40).moves.includes('demoniofleur')"),true);
+ assert.equal(h.exec("makeChar('franky',39).id"),'franky');
+ assert.equal(h.exec("makeChar('franky',40).id"),'franky-shogun');
+ assert.equal(h.exec("makeChar('franky',40).moves.includes('generalcannon')"),true);
 });
 
 test('base Luffy 15 reaches journey 20 with a charged base ultimate, and no Gear 2 attacks',()=>{
