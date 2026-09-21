@@ -42,7 +42,7 @@ jobs:
         run: |
           app_version_name=$(node -p "require('./package.json').version")
           app_version_code=$(date +%s)
-          node -e "const fs=require('fs');const p='public/android-version.json';const x=JSON.parse(fs.readFileSync(p));x.version=process.argv[1];x.versionCode=Number(process.argv[2]);fs.writeFileSync(p,JSON.stringify(x,null,2)+'\n')" "$app_version_name" "$app_version_code"
+          node -e "const fs=require('fs');const p='public/android-version.json';const x=JSON.parse(fs.readFileSync(p));x.version=process.argv[1];x.versionCode=Number(process.argv[2]);x.downloadUrl='https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/download/android-'+process.argv[2]+'/one-piece-rogue-like.apk';fs.writeFileSync(p,JSON.stringify(x,null,2)+'\n')" "$app_version_name" "$app_version_code"
           echo "APP_VERSION_NAME=$app_version_name" >> "$GITHUB_ENV"
           echo "APP_VERSION_CODE=$app_version_code" >> "$GITHUB_ENV"
       - run: npm run android:sync
