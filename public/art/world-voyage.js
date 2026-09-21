@@ -35,7 +35,14 @@
     const events=new AbortController();let route,position=0,currentId=initialId,targetId=null,trip=null,frame=0,dead=false,follow=true,lastSize='';
     // Keep the viewport-sized ocean at the same world coordinate as the islands.
     const sea=chart.parentElement.querySelector('.world-sea');
-    const syncSea=()=>sea?.style.setProperty('--sea-offset',`${-chart.scrollTop}px`);
+    const syncSea=()=>{
+      if(!sea)return;
+      const offset=-chart.scrollTop;
+      sea.style.setProperty('--sea-offset',`${offset}px`);
+      // Wrap each repeating texture independently; layers stay viewport-sized.
+      sea.style.setProperty('--sea-base-shift',`${offset%480}px`);
+      sea.style.setProperty('--sea-foam-shift',`${offset%660}px`);
+    };
     const assets=['north','east','south','west'];for(const dir of assets){const img=new Image();img.src=`/art/world/ship-${dir}.webp`;}
     function draw(direction=1,refollow=false){
       const p=pointAt(route,position),next=pointAt(route,position+direction*5),dx=next.x-p.x,dy=next.y-p.y;
