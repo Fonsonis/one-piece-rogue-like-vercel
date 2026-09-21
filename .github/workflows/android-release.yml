@@ -22,6 +22,10 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: android-actions/setup-android@v3
+        with:
+          # El paquete SDK heredado `tools` ya no existe. El action lo solicita
+          # por defecto si no se indica explícitamente esta lista.
+          packages: platform-tools
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - run: npm ci
       - name: Validar versión del tag
@@ -34,7 +38,14 @@ jobs:
           ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          test -n "$ANDROID_KEYSTORE_BASE64"
+          missing=0
+          for secret_name in ANDROID_KEYSTORE_BASE64 ANDROID_STORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            if [ -z "${!secret_name:-}" ]; then
+              echo "::error::Falta configurar el secret ${secret_name} en GitHub Actions."
+              missing=1
+            fi
+          done
+          test "$missing" -eq 0
           mkdir -p .android-signing
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > .android-signing/one-piece-rogue-like.jks
           {
