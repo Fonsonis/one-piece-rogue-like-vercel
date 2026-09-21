@@ -1,0 +1,9 @@
+{
+  "appId": "com.fonsonis.onepieceroguelike",
+  "appName": "One Piece Rogue Like",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#2f7fc4",
+    "allowMixedContent": false
+  }
+}

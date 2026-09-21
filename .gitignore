@@ -40,3 +40,8 @@ next-env.d.ts
 /.sites-runtime/
 /outputs/
 /work/
+/.tools/
+/.android-signing/
+/android/.gradle/
+/android/local.properties
+/android/app/build/

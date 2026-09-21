@@ -39,9 +39,13 @@ Mantened las pantallas encendidas y el juego visible. La partida se pausa cuando
 
 Las redes de invitados con aislamiento, VPN, restricciones de red local y ciertos puntos de acceso/navegadores pueden impedir la conexión. No se usa ningún servidor de retransmisión como alternativa. Verificado con navegadores aislados en un equipo; probar también entre móviles reales en la red objetivo antes de anunciar compatibilidad general.
 
-### Abrir el juego sin internet
+### APK Android y juego sin internet
 
-En el menú, **Preparar juego sin internet → Descargar / actualizar** almacena los recursos (~92 MB) en ese navegador. Espera la confirmación de descarga completa. Después abre **la misma dirección**; para multijugador sigue haciendo falta una red local, aunque no tenga acceso a internet. Una copia descargada se sirve desde caché sin consultar servicios de fuentes externos. Las actualizaciones se descargan con el mismo botón; una descarga fallida conserva la copia anterior.
+El botón **Descargar APK para Android** obtiene una APK firmada desde la última release de GitHub. La APK contiene la build completa (unos 123 MB), incluidos sprites, mapas, música y tipografía: se instala y arranca sin conexión desde el primer uso. El progreso se guarda en el almacenamiento local de la aplicación y las actualizaciones firmadas se pueden instalar encima sin perderlo.
+
+Dentro de la APK, ese mismo acceso cambia a **Buscar actualización Android**. Con conexión consulta `android-version.json`; si hay una versión superior, abre la descarga y Android pide confirmar la instalación. Si la consulta falla, el juego empaquetado sigue funcionando normalmente. Para publicar una actualización deben incrementarse `version`, `versionCode`, `android/app/build.gradle` y la constante de `public/local/android-update.mjs`, y se debe firmar con la misma clave.
+
+La opción secundaria **Preparar navegador sin internet → Descargar / actualizar** almacena los recursos (~121 MB) en el navegador web. Espera la confirmación de descarga completa. Después abre **la misma dirección**; para multijugador sigue haciendo falta una red local, aunque no tenga acceso a internet. Una copia descargada se sirve desde caché sin consultar servicios de fuentes externos. Las actualizaciones se descargan con el mismo botón; una descarga fallida conserva la copia anterior.
 
 El navegador puede desalojar los recursos por falta de espacio. Conserva una exportación JSON independiente del progreso. Esta función registra un service worker únicamente al solicitar la descarga; no precarga archivos ni sustituye el guardado sin pulsar el botón.
 
@@ -84,6 +88,19 @@ npm start
 ```
 
 No abras el HTML con `file://`: Luffy Run carga módulos y recursos mediante HTTP.
+
+### Construir la APK Android
+
+La plataforma nativa está en `android/` y Capacitor copia `dist/` dentro del instalador. Con JDK 21 y Android SDK 35 disponibles mediante `JAVA_HOME` y `ANDROID_HOME`:
+
+```sh
+npm ci
+npm run android:apk
+```
+
+El resultado firmado se crea en `outputs/one-piece-rogue-like.apk`. En el primer build local, el script genera `.android-signing/one-piece-rogue-like.jks` y sus credenciales; ambos están ignorados por Git. Haz una copia privada de esa carpeta: perder la clave impide que Android acepte futuras versiones como actualización de la app instalada.
+
+El workflow `android-release.yml` publica el mismo nombre estable al crear un tag `v*`. Requiere los secretos `ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS` y `ANDROID_KEY_PASSWORD`, obtenidos de la misma clave local.
 
 ## Tripulación y relevo
 
@@ -148,6 +165,8 @@ Las pruebas verifican contenido del juego, los 589 atlas y retratos, escenarios 
 
 - `public/`: juego completo y recursos que se sirven al navegador.
 - `scripts/build-static.mjs`: prepara `dist/` y comprueba la sintaxis JavaScript.
+- `scripts/build-android-apk.mjs`: genera una APK release firmada y su SHA-256.
+- `android/`: contenedor nativo de Capacitor; sus assets web se actualizan con `npm run android:sync`.
 - `scripts/serve-static.mjs`: servidor de desarrollo local; no se despliega como función.
 - `tests/`: pruebas del motor, arte, guardado y salida estática.
 - `docs/`: documentación y procedencia del arte.

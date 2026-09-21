@@ -1,0 +1,58 @@
+name: Publicar APK Android
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+      - uses: android-actions/setup-android@v3
+      - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
+      - run: npm ci
+      - name: Validar versión del tag
+        run: node scripts/verify-android-version.mjs "${GITHUB_REF_NAME#v}"
+      - run: npm run android:sync
+      - name: Restaurar clave de firma
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          mkdir -p .android-signing
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > .android-signing/one-piece-rogue-like.jks
+          {
+            echo 'storeFile=.android-signing/one-piece-rogue-like.jks'
+            echo "storePassword=$ANDROID_STORE_PASSWORD"
+            echo "keyAlias=$ANDROID_KEY_ALIAS"
+            echo "keyPassword=$ANDROID_KEY_PASSWORD"
+          } > .android-signing/signing.properties
+      - name: Compilar APK release
+        working-directory: android
+        run: ./gradlew assembleRelease
+      - name: Preparar artefacto
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk one-piece-rogue-like.apk
+          sha256sum one-piece-rogue-like.apk > one-piece-rogue-like.apk.sha256
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            one-piece-rogue-like.apk
+            one-piece-rogue-like.apk.sha256
+          generate_release_notes: true

@@ -2209,6 +2209,7 @@ function startLogPoseGacha(activeSagas) {
 
 // ============ PANTALLA: HOME ============
 function screenHome() {
+  const nativeAndroid = globalThis.Capacitor?.isNativePlatform?.() === true && globalThis.Capacitor?.getPlatform?.() === 'android';
   playMusic('menu');
   const accLvl = accountLevel();
   const runnerUnlocked = accLvl >= 1;
@@ -2237,7 +2238,10 @@ function screenHome() {
     </div>
     <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? 'Doble salto · recupera 25 pasos cada 1.000 m' : '🔒 Se desbloquea al nivel 1 de cuenta'}</small></span></button>
     <button class="local-menu-button" id="btn-local"><span aria-hidden="true">⚔️</span><span><strong>MULTIJUGADOR LOCAL</strong><small>Duelo · Torneo · Alianza contra un yonko · Conexión por QR</small></span></button>
-    <div style="text-align:center;margin:12px 0"><button class="btn gray small" id="btn-offline">⬇ Preparar juego sin internet</button></div>
+    <div class="home-install-actions">
+      <button class="btn green small" id="btn-offline">${nativeAndroid ? '↻ Buscar actualización Android' : '⬇ Descargar APK para Android'}</button>
+      ${nativeAndroid ? '<small>El juego completo ya está guardado en esta APK y funciona sin conexión.</small>' : '<button class="btn gray small" id="btn-browser-offline">Preparar navegador sin internet</button>'}
+    </div>
     ${pendingPirateKingRewards().length ? `<div class="panel"><button class="btn gold" id="btn-king-rewards">👑 ELEGIR LEGENDARIO · ${pendingPirateKingRewards().length} recompensa(s) de Rey Pirata</button></div>` : ''}
     <div class="home-main-buttons">
       <button class="btn blue small" id="btn-dex">
@@ -2292,9 +2296,13 @@ function screenHome() {
   };
   $('#btn-king-rewards')?.addEventListener('click', () => showPirateKingReward(pendingPirateKingRewards()[0], screenHome));
   $('#btn-offline').onclick = async () => {
+    try { const { downloadAndroidApk } = await import('./local/android-update.mjs'); await downloadAndroidApk({ toast }); }
+    catch (e) { toast(e.message || 'No se pudo abrir la descarga de Android.'); }
+  };
+  $('#btn-browser-offline')?.addEventListener('click', async () => {
     try { const { prepareOffline } = await import('./local/offline.mjs'); await prepareOffline(); }
     catch (e) { toast(e.message || 'No se pudo preparar la copia sin conexión.'); }
-  };
+  });
   if (towerUnlocked) $('#mode-tower').onclick = () => screenTowerIntro();
   if (challengeUnlocked) $('#mode-challenge').onclick = () => screenChallenges();
   $('#btn-runner').onclick = async () => {
