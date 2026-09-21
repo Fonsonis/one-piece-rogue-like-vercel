@@ -2,8 +2,16 @@ name: Publicar APK Android
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: android-release-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: write
@@ -28,10 +36,18 @@ jobs:
           packages: platform-tools
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - run: npm ci
-      - name: Validar versión del tag
-        run: node scripts/verify-android-version.mjs "${GITHUB_REF_NAME#v}"
+      - run: node scripts/verify-android-version.mjs
+      - name: Preparar versión incremental Android
+        shell: bash
+        run: |
+          app_version_name=$(node -p "require('./package.json').version")
+          app_version_code=$(date +%s)
+          node -e "const fs=require('fs');const p='public/android-version.json';const x=JSON.parse(fs.readFileSync(p));x.version=process.argv[1];x.versionCode=Number(process.argv[2]);fs.writeFileSync(p,JSON.stringify(x,null,2)+'\n')" "$app_version_name" "$app_version_code"
+          echo "APP_VERSION_NAME=$app_version_name" >> "$GITHUB_ENV"
+          echo "APP_VERSION_CODE=$app_version_code" >> "$GITHUB_ENV"
       - run: npm run android:sync
       - name: Restaurar clave de firma
+        if: github.event_name != 'pull_request'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_STORE_PASSWORD: ${{ secrets.ANDROID_STORE_PASSWORD }}
@@ -55,15 +71,26 @@ jobs:
             echo "keyPassword=$ANDROID_KEY_PASSWORD"
           } > .android-signing/signing.properties
       - name: Compilar APK release
+        if: github.event_name != 'pull_request'
         working-directory: android
-        run: ./gradlew assembleRelease
+        run: bash ./gradlew assembleRelease -PappVersionCode="$APP_VERSION_CODE" -PappVersionName="$APP_VERSION_NAME"
+      - name: Verificar APK de la PR
+        if: github.event_name == 'pull_request'
+        working-directory: android
+        run: bash ./gradlew assembleDebug -PappVersionCode="$APP_VERSION_CODE" -PappVersionName="$APP_VERSION_NAME"
       - name: Preparar artefacto
+        if: github.event_name != 'pull_request'
         run: |
           cp android/app/build/outputs/apk/release/app-release.apk one-piece-rogue-like.apk
           sha256sum one-piece-rogue-like.apk > one-piece-rogue-like.apk.sha256
       - uses: softprops/action-gh-release@v2
+        if: github.event_name != 'pull_request'
         with:
+          tag_name: android-${{ env.APP_VERSION_CODE }}
+          name: Android ${{ env.APP_VERSION_NAME }} · compilación ${{ env.APP_VERSION_CODE }}
+          make_latest: true
           files: |
             one-piece-rogue-like.apk
             one-piece-rogue-like.apk.sha256
+            public/android-version.json
           generate_release_notes: true

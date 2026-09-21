@@ -5,8 +5,8 @@ const release = JSON.parse(readFileSync('public/android-version.json', 'utf8'));
 const updater = readFileSync('public/local/android-update.mjs', 'utf8');
 const gradle = readFileSync('android/app/build.gradle', 'utf8');
 const updaterVersion = updater.match(/CURRENT_VERSION = '([^']+)'/)?.[1];
-const gradleVersion = gradle.match(/versionName "([^"]+)"/)?.[1];
-const gradleVersionCode = Number(gradle.match(/versionCode (\d+)/)?.[1]);
+const gradleVersion = gradle.match(/defaultVersionName = "([^"]+)"/)?.[1];
+const gradleVersionCode = Number(gradle.match(/defaultVersionCode = (\d+)/)?.[1]);
 const expectedTagVersion = process.argv[2];
 
 const versions = { packageVersion, manifestVersion: release.version, updaterVersion, gradleVersion };

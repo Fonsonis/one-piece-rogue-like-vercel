@@ -587,7 +587,20 @@ function manualSave() {
 // ---------- Copias JSON portátiles, compatibles con el juego original ----------
 async function exportSave() {
   const payload = GameSaveStorage.payload(meta, battle ? savedRun : run);
-  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const json = JSON.stringify(payload, null, 2);
+  const nativeAndroid = globalThis.Capacitor?.isNativePlatform?.() === true && globalThis.Capacitor?.getPlatform?.() === 'android';
+  if (nativeAndroid) {
+    try {
+      const { exportAndroidJson } = await import('./local/android-files.mjs');
+      await exportAndroidJson(json);
+      toast('💾 Elige dónde guardar o compartir la copia JSON');
+    } catch (error) {
+      console.error('[android-export] No se pudo exportar la partida', error);
+      toast('❌ Android no pudo abrir el selector para guardar el JSON.');
+    }
+    return;
+  }
+  const blob = new Blob([json], { type: 'application/json' });
   if (typeof window.showSaveFilePicker === 'function') {
     let writable;
     try {
