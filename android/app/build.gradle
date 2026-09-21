@@ -6,6 +6,11 @@ if (signingPropertiesFile.exists()) {
     signingPropertiesFile.withInputStream { signingProperties.load(it) }
 }
 
+def defaultVersionCode = 10200
+def defaultVersionName = "1.2.0"
+def appVersionCode = providers.gradleProperty('appVersionCode').map { it.toInteger() }.orElse(defaultVersionCode).get()
+def appVersionName = providers.gradleProperty('appVersionName').orElse(defaultVersionName).get()
+
 android {
     namespace "com.fonsonis.onepieceroguelike"
     compileSdk rootProject.ext.compileSdkVersion
@@ -13,8 +18,8 @@ android {
         applicationId "com.fonsonis.onepieceroguelike"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 10100
-        versionName "1.1.0"
+        versionCode appVersionCode
+        versionName appVersionName
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.

@@ -1,6 +1,7 @@
-const CURRENT_VERSION = '1.1.0';
+const CURRENT_VERSION = '1.2.0';
+const CURRENT_VERSION_CODE = 10200;
 const RELEASE_URL = 'https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/latest/download/one-piece-rogue-like.apk';
-const VERSION_URL = 'https://one-piece-rogue-like-vercel.vercel.app/android-version.json';
+const RELEASE_VERSION_URL = 'https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/latest/download/android-version.json';
 
 export function isAndroidApp() {
   return globalThis.Capacitor?.isNativePlatform?.() === true && globalThis.Capacitor?.getPlatform?.() === 'android';
@@ -23,6 +24,17 @@ async function openExternal(url) {
   globalThis.open(url, '_blank', 'noopener,noreferrer');
 }
 
+async function installedRelease() {
+  const capacitor = globalThis.Capacitor;
+  const app = capacitor?.registerPlugin?.('App') || capacitor?.Plugins?.App;
+  if (!app?.getInfo) return { version: CURRENT_VERSION, versionCode: CURRENT_VERSION_CODE };
+  const info = await app.getInfo();
+  return {
+    version: info.version || CURRENT_VERSION,
+    versionCode: Number(info.build) || CURRENT_VERSION_CODE,
+  };
+}
+
 export async function downloadAndroidApk({ toast } = {}) {
   if (!isAndroidApp()) {
     globalThis.location.assign(RELEASE_URL);
@@ -30,18 +42,26 @@ export async function downloadAndroidApk({ toast } = {}) {
   }
 
   try {
-    const response = await fetch(`${VERSION_URL}?t=${Date.now()}`, { cache: 'no-store' });
+    const installed = await installedRelease();
+    toast?.(`↻ Buscando una versión posterior a ${installed.version}…`);
+    const response = await fetch(`${RELEASE_VERSION_URL}?t=${Date.now()}`, { cache: 'no-store' });
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
     const release = await response.json();
-    if (compareVersions(release.version, CURRENT_VERSION) <= 0) {
-      toast?.(`✅ Ya tienes la versión más reciente (${CURRENT_VERSION}).`);
+    const releaseCode = Number(release.versionCode) || 0;
+    const hasNewBuild = releaseCode > installed.versionCode || (!releaseCode && compareVersions(release.version, installed.version) > 0);
+    if (!hasNewBuild) {
+      toast?.(`✅ Ya tienes la versión más reciente (${installed.version}).`);
       return;
     }
-    const accepted = globalThis.confirm(`Hay una actualización disponible: ${release.version}. ¿Quieres descargarla ahora?`);
-    if (accepted) await openExternal(release.downloadUrl || RELEASE_URL);
-  } catch {
-    toast?.('No se pudo comprobar la actualización. El juego offline sigue disponible.');
+    const accepted = globalThis.confirm(`Hay una actualización disponible: ${release.version} (compilación ${releaseCode}). ¿Quieres descargarla ahora?`);
+    if (accepted) {
+      await openExternal(release.downloadUrl || RELEASE_URL);
+      toast?.('⬇ Descarga abierta. Cuando termine, pulsa el APK descargado para instalar la actualización.');
+    }
+  } catch (error) {
+    console.error('[android-update] No se pudo comprobar o abrir la actualización', error);
+    toast?.('No se pudo comprobar la actualización. Revisa la conexión e inténtalo de nuevo.');
   }
 }
 
-export const androidRelease = Object.freeze({ version: CURRENT_VERSION, downloadUrl: RELEASE_URL });
+export const androidRelease = Object.freeze({ version: CURRENT_VERSION, versionCode: CURRENT_VERSION_CODE, downloadUrl: RELEASE_URL });
