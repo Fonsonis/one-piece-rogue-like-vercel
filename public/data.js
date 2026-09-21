@@ -1433,6 +1433,7 @@ const GOD_VALLEY_FORMS = Object.freeze([
   'xebec','garling','bogard','bakkin','gloriosa','john','streusen',
   'shakky','saturn','gunko','sommers',
 ]);
+const GOD_VALLEY_FORM_LEVEL = 30;
 for (const baseId of GOD_VALLEY_FORMS) {
   const base=CHARS[baseId], id=`${baseId}-young`, next=base.evo;
   const signature=base.ultimate || base.learnset.at(-1)[1];
@@ -1440,14 +1441,14 @@ for (const baseId of GOD_VALLEY_FORMS) {
   MOVES[move]={name:`${base.name} · voluntad de God Valley`,type:base.types[0],power:80,acc:.95};
   CHARS[id]={...base,name:`${base.name} · God Valley`,
     base:base.base.map((n,i)=>n+(i===0?4:2)),types:[...base.types],
-    learnset:[[25,move],[25,signature]],ultimate:signature,generated:false,
-    historicalBase:baseId,formLevel:25,
-    desc:'Versión de hace 38 años, durante God Valley. Requiere nivel base y nivel en partida 25. Adaptación de progreso del juego.',
-    evo:next ? {...next,lvl:30} : undefined,
+    learnset:[[GOD_VALLEY_FORM_LEVEL,move],[GOD_VALLEY_FORM_LEVEL,signature]],ultimate:signature,generated:false,
+    historicalBase:baseId,formLevel:GOD_VALLEY_FORM_LEVEL,
+    desc:`Versión de hace 38 años, durante God Valley. Requiere nivel base y nivel en partida ${GOD_VALLEY_FORM_LEVEL}. Adaptación de progreso del juego.`,
+    evo:next ? {...next,lvl:40} : undefined,
   };
-  // La fase joven ocupa Nv.25; las formas Zoan previas continúan desde Nv.30/40.
+  // La fase joven ocupa Nv.30; las formas Zoan previas continúan desde Nv.40/50.
   if(next){
-    let form=CHARS[next.to], level=30;
+    let form=CHARS[next.to], level=40;
     while(form){
       form.formLevel=level;
       form.base=form.base.map((n,i)=>n+(i===0?4:2));
@@ -1457,7 +1458,7 @@ for (const baseId of GOD_VALLEY_FORMS) {
       level+=10;form.evo={...form.evo,lvl:level};form=CHARS[form.evo.to];
     }
   }
-  base.evo={lvl:25,to:id};
+  base.evo={lvl:GOD_VALLEY_FORM_LEVEL,to:id};
 }
 // Infancias de God Valley: cartas independientes, no evoluciones ni fases del adulto.
 // Se conservan los IDs de los sprites ya creados; su identidad jugable es propia.
@@ -1493,7 +1494,7 @@ CHARS.im.evo={lvl:25,to:'im-gunko'};
 
 // Formas mostradas del Gorosei: no se atribuye una fruta o despertar sin confirmar.
 const GOROSEI_FORMS = Object.freeze({
-  saturn:[['hybrid','Gyūki híbrido',30],['beast','Gyūki',40]],
+  saturn:[['hybrid','Gyūki híbrido',40],['beast','Gyūki',50]],
   mars:[['beast','Itsumade',40]],
   warcury:[['beast','Hōki',40]],
   nusjuro:[['hybrid','Bakotsu híbrido',25],['beast','Bakotsu',40]],

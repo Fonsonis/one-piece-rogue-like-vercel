@@ -16,17 +16,17 @@ test('Elbaph appends eight playable stages and unlocks from Egghead after Sabaod
  assert.equal(h.exec("makeEnemy('im',SAGAS[14].islands.at(-1).bossLvl[0]).id"),'im-revealed');
 });
 
-test('God Valley unlocks on base and journey level 25; preserves recruitment, saga and passive identity',()=>{
+test('God Valley unlocks on base and journey level 30; preserves recruitment, saga and passive identity',()=>{
  const h=combatHarness();h.exec('maxStartLvlCap=()=>100');
  const ids=Array.from(h.exec('GOD_VALLEY_FORMS'));
  assert.equal(ids.length,19);
  for(const id of ids){
   h.ctx.subject=id;
-  h.exec('meta.charUpgrades={[subject]:19}');
+  h.exec('meta.charUpgrades={[subject]:24}');
   assert.equal(h.exec('makeChar(subject,100).id'),id);
-  h.exec('meta.charUpgrades[subject]=20');
-  assert.equal(h.exec('makeChar(subject,24).id'),id);
-  assert.equal(h.exec('makeChar(subject,25).id'),id+'-young');
+  h.exec('meta.charUpgrades[subject]=25');
+  assert.equal(h.exec('makeChar(subject,29).id'),id);
+  assert.equal(h.exec('makeChar(subject,30).id'),id+'-young');
   assert.equal(h.exec('baseFormOf(subject+"-young")'),id);
   assert.equal(h.exec('CHARS[subject+"-young"].saga'),h.exec('CHARS[subject].saga'));
   assert.equal(h.exec('JSON.stringify(passiveRule({id:subject+"-young"}))'),h.exec('JSON.stringify(passiveRule({id:subject}))'));
@@ -45,7 +45,7 @@ test('Im phases are separate from Gunko and old fighters retain bonuses, XP and 
  assert.equal(h.exec("baseFormOf('im-gunko')"),'im');
  assert.equal(h.exec("baseFormOf('gunko-young')"),'gunko');
  h.exec(`meta.charUpgrades={};let veteran=makeChar('garp',60);veteran.hp=0;veteran.maxhp+=27;veteran.atk+=11;veteran.xp=432;
- meta.charUpgrades={garp:20};migrateFighter(veteran);`);
+ meta.charUpgrades={garp:25};migrateFighter(veteran);`);
  assert.equal(h.exec('veteran.id'),'garp-young');
  assert.equal(h.exec('veteran.hp'),0);
  assert.equal(h.exec('veteran.xp'),432);
@@ -83,4 +83,6 @@ test('all five Gorosei have playable transformations gated by both levels, with 
   assert.equal(h.exec(`CHARS['${id}'].saga`),'egghead');
  }
  assert.equal(h.exec("CHARS['saturn-young'].evo.to"),'saturn-hybrid');
+ h.exec('meta.charUpgrades={saturn:25}');
+ assert.equal(h.exec("makeChar('saturn',30).id"),'saturn-young');
 });
