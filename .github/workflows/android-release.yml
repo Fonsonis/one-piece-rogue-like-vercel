@@ -46,6 +46,9 @@ jobs:
           echo "APP_VERSION_NAME=$app_version_name" >> "$GITHUB_ENV"
           echo "APP_VERSION_CODE=$app_version_code" >> "$GITHUB_ENV"
       - run: npm run android:sync
+      - name: Verificar puente de actualización Android
+        working-directory: android
+        run: bash ./gradlew testDebugUnitTest
       - name: Restaurar clave de firma
         if: github.event_name != 'pull_request'
         env:
