@@ -44,11 +44,9 @@ function evolutionFormAt(id, lvl, progress = meta) {
   while (CHARS[form].evo && Math.min(lvl, baseLevel) >= CHARS[form].evo.lvl) form = CHARS[form].evo.to;
   return form;
 }
-// Rivals evolve from their combat level alone, regardless of the player's unlocks.
+// Rivals keep their combat level, but cannot reveal forms the account has not unlocked.
 function enemyFormAt(id, lvl) {
-  let form = baseFormOf(id);
-  while (CHARS[form].evo && lvl >= CHARS[form].evo.lvl) form = CHARS[form].evo.to;
-  return form;
+  return evolutionFormAt(id, lvl);
 }
 function formMovesAt(id, lvl, exactForm = false, progress = meta) {
   const c = CHARS[id];

@@ -10,7 +10,7 @@ try {
  await page.goto('http://127.0.0.1:4175/');await page.waitForSelector('#mode-challenge');
  await page.evaluate(()=>{
   meta.accXp=xpForAccLevel(35);meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));
-  meta.roster=['luffy'];meta.charUpgrades={};startChallenge('tournament',['luffy']);
+  meta.roster=['luffy'];meta.charUpgrades={lucci:95};startChallenge('tournament',['luffy']);
   meta.challenge.level=65;const m=challengeCurrentMatch(meta.challenge);
   const opponent=meta.challenge.entrants[m.a===0?m.b:m.a];
   const existing=meta.challenge.entrants.find(e=>e.members.includes('lucci'));

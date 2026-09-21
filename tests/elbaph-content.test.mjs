@@ -13,6 +13,8 @@ test('Elbaph appends eight playable stages and unlocks from Egghead after Sabaod
  assert.equal(h.exec('SAGAS[14].islands.every(i=>i.boss.length && i.pool.length && i.boss.every(id=>CHARS[id]))'),true);
  assert.equal(h.exec("SAGAS[13].islands.every(i=>!i.boss.includes('im')&&!i.pool.includes('im'))"),true);
  assert.equal(h.exec("SAGAS[14].islands.at(-1).boss[0]"),'im');
+ assert.equal(h.exec("makeEnemy('im',SAGAS[14].islands.at(-1).bossLvl[0]).id"),'im');
+ h.exec("meta.charUpgrades.im=95");
  assert.equal(h.exec("makeEnemy('im',SAGAS[14].islands.at(-1).bossLvl[0]).id"),'im-revealed');
 });
 
