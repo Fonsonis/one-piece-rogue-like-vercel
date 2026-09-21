@@ -6,7 +6,7 @@ import {createHash} from 'node:crypto';
 const require = createRequire(import.meta.url);
 const sharp = require(process.env.SHARP_MODULE || 'sharp');
 const luffyMode=process.argv.includes('--luffy');
-const artModes={'--redraw':'legacy-redraw','--zou':'zou-art','--strawhat':'strawhat-art','--sabaody':'sabaody-art','--elbaph':'elbaph-art','--luffy':'luffy-animation'};
+const artModes={'--new-forms':'new-forms-art','--redraw':'legacy-redraw','--zou':'zou-art','--strawhat':'strawhat-art','--sabaody':'sabaody-art','--elbaph':'elbaph-art','--luffy':'luffy-animation'};
 const prefix=Object.entries(artModes).find(([flag])=>process.argv.includes(flag))?.[1] || 'zoan-art';
 const spec = JSON.parse(fs.readFileSync(`docs/${prefix}-prompts.json`));
 const ratios = JSON.parse(fs.readFileSync(`docs/${prefix}-ratios.json`));

@@ -10011,5 +10011,39 @@
     ],
     "atlasScale": 1.509433962264151,
     "portraitScale": 1.1224489795918366
+  },
+  "bonney-nika": {
+    "ratio": 1,
+    "guardBounds": [
+      50,
+      26,
+      142,
+      180
+    ],
+    "portraitBounds": [
+      49,
+      18,
+      143,
+      176
+    ],
+    "atlasScale": 0.8311688311688312,
+    "portraitScale": 0.8354430379746836
+  },
+  "ivankov-female": {
+    "ratio": 1.2,
+    "guardBounds": [
+      64,
+      24,
+      129,
+      180
+    ],
+    "portraitBounds": [
+      63,
+      18,
+      129,
+      176
+    ],
+    "atlasScale": 0.9846153846153846,
+    "portraitScale": 1.0025316455696203
   }
 }

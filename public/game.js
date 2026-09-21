@@ -1194,13 +1194,13 @@ function trackKills(qty = 1) {
 
 function berriesHTML(v) { return `฿${v.toLocaleString('es')}`; }
 
-function topbar(showBerries = false, showAuto = showBerries, showSpeed = false, showFlee = false) {
+function topbar(showBerries = false, showAuto = showBerries, showSpeed = false, showFlee = false, inCombat = false) {
   const autoLabel = !autoMode ? '🤖 PAUSADO' : (autoSettings.speed === 'x1' ? '🤖 AUTO x1' : '🤖 AUTO x2');
   const autoBtnClass = !autoMode ? 'gray' : 'green';
   const combatSpeed = battle?.speed ?? preferredCombatSpeed();
-  return `<div class="topbar">
+  return `<div class="topbar${inCombat ? ' combat-topbar' : ''}">
     <div class="logo">ONE PIECE <span>ROGUE LIKE</span></div>
-    <div class="daily-steps" title="Se recargan cada día"><span aria-hidden="true">👢</span><strong>${dailyStepsRemaining()}</strong><span>/ ${DAILY_STEPS_LIMIT} pasos</span></div>
+    ${inCombat ? '' : `<div class="daily-steps" title="Se recargan cada día"><span aria-hidden="true">👢</span><strong>${dailyStepsRemaining()}</strong><span>/ ${DAILY_STEPS_LIMIT} pasos</span></div>`}
     ${showBerries && run ? `<div class="floating-berries"><div class="berries">${berriesHTML(run.berries)}</div></div>` : ''}
     <div class="floating-controls">
       ${showAuto ? `<button class="btn small ${autoBtnClass}" id="btn-topbar-auto" title="Cambiar velocidad o activar/pausar modo auto">${autoLabel}</button>` : ''}
@@ -3135,7 +3135,7 @@ function showInventoryModal(opts = {}) {
       if(upgradeCharLvl(btn.dataset.id))refresh(`.btn-upg-inv[data-id="${btn.dataset.id}"]:not(:disabled),.btn-info-inv[data-id="${btn.dataset.id}"]`);
     });
     ov.querySelectorAll('.btn-info-inv').forEach(btn=>btn.onclick=()=>{
-      showCharModal(btn.dataset.id);
+      showCharModal(btn.dataset.id,null,null,filterSortChars(allUnlocked,invViewState,id=>evolutionFormAt(id,startLvlOf(id))));
       const sheet=document.querySelector('#sheet-close')?.closest('.overlay');if(!sheet)return;
       const closeSheet=()=>{sheet.remove();refresh(`.btn-info-inv[data-id="${btn.dataset.id}"]`);};
       sheet.querySelector('#sheet-close').onclick=closeSheet;
@@ -4178,31 +4178,27 @@ function showTowerBackpack(onContinue) {
   update(); document.body.appendChild(ov);
 }
 
+// Each tier raises the quantity of its item without replacing earlier supplies.
+function startingSupplies() {
+  const g = meta.global;
+  const foodTier = Math.max(0, ...Object.entries(GLOBAL_ITEMS).filter(([id,item])=>item.chain==='food' && g[id]).map(([,item])=>item.tier));
+  const wanted = {
+    sake: foodTier >= 8 ? 3 : foodTier >= 7 ? 2 : foodTier >= 6 ? 1 : 0,
+    carnereal: foodTier >= 5 ? 3 : foodTier >= 4 ? 2 : foodTier >= 3 || g.carnerealplus || g.platosanjiplus ? 1 : 0,
+    carne: foodTier >= 2 || g.carneplus3 || g.carnerealplus || g.platosanjiplus ? 3 : foodTier >= 1 ? 2 : 1,
+  };
+  const owner = {items:{cartel:3 + (g.cartelesplus2 ? 4 : g.cartelesplus ? 2 : 0)}};
+  // Pack the best supplies first, including actual piece shapes and stack limits.
+  for (const id of ['sake','carnereal','carne']) {
+    for (let n=0;n<wanted[id];n++) if (!addBackpackItem(owner,id)) break;
+  }
+  return owner.items;
+}
+
 function startRun(sagaIdx, starterIds, islandIdx = 0, islandRepeat = null) {
   const saga = SAGAS[sagaIdx];
   if (!saga?.islands[islandIdx] || !islandAvailable(sagaIdx,islandIdx)) return;
-  const items = {
-    cartel: 3 + (meta.global.cartelesplus2 ? 4 : meta.global.cartelesplus ? 2 : 0),
-  };
-  if (meta.global.food_sake3) {
-    items.sake = 3;
-  } else if (meta.global.food_sake2) {
-    items.sake = 2;
-  } else if (meta.global.food_sake1) {
-    items.sake = 1;
-  } else if (meta.global.food_carnereal3) {
-    items.carnereal = 3;
-  } else if (meta.global.food_carnereal2) {
-    items.carnereal = 2;
-  } else if (meta.global.food_carnereal1 || meta.global.carnerealplus || meta.global.platosanjiplus) {
-    items.carnereal = 1;
-  } else if (meta.global.carneplus2 || meta.global.carneplus3) {
-    items.carne = 3;
-  } else if (meta.global.carneplus) {
-    items.carne = 2;
-  } else {
-    items.carne = 1;
-  }
+  const items = startingSupplies();
   const berries = 300 + (meta.global.berriesplus3 ? 700 : meta.global.berriesplus2 ? 400 : meta.global.berriesplus ? 200 : 0);
 
   run = {
@@ -5282,7 +5278,7 @@ function addToTeam(f, done) {
 
 // ============ FICHA DE PERSONAJE ============
 // Muestra las características reales del personaje en la saga (nivel, fusiones y barco).
-function showCharModal(fOrId, existingOverlay = null, selectedForm = null) {
+function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navigation = null) {
   const isLive = typeof fOrId === 'object';
   const forms=characterForms(isLive?fOrId.id:fOrId);
   const previewId=forms.some(form=>form.id===selectedForm)?selectedForm:forms[0].id;
@@ -5323,6 +5319,7 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null) {
   const ov = existingOverlay || document.createElement('div');
   const previousFocus=document.activeElement;
   const closeSheet = existingOverlay?.querySelector('#sheet-close')?.onclick || (() => {ov.remove();if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});});
+  ov.sheetNavigation = navigation || ov.sheetNavigation || null;
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal char-sheet ${phaseLocked?'phase-locked':''}" role="dialog" aria-modal="true" aria-label="Ficha de ${collectionText(c.name)}">
     <h2><span style="font-size:26px;vertical-align:middle;">${phaseLocked?'🔒':charIcon(f.id, 34)}</span> ${c.name}${phaseLocked?'':rarityTag+fusionTag} <small>${phaseLocked?'Bloqueada':'Nv.'+f.lvl}</small></h2>
@@ -5469,12 +5466,79 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null) {
       );
     };
   }
+  bindSheetNavigation(ov, baseFormOf(f.id));
   ov.querySelector('#sheet-close').onclick = closeSheet;
   if (!existingOverlay) {
     ov.onclick = e => { if (e.target === ov) closeSheet(); };
     bindCollectionDialog(ov,closeSheet,'#sheet-close');
   }
 }
+
+function bindSheetNavigation(ov, id) {
+  const ids = ov.sheetNavigation;
+  if (!ids || ids.length < 2) return;
+  const index = ids.indexOf(id), modal = ov.querySelector('.char-sheet');
+  if (index < 0) return;
+  const nav = document.createElement('nav');nav.className='sheet-character-nav';
+  nav.setAttribute('aria-label','Personajes de la lista');
+  nav.innerHTML=`<button class="btn gray" data-sheet-step="-1" ${index===0?'disabled':''} aria-label="Personaje anterior">←</button><span>${index+1} / ${ids.length}<small>Desliza para cambiar de personaje</small></span><button class="btn gray" data-sheet-step="1" ${index===ids.length-1?'disabled':''} aria-label="Personaje siguiente">→</button>`;
+  modal.prepend(nav);
+  const move = step => {
+    if (!ids[index+step]) return;
+    showCharModal(ids[index+step],ov);
+    ov.querySelector('.modal').scrollTop=0;
+    ov.querySelector(`[data-sheet-step="${step}"]:not(:disabled)`)?.focus({preventScroll:true});
+  };
+  nav.querySelectorAll('[data-sheet-step]').forEach(button=>button.onclick=()=>move(Number(button.dataset.sheetStep)));
+  let start=null;
+  modal.onpointerdown=e=>{
+    if (!e.isPrimary || e.target.closest('button,input,select,textarea,a')) return;
+    start={x:e.clientX,y:e.clientY,id:e.pointerId};
+  };
+  modal.onpointercancel=()=>{start=null;};
+  modal.onpointerup=e=>{
+    if(!start || start.id!==e.pointerId)return;
+    const dx=e.clientX-start.x,dy=e.clientY-start.y;start=null;
+    if(Math.abs(dx)>=55 && Math.abs(dx)>Math.abs(dy)*1.5)move(dx<0?1:-1);
+  };
+}
+
+// Render selection menus inside the game instead of opening the Android picker.
+function showGameSelect(select) {
+  if (select.disabled || document.querySelector('.game-select-overlay')) return;
+  const ov=document.createElement('div');ov.className='overlay game-select-overlay';
+  const label=select.getAttribute('aria-label') || select.title || select.labels?.[0]?.firstChild?.textContent?.trim() || 'Seleccionar';
+  const options=Array.from(select.options);
+  ov.innerHTML=`<section class="modal game-select-modal" role="dialog" aria-modal="true" aria-labelledby="game-select-title"><h2 id="game-select-title">${esc(label)}</h2><div class="game-select-options">${options.map((option,i)=>`<button class="btn gray" data-option="${i}" aria-pressed="${option.selected}" ${option.disabled?'disabled':''}>${esc(option.textContent)}</button>`).join('')}</div><button class="btn gray" id="game-select-close">Cerrar</button></section>`;
+  document.body.appendChild(ov);
+  const close=()=>{ov.remove();if(select.isConnected)select.focus({preventScroll:true});};
+  ov.querySelectorAll('[data-option]').forEach(button=>button.onclick=()=>{
+    const option=options[Number(button.dataset.option)];
+    const changed=select.value!==option.value;select.value=option.value;close();
+    if(changed){select.dispatchEvent(new Event('input',{bubbles:true}));select.dispatchEvent(new Event('change',{bubbles:true}));}
+  });
+  ov.querySelector('#game-select-close').onclick=close;
+  ov.onclick=e=>{if(e.target===ov)close();};
+  bindCollectionDialog(ov,close,'[aria-pressed="true"]:not(:disabled), [data-option]:not(:disabled)');
+}
+let suppressSelectClick = false;
+function interceptGameSelect(event) {
+  if(event.type==='pointerdown')suppressSelectClick=false;
+  if(event.type==='click' && suppressSelectClick){
+    suppressSelectClick=false;event.preventDefault();event.stopPropagation();return;
+  }
+  const select=event.target?.closest?.('select');
+  if(!select || select.disabled)return;
+  if(event.type==='keydown' && !['Enter',' ','ArrowDown','ArrowUp','Home','End'].includes(event.key))return;
+  event.preventDefault();event.stopPropagation();
+  // Suppress native pointer activation; open on click so the releasing tap cannot dismiss the new overlay.
+  if(event.type==='pointerup')suppressSelectClick=true;
+  if(event.type!=='pointerdown')showGameSelect(select);
+}
+document.addEventListener('pointerdown',interceptGameSelect,true);
+document.addEventListener('pointerup',interceptGameSelect,true);
+document.addEventListener('click',interceptGameSelect,true);
+document.addEventListener('keydown',interceptGameSelect,true);
 
 // ============ EVENTO: CROSSGUILD ============
 // Dos opciones: contratar a cualquier pirata del catálogo pagando su caché,
@@ -6539,7 +6603,7 @@ function battleLayoutHTML(logLines, labels = {}) {
 
 function renderBattle(logLines) {
   const b = battle;
-  render(`${topbar(!b.tower && !b.opts.challenge, !b.tower && !b.opts.challenge, true, b.opts.wild && !b.tower)}${battleLayoutHTML(logLines)}`);
+  render(`${topbar(!b.tower && !b.opts.challenge, !b.tower && !b.opts.challenge, true, b.opts.wild && !b.tower, true)}${battleLayoutHTML(logLines)}`);
   bindControls();
   refreshReserves();
   // En combate: las cartas enemigas muestran su ficha; las cartas aliadas activan la Ultimate si está lista
@@ -7715,6 +7779,10 @@ const GLOBAL_ITEMS = {
   tower_start50: { name: 'Comienzo Épico en Torre Marine', emoji: '🗼', desc: 'Comienza tus ascensos en la Torre Marine directamente en el Piso 50 (luchadores a Nv.65).', cost: 2000, lvl: 80 },
 };
 
+for (const item of Object.values(GLOBAL_ITEMS)) if (item.chain === 'food') {
+  item.desc += ' Conserva los suministros anteriores; si falta espacio, se descartan primero los de menor calidad.';
+}
+
 function nextStarterSlotItem() {
   const current = starterSlotsCount();
   if (current >= 6) {
@@ -8213,7 +8281,7 @@ function screenDex() {
     }
     renderCharGrid($('#char-grid'), ids, dexView, dexCardHTML, el => {
       el.querySelectorAll('.dex-card.seen').forEach(card => {
-        card.onclick = () => showCharModal(card.dataset.id);
+        card.onclick = () => showCharModal(card.dataset.id,null,null,ids.filter(dexEntrySeen));
       });
     });
   };

@@ -321,3 +321,22 @@ html .inventory-modal #inv-cards-grid { overflow:visible; max-height:none; min-h
 .pirate-dex button.dex-card:focus-visible { outline:3px solid var(--sea); outline-offset:3px; }
 .pirate-dex .dex-forms-count { margin:0; color:var(--collection-ready); font:650 11px/1.4 system-ui,sans-serif; }
 .collection-sort-stat { display:block; margin:5px 0; font:700 12px/1.4 system-ui,sans-serif; color:var(--sea); text-align:center; }
+
+/* Combat tools always fit; navigation steps belong to the map. */
+#app:has(.battle-layout) > .combat-topbar { display:flex; flex-wrap:wrap; min-width:0; max-width:100%; gap:4px; overflow:visible; margin-bottom:4px; }
+#app:has(.battle-layout) > .combat-topbar .logo { display:none; }
+#app:has(.battle-layout) > .combat-topbar .floating-controls { position:static; display:flex; flex:1 1 260px; flex-wrap:wrap; max-width:100%; min-width:0; gap:4px; overflow:visible; }
+#app:has(.battle-layout) > .combat-topbar .floating-controls .btn { flex:1 1 auto; min-width:0; min-height:40px; padding:5px; font-size:clamp(8px,2vw,11px); white-space:normal; }
+#app:has(.battle-layout) > .combat-topbar .floating-controls #btn-abandon { flex:0 0 32px; width:32px; min-width:32px; }
+#app:has(.battle-layout) > .combat-topbar .floating-berries { position:static; min-width:0; max-width:100%; }
+#app:has(.battle-layout) > .combat-topbar .berries { overflow-wrap:anywhere; font-size:10px; padding:4px; }
+.sheet-character-nav { display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0 0 12px; }
+.sheet-character-nav > span { text-align:center; font-size:12px; }
+.sheet-character-nav small { display:block; font:12px/1.5 system-ui,sans-serif; }
+.sheet-character-nav .btn { min-width:44px; min-height:44px; }
+.char-sheet:has(.sheet-character-nav) { touch-action:pan-y; }
+.game-select-overlay { z-index:10020; }
+.game-select-modal { width:min(440px,100%); display:flex; flex-direction:column; max-height:85dvh; gap:12px; overflow:hidden; }
+.game-select-options { display:flex; flex-direction:column; gap:6px; overflow-y:auto; min-height:0; overscroll-behavior:contain; }
+.game-select-options .btn { flex:none; min-height:44px; white-space:normal; text-align:left; font:14px/1.4 system-ui,sans-serif; }
+.game-select-options [aria-pressed="true"] { border-color:var(--sea); box-shadow:inset 4px 0 var(--sea); font-weight:700; }

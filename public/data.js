@@ -1585,6 +1585,27 @@ for(const [id,name,level,types,bonus,move,label] of [
 CHARS['momonosuke-animal'].evo={lvl:30,to:'momonosuke-adult'};
 CHARS['momonosuke-adult'].evo={lvl:40,to:'momonosuke-dragon'};
 
+// Bonney imagina futuros posibles con la Toshi Toshi no Mi; no es una Zoan.
+for (const [id,label,level,bonus,move,power] of [
+  ['bonney-nika','Futuro Nika',45,9,'bonneynika',100],
+]) {
+  const base=CHARS.bonney;
+  MOVES[move]={name:level===45?'Puño de la Liberación':'Puño del Futuro Gigante',type:'Golpe',power,acc:.95};
+  CHARS[id]={...base,name:`Jewelry Bonney · ${label}`,types:['Golpe','Fruta'],
+    base:base.base.map((n,i)=>n+(i===0?bonus*2:bonus)),rareza:level===45?5:4,
+    learnset:[[level,'distortion'],[level,move]],ultimate:move,evo:undefined,generated:false,formLevel:level,
+    desc:`Futuro imaginado mediante la Toshi Toshi no Mi. Requiere nivel base y en partida ${level}.`};
+}
+CHARS.bonney.evo={lvl:45,to:'bonney-nika'};
+
+MOVES.ivankovwink={name:'Guiño de la Emperatriz',type:'Fruta',power:85,acc:.95};
+CHARS['ivankov-female']={...CHARS.ivankov,name:'Emporio Ivankov · Forma femenina',
+  base:CHARS.ivankov.base.map((n,i)=>n+(i===0?10:5)),rareza:4,
+  learnset:[[30,CHARS.ivankov.learnset[0][1]],[30,'ivankovwink']],ultimate:'ivankovwink',evo:undefined,
+  generated:false,formLevel:30,
+  desc:'Transformación hormonal mediante la Horu Horu no Mi. Requiere nivel base y en partida 30.'};
+CHARS.ivankov.evo={lvl:30,to:'ivankov-female'};
+
 // Recompensas de colección de las nuevas sagas, sin recalcular atributos existentes.
 CHARS.caesar.rareza=5;CHARS.caesar.bossLevelRarity=3;
 CHARS.zunesha.rareza=5;
