@@ -20,6 +20,7 @@ html[data-theme="dark"] .nakama-picker-scopes .btn[aria-pressed="true"] { backgr
 .nakama-picker-summary .btn { padding:6px 10px; }
 .nakama-picker-roster { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; min-height:150px; overflow-y:auto; flex:1 1 auto; padding:4px; border:1px solid #91aaa9; border-radius:8px; background:var(--paper-dark); }
 .nakama-picker-card { position:relative; min-width:0; border:2px solid #91aaa9; border-radius:7px; background:var(--paper); }
+.nakama-picker-roster { touch-action:pan-y pinch-zoom; }
 .nakama-picker-card.in-team { border-color:var(--sea); }
 .nakama-picker-pick { display:flex; flex-direction:column; align-items:center; gap:4px; width:100%; height:100%; padding:6px; background:transparent; color:var(--ink); border:0; border-radius:5px; cursor:pointer; font:12px/1.3 system-ui,sans-serif; }
 .nakama-picker-pick:hover { background:var(--paper-dark); }
