@@ -30,11 +30,14 @@ test('one chart renders every saga and island in reverse order, preserving modes
  for(const id of ['tab-classic','tab-nuz','btn-diff-trigger','btn-saga-probs-all'])assert.ok(html.includes(`id="${id}"`));
 });
 
-test('the vertical chart keeps a stable viewport and settles on complete island cards',()=>{
+test('the vertical chart keeps a stable viewport, reaches East Blue and settles on complete island cards',()=>{
  const appRule=worldMapCSS.match(/#app:has\(\.world-map\)\s*\{([^}]*)\}/)?.[1] || '';
  assert.match(appRule,/width:100%/);assert.match(appRule,/max-width:none/);assert.match(appRule,/margin:0/);assert.match(appRule,/overflow:hidden/);
- assert.match(worldMapCSS,/\.world-map\s*\{[^}]*scroll-snap-type:y mandatory/);
+ assert.match(worldMapCSS,/\.world-map\s*\{[^}]*scroll-snap-type:y proximity/);
+ assert.match(worldMapCSS,/\.world-map\s*\{[^}]*container-type:size/);
  assert.match(worldMapCSS,/\.world-stop\s*\{[^}]*scroll-snap-align:center/);
+ assert.match(worldMapCSS,/\.world-start\s*\{[^}]*scroll-snap-align:end/);
+ assert.match(worldMapCSS,/@media\(max-width:600px\)[\s\S]*?\.world-stop\s*\{[^}]*height:max\(250px,72cqh\)/);
  assert.match(worldMapCSS,/\.world-map:has\(\.world-ship\.is-sailing\)\s*\{\s*scroll-snap-type:none/);
 });
 

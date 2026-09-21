@@ -17,11 +17,39 @@ function compareVersions(left, right) {
   return 0;
 }
 
-async function openExternal(url) {
-  const capacitor = globalThis.Capacitor;
-  const browser = capacitor?.registerPlugin?.('Browser') || capacitor?.Plugins?.Browser;
-  if (browser?.open) return browser.open({ url });
-  globalThis.open(url, '_blank', 'noopener,noreferrer');
+function androidUpdater() {
+  return globalThis.Capacitor?.registerPlugin?.('AndroidUpdater') || globalThis.Capacitor?.Plugins?.AndroidUpdater;
+}
+
+function downloadMessage(status) {
+  const downloaded = Number(status.bytesDownloaded) || 0;
+  const total = Number(status.totalBytes) || 0;
+  if (total > 0) {
+    const percent = Math.min(100, Math.floor(downloaded * 100 / total));
+    return `⬇ Descargando actualización… ${percent}% · ${(downloaded / 1048576).toFixed(1)}/${(total / 1048576).toFixed(1)} MB`;
+  }
+  return status.state === 'paused' ? '⏸ Android ha pausado la descarga; se reanudará cuando sea posible.' : '⬇ Preparando descarga segura en Android…';
+}
+
+async function finishNativeDownload(updater, initialStatus, toast) {
+  let status = initialStatus;
+  let previousMessage = '';
+  while (['pending', 'running', 'paused'].includes(status?.state)) {
+    const message = downloadMessage(status);
+    if (message !== previousMessage) toast?.(message);
+    previousMessage = message;
+    await new Promise(resolve => setTimeout(resolve, 900));
+    status = await updater.getStatus();
+  }
+  if (status?.state !== 'successful') {
+    throw new Error(`Descarga Android fallida (${status?.reason ?? 'sin estado'})`);
+  }
+
+  toast?.('✅ APK descargado por completo. Abriendo el instalador de Android…');
+  const result = await updater.install();
+  if (result?.state === 'permissionRequired') {
+    toast?.('🔐 Autoriza “instalar apps desconocidas”. Al volver se abrirá el instalador automáticamente.');
+  }
 }
 
 async function installedRelease() {
@@ -55,12 +83,17 @@ export async function downloadAndroidApk({ toast } = {}) {
     }
     const accepted = globalThis.confirm(`Hay una actualización disponible: ${release.version} (compilación ${releaseCode}). ¿Quieres descargarla ahora?`);
     if (accepted) {
-      await openExternal(release.downloadUrl || RELEASE_URL);
-      toast?.('⬇ Descarga abierta. Cuando termine, pulsa el APK descargado para instalar la actualización.');
+      const updater = androidUpdater();
+      if (!updater?.startDownload || !updater?.getStatus || !updater?.install) throw new Error('Plugin AndroidUpdater no disponible');
+      const status = await updater.startDownload({
+        url: release.downloadUrl || RELEASE_URL,
+        versionCode: releaseCode,
+      });
+      await finishNativeDownload(updater, status, toast);
     }
   } catch (error) {
-    console.error('[android-update] No se pudo comprobar o abrir la actualización', error);
-    toast?.('No se pudo comprobar la actualización. Revisa la conexión e inténtalo de nuevo.');
+    console.error('[android-update] No se pudo completar la actualización', error);
+    toast?.('No se pudo completar la actualización. Revisa la conexión y vuelve a pulsar “Actualizar APK” para continuar o reintentar.');
   }
 }
 
