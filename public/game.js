@@ -6902,7 +6902,7 @@ function attackWith(att, dfd, mv, targetSide) {
     log(`🔥 ¡${charName(dfd)} sufre una Quemadura!`);
   }
   // Hielo Ⅱ: los ataques ralentizan (-15% VEL, 1 turno)
-  if (synergyTier(atkTeam, 'Hielo') === 2) { dfd.st.slow = 2; dfd.st.slowRate = .15 * synergyBoost(atkTeam, 'Hielo'); }
+  if (synergyTier(atkTeam, 'Hielo') === 2) { dfd.st.slow = 2; dfd.st.slowRate = Math.max(dfd.st.slowRate || 0, .15 * synergyBoost(atkTeam, 'Hielo')); }
   // Veneno Ⅱ: 25% de probabilidad de envenenar con cualquier ataque
   if (synergyTier(atkTeam, 'Veneno') === 2 && !dfd.st.poison && Math.random() < .25 * synergyBoost(atkTeam, 'Veneno')) {
     dfd.st.poison = true;
@@ -7008,14 +7008,14 @@ function afterRound() {
   const hpDelta = actors.map((act, i) => {
     if (!act || act.hp <= 0) return 0;
     const team = teamOf(act), foe = targets[i];
-    if (!foe || foe.hp <= 0) return 0;
-    const drain = Math.min(foe.hp, Math.floor(foe.maxhp * (passiveRule(act).drain || 0)));
+    const drain = foe?.hp > 0 ? Math.min(foe.hp, Math.floor(foe.maxhp * (passiveRule(act).drain || 0))) : 0;
     let heal = (passiveRule(act).regen || 0) + (relicRule(act).regen || 0) + relicTeamBonus(act,'teamRegen');
     if (team.some(x => x.hp > 0 && isP(x,'marco'))) heal += .06;
     if (team.some(x => x.hp > 0 && isP(x,'ryokugyu'))) heal += .05;
     const water = synergyTier(team,'Agua');
     if (water) heal += synergyBonus(team, 'Agua', .04, .08);
-    const blocked = synergyTier(teamOf(foe),'Oscuridad') === 2;
+    const opposingTeam = b.pTeam.includes(act) ? b.eTeam : b.pTeam;
+    const blocked = synergyTier(opposingTeam,'Oscuridad') === 2;
     return {drain, heal:blocked ? 0 : Math.floor((heal * act.maxhp + drain) * healScaleNow())};
   });
   actors.forEach((act,i) => {
@@ -8309,7 +8309,7 @@ const RELICS = Object.fromEntries(Object.entries(CHARS).filter(([id]) => !BASE_O
   const move = MOVES[moveId];
   const [name,emoji,passiveName,passiveDesc,rule] = SIGNATURE_RELICS[id] || [
     `Emblema de ${c.name}`, c.emoji, `Legado: ${move?.name || c.name}`,
-    `+35% de daño al usar ${move?.name || 'su técnica característica'}.`, {move:moveId,damage:1.35}
+    `+35% de daño al usar ${move?.name || 'su técnica característica'} o la técnica ofensiva característica de su transformación (definitiva o, si es de apoyo, ataque disponible más potente).`, {move:moveId,damage:1.35}
   ];
   const key = `relic_${id}`;
   return [key,{id:key,character:id,name,emoji,desc:RELIC_BOOST,passiveName,passiveDesc,rule}];
@@ -8326,10 +8326,17 @@ function relicStatMult(f) { return equippedRelic(f) ? 1.10 : 1; }
 function relicTeamBonus(f,key) {
   return teamOf(f).filter(a=>a.hp>0).reduce((n,a)=>n+(relicRule(a)[key] || 0),0);
 }
+function relicFormMove(f) {
+  const ultimate = getUltimateMove(f);
+  if (ultimate.power > 0) return ultimate;
+  return (f.moves || []).map(id=>MOVES[id]).filter(move=>move?.power>0)
+    .sort((a,b)=>b.power*b.acc-a.power*a.acc)[0];
+}
 function relicDamageMult(att,dfd,mv) {
   const a = relicRule(att), d = relicRule(dfd);
   let mult = 1;
-  if ((a.type && a.type === mv.type) || (a.move && MOVES[a.move] === mv)) mult *= a.damage;
+  if ((a.type && a.type === mv.type) || (a.move && (MOVES[a.move] === mv ||
+      (att.id !== baseFormOf(att.id) && relicFormMove(att) === mv)))) mult *= a.damage;
   if (att.hp < att.maxhp*.5) mult *= a.lowDamage || 1;
   if (dfd.hp < dfd.maxhp*.5) mult *= (a.execute || 1)*(d.lowReduction || 1);
   if (dfd.hp > dfd.maxhp*.5) mult *= d.healthyReduction || 1;
