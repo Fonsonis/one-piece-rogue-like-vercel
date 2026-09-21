@@ -69,7 +69,12 @@ test('reduced motion arrives immediately and long journeys finish in five second
 
 test('ocean scrolls pixel for pixel with the islands, including return scrolling',()=>{
  const h=mounted();assert.equal(h.seaValues['--sea-offset'],'0px');
- for(const y of [375,700,210,0]){h.chart.scrollTop=y;h.listeners.scroll();assert.equal(h.seaValues['--sea-offset'],`${-y}px`);}
+ for(const y of [375,480,660,700,19375,210,0]){
+  h.chart.scrollTop=y;h.listeners.scroll();
+  assert.equal(h.seaValues['--sea-offset'],`${-y}px`);
+  assert.equal(h.seaValues['--sea-base-shift'],`${-y%480}px`);
+  assert.equal(h.seaValues['--sea-foam-shift'],`${-y%660}px`);
+ }
 });
 
 test('every canonical destination and sailing direction has a bundled static image',()=>{

@@ -6442,12 +6442,48 @@ function reservesHTML() {
     }).join('')}</div>`;
 }
 
-function refreshReserves() {
-  const el = $('#battle-reserves');
+// Cache source values, not decorated DOM: event sprites replace emoji text after rendering.
+// Weak keys also invalidate the cache automatically whenever a screen is rebuilt.
+const battleViewCache = new WeakMap();
+function updateBattleView(el, key, value, apply) {
   if (!el) return;
-  el.innerHTML = reservesHTML();
-  el.querySelectorAll('[data-reserve]').forEach(button => {
-    button.onclick = () => switchBattleFighter(Number(button.dataset.reserve));
+  let values = battleViewCache.get(el);
+  if (!values) { values = new Map(); battleViewCache.set(el, values); }
+  if (values.get(key) === value) return;
+  apply(el, value);
+  values.set(key, value);
+}
+function battleText(el, value) {
+  updateBattleView(el, 'text', value, (node, text) => { node.textContent = text; });
+}
+function battleHTML(el, value) {
+  updateBattleView(el, 'html', value, (node, html) => { node.innerHTML = html; });
+}
+function battleHPBar(bar, f) {
+  updateBattleView(bar, 'width', clamp(f.hp / f.maxhp * 100, 0, 100) + '%', (el, width) => { el.style.width = width; });
+  updateBattleView(bar, 'class', hpBarClass(f), (el, name) => { el.className = name; });
+}
+function refreshReserves() {
+  const el = $('#battle-reserves'), b = battle;
+  if (!el || !b) return;
+  const structure = JSON.stringify([!!b.opts?.duos, b.pTeam.map(f => [f.id, charName(f)])]);
+  updateBattleView(el, 'structure', structure, node => {
+    node.innerHTML = reservesHTML();
+    node.querySelectorAll('[data-reserve]').forEach(button => {
+      button.onclick = () => switchBattleFighter(Number(button.dataset.reserve));
+    });
+  });
+  if (b.opts?.duos) return;
+  battleText(el.querySelector('.battle-reserve-heading span'), b.switchUsed ? 'Relevo usado · 0/1' : 'Toca una reserva · 1 relevo disponible');
+  el.querySelectorAll('[data-reserve]').forEach((button, index) => {
+    const f = b.pTeam[index], active = f === b.curP;
+    const disabled = !!(active || f.hp <= 0 || b.switchUsed || b.over || b.waiting || b.curP?.hp <= 0 || b.curE?.hp <= 0);
+    if (button.disabled !== disabled) button.disabled = disabled;
+    button.classList.toggle('is-active', active);
+    button.classList.toggle('is-ko', f.hp <= 0);
+    updateBattleView(button, 'label', `${active ? 'Activo' : 'Relevar con'} ${charName(f)}, ${f.hp}/${f.maxhp} PS`, (node, label) => node.setAttribute('aria-label', label));
+    battleHPBar(button.querySelector('.hp-bar i'), f);
+    battleText(button.querySelector('small'), `${f.hp}/${f.maxhp} PS · ${f.hp <= 0 ? 'KO' : active ? 'Activo' : 'Reserva'}`);
   });
 }
 
@@ -6582,36 +6618,35 @@ function refreshHPCards() {
   if (battle.opts?.local) return;
   for (const side of ['p', 'e']) {
     const count = $(`#count-${side}`);
-    if (count) count.textContent = battleTeamCount(side);
+    battleText(count, battleTeamCount(side));
   }
   [['p', battle.pTeam, battle.curP], ['e', battle.eTeam, battle.curE]].forEach(([side, team, active]) => {
     team.forEach((f, i) => {
       const card = $(`#fc-${side}-${i}`);
       if (!card) return;
       const bar = card.querySelector('.hp-bar i');
-      bar.style.width = clamp(f.hp / f.maxhp * 100, 0, 100) + '%';
-      bar.className = hpBarClass(f);
-      card.querySelector('.hp-nums').textContent = `${f.hp}/${f.maxhp}`;
+      battleHPBar(bar, f);
+      battleText(card.querySelector('.hp-nums'), `${f.hp}/${f.maxhp}`);
       card.classList.toggle('ko', f.hp <= 0);
       card.classList.toggle('active', f === active);
       const isUltUnlocked = f.lvl >= 20;
       const isUltReady = isUltUnlocked && (f.ultCharge || 0) >= 100;
       card.classList.toggle('ult-ready', isUltReady);
       const ultBar = card.querySelector('.ult-bar');
-      if (ultBar) ultBar.style.width = clamp(f.ultCharge || 0, 0, 100) + '%';
+      updateBattleView(ultBar, 'width', clamp(f.ultCharge || 0, 0, 100) + '%', (el, width) => { el.style.width = width; });
       const xpEl = card.querySelector('.xp-progress');
-      if (xpEl) xpEl.outerHTML = xpBarHTML(f);
+      if (xpEl) updateBattleView(card, 'xp', xpBarHTML(f), (node, html) => { xpEl.outerHTML = html; });
       const statsEl = card.querySelector('.fcard-stats-mini');
-      if (statsEl) statsEl.innerHTML = combatStatsHTML(f);
+      battleHTML(statsEl, combatStatsHTML(f));
       const stEl = card.querySelector('.fcard-st');
-      if (stEl) stEl.textContent = stIcons(f);
+      battleText(stEl, stIcons(f));
     });
   });
   for (const [side, team] of [['p',battle.pTeam],['e',battle.eTeam]]) {
-    const el = $(`#passives-${side}`); if (el) el.innerHTML = battleTeamPassivesHTML(team);
+    const el = $(`#passives-${side}`); battleHTML(el, battleTeamPassivesHTML(team));
   }
-  const sp = $('#syn-p'); if (sp) sp.innerHTML = synChipsHTML(battle.pTeam);
-  const se = $('#syn-e'); if (se) se.innerHTML = synChipsHTML(battle.eTeam);
+  const sp = $('#syn-p'); battleHTML(sp, synChipsHTML(battle.pTeam));
+  const se = $('#syn-e'); battleHTML(se, synChipsHTML(battle.eTeam));
   refreshReserves();
   keepActiveFightersVisible();
 }

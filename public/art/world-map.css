@@ -89,6 +89,13 @@ html[data-theme="dark"] .world-saga-details,html[data-theme="dark"] .world-islan
 .world-ocean-frame { position:relative; flex:1; min-height:0; overflow:hidden; isolation:isolate; border:2px solid #284858; border-radius:3px; background:#168ac8; }
 .world-sea { position:absolute; z-index:-1; inset:-32px; pointer-events:none; background:#168ac8 url('world/ocean.webp') center var(--sea-offset,0px)/480px 480px repeat; animation:world-sea-drift 12s ease-in-out infinite alternate; will-change:transform; }
 .world-sea:after { content:''; position:absolute; inset:-24px; background:url('world/ocean.webp') 150px calc(var(--sea-offset,0px) + 80px)/660px 660px repeat; opacity:.22; mix-blend-mode:screen; animation:world-sea-foam 9s ease-in-out infinite alternate; }
+/* Move cached textures instead of repainting background-position on every scroll.
+   Keep the original background implementation on older WebViews. */
+@supports (translate: 0 1px) {
+  .world-sea { background:#168ac8; }
+  .world-sea:before { content:''; position:absolute; inset:0 0 -480px; background:url('world/ocean.webp') center 0/480px 480px repeat; translate:0 var(--sea-base-shift,0px); will-change:transform; }
+  .world-sea:after { bottom:-684px; background-position:150px 80px; translate:0 var(--sea-foam-shift,0px); will-change:transform; }
+}
 .world-island-card .island-land img { display:block; width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 4px 1px #074c6933); }
 .world-stop.is-selected .island-label { border-color:#9b501d; outline:3px solid #ffe59c; }
 .world-island-card .island-zone { font-weight:700; }
