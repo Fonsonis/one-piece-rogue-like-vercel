@@ -73,11 +73,11 @@ jobs:
       - name: Compilar APK release
         if: github.event_name != 'pull_request'
         working-directory: android
-        run: ./gradlew assembleRelease -PappVersionCode="$APP_VERSION_CODE" -PappVersionName="$APP_VERSION_NAME"
+        run: bash ./gradlew assembleRelease -PappVersionCode="$APP_VERSION_CODE" -PappVersionName="$APP_VERSION_NAME"
       - name: Verificar APK de la PR
         if: github.event_name == 'pull_request'
         working-directory: android
-        run: ./gradlew assembleDebug -PappVersionCode="$APP_VERSION_CODE" -PappVersionName="$APP_VERSION_NAME"
+        run: bash ./gradlew assembleDebug -PappVersionCode="$APP_VERSION_CODE" -PappVersionName="$APP_VERSION_NAME"
       - name: Preparar artefacto
         if: github.event_name != 'pull_request'
         run: |
