@@ -1,4 +1,4 @@
-export const RULES = Object.freeze({maxJumps:2,metersPerReward:1000,famePerReward:25,gravity:1850,jumpVelocity:-660,punchCooldown:2.4,punchDuration:0.32,startSpeed:285,maxSpeed:650});
+export const RULES = Object.freeze({maxJumps:2,metersPerReward:1000,stepsPerReward:25,gravity:1850,jumpVelocity:-660,punchCooldown:2.4,punchDuration:0.32,startSpeed:285,maxSpeed:650});
 const overlaps=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
 export class RunnerEngine {
   constructor({width=900,height=540,random=Math.random,onEvent=()=>{}}={}) {
@@ -68,9 +68,9 @@ export class RunnerEngine {
     this.distance+=this.speed*dt;this.scroll+=travel;this.score=Math.floor(this.distance/14)+this.kills*30;
     const milestones=Math.floor(this.meters/RULES.metersPerReward);
     if(milestones>this.rewardedMilestones){
-      const fame=(milestones-this.rewardedMilestones)*RULES.famePerReward;
+      const steps=(milestones-this.rewardedMilestones)*RULES.stepsPerReward;
       this.rewardedMilestones=milestones;
-      this.onEvent('reward',{fame,totalFame:milestones*RULES.famePerReward,meters:this.meters});
+      this.onEvent('reward',{steps,totalSteps:milestones*RULES.stepsPerReward,meters:this.meters});
     }
     this.cooldown=Math.max(0,this.cooldown-dt);this.punchLeft=Math.max(0,this.punchLeft-dt);
     this.shake=Math.max(0,this.shake-dt*35);

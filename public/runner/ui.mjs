@@ -25,7 +25,7 @@ async function assets() {
   return assetsPromise;
 }
 
-export async function openRunner({onExit,onScore,onFame,best=0}={}) {
+export async function openRunner({onExit,onScore,onSteps,best=0}={}) {
   if(document.querySelector('.runner-root'))return;
   const root=document.createElement('section');root.className='runner-root';root.setAttribute('aria-label','Minijuego Luffy Run');
   root.innerHTML=`
@@ -35,13 +35,13 @@ export async function openRunner({onExit,onScore,onFame,best=0}={}) {
       <div class="runner-dialog"><div class="runner-dialog-card"><h2 data-title>Luffy Run</h2><p data-description>Preparando las animaciones…</p><button data-primary disabled>Cargando…</button></div></div>
     </div>
     <div class="runner-controls"><button class="runner-action jump" data-jump>↑ SALTAR<small data-jumps>Doble salto · 2 disponibles</small></button><button class="runner-action punch" data-punch aria-disabled="true">👊 <span data-punch-label>PUÑETAZO</span><small data-cooldown>Gomu Gomu no Pistol</small><span class="cooldown-fill"></span></button></div>
-    <p class="runner-reward" data-reward>0 / 1.000 m · Próxima recompensa: 25 fama</p>
+    <p class="runner-reward" data-reward>0 / 1.000 m · Próxima recompensa: 25 pasos</p>
     <p class="runner-keytip">Toca la pantalla para saltar · Teclado: espacio / ↑ salto · X golpe · P pausa</p>`;
   document.body.appendChild(root);
   const oldOverflow=document.body.style.overflow;document.body.style.overflow='hidden';
   const $=s=>root.querySelector(s),canvas=$('canvas'),ctx=canvas.getContext('2d');
   const dialog=$('.runner-dialog'),primary=$('[data-primary]'),pause=$('[data-pause]');
-  const events=new AbortController();let closed=false,raf=0,last=0,accumulator=0,loaded=null,calloutTime=0,hitLabel=0;
+  const events=new AbortController();let closed=false,raf=0,last=0,accumulator=0,loaded=null,calloutTime=0,hitLabel=0,earnedSteps=0;
   const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
   let audio;
   function sound(type) {
@@ -61,10 +61,14 @@ export async function openRunner({onExit,onScore,onFame,best=0}={}) {
   const engine=new RunnerEngine({onEvent(type,data){
     if(['jump','punch','hit','over'].includes(type))sound(type);
     if(type==='hit'){hitLabel=.4;calloutTime=1.1;$('[data-callout]').textContent=data.chain?'¡GOLPE EN CADENA! +30':'¡POR LOS AIRES! +30';}
-    if(type==='reward'){onFame?.(data.fame);calloutTime=1.5;$('[data-callout]').textContent=`¡+${data.fame} FAMA!`;}
+    if(type==='reward'){
+      const credited=onSteps?.(data.steps),gained=Number.isFinite(credited)?credited:data.steps;
+      earnedSteps+=gained;calloutTime=1.5;
+      $('[data-callout]').textContent=gained?`¡+${gained} PASOS!`:'¡PASOS AL MÁXIMO!';
+    }
     if(type==='over'){
       best=Math.max(best,engine.score);onScore?.(engine.score);pause.disabled=true;
-      showDialog('¡Fin de la carrera!',`${engine.meters} metros · ${engine.score} puntos · ${engine.kills} enemigos.\nFama ganada: ${engine.rewardedMilestones * RULES.famePerReward}. Récord: ${best} puntos.`, 'VOLVER A CORRER',start);
+      showDialog('¡Fin de la carrera!',`${engine.meters} metros · ${engine.score} puntos · ${engine.kills} enemigos.\nPasos recuperados: ${earnedSteps}. Récord: ${best} puntos.`, 'VOLVER A CORRER',start);
     }
   }});
   function showDialog(title,description,label,action) {
@@ -72,7 +76,7 @@ export async function openRunner({onExit,onScore,onFame,best=0}={}) {
     // Only move focus for keyboard players; touch remains on the playfield.
     if(document.activeElement===canvas)primary.focus({preventScroll:true});
   }
-  function start(){if(!loaded)return;dialog.hidden=true;engine.start();last=performance.now();accumulator=0;pause.disabled=false;pause.textContent='Ⅱ Pausa';pause.setAttribute('aria-label','Pausar partida');$('[data-callout]').textContent='';canvas.focus({preventScroll:true});}
+  function start(){if(!loaded)return;dialog.hidden=true;earnedSteps=0;engine.start();last=performance.now();accumulator=0;pause.disabled=false;pause.textContent='Ⅱ Pausa';pause.setAttribute('aria-label','Pausar partida');$('[data-callout]').textContent='';canvas.focus({preventScroll:true});}
   function togglePause(){
     if(engine.status==='running'){
       engine.pause();pause.textContent='▶ Seguir';pause.setAttribute('aria-label','Continuar partida');
@@ -160,7 +164,7 @@ export async function openRunner({onExit,onScore,onFame,best=0}={}) {
       lastHud=now;$('[data-score]').textContent=engine.score;$('[data-best]').textContent=Math.max(best,engine.score);$('[data-meters]').textContent=engine.meters;
       $('[data-jumps]').textContent=`Doble salto · ${RULES.maxJumps-engine.jumpsUsed} disponibles`;
       $('[data-jump]').setAttribute('aria-disabled',String(engine.status!=='running'||engine.jumpsUsed>=RULES.maxJumps));
-      $('[data-reward]').textContent=`${engine.meters % RULES.metersPerReward} / 1.000 m · Próxima recompensa: 25 fama · Ganada: ${engine.rewardedMilestones * RULES.famePerReward}`;$('[data-speed]').textContent='×'+(engine.speed/RULES.startSpeed).toFixed(1);
+      $('[data-reward]').textContent=`${engine.meters % RULES.metersPerReward} / 1.000 m · Próxima recompensa: 25 pasos · Ganados: ${earnedSteps}`;$('[data-speed]').textContent='×'+(engine.speed/RULES.startSpeed).toFixed(1);
       const waiting=engine.cooldown>0;
       $('[data-punch]').setAttribute('aria-disabled',String(waiting||engine.status!=='running'));
       $('[data-punch-label]').textContent=waiting?'RECARGANDO':'PUÑETAZO';
@@ -171,7 +175,7 @@ export async function openRunner({onExit,onScore,onFame,best=0}={}) {
   }
   raf=requestAnimationFrame(loop);
   async function load(){
-    try{loaded=await assets();if(closed)return;showDialog('¡A correr, capitán!','Puedes hacer dos saltos seguidos. Toca el suelo para recuperarlos. Cada 1.000 metros de esta carrera ganas 25 fama. Usa el puñetazo para mandar a los enemigos por los aires. ¡Cada vez irá más rápido!','EMPEZAR',start);}
+    try{loaded=await assets();if(closed)return;showDialog('¡A correr, capitán!','Puedes hacer dos saltos seguidos. Toca el suelo para recuperarlos. Cada 1.000 metros de esta carrera recuperas hasta 25 pasos, sin superar el máximo diario de 1.000. Usa el puñetazo para mandar a los enemigos por los aires. ¡Cada vez irá más rápido!','EMPEZAR',start);}
     catch{if(!closed)showDialog('No han cargado los gráficos','Comprueba la conexión e inténtalo otra vez.','REINTENTAR',load);}
   }
   await load();

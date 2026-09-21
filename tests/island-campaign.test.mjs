@@ -130,3 +130,12 @@ test('wild escape flag lives next to encounter title and is absent from restrict
  }
  h.exec('battle.opts={wild:true};battle.tower=true;');assert.ok(!h.exec('battleLayoutHTML([])').includes('battle-flee'));
 });
+
+test('pirate flag decision shows the current crew with level, HP and types',()=>{
+ const h=combatHarness();
+ h.exec("run={saga:0,mode:'classic',berries:0,team:[makeChar('luffy',12),makeChar('zoro',9)],items:{}};run.team[1].hp=0;");
+ const html=h.exec('wildTeamPreviewHTML()');
+ assert.match(html,/Tu equipo/);assert.match(html,/1\/2 en pie/);
+ assert.match(html,/>Luffy</);assert.match(html,/Nv12/);assert.match(html,/GOLPE/);
+ assert.match(html,/>Zoro</);assert.match(html,/class="wild-team-member ko"/);assert.match(html,/0\/\d+ PS/);
+});

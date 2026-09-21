@@ -562,6 +562,16 @@ function spendDailyStep(action = 'continuar', persist = saveMeta) {
   steps.remaining++;
   return false;
 }
+function grantDailySteps(amount, persist = saveMeta) {
+  const steps = dailyStepsState();
+  const requested = Math.max(0, Math.floor(Number(amount) || 0));
+  const granted = Math.min(requested, DAILY_STEPS_LIMIT - steps.remaining);
+  if (!granted) return 0;
+  steps.remaining += granted;
+  if (persist()) return granted;
+  steps.remaining -= granted;
+  return 0;
+}
 function manualSave() {
   if (battle) return toast('💾 Termina el combate para guardar el viaje. El progreso se conserva en cada punto de guardado.');
   const write = () => {
@@ -1817,6 +1827,47 @@ function claimAchievement(id, progressive = false) {
   return a.fame;
 }
 
+function claimableAchievementRewards() {
+  const rewards = [];
+  const staticList = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS, ISLAND_DIFF_ACHIEVEMENTS).filter(isVisibleAch);
+  for (const achievement of staticList) {
+    if (!meta.claimedAch?.[achievement.id] && achievement.check() >= achievement.goal) {
+      rewards.push({id:achievement.id, progressive:false, fame:achievement.fame});
+    }
+  }
+  for (const achievement of PROGRESSIVE_ACHIEVEMENTS) {
+    const value = achievement.check();
+    for (let tier = getClaimedProgTier(achievement); tier < achievement.goals.length && value >= achievement.goals[tier]; tier++) {
+      rewards.push({id:achievement.id, progressive:true, tier, fame:achievement.fames[tier]});
+    }
+  }
+  return rewards;
+}
+
+function claimAllAchievements(persist = saveMeta) {
+  const rewards = claimableAchievementRewards();
+  if (!rewards.length) return {count:0,total:0};
+  const previous = {
+    claimedAch: {...(meta.claimedAch || {})}, claimedProg: {...(meta.claimedProg || {})},
+    fame: meta.fame || 0, accXp: meta.accXp || 0,
+  };
+  meta.claimedAch = {...previous.claimedAch};
+  meta.claimedProg = {...previous.claimedProg};
+  for (const reward of rewards) {
+    if (reward.progressive) meta.claimedProg[reward.id] = Math.max(meta.claimedProg[reward.id] || 0, reward.tier + 1);
+    else meta.claimedAch[reward.id] = true;
+  }
+  const total = rewards.reduce((sum,reward)=>sum+reward.fame,0);
+  meta.fame = previous.fame + total;
+  meta.accXp = previous.accXp + total;
+  if (persist()) return {count:rewards.length,total};
+  meta.claimedAch = previous.claimedAch;
+  meta.claimedProg = previous.claimedProg;
+  meta.fame = previous.fame;
+  meta.accXp = previous.accXp;
+  return {count:0,total:0};
+}
+
 let currentAchCategory = 'all';
 let currentAchSaga = 'all';
 
@@ -1869,7 +1920,9 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
   };
   const renderContent = () => {
     const all = [...PROGRESSIVE_ACHIEVEMENTS.map(a=>describe(a,true)),...visibleStaticList.map(a=>describe(a,false))];
-    const readyCount = all.filter(a=>a.ready).length;
+    const claimable = claimableAchievementRewards();
+    const readyCount = claimable.length;
+    const readyFame = claimable.reduce((sum,reward)=>sum+reward.fame,0);
     const q = query.trim().toLocaleLowerCase('es');
     const items = all.filter(({a,progressive,status}) =>
       (currentAchCategory==='all' || (currentAchCategory==='prog'?progressive:!progressive&&a.cat===currentAchCategory)) &&
@@ -1880,7 +1933,7 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
     const pages = Math.max(1,Math.ceil(items.length/pageSize));page=Math.min(page,pages-1);
     const {totalCompleted,totalAchievements} = getAchievementsInfo();
     return `<header class="collection-header"><div><span class="collection-eyebrow">Tu aventura</span><h2 id="ach-title" tabindex="-1">Logros de pirata</h2></div><button class="btn gray collection-close" id="ach-close" aria-label="Cerrar logros">Cerrar <span aria-hidden="true">×</span></button></header>
-      <div class="collection-summary"><div><strong>${number(totalCompleted)} <small>/ ${number(totalAchievements)}</small></strong><span>Objetivos completados</span></div><button class="collection-summary-action" id="ach-show-ready"><strong>${number(readyCount)}</strong><span>Por reclamar →</span></button></div>
+      <div class="collection-summary"><div><strong>${number(totalCompleted)} <small>/ ${number(totalAchievements)}</small></strong><span>Objetivos completados</span></div><div class="achievement-summary-actions"><button class="collection-summary-action" id="ach-show-ready"><strong>${number(readyCount)}</strong><span>Por reclamar →</span></button><button class="btn green" id="ach-claim-all" ${readyCount?'':'disabled'}>Reclamar todo${readyCount?` · +${number(readyFame)} Fama`:''}</button></div></div>
       <div class="collection-search"><label for="ach-search">Buscar logro<input id="ach-search" type="search" placeholder="Nombre, isla u objetivo" value="${collectionText(query)}"></label><label for="ach-state">Estado<select id="ach-state">${[['all','Todos'],['ready','Por reclamar'],['progress','En progreso'],['claimed','Completados']].map(([v,l])=>`<option value="${v}" ${state===v?'selected':''}>${l}</option>`).join('')}</select></label></div>
       <details class="collection-extra" ${filtersOpen?'open':''}><summary>Filtros${currentAchCategory!=='all'||currentAchSaga!=='all'||sort!=='ready'?' · activos':''}</summary><div class="collection-filter-grid">
         <label for="ach-sort">Ordenar por<select id="ach-sort">${[['ready','Por reclamar primero'],['progress-desc','% completado: mayor a menor'],['progress-asc','% completado: menor a mayor']].map(([v,l])=>`<option value="${v}" ${sort===v?'selected':''}>${l}</option>`).join('')}</select></label>
@@ -1914,6 +1967,14 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
     ov.querySelector('#ach-search').oninput=e=>{query=e.target.value;page=0;refresh('#ach-search',0,e.target.selectionStart);};
     for(const [id,update] of [['ach-sort',v=>sort=v],['ach-state',v=>state=v],['ach-category',v=>currentAchCategory=v],['ach-saga',v=>currentAchSaga=v]])ov.querySelector('#'+id).onchange=e=>{update(e.target.value);page=0;refresh('#'+id);};
     ov.querySelector('#ach-show-ready').onclick=()=>{state='ready';query='';currentAchCategory='all';currentAchSaga='all';page=0;refresh('#ach-state');};
+    ov.querySelector('#ach-claim-all').onclick=()=>{
+      const button=ov.querySelector('#ach-claim-all');button.disabled=true;
+      const scroll=ov.querySelector('.collection-list').scrollTop;
+      const result=claimAllAchievements();
+      if(!result.count){button.disabled=false;return;}
+      syncFameUI();toast(`🏆 ${number(result.count)} recompensas reclamadas: +${number(result.total)} Fama`);
+      refresh('#ach-claim-all',scroll);
+    };
     ov.querySelector('#ach-reset').onclick=()=>{query='';state='all';sort='ready';currentAchCategory='all';currentAchSaga='all';page=0;refresh('#ach-search');};
     ov.querySelectorAll('[data-ach-page]').forEach(btn=>btn.onclick=()=>{page+=Number(btn.dataset.achPage);refresh('.collection-list');});
     ov.querySelectorAll('[data-claim],[data-claim-prog]').forEach(btn=>btn.onclick=()=>{
@@ -2174,7 +2235,7 @@ function screenHome() {
         <div class="mode-btn">${challengeUnlocked ? 'ENTRAR' : '🔒 NV. CUENTA 35'}</div>
       </div>
     </div>
-    <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? 'Doble salto · 25 fama cada 1.000 m' : '🔒 Se desbloquea al nivel 1 de cuenta'}</small></span></button>
+    <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? 'Doble salto · recupera 25 pasos cada 1.000 m' : '🔒 Se desbloquea al nivel 1 de cuenta'}</small></span></button>
     <button class="local-menu-button" id="btn-local"><span aria-hidden="true">⚔️</span><span><strong>MULTIJUGADOR LOCAL</strong><small>Duelo · Torneo · Alianza contra un yonko · Conexión por QR</small></span></button>
     <div style="text-align:center;margin:12px 0"><button class="btn gray small" id="btn-offline">⬇ Preparar juego sin internet</button></div>
     ${pendingPirateKingRewards().length ? `<div class="panel"><button class="btn gold" id="btn-king-rewards">👑 ELEGIR LEGENDARIO · ${pendingPirateKingRewards().length} recompensa(s) de Rey Pirata</button></div>` : ''}
@@ -2245,7 +2306,7 @@ function screenHome() {
       playMusic('combat');
       await openRunner({
         best: meta.runnerBest || 0,
-        onFame: amount => gainFame(amount),
+        onSteps: amount => grantDailySteps(amount),
         onScore: score => {
           if (score > (meta.runnerBest || 0)) { meta.runnerBest = score; saveMeta(); }
         },
@@ -4888,6 +4949,17 @@ function cartelesBadgeHTML() {
   return `<div style="font-size:10.5px;background:rgba(255,215,0,0.16);padding:6px 10px;border-radius:6px;border:1px solid var(--gold);margin:8px 0;color:#222;text-align:center;"><b>📜 Carteles en tu bolsa:</b> 📜 ×${c1} Recluta ${c2 ? `· 🏅 ×${c2} Dorado` : ''} ${c3 ? `· 📯 ×${c3} Buster` : ''}</div>`;
 }
 
+function wildTeamPreviewHTML() {
+  const members = (run?.team || []).filter(Boolean);
+  return `<section class="wild-team-preview" aria-labelledby="wild-team-title">
+    <header><h3 id="wild-team-title">Tu equipo</h3><span>${members.filter(f=>f.hp>0).length}/${members.length} en pie</span></header>
+    <div class="wild-team-grid">${members.map(f=>{
+      const hp=Math.max(0,Math.min(100,f.hp/f.maxhp*100));
+      return `<div class="wild-team-member ${f.hp<=0?'ko':''}"><span class="wild-team-portrait" aria-hidden="true">${charIcon(f.id,42)}</span><div><strong>${esc(charName(f))}</strong><small>Nv${f.lvl} · ${Math.max(0,f.hp)}/${f.maxhp} PS</small><span class="hp-mini"><i style="width:${hp}%"></i></span>${typeBadges(fighterTypes(f))}</div></div>`;
+    }).join('')}</div>
+  </section>`;
+}
+
 function wildEncounter(wild) {
   const c = charData(wild);
   const isLegendary = c.rareza === 5;
@@ -4903,6 +4975,7 @@ function wildEncounter(wild) {
       <div class="special-stars">${'⭐'.repeat(c.rareza)}</div>
       ${typeBadges(c.types)}
     </div>
+    ${wildTeamPreviewHTML()}
     ${cartelesBadgeHTML()}
     ${isLegendary ? '<div class="special-fail" style="color:var(--gold);border-color:var(--gold);background:#fffbe8;">👑 ¡PIRATA LEGENDARIO (5⭐)!<br>Inmune al reclutamiento salvaje. ¡Únicamente puedes combatirlo!</div>' : nuzBlock ? '<div class="special-fail">Regla Nuzlocke: ya reclutaste en esta isla (solo puedes combatir).</div>' : ''}
     <div class="actions" style="flex-direction:column;align-items:stretch;">
@@ -8044,13 +8117,13 @@ function dexCardHTML(id) {
   const seen = dexEntrySeen(id);
   const got = dexBaseIds(meta.recruited).includes(id);
   const vet = dexBaseIds(meta.roster).includes(id);
-  return `<button type="button" class="dex-card ${seen ? 'seen' : 'unknown'}" data-id="${id}" ${seen?'':'disabled'} aria-label="${esc(c.name)}${seen?', ver ficha y fases':', sin avistar'}">
-    <div class="emoji">${seen ? charIcon(id, 46) : '❔'}</div>
-    <div>${c.name}</div>
-    <div class="dex-rarity" style="font-size:7px;" aria-label="Rareza ${c.rareza} de 5 estrellas"><span class="dex-rarity-full" aria-hidden="true">${'⭐'.repeat(c.rareza)}</span><span class="dex-rarity-compact" aria-hidden="true">★ ${c.rareza}/5</span></div>
-    ${vet ? '<div style="color:var(--accent)">🏅 veterano</div>' : got ? '<div style="color:var(--green)">✓ nakama</div>' : (seen ? '<div style="color:#999">visto</div>' : '<div style="color:#aaa">sin avistar</div>')}
+  const status=vet?'🏅 Veterano':got?'✓ Nakama':seen?'Avistado':'Sin avistar';
+  return `<button type="button" class="dex-card ${seen ? 'seen' : 'unknown'} inventory-card" data-id="${id}" ${seen?'':'disabled'} aria-label="${esc(c.name)}${seen?', ver ficha y fases':', sin avistar'}">
+    <div class="inventory-card-top"><span>${status}</span><span class="inventory-rarity" aria-label="Rareza ${c.rareza} de 5 estrellas">★ ${c.rareza}/5</span></div>
+    <span class="inventory-profile"><span class="inventory-portrait emoji" aria-hidden="true">${seen ? charIcon(id, 70) : '❔'}</span><strong>${c.name}</strong>${seen?'<span class="inventory-profile-link">Ver ficha ↗</span>':''}</span>
+    <div class="dex-rarity dex-rarity-full" aria-hidden="true">${'⭐'.repeat(c.rareza)}</div>
     ${seen?characterSortStatHTML(id,dexView.sort):''}
-    ${forms.length>1?`<div class="dex-forms-count">${forms.length} fases</div>`:''}
+    <div class="dex-card-footer"><span>${status}</span>${forms.length>1?`<span class="dex-forms-count">${forms.length} fases</span>`:''}</div>
   </button>`;
 }
 
@@ -8061,10 +8134,11 @@ function screenDex() {
   render(`
     ${topbar(false)}
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
-    <div class="panel pirate-dex">
-      <header class="dex-header"><h2>📖 Dex Pirata</h2><div class="dex-progress" aria-label="Progreso de la colección"><span><strong>${dexBaseIds(meta.dex).length} <small>/ ${all.length}</small></strong>Avistados</span><span><strong>${dexBaseIds(meta.recruited).length}</strong>Reclutados</span></div></header>
-      ${charControlsHTML(dexView, { sagas: sagaOpts })}
-      <div id="char-grid"></div>
+    <div class="panel pirate-dex collection-page">
+      <header class="collection-header dex-header"><div><span class="collection-eyebrow">Tu colección</span><h2>📖 Dex Pirata</h2></div></header>
+      <div class="collection-summary dex-progress" aria-label="Progreso de la colección"><span><strong>${dexBaseIds(meta.dex).length} <small>/ ${all.length}</small></strong><span>Avistados</span></span><span><strong>${dexBaseIds(meta.recruited).length}</strong><span>Reclutados</span></span></div>
+      <div class="dex-filter-panel"><span class="collection-eyebrow">Buscar y ordenar</span>${charControlsHTML(dexView, { sagas: sagaOpts })}</div>
+      <div id="char-grid" class="collection-list"></div>
       <p class="dex-help">Toca un personaje avistado para abrir su ficha. Cada carta reúne todas sus fases. Busca también por el nombre, tipo o rareza de una transformación. Los no avistados solo muestran su nombre.</p>
     </div>
   `);

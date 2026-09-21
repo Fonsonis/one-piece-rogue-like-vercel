@@ -9977,5 +9977,39 @@
     ],
     "atlasScale": 1.1510791366906474,
     "portraitScale": 1.0443037974683544
+  },
+  "robin-demoniofleur": {
+    "ratio": 1.15,
+    "guardBounds": [
+      37,
+      61,
+      156,
+      180
+    ],
+    "portraitBounds": [
+      17,
+      18,
+      175,
+      176
+    ],
+    "atlasScale": 1.2369747899159662,
+    "portraitScale": 0.960759493670886
+  },
+  "franky-shogun": {
+    "ratio": 1.25,
+    "guardBounds": [
+      36,
+      74,
+      156,
+      180
+    ],
+    "portraitBounds": [
+      13,
+      29,
+      179,
+      176
+    ],
+    "atlasScale": 1.509433962264151,
+    "portraitScale": 1.1224489795918366
   }
 }
