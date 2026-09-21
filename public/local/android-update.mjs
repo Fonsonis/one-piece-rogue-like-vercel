@@ -7,14 +7,34 @@ export function isAndroidApp() {
   return globalThis.Capacitor?.isNativePlatform?.() === true && globalThis.Capacitor?.getPlatform?.() === 'android';
 }
 
-function compareVersions(left, right) {
-  const a = String(left).split('.').map(Number);
-  const b = String(right).split('.').map(Number);
-  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
-    const difference = (a[index] || 0) - (b[index] || 0);
-    if (difference) return Math.sign(difference);
+async function latestAndroidRelease() {
+  // GitHub release redirects do not expose CORS headers. Use the native HTTP
+  // bridge only for this small manifest; the APK stays in DownloadManager.
+  const http = globalThis.Capacitor?.registerPlugin?.('CapacitorHttp') || globalThis.Capacitor?.Plugins?.CapacitorHttp;
+  if (!http?.get) throw new Error('El módulo de conexión nativa no está disponible.');
+  const response = await http.get({
+    url: `${RELEASE_VERSION_URL}?t=${Date.now()}`,
+    responseType: 'json',
+    connectTimeout: 15000,
+    readTimeout: 15000,
+    disableRedirects: false,
+  });
+  if (!(response.status >= 200 && response.status < 300)) {
+    throw new Error(`El servidor de actualizaciones respondió HTTP ${response.status}.`);
   }
-  return 0;
+  let release;
+  try {
+    // Release assets can arrive as application/octet-stream rather than JSON.
+    release = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
+  } catch {
+    throw new Error('El archivo de versión publicado no contiene JSON válido.');
+  }
+  const versionCode = Number(release?.versionCode);
+  if (!release || typeof release.version !== 'string' || !release.version.trim() ||
+      !Number.isSafeInteger(versionCode) || versionCode <= 0) {
+    throw new Error('El archivo de versión publicado está incompleto o no es válido.');
+  }
+  return { ...release, versionCode };
 }
 
 function androidUpdater() {
@@ -69,20 +89,21 @@ export async function downloadAndroidApk({ toast } = {}) {
     return;
   }
 
+  let phase = 'leer la versión instalada';
   try {
     const installed = await installedRelease();
+    phase = 'buscar la actualización';
     toast?.(`↻ Buscando una versión posterior a ${installed.version}…`);
-    const response = await fetch(`${RELEASE_VERSION_URL}?t=${Date.now()}`, { cache: 'no-store' });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const release = await response.json();
-    const releaseCode = Number(release.versionCode) || 0;
-    const hasNewBuild = releaseCode > installed.versionCode || (!releaseCode && compareVersions(release.version, installed.version) > 0);
+    const release = await latestAndroidRelease();
+    const releaseCode = release.versionCode;
+    const hasNewBuild = releaseCode > installed.versionCode;
     if (!hasNewBuild) {
       toast?.(`✅ Ya tienes la versión más reciente (${installed.version}).`);
       return;
     }
     const accepted = globalThis.confirm(`Hay una actualización disponible: ${release.version} (compilación ${releaseCode}). ¿Quieres descargarla ahora?`);
     if (accepted) {
+      phase = 'descargar o instalar la actualización';
       const updater = androidUpdater();
       if (!updater?.startDownload || !updater?.getStatus || !updater?.install) throw new Error('Plugin AndroidUpdater no disponible');
       const status = await updater.startDownload({
@@ -93,7 +114,8 @@ export async function downloadAndroidApk({ toast } = {}) {
     }
   } catch (error) {
     console.error('[android-update] No se pudo completar la actualización', error);
-    toast?.('No se pudo completar la actualización. Revisa la conexión y vuelve a pulsar “Actualizar APK” para continuar o reintentar.');
+    const detail = error?.message || 'Error sin detalles del sistema.';
+    toast?.(`No se pudo ${phase}. ${detail} Vuelve a pulsar “Actualizar APK” para reintentar.`);
   }
 }
 
