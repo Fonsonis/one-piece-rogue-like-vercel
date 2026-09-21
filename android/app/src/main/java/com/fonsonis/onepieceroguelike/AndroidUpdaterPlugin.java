@@ -109,7 +109,7 @@ public class AndroidUpdaterPlugin extends Plugin {
     @PluginMethod
     public void startDownload(PluginCall call) {
         String url = call.getString("url");
-        Long versionCode = call.getLong("versionCode", 0L);
+        Integer versionCode = readVersionCode(call);
         if (!validReleaseUrl(url)) {
             call.reject("La URL de actualización no pertenece al repositorio oficial.");
             return;
@@ -153,6 +153,13 @@ public class AndroidUpdaterPlugin extends Plugin {
             clearStoredDownload(false);
             call.reject("Android no pudo iniciar la descarga.", error);
         }
+    }
+
+    static Integer readVersionCode(PluginCall call) {
+        // Android version codes fit in a signed int. The JSON bridge decodes
+        // these numbers as Integer; PluginCall.getLong only accepts Long and
+        // silently returns its default for Integer values.
+        return call.getInt("versionCode", 0);
     }
 
     @PluginMethod
