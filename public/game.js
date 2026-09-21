@@ -7306,10 +7306,14 @@ function endBattle(victory, fled, recruited) {
     if (autoTimer) { clearTimeout(autoTimer); autoTimer = null; }
     const rewardsHTML = journeyRewardsHTML();
     clearRun();
+    // Present the reward on the destination screen. Keeping the old battle/map
+    // surface mounted until CONTINUAR made mobile browsers reflow between two
+    // different fullscreen layouts, which looked like a small page zoom.
+    screenIslands(sagaIdx);
     modalInfo('🏅 ¡Emblema conseguido!',
       `${rewardsHTML}<div class="reward-list">¡Has completado ${saga.islands[islandIdx].name}!<br>+${bossFame} ⭐ Fama<br><br>Desbloqueada: <b>${saga.islands[islandIdx+1].name}</b> 🧭<br>Elige la siguiente isla y prepara tu equipo.${newVets.length ? `<br><br><small>🏅 Nakamas permanentes:<br>${newVets.map(id => `${charIcon(id, 16)} ${CHARS[id].name}`).join(' · ')}</small>` : ''
       }</div>`,
-      () => screenIslands(sagaIdx));
+      null);
     return;
   }
   saveRun();

@@ -1,6 +1,7 @@
 /* A continuous sea chart. Only the chart scrolls; navigation stays within reach. */
-body:has(.world-map) { height:100dvh; min-height:0; overflow:hidden; }
-#app:has(.world-map) { height:100dvh; min-height:0; display:flex; flex-direction:column; gap:8px; padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)); }
+html:has(.world-map) { overflow:hidden; overscroll-behavior:none; -webkit-text-size-adjust:100%; text-size-adjust:100%; }
+body:has(.world-map) { width:100%; max-width:none; height:100dvh; min-height:0; margin:0; overflow:hidden; position:relative; }
+#app:has(.world-map) { width:100%; max-width:none; height:100dvh; min-width:0; min-height:0; margin:0; position:relative; overflow:hidden; display:flex; flex-direction:column; gap:8px; padding:max(8px,env(safe-area-inset-top)) max(8px,env(safe-area-inset-right)) max(8px,env(safe-area-inset-bottom)) max(8px,env(safe-area-inset-left)); }
 #app:has(.world-map) > .topbar { flex:none; margin:0; min-height:40px; }
 #app:has(.world-map) > .topbar .logo { display:none; }
 .world-controls { flex:none; position:relative; z-index:20; }
@@ -14,7 +15,8 @@ body:has(.world-map) { height:100dvh; min-height:0; overflow:hidden; }
 .world-controls .diff-dropdown-menu { max-height:min(420px,60dvh); overflow:auto; max-width:calc(100vw - 24px); }
 .world-nav { font-size:8px; }
 .world-nav select { flex:1; min-width:0; height:40px; border:1px solid var(--line); border-radius:3px; background:var(--paper); color:var(--ink); font:10px 'Press Start 2P',monospace; padding:6px; }
-.world-map { position:relative; height:100%; min-height:0; overflow:auto; overscroll-behavior:contain; overflow-anchor:none; border:1px solid var(--line); border-radius:4px; background:transparent; scrollbar-color:#628f94 #d2e7df; }
+.world-map { position:relative; height:100%; min-height:0; overflow:auto; overscroll-behavior:contain; overflow-anchor:none; scroll-snap-type:y mandatory; scroll-padding-block:calc(50% - 125px); border:1px solid var(--line); border-radius:4px; background:transparent; scrollbar-color:#628f94 #d2e7df; }
+.world-map:has(.world-ship.is-sailing) { scroll-snap-type:none; }
 .world-map:focus-visible { outline:3px solid var(--accent); outline-offset:-3px; }
 .world-chart { position:relative; max-width:880px; margin:auto; isolation:isolate; padding-bottom:120px; }
 .world-start,.world-end { position:relative; margin:0; padding:22px 12px; text-align:center; color:#fff7db; text-shadow:0 2px 0 #16516d; font-size:9px; line-height:2; }
@@ -30,7 +32,7 @@ body:has(.world-map) { height:100dvh; min-height:0; overflow:hidden; }
 .world-saga-details .actions { padding:8px; flex-wrap:wrap; }
 .world-saga-details .btn { min-height:44px; font-size:8px; }
 .world-difficulties { display:flex; flex-wrap:wrap; justify-content:center; gap:6px 12px; padding:6px; }
-.world-stop { position:relative; height:270px; max-width:600px; margin:auto; }
+.world-stop { position:relative; height:270px; max-width:600px; margin:auto; scroll-snap-align:center; }
 .world-island-card { position:absolute; width:190px; top:50%; left:25%; transform:translate(-50%,-50%); }
 .world-stop.starboard .world-island-card { left:75%; }
 .world-island-card .island-select { position:relative; }

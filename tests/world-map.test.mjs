@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import {combatHarness} from './balance-harness.mjs';
 import fs from 'node:fs';
 
+const worldMapCSS=fs.readFileSync('public/art/world-map.css','utf8');
+
 function setup() {
  const h=combatHarness(),nodes=new Map();
  const node=s=>{if(!nodes.has(s))nodes.set(s,{dataset:{},scrollTop:0,scrollHeight:16000,clientHeight:500,offsetTop:15400,offsetHeight:195,classList:{add(){},remove(){}}});return nodes.get(s);};
@@ -26,6 +28,14 @@ test('one chart renders every saga and island in reverse order, preserving modes
  assert.ok(html.indexOf('id="world-saga-8"')<html.indexOf('RED LINE · NUEVO MUNDO'));
  assert.ok(html.indexOf('RED LINE · NUEVO MUNDO')<html.indexOf('id="world-saga-7"'));
  for(const id of ['tab-classic','tab-nuz','btn-diff-trigger','btn-saga-probs-all'])assert.ok(html.includes(`id="${id}"`));
+});
+
+test('the vertical chart keeps a stable viewport and settles on complete island cards',()=>{
+ const appRule=worldMapCSS.match(/#app:has\(\.world-map\)\s*\{([^}]*)\}/)?.[1] || '';
+ assert.match(appRule,/width:100%/);assert.match(appRule,/max-width:none/);assert.match(appRule,/margin:0/);assert.match(appRule,/overflow:hidden/);
+ assert.match(worldMapCSS,/\.world-map\s*\{[^}]*scroll-snap-type:y mandatory/);
+ assert.match(worldMapCSS,/\.world-stop\s*\{[^}]*scroll-snap-align:center/);
+ assert.match(worldMapCSS,/\.world-map:has\(\.world-ship\.is-sailing\)\s*\{\s*scroll-snap-type:none/);
 });
 
 test('mode and difficulty changes keep the chosen saga instead of restoring the last completed island',()=>{

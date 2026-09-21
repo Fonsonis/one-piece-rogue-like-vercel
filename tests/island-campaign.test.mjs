@@ -131,6 +131,12 @@ test('wild escape flag lives next to encounter title and is absent from restrict
  h.exec('battle.opts={wild:true};battle.tower=true;');assert.ok(!h.exec('battleLayoutHTML([])').includes('battle-flee'));
 });
 
+test('the completion reward is mounted on the final world-map layout without a viewport jump',()=>{
+  const h=harness();
+  h.exec(`let completionUI=[];screenIslands=()=>completionUI.push('world-map');modalInfo=()=>completionUI.push('reward');startRun(0,['luffy']);battle={opts:{boss:true}};originalEndBattle(true);`);
+  assert.deepEqual(Array.from(h.exec('completionUI')),['world-map','reward']);
+});
+
 test('pirate flag decision shows the current crew with level, HP and types',()=>{
  const h=combatHarness();
  h.exec("run={saga:0,mode:'classic',berries:0,team:[makeChar('luffy',12),makeChar('zoro',9)],items:{}};run.team[1].hp=0;");
