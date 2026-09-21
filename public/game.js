@@ -2997,7 +2997,6 @@ function showNakamaPicker(opts) {
     <button class="btn gray usage-filter" id="np-used" aria-pressed="${st.sort === 'usageDesc'}">Más usados</button>
     <div class="nakama-picker-summary"><span id="np-count" role="status"></span><button class="btn gray" id="np-reset">Limpiar filtros</button></div>
     <div class="nakama-picker-roster" id="np-roster"></div>
-    <small>Desliza a izquierda o derecha para pasar de página.</small>
     <footer class="nakama-picker-pages"><button class="btn gray" id="np-prev" aria-label="Página anterior">◀</button><span id="np-page" role="status"></span><button class="btn gray" id="np-next" aria-label="Página siguiente">▶</button></footer>
   </section>`;
   document.body.appendChild(ov);
@@ -3028,7 +3027,7 @@ function showNakamaPicker(opts) {
     find('#np-roster').scrollTop = 0;
     ov.querySelectorAll('[data-id]').forEach(btn => btn.onclick = () => { close(); opts.onSelect(btn.dataset.id); });
     ov.querySelectorAll('[data-info]').forEach(btn => btn.onclick = () => {
-      showCharModal(btn.dataset.info, null, null, ids);
+      showCharModal(btn.dataset.info);
       const closeSheet = document.querySelector('#sheet-close');
       const sheet = closeSheet.closest('.overlay');
       const returnToPicker = () => { sheet.remove(); btn.focus(); };
@@ -3054,27 +3053,6 @@ function showNakamaPicker(opts) {
     // A disabled paging control must not strand keyboard focus.
     if (find(`#np-${key}`).disabled) find('.nakama-picker-pick')?.focus();
   };
-  const roster = find('#np-roster');
-  let swipeStart = null, suppressSwipeClick = false;
-  roster.onpointerdown = e => {
-    suppressSwipeClick = false;
-    swipeStart = e.isPrimary && e.pointerType === 'touch' ? {x:e.clientX, y:e.clientY, id:e.pointerId} : null;
-  };
-  roster.onpointercancel = () => { swipeStart = null; };
-  roster.onpointerup = e => {
-    if (!swipeStart || swipeStart.id !== e.pointerId) return;
-    const dx = e.clientX - swipeStart.x, dy = e.clientY - swipeStart.y;
-    swipeStart = null;
-    if (Math.abs(dx) < 40 || Math.abs(dx) <= Math.abs(dy) * 1.5) return;
-    suppressSwipeClick = true;
-    const step = dx < 0 ? 1 : -1;
-    if (!find(step > 0 ? '#np-next' : '#np-prev').disabled) { st.page += step; draw(); }
-  };
-  roster.addEventListener('click', e => {
-    if (!suppressSwipeClick || e.detail === 0) return;
-    suppressSwipeClick = false;
-    e.preventDefault(); e.stopImmediatePropagation();
-  }, true);
   ov.onclick = e => { if (e.target === ov) close(); };
   ov.onkeydown = e => {
     if (e.key === 'Escape') { e.preventDefault(); close(); }
