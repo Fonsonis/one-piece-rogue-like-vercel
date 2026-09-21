@@ -19,7 +19,8 @@ test('God Valley children are independent collectible recruits with separate pro
  for(const base of ['kuma','ivankov','ginny','dragon']){
   const id=base+'-young';
   assert.equal(h.exec(`baseFormOf('${id}')`),id);
-  assert.equal(h.exec(`CHARS.${base}.evo`),undefined);
+  assert.equal(h.exec(`CHARS['${id}'].evo`),undefined);
+  assert.notEqual(h.exec(`CHARS.${base}.evo?.to`),id);
   assert.equal(h.exec(`EVOLVED_FORMS.has('${id}')`),false);
   assert.equal(h.exec(`SAGAS.find(s=>s.id==='elbaph').islands.some(i=>i.pool.includes('${id}'))`),true);
   h.exec(`meta.charUpgrades={'${base}':50};`);
