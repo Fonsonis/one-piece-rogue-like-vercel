@@ -1,4 +1,12 @@
 /* ============ GRAND LINE LIKE — Estilos ============ */
+@font-face {
+  font-family: 'Press Start 2P';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('fonts/press-start-2p.ttf') format('truetype');
+}
+
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -97,6 +105,19 @@ button { font-family: inherit; cursor: pointer; }
 .btn.gold { background: var(--gold); color: var(--ink); }
 .btn:disabled { background: #999; cursor: not-allowed; filter: grayscale(.6); }
 .btn.small { padding: 6px 10px; font-size: 9px; }
+
+.home-install-actions {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 8px; margin: 12px 0; text-align: center;
+}
+.home-install-actions .btn {
+  flex: 1 1 280px; max-width: 340px; min-height: 44px;
+  white-space: normal; line-height: 1.5;
+}
+.home-install-actions small {
+  flex-basis: 100%; color: #fff; font-size: 8px; line-height: 1.6;
+  text-shadow: 1px 1px 2px #000;
+}
 
 /* --- Home: tarjetas de modo --- */
 .modes { display: flex; gap: 14px; justify-content: center; flex-wrap: wrap; }
