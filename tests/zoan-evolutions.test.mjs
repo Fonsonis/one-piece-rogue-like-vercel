@@ -51,14 +51,14 @@ test('forms keep the base saga, passives and recruitment identity without enteri
 
 test('old Gear 3 moves migrate even when the character remains in Gear 3',()=>{
   const h=combatHarness();
-  h.exec(`maxStartLvlCap=()=>100;meta.sagaDiffWins={skypiea:{3:true}};meta.charUpgrades={luffy:20};const f=makeChar('luffy',25);
+  h.exec(`maxStartLvlCap=()=>100;meta.sagaDiffWins={};markSagaReached(SAGAS.findIndex(s=>s.id==='water7'));meta.charUpgrades={luffy:20};const f=makeChar('luffy',25);
     f.moves=['hakiarm'];f.evolutionRulesVersion=1;migrateFighter(f);`);
   assert.equal(h.exec('f.id'),'luffy3');
   assert.deepEqual(Array.from(h.exec('f.moves')),['gigantpistol']);
 });
 
 test('Chopper cannot use Monster Point before its permanent unlock',()=>{
-  const h=combatHarness();h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins={skypiea:{3:true}};');
+  const h=combatHarness();h.exec("maxStartLvlCap=()=>100;meta.sagaDiffWins={};markSagaReached(SAGAS.findIndex(s=>s.id==='water7'));");
   for(const level of [5,20,25,39]){
     h.exec(`meta.charUpgrades={chopper:${level-5}};const f${level}=makeChar('chopper',100);`);
     assert.equal(h.exec(`f${level}.moves.includes('monsterpoint')`),false);

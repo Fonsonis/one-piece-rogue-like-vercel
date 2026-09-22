@@ -1567,7 +1567,7 @@ for(const baseId of SULONG_FORMS){
     base:base.base.map((n,i)=>n+(i===0?9:i===3?6:4)),rareza:Math.min(5,base.rareza+1),
     learnset:[[40,move]],ultimate:move,evo:undefined,generated:false,zoan:false,zoanForm:undefined,
     sulongBase:baseId,formLevel:40,
-    desc:'Transformación Sulong mostrada en el manga. No es un despertar de fruta. Requiere nivel base y en partida 40, además de alcanzar su saga de debut.'};
+    desc:`Transformación Sulong ${baseId==='pekoms'?'iniciada':'mostrada'} en el manga. No es un despertar de fruta. Requiere nivel base y en partida 40, además de alcanzar su saga de debut.`};
   let previous=base;while(previous.evo)previous=CHARS[previous.evo.to];
   previous.evo={lvl:40,to:id};
 }

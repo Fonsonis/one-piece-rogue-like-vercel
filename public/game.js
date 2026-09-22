@@ -34,7 +34,7 @@ function formSagaUnlocked(id, progress = meta) {
   const sagaId = formUnlockSaga(id);
   if (!sagaId) return true;
   const sagaIndex = SAGAS.findIndex(saga => saga.id === sagaId);
-  return sagaIndex >= 0 && sagaUnlocked(sagaIndex, progress);
+  return sagaIndex >= 0 && sagaReached(sagaIndex, progress);
 }
 function characterPhaseUnlocked(id, progress = meta) {
   const phase = characterForms(id).find(form => form.id === id);
@@ -466,6 +466,7 @@ function normalizeDailySteps(value, now = new Date()) {
 const META_DEFAULTS = () => ({
   wins: {}, nuzWins: {}, dex: [], recruited: [], roster: [], towerRecord: 0,
   fame: 0, upgrades: {}, accXp: 0, global: {}, defeated: [],
+  reachedSagas: ['eastblue'], // sagas visitadas; distinto de las sagas disponibles en el selector
   sagaClears: {}, // id base -> nº de sagas conquistadas con ese nakama en la banda
   sagaDiffWins: {}, // sagaId -> { diffLevel: true }
   pirateKingRewards: {}, // sagaId -> 'pending' o ID del legendario elegido
@@ -509,6 +510,7 @@ function loadMeta() {
         [id,id==='sake' ? autoSettings.revive : autoSettings.healItems.includes(id)]))};
   }
   migrateLegacyIslandWins(meta);
+  normalizeReachedSagas(meta, loadedSave?.run);
   preparePirateKingRewards(meta);
   if (!meta.totalIslands) {
     const totalWins = Object.values(meta.wins || {}).reduce((a, b) => a + b, 0) +
@@ -650,6 +652,7 @@ function importSaveFile(file) {
       nextMeta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 }, nextMeta.settings);
       if (!nextMeta.roster.includes('luffy')) nextMeta.roster.push('luffy');
       const nextRun = data.run || null;
+      normalizeReachedSagas(nextMeta, nextRun);
       if (nextRun) {
         ensureStartingTeam(nextRun);
         if (nextRun.mode === 'nuzlocke') nextRun.team = nextRun.team.filter(f => f.hp > 0);
@@ -697,6 +700,9 @@ function validateGameSave(data) {
   if (Object.keys(data.meta.sagaStats || {}).some(id => !SAGAS.some(s => s.id === id))) throw new Error('Contadores de saga incompatibles.');
   for (const key of ['dex', 'recruited', 'roster', 'defeated']) {
     if (data.meta[key]?.some(id => !CHARS[id])) throw new Error('Personaje desconocido.');
+  }
+  if (data.meta.reachedSagas?.some((id,index,ids) => !SAGAS.some(saga=>saga.id===id) || ids.indexOf(id)!==index)) {
+    throw new Error('Progreso de sagas incompatible.');
   }
   const r = data.run;
   for (const [key, islands] of Object.entries(data.meta.islandProgress || {})) {
@@ -2381,6 +2387,42 @@ function sagaUnlocked(i, progress = meta) {
   if(SAGAS[i]?.id==='wholecake'&&progress.legacyWholeCakeAccess)return true;
   if(SAGAS[i]?.id==='marineford'&&progress.legacyMarinefordAccess)return true;
   return sagaMaxDiffCleared(prevSaga.id, progress) >= 3;
+}
+
+// Evolution canon follows sagas the player has actually visited, not merely
+// sagas that are available in the selector. Older saves are reconstructed from
+// direct evidence and then stored as one chronological prefix.
+function normalizeReachedSagas(progress, journey = null) {
+  if (!progress || typeof progress !== 'object') return ['eastblue'];
+  let highest = 0;
+  const note = sagaId => {
+    const index = SAGAS.findIndex(saga=>saga.id===sagaId);
+    if (index > highest) highest = index;
+  };
+  for (const sagaId of progress.reachedSagas || []) note(sagaId);
+  for (const [sagaId,wins] of Object.entries(progress.sagaDiffWins || {})) {
+    if (wins && Object.values(wins).some(Boolean)) note(sagaId);
+  }
+  for (const key of ['wins','nuzWins']) for (const [sagaId,wins] of Object.entries(progress[key] || {})) {
+    if (Number(wins) > 0) note(sagaId);
+  }
+  for (const key of Object.keys(progress.islandProgress || {})) note(key.split(':')[0]);
+  const recentSaga = progress.lastCompletedIsland?.saga;
+  if (Number.isInteger(recentSaga)) note(SAGAS[recentSaga]?.id);
+  if (Number.isInteger(journey?.saga)) note(SAGAS[journey.saga]?.id);
+  progress.reachedSagas = SAGAS.slice(0, highest + 1).map(saga=>saga.id);
+  return progress.reachedSagas;
+}
+function markSagaReached(i, progress = meta) {
+  if (!Number.isInteger(i) || !SAGAS[i]) return normalizeReachedSagas(progress);
+  normalizeReachedSagas(progress);
+  const highest = Math.max(i, ...progress.reachedSagas.map(id=>SAGAS.findIndex(saga=>saga.id===id)));
+  progress.reachedSagas = SAGAS.slice(0, highest + 1).map(saga=>saga.id);
+  return progress.reachedSagas;
+}
+function sagaReached(i, progress = meta) {
+  if (!Number.isInteger(i) || !SAGAS[i]) return false;
+  return normalizeReachedSagas(progress).includes(SAGAS[i].id);
 }
 
 // Desbloqueo secuencial de dificultades por saga:
@@ -4208,6 +4250,7 @@ function startingSupplies() {
 function startRun(sagaIdx, starterIds, islandIdx = 0, islandRepeat = null) {
   const saga = SAGAS[sagaIdx];
   if (!saga?.islands[islandIdx] || !islandAvailable(sagaIdx,islandIdx)) return;
+  markSagaReached(sagaIdx);
   const items = startingSupplies();
   const berries = 300 + (meta.global.berriesplus3 ? 700 : meta.global.berriesplus2 ? 400 : meta.global.berriesplus ? 200 : 0);
 

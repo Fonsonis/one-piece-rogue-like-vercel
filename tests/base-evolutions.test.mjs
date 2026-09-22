@@ -40,9 +40,9 @@ test('the canonical saga catalog covers every evolution exactly once',()=>{
 
 test('player forms need saga, permanent level and journey level independently',()=>{
  const h=combatHarness();
- h.exec(`maxStartLvlCap=()=>100;meta.charUpgrades={sanji:95};meta.sagaDiffWins={skypiea:{3:true}};`);
+ h.exec(`maxStartLvlCap=()=>100;meta.charUpgrades={sanji:95};meta.sagaDiffWins={};markSagaReached(SAGAS.findIndex(s=>s.id==='water7'));`);
  assert.equal(h.exec("makeChar('sanji',40).id"),'sanji-diable','Wano form hidden before reaching Wano');
- h.exec('meta.sagaDiffWins.wholecake={3:true};');
+ h.exec("markSagaReached(SAGAS.findIndex(s=>s.id==='wano'));");
  assert.equal(h.exec("makeChar('sanji',39).id"),'sanji-raid','journey threshold remains intact');
  assert.equal(h.exec("makeChar('sanji',40).id"),'sanji-ifrit');
  h.exec('meta.charUpgrades.sanji=34;');
@@ -104,7 +104,7 @@ test('legacy evolved allies fall back without losing XP, upgrades, fusion bonuse
 
 test('buying the threshold level unlocks a high-level journey fighter without healing a KO',()=>{
  const h=combatHarness();
- h.exec(`maxStartLvlCap=()=>100;meta.charUpgrades={luffy:14};meta.sagaDiffWins={skypiea:{3:true}};meta.logPoses=10000000;
+ h.exec(`maxStartLvlCap=()=>100;meta.charUpgrades={luffy:14};meta.sagaDiffWins={};markSagaReached(SAGAS.findIndex(s=>s.id==='water7'));meta.logPoses=10000000;
  run={saga:0,mode:'classic',team:[makeChar('luffy',60)],items:{}};const f=run.team[0];f.xp=99;f.hp=0;f.maxhp+=9;f.atk+=7;
  const originalLevel=f.lvl;upgradeCharLvl('luffy');`);
  assert.equal(h.exec('f.id'),'luffy2');assert.equal(h.exec('f.lvl'),60);
