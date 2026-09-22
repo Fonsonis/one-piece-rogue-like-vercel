@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { downloadAndroidApk } from '../public/local/android-update.mjs';
 
-async function withAndroid({ installedCode, releaseCode, accepted = false, downloadStates = [{ state: 'successful', bytesDownloaded: 10, totalBytes: 10 }], installState = 'installing', httpStatus = 200, rawManifest, httpError, installError, nativeHttp = true }, run) {
+async function withAndroid({ installedCode, releaseCode, accepted = false, downloadStates = [{ state: 'successful', bytesDownloaded: 10, totalBytes: 10 }], installState = 'installing', httpStatus = 200, rawManifest, apiManifest, httpError, installError, nativeHttp = true, appInfo }, run) {
   const previous = {
     Capacitor: globalThis.Capacitor,
     fetch: globalThis.fetch,
@@ -17,9 +17,11 @@ async function withAndroid({ installedCode, releaseCode, accepted = false, downl
       if (name === 'CapacitorHttp') return nativeHttp ? { get: async options => {
         requests.push(options);
         if (httpError) throw httpError;
-        return { status: httpStatus, data: rawManifest === undefined ? { version: '1.2.0', versionCode: releaseCode, downloadUrl: 'https://example.test/game.apk' } : rawManifest };
+        return { status: httpStatus, data: options.url.includes('api.github.com')
+          ? (apiManifest ?? rawManifest)
+          : (rawManifest === undefined ? { version: '1.2.0', versionCode: releaseCode, downloadUrl: `https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/download/android-${releaseCode}/one-piece-rogue-like.apk` } : rawManifest) };
       } } : null;
-      if (name === 'App') return { getInfo: async () => ({ version: '1.2.0', build: String(installedCode) }) };
+      if (name === 'App') return { getInfo: async () => appInfo ?? ({ version: '1.2.0', build: String(installedCode) }) };
       if (name === 'AndroidUpdater') return {
         startDownload: async options => {
           downloads.push(options);
@@ -47,7 +49,7 @@ async function withAndroid({ installedCode, releaseCode, accepted = false, downl
 test('the APK detects a newer build even when the semantic version is unchanged', async () => {
   await withAndroid({ installedCode: 102000001, releaseCode: 102000002, accepted: true }, async state => {
     await downloadAndroidApk({ toast: state.toast });
-    assert.deepEqual(state.downloads, [{ url: 'https://example.test/game.apk', versionCode: 102000002 }]);
+    assert.deepEqual(state.downloads, [{ url: 'https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/download/android-102000002/one-piece-rogue-like.apk', versionCode: 102000002 }]);
     assert.equal(state.installs.length, 1);
     assert.match(state.messages.at(-1), /Abriendo el instalador/);
   });
@@ -57,7 +59,7 @@ test('the APK does not offer the same or an older build', async () => {
   await withAndroid({ installedCode: 102000002, releaseCode: 102000002 }, async state => {
     await downloadAndroidApk({ toast: state.toast });
     assert.deepEqual(state.downloads, []);
-    assert.match(state.messages.at(-1), /versión más reciente/);
+    assert.match(state.messages.at(-1), /compilación más reciente/);
   });
 });
 
@@ -99,11 +101,48 @@ test('version lookup uses native HTTP with redirects and bounded timeouts, even 
   });
 });
 
-test('release manifests delivered as text still update and use the official fallback APK URL', async () => {
-  await withAndroid({ installedCode: 1, accepted: true, rawManifest: JSON.stringify({ version: '1.2.0', versionCode: 2 }) }, async state => {
+test('release manifests delivered as text still update', async () => {
+  await withAndroid({ installedCode: 1, accepted: true, rawManifest: JSON.stringify({ version: '1.2.0', versionCode: 2, downloadUrl: 'https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/download/android-2/one-piece-rogue-like.apk' }) }, async state => {
     await downloadAndroidApk({ toast: state.toast });
-    assert.match(state.downloads[0].url, /github\.com\/Fonsonis\/one-piece-rogue-like-vercel\/releases\/latest\/download\/one-piece-rogue-like\.apk$/);
+    assert.match(state.downloads[0].url, /github\.com\/Fonsonis\/one-piece-rogue-like-vercel\/releases\/download\/android-2\/one-piece-rogue-like\.apk$/);
     assert.equal(state.installs.length, 1);
+  });
+});
+
+test('GitHub API recovers the exact published release when the manifest is unavailable', async () => {
+  await withAndroid({ installedCode: 1, accepted: true, rawManifest: '<html>error</html>', apiManifest: {
+    tag_name: 'android-3', name: 'Android 1.2.0', assets: [{ name: 'one-piece-rogue-like.apk', state: 'uploaded', browser_download_url: 'https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/download/android-3/one-piece-rogue-like.apk' }],
+  } }, async state => {
+    await downloadAndroidApk({ toast: state.toast });
+    assert.equal(state.requests.length, 2);
+    assert.equal(state.downloads[0].versionCode, 3);
+  });
+});
+
+test('a manifest pointing to another build is never downloaded', async () => {
+  await withAndroid({ installedCode: 1, accepted: true, rawManifest: {
+    version: '1.2.0', versionCode: 3,
+    downloadUrl: 'https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/download/android-2/one-piece-rogue-like.apk',
+  } }, async state => {
+    await downloadAndroidApk({ toast: state.toast });
+    assert.deepEqual(state.downloads, []);
+    assert.match(state.messages.at(-1), /incompleto o no es válido/);
+  });
+});
+
+test('an unreadable installed build cannot be mistaken for an up-to-date APK', async () => {
+  await withAndroid({ installedCode: 1, releaseCode: 2, appInfo: { version: '1.2.0', build: '' } }, async state => {
+    await downloadAndroidApk({ toast: state.toast });
+    assert.match(state.messages.at(-1), /leer la versión instalada/);
+    assert.equal(state.requests.length, 0);
+  });
+});
+
+test('a completed download containing the wrong APK is rejected before installation', async () => {
+  await withAndroid({ installedCode: 1, releaseCode: 2, accepted: true, downloadStates: [{ state: 'failed', error: 'La APK descargada no coincide con la compilación publicada.' }] }, async state => {
+    await downloadAndroidApk({ toast: state.toast });
+    assert.equal(state.installs.length, 0);
+    assert.match(state.messages.at(-1), /no coincide con la compilación/);
   });
 });
 
@@ -122,7 +161,7 @@ for (const [label, options, message] of [
       assert.match(state.messages.at(-1), message);
       assert.deepEqual(state.downloads, []);
       assert.deepEqual(state.installs, []);
-      assert.ok(!state.messages.some(m => m.includes('versión más reciente')));
+      assert.ok(!state.messages.some(m => m.includes('compilación más reciente')));
     });
   });
 }

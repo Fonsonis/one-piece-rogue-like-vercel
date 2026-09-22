@@ -43,7 +43,7 @@ Las redes de invitados con aislamiento, VPN, restricciones de red local y cierto
 
 El botón **Descargar APK para Android** obtiene una APK firmada desde la última release de GitHub. La APK contiene la build completa (unos 123 MB), incluidos sprites, mapas, música y tipografía: se instala y arranca sin conexión desde el primer uso. El progreso se guarda en el almacenamiento local de la aplicación y las actualizaciones firmadas se pueden instalar encima sin perderlo.
 
-Dentro de la APK, ese mismo acceso cambia a **Buscar actualización Android**. Con conexión consulta `android-version.json`; si hay una versión superior, abre la descarga y Android pide confirmar la instalación. Si la consulta falla, el juego empaquetado sigue funcionando normalmente. Para publicar una actualización deben incrementarse `version`, `versionCode`, `android/app/build.gradle` y la constante de `public/local/android-update.mjs`, y se debe firmar con la misma clave.
+Dentro de la APK, ese mismo acceso cambia a **Buscar actualización Android**. Con conexión consulta el `android-version.json` de la última release; si falla, consulta la API de GitHub para localizar la APK publicada. Compara el código de compilación instalado con el publicado, muestra el progreso y comprueba que la descarga sea una APK de esta aplicación y de la compilación esperada antes de abrir el instalador. La búsqueda y los errores quedan visibles bajo el botón. El workflow asigna un nuevo `versionCode` a cada release y verifica que coincida con la APK; las compilaciones locales usan el código de `android/app/build.gradle`. Para publicar una actualización se debe firmar con la misma clave.
 
 La opción secundaria **Preparar navegador sin internet → Descargar / actualizar** almacena los recursos (~121 MB) en el navegador web. Espera la confirmación de descarga completa. Después abre **la misma dirección**; para multijugador sigue haciendo falta una red local, aunque no tenga acceso a internet. Una copia descargada se sirve desde caché sin consultar servicios de fuentes externos. Las actualizaciones se descargan con el mismo botón; una descarga fallida conserva la copia anterior.
 
@@ -100,7 +100,7 @@ npm run android:apk
 
 El resultado firmado se crea en `outputs/one-piece-rogue-like.apk`. En el primer build local, el script genera `.android-signing/one-piece-rogue-like.jks` y sus credenciales; ambos están ignorados por Git. Haz una copia privada de esa carpeta: perder la clave impide que Android acepte futuras versiones como actualización de la app instalada.
 
-El workflow `android-release.yml` publica el mismo nombre estable al crear un tag `v*`. Requiere los secretos `ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS` y `ANDROID_KEY_PASSWORD`, obtenidos de la misma clave local.
+El workflow `android-release.yml` publica la APK y su manifiesto en una release `android-<versionCode>` después de cada cambio en `main`. Requiere los secretos `ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS` y `ANDROID_KEY_PASSWORD`, obtenidos de la misma clave local.
 
 ## Tripulación y relevo
 

@@ -2304,6 +2304,7 @@ function screenHome() {
     <button class="local-menu-button" id="btn-local"><span aria-hidden="true">⚔️</span><span><strong>MULTIJUGADOR LOCAL</strong><small>Duelo · Torneo · Alianza contra un yonko · Conexión por QR</small></span></button>
     <div class="home-install-actions">
       <button class="btn green small" id="btn-offline">${nativeAndroid ? '↻ Buscar actualización Android' : '⬇ Descargar APK para Android'}</button>
+      ${nativeAndroid ? '<small id="android-update-status" role="status" aria-live="polite"></small>' : ''}
       ${nativeAndroid ? '<small>El juego completo ya está guardado en esta APK y funciona sin conexión.</small>' : '<button class="btn gray small" id="btn-browser-offline">Preparar navegador sin internet</button>'}
     </div>
     ${pendingPirateKingRewards().length ? `<div class="panel"><button class="btn gold" id="btn-king-rewards">👑 ELEGIR LEGENDARIO · ${pendingPirateKingRewards().length} recompensa(s) de Rey Pirata</button></div>` : ''}
@@ -2360,8 +2361,13 @@ function screenHome() {
   };
   $('#btn-king-rewards')?.addEventListener('click', () => showPirateKingReward(pendingPirateKingRewards()[0], screenHome));
   $('#btn-offline').onclick = async () => {
-    try { const { downloadAndroidApk } = await import('./local/android-update.mjs'); await downloadAndroidApk({ toast }); }
-    catch (e) { toast(e.message || 'No se pudo abrir la descarga de Android.'); }
+    const button = $('#btn-offline');
+    const status = $('#android-update-status');
+    button.disabled = true;
+    const updateStatus = message => { if (status?.isConnected) status.textContent = message; toast(message); };
+    try { const { downloadAndroidApk } = await import('./local/android-update.mjs'); await downloadAndroidApk({ toast: updateStatus }); }
+    catch (e) { updateStatus(e.message || 'No se pudo abrir la descarga de Android.'); }
+    finally { if (button.isConnected) button.disabled = false; }
   };
   $('#btn-browser-offline')?.addEventListener('click', async () => {
     try { const { prepareOffline } = await import('./local/offline.mjs'); await prepareOffline(); }
