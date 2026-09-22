@@ -3,32 +3,32 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {combatHarness} from './balance-harness.mjs';
 
-test('all enemy identities respect both combat level and permanent unlocks with matching form stats',()=>{
+test('all enemy identities follow combat level and unlocked sagas, never permanent player levels',()=>{
  const h=combatHarness();
  const failures=h.exec(`(() => {
-  const failures=[];meta.charUpgrades={};maxStartLvlCap=()=>100;
+  const failures=[];meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));maxStartLvlCap=()=>100;
   for(const id of Object.keys(CHARS)) {
    const forms=characterForms(id);
    const levels=new Set([1,65,100,...forms.flatMap(f=>[Math.max(1,f.level-1),Math.max(1,f.level)])]);
-   for(const unlocked of [5,20,30,40,45,60,100]) for(const level of levels) {
-    meta.charUpgrades[baseFormOf(id)]=unlocked-5;
-    const expected=forms.filter(f=>f.level<=Math.min(level,unlocked)).at(-1).id;
+   for(const permanent of [5,20,40,100]) for(const level of levels) {
+    meta.charUpgrades={[baseFormOf(id)]:permanent-5};
+    const expected=forms.filter(f=>f.level<=level).at(-1).id;
     const actual=makeEnemy(id,level),exact=makeChar(expected,level,false,true);
     for(const key of ['id','lvl','hp','maxhp','atk','def','spatk','spdef','spd','moves'])
      if(JSON.stringify(actual[key])!==JSON.stringify(exact[key]))failures.push(id+':'+level+':'+key);
    }
   }
-  return failures;
+ return failures;
  })()`);
  assert.deepEqual(Array.from(failures),[]);
- h.exec('meta.charUpgrades={};');
+ h.exec('meta.charUpgrades={};meta.sagaDiffWins={};');
  assert.equal(h.exec("makeEnemy('lucci-awakened',65).id"),'lucci');
  assert.equal(h.exec("makeEnemy('lucci-awakened',65).lvl"),65);
 });
 
 test('story wilds, marine groups, bosses and ambushes create evolved enemies with existing difficulty scaling',()=>{
  const h=combatHarness();
- h.exec(`maxStartLvlCap=()=>100;meta.charUpgrades={lucci:95};let enemies;wildEncounter=f=>{enemies=[f];};startBattle=fs=>{enemies=fs;};
+ h.exec(`maxStartLvlCap=()=>100;meta.charUpgrades={};meta.sagaDiffWins={wano:{3:true}};let enemies;wildEncounter=f=>{enemies=[f];};startBattle=fs=>{enemies=fs;};
  saveRun=()=>{};resolveAutoLoot=()=>{};hasPendingLoot=()=>false;
  run={saga:0,islandIdx:0,diff:5,team:[],items:{},map:{rows:[[{type:'wild'}]]}};
  const island=SAGAS[0].islands[0];island.pool=['lucci'];island.lvl=[59,59];island.boss=['lucci'];island.bossLvl=[65];Math.random=()=>0;`);
@@ -47,7 +47,7 @@ test('saved tournament and legends combat resolve every opponent from the round 
  for(const kind of ['tournament','legends']){
   const h=combatHarness();
   h.exec(`accountLevel=()=>35;screenChallengeBracket=()=>{};maxStartLvlCap=()=>100;
-   meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.roster=['luffy','shanks','roger'];meta.charUpgrades={lucci:95,kaido:95};
+   meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.roster=['luffy','shanks','roger'];meta.charUpgrades={};
    startChallenge('${kind}',${kind==='legends'?"['shanks','roger']":"['luffy']"});
    meta.challenge.level=65;
    const match=challengeCurrentMatch(meta.challenge),index=match.a===0?match.b:match.a;
@@ -70,23 +70,23 @@ test('saved tournament and legends combat resolve every opponent from the round 
  }
 });
 
-test('cooperative AI respects unlocks while PvP keeps player selected forms',()=>{
+test('cooperative AI respects saga unlocks while PvP keeps player selected forms',()=>{
  const h=combatHarness();h.exec(fs.readFileSync('public/local/combat.js','utf8'));
  h.exec(`const players=[{id:'a',team:['lucci']},{id:'b',team:['luffy']}];`);
  assert.equal(h.exec("LocalCombat.create(players,{mode:'coop',boss:'lucci'}).eTeam[0].id"),'lucci');
- h.exec('maxStartLvlCap=()=>100;meta.charUpgrades={lucci:25};');
+ h.exec('maxStartLvlCap=()=>100;meta.charUpgrades={};meta.sagaDiffWins={skypiea:{3:true}};');
  assert.equal(h.exec("LocalCombat.create(players,{mode:'coop',boss:'lucci'}).eTeam[0].id"),'lucci-hybrid');
  assert.equal(h.exec("LocalCombat.create(players,{mode:'pvp'}).eTeam[0].id"),'luffy');
 });
 
 
-test('enemy unlocks follow permanent levels rather than discovery and retain difficulty scaling',()=>{
+test('returning to East Blue uses Wano forms after reaching Wano but preserves combat thresholds',()=>{
  const h=combatHarness();
- h.exec(`maxStartLvlCap=()=>100;meta.charUpgrades={luffy:19};meta.dex=['luffy5'];run={diff:5};`);
- assert.equal(h.exec("makeEnemy('luffy5',90,true).id"),'luffy2');
- assert.equal(h.exec("makeEnemy('luffy5',90,true).lvl"),90);
- assert.equal(h.exec("makeEnemy('luffy5',90,true).atk===makeChar('luffy2',90,true,true).atk"),true);
- h.exec('meta.charUpgrades.luffy=20;');
- assert.equal(h.exec("makeEnemy('luffy5',90,true).id"),'luffy3');
- assert.equal(h.exec("makeEnemy('luffy5',19,true).id"),'luffy');
+ h.exec(`maxStartLvlCap=()=>100;meta.charUpgrades={sanji:95};meta.sagaDiffWins={skypiea:{3:true}};run={saga:0,diff:5};`);
+ assert.equal(h.exec("makeEnemy('sanji',40,true).id"),'sanji-diable');
+ h.exec('meta.charUpgrades={};meta.sagaDiffWins.wholecake={3:true};');
+ assert.equal(h.exec("makeEnemy('sanji',40,true).id"),'sanji-ifrit');
+ assert.equal(h.exec("makeEnemy('sanji',40,true).lvl"),40);
+ assert.equal(h.exec("makeEnemy('sanji',40,true).atk===makeChar('sanji-ifrit',40,true,true).atk"),true);
+ assert.equal(h.exec("makeEnemy('sanji',39,true).id"),'sanji-raid');
 });

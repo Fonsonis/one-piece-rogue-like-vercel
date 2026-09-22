@@ -20,7 +20,7 @@ test('starting supplies retain previous tiers, including legacy saves',()=>{
 });
 
 test('Bonney has only Nika at 45, Ivankov transforms at 30, and permanent unlocks are required',()=>{
- const h=combatHarness();h.exec('maxStartLvlCap=()=>100;');
+ const h=combatHarness();h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));');
  assert.deepEqual(Array.from(h.exec('characterForms("bonney").map(f=>f.id)')),['bonney','bonney-nika']);
  for(const [base,form,level] of [['bonney','bonney-nika',45],['ivankov','ivankov-female',30]]){
   h.ctx.spec={base,form,level};

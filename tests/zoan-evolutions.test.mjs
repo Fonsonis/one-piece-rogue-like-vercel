@@ -14,7 +14,7 @@ test('Zoan roster covers secondary characters and only confirmed awakenings',()=
 });
 
 test('animal 20, hybrid 25, awakening 40 are exact and share permanent progression',()=>{
-  const h=combatHarness();h.exec('maxStartLvlCap=()=>100;');
+  const h=combatHarness();h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));');
   for(const base of ['lucci','kaku']){
     for(const [level,kind] of [[20,'animal'],[25,'hybrid'],[40,'awakened']]){
       h.exec(`meta.charUpgrades={${base}:${level-5}};`);
@@ -28,7 +28,7 @@ test('animal 20, hybrid 25, awakening 40 are exact and share permanent progressi
 });
 
 test('new forms migrate old high-level allies without losing bonuses, XP or KO',()=>{
-  const h=combatHarness();h.exec('maxStartLvlCap=()=>100;');
+  const h=combatHarness();h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));');
   for(const base of ['lucci','kaku','kaido','chopper'])for(const dead of [false,true]){
     assert.equal(h.exec(`(()=>{
       meta.charUpgrades={};const f=makeChar('${base}',55);f.xp=321;f.stars=3;f.maxhp+=13;f.atk+=7;f.hp=${dead?'0':'f.maxhp-9'};
@@ -51,14 +51,14 @@ test('forms keep the base saga, passives and recruitment identity without enteri
 
 test('old Gear 3 moves migrate even when the character remains in Gear 3',()=>{
   const h=combatHarness();
-  h.exec(`maxStartLvlCap=()=>100;meta.charUpgrades={luffy:20};const f=makeChar('luffy',25);
+  h.exec(`maxStartLvlCap=()=>100;meta.sagaDiffWins={skypiea:{3:true}};meta.charUpgrades={luffy:20};const f=makeChar('luffy',25);
     f.moves=['hakiarm'];f.evolutionRulesVersion=1;migrateFighter(f);`);
   assert.equal(h.exec('f.id'),'luffy3');
   assert.deepEqual(Array.from(h.exec('f.moves')),['gigantpistol']);
 });
 
 test('Chopper cannot use Monster Point before its permanent unlock',()=>{
-  const h=combatHarness();h.exec('maxStartLvlCap=()=>100;');
+  const h=combatHarness();h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins={skypiea:{3:true}};');
   for(const level of [5,20,25,39]){
     h.exec(`meta.charUpgrades={chopper:${level-5}};const f${level}=makeChar('chopper',100);`);
     assert.equal(h.exec(`f${level}.moves.includes('monsterpoint')`),false);

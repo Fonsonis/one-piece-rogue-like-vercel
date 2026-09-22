@@ -1409,7 +1409,7 @@ for (const [baseId, forms] of Object.entries(ZOAN_FORMS)) {
       ...base, name:`${base.name} · ${label}`, base:base.base.map((n,i)=>n + rank * (i === 0 ? 3 : 1)),
       types:[...base.types], learnset:[[lvl,moveId],[lvl,special]],
       ultimate:special, evo:undefined, generated:false, zoanBase:baseId, zoanForm:kind, formLevel:lvl,
-      desc:`${label}. ${baseId === 'tamago' ? 'Etapa del ciclo huevo, pollito y gallo; adaptada a la progresión por nivel.' : kind === 'monster' ? 'Forma especial mediante Rumble Ball.' : kind === 'awakened' ? 'Despertar Zoan confirmado.' : 'Transformación Zoan.'} Requiere nivel base y nivel en partida ${lvl}.`,
+      desc:`${label}. ${baseId === 'tamago' ? 'Etapa del ciclo huevo, pollito y gallo; adaptada a la progresión por nivel.' : kind === 'monster' ? 'Forma especial mediante Rumble Ball.' : kind === 'awakened' ? 'Despertar Zoan confirmado.' : 'Transformación Zoan.'} Requiere nivel base y nivel en partida ${lvl}, además de alcanzar su saga de debut.`,
     };
     previous.evo = {lvl,to:id};
     previous = CHARS[id];
@@ -1443,7 +1443,7 @@ for (const baseId of GOD_VALLEY_FORMS) {
     base:base.base.map((n,i)=>n+(i===0?4:2)),types:[...base.types],
     learnset:[[GOD_VALLEY_FORM_LEVEL,move],[GOD_VALLEY_FORM_LEVEL,signature]],ultimate:signature,generated:false,
     historicalBase:baseId,formLevel:GOD_VALLEY_FORM_LEVEL,
-    desc:`Versión de hace 38 años, durante God Valley. Requiere nivel base y nivel en partida ${GOD_VALLEY_FORM_LEVEL}. Adaptación de progreso del juego.`,
+    desc:`Versión de hace 38 años, durante God Valley. Requiere nivel base y nivel en partida ${GOD_VALLEY_FORM_LEVEL}, además de alcanzar su saga de debut. Adaptación de progreso del juego.`,
     evo:next ? {...next,lvl:40} : undefined,
   };
   // La fase joven ocupa Nv.30; las formas Zoan previas continúan desde Nv.40/50.
@@ -1487,7 +1487,7 @@ for (const [id,label,level,bonus] of [
   CHARS[id]={...base,name:`Im · ${label}`,base:base.base.map((n,i)=>n+bonus*(i===0?3:1)),
     types:[...base.types],learnset:[[level,'domireversi'],[level,TYPE_LADDER.Haki[2]]],
     ultimate:'domireversi',generated:false,formLevel:level,
-    desc:`${label}, mostrada en el manga de Elbaph. Requiere nivel base y nivel en partida ${level}.`,
+    desc:`${label}, mostrada en el manga de Elbaph. Requiere nivel base y nivel en partida ${level}, además de alcanzar su saga de debut.`,
     evo:id==='im-gunko'?{lvl:40,to:'im-revealed'}:undefined};
 }
 CHARS.im.evo={lvl:25,to:'im-gunko'};
@@ -1511,7 +1511,7 @@ for(const [baseId,forms] of Object.entries(GOROSEI_FORMS)) {
       base:base.base.map((n,i)=>n+rank*(i===0?3:2)),
       learnset:[[level,move],[level,TYPE_LADDER[base.types[1]||base.types[0]][2]]],
       ultimate:move,evo:undefined,generated:false,formLevel:level,goroseiBase:baseId,
-      desc:`${label}, transformación mostrada en el manga. Requiere nivel base y nivel en partida ${level}.`};
+      desc:`${label}, transformación mostrada en el manga. Requiere nivel base y nivel en partida ${level}, además de alcanzar su saga de debut.`};
     previous.evo={lvl:level,to:id};previous=CHARS[id];
   }
 }
@@ -1544,7 +1544,7 @@ for(const [start,forms] of Object.entries(STRAW_HAT_COMBAT_FORMS)){
     if(!MOVES[move])MOVES[move]={name:label,type:types[0],power:level===40?95:80,acc:.95};
     CHARS[id]={...CHARS[start],name,types,base,rareza:level===40?5:4,
       learnset:[[level,move]],ultimate:move,evo:undefined,generated:false,formLevel:level,
-      desc:`${desc} Requiere nivel base y nivel en partida ${level}.`};
+      desc:`${desc} Requiere nivel base y nivel en partida ${level}, además de alcanzar su saga de debut.`};
     previous.evo={lvl:level,to:id};previous=CHARS[id];
   }
 }
@@ -1567,7 +1567,7 @@ for(const baseId of SULONG_FORMS){
     base:base.base.map((n,i)=>n+(i===0?9:i===3?6:4)),rareza:Math.min(5,base.rareza+1),
     learnset:[[40,move]],ultimate:move,evo:undefined,generated:false,zoan:false,zoanForm:undefined,
     sulongBase:baseId,formLevel:40,
-    desc:'Transformación Sulong mostrada en el manga. No es un despertar de fruta. Requiere nivel base y en partida 40.'};
+    desc:'Transformación Sulong mostrada en el manga. No es un despertar de fruta. Requiere nivel base y en partida 40, además de alcanzar su saga de debut.'};
   let previous=base;while(previous.evo)previous=CHARS[previous.evo.to];
   previous.evo={lvl:40,to:id};
 }
@@ -1580,7 +1580,7 @@ for(const [id,name,level,types,bonus,move,label] of [
  MOVES[move]={name:label,type:types[0],power:level===40?95:75,acc:.95};
  CHARS[id]={...base,name,types,base:base.base.map((n,i)=>n+(i===0?bonus*2:bonus)),rareza:level===40?5:4,
    learnset:[[level,move]],ultimate:move,evo:undefined,generated:false,formLevel:level,zoanForm:level===40?'animal':undefined,
-   desc:'Momonosuke tras el envejecimiento físico de Shinobu. Su mente conserva su edad. Requiere nivel base y en partida '+level+'.'};
+   desc:'Momonosuke tras el envejecimiento físico de Shinobu. Su mente conserva su edad. Requiere nivel base y en partida '+level+', además de alcanzar su saga de debut.'};
 }
 CHARS['momonosuke-animal'].evo={lvl:30,to:'momonosuke-adult'};
 CHARS['momonosuke-adult'].evo={lvl:40,to:'momonosuke-dragon'};
@@ -1594,7 +1594,7 @@ for (const [id,label,level,bonus,move,power] of [
   CHARS[id]={...base,name:`Jewelry Bonney · ${label}`,types:['Golpe','Fruta'],
     base:base.base.map((n,i)=>n+(i===0?bonus*2:bonus)),rareza:level===45?5:4,
     learnset:[[level,'distortion'],[level,move]],ultimate:move,evo:undefined,generated:false,formLevel:level,
-    desc:`Futuro imaginado mediante la Toshi Toshi no Mi. Requiere nivel base y en partida ${level}.`};
+    desc:`Futuro imaginado mediante la Toshi Toshi no Mi. Requiere nivel base y en partida ${level}, además de alcanzar su saga de debut.`};
 }
 CHARS.bonney.evo={lvl:45,to:'bonney-nika'};
 
@@ -1603,7 +1603,7 @@ CHARS['ivankov-female']={...CHARS.ivankov,name:'Emporio Ivankov · Forma femenin
   base:CHARS.ivankov.base.map((n,i)=>n+(i===0?10:5)),rareza:4,
   learnset:[[30,CHARS.ivankov.learnset[0][1]],[30,'ivankovwink']],ultimate:'ivankovwink',evo:undefined,
   generated:false,formLevel:30,
-  desc:'Transformación hormonal mediante la Horu Horu no Mi. Requiere nivel base y en partida 30.'};
+  desc:'Transformación hormonal mediante la Horu Horu no Mi. Requiere nivel base y en partida 30, además de alcanzar su saga de debut.'};
 CHARS.ivankov.evo={lvl:30,to:'ivankov-female'};
 
 // Recompensas de colección de las nuevas sagas, sin recalcular atributos existentes.
@@ -1666,6 +1666,40 @@ for (const [id, s] of Object.entries(SAGA_FIXES)) if (CHARS[id]) CHARS[id].saga 
 // Every evolution inherits its base saga, including historical and Im phases.
 for (let pass=0;pass<5;pass++) for (const c of Object.values(CHARS)) {
   if(c.evo) CHARS[c.evo.to].saga=c.saga;
+}
+
+// Canonical story gate for every playable phase. This is intentionally separate
+// from `saga`: that field keeps forms grouped with their base identity in pools,
+// filters and the Dex, while `unlockSaga` records when the form first appears.
+const FORM_UNLOCK_SAGAS = Object.freeze({
+  eastblue: ['zoro2'],
+  alabasta: ['nami2','chopper-animal','chopper-hybrid','chaka-animal','chaka-hybrid','pell-animal','pell-hybrid','dalton-animal','dalton-hybrid','merrychristmas-animal','merrychristmas-hybrid'],
+  skypiea: ['pierre-animal','pierre-hybrid'],
+  water7: ['luffy2','luffy3','coby2','usopp2','chopper-monster','lucci-animal','lucci-hybrid','kaku-animal','kaku-hybrid','jabra-animal','jabra-hybrid','sanji-diable'],
+  sabaody: ['drake-animal'],
+  marineford: ['marco-animal','marco-hybrid','sandersonia-animal','sandersonia-hybrid','marigold-animal','marigold-hybrid','sengoku-animal','onigumo-hybrid','ivankov-female'],
+  gyojin: ['nami-sorcery','franky-shogun','pekoms-animal','pekoms-hybrid'],
+  punkhazard: ['momonosuke-animal'],
+  zou: ['jack-animal'],
+  wholecake: ['luffy4','morgans-animal','morgans-hybrid','tamago-animal','tamago-hybrid','carrot-sulong','pekoms-sulong'],
+  wano: [
+    'luffy5','kaido-animal','kaido-hybrid','yamato-animal','yamato-hybrid','king-animal','king-hybrid','queen-animal','queen-hybrid',
+    'drake-hybrid','orochi-animal','orochi-hybrid','jack-hybrid','ulti-animal','ulti-hybrid','pageone-animal','pageone-hybrid',
+    'whoswho-animal','whoswho-hybrid','sasaki-animal','sasaki-hybrid','blackmaria-animal','blackmaria-hybrid','devon-animal','devon-hybrid',
+    'zoro-enma','zoro-kingofhell','nami-zeus','sanji-raid','sanji-ifrit','robin-demoniofleur',
+    'wanda-sulong','inuarashi-sulong','nekomamushi-sulong','shishilian-sulong','giovanni-sulong','concelot-sulong','roddy-sulong','blackback-sulong',
+    'momonosuke-adult','momonosuke-dragon',
+  ],
+  egghead: ['stronger-animal','lucci-awakened','kaku-awakened','bonney-nika','bepo-sulong','saturn-hybrid','saturn-beast','mars-beast','warcury-beast','nusjuro-hybrid','nusjuro-beast','jupeter-beast'],
+  elbaph: [
+    'loki-animal','killingham-animal','killingham-hybrid',
+    'garp-young','roger-young','rayleigh-young','gaban-young','newgate-young','bigmom-young','kaido-young','shiki-young','xebec-young','garling-young',
+    'bogard-young','bakkin-young','gloriosa-young','john-young','streusen-young','shakky-young','saturn-young','gunko-young','sommers-young',
+    'im-gunko','im-revealed',
+  ],
+});
+for (const [sagaId, ids] of Object.entries(FORM_UNLOCK_SAGAS)) for (const id of ids) {
+  if (CHARS[id]) CHARS[id].unlockSaga = sagaId;
 }
 // 'whitebeard2' era un duplicado sin nombre de Barbablanca: newgate ocupa su sitio
 delete CHARS.whitebeard2;

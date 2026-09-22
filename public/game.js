@@ -25,9 +25,20 @@ function characterForms(id) {
   }
   return forms;
 }
-function characterPhaseUnlocked(id) {
+function formUnlockSaga(id) { return CHARS[id]?.unlockSaga || ''; }
+function formUnlockSagaName(id) {
+  const sagaId = formUnlockSaga(id);
+  return SAGAS.find(saga => saga.id === sagaId)?.name || sagaId;
+}
+function formSagaUnlocked(id, progress = meta) {
+  const sagaId = formUnlockSaga(id);
+  if (!sagaId) return true;
+  const sagaIndex = SAGAS.findIndex(saga => saga.id === sagaId);
+  return sagaIndex >= 0 && sagaUnlocked(sagaIndex, progress);
+}
+function characterPhaseUnlocked(id, progress = meta) {
   const phase = characterForms(id).find(form => form.id === id);
-  return !!phase && phase.level <= startLvlOf(id);
+  return !!phase && phase.level <= startLvlOf(id, progress) && formSagaUnlocked(id, progress);
 }
 function dexBaseIds(ids=[]) { return [...new Set(ids.filter(id=>CHARS[id]).map(baseFormOf))]; }
 function dexEntrySeen(id) { return characterForms(id).some(form=>meta.dex.includes(form.id)); }
@@ -37,27 +48,25 @@ function dexFilteredBases(state) {
   return filterSortChars(dexBaseIds(matches),{...state,q:'',saga:'',type:'',rarity:0});
 }
 
-// Las formas requieren tanto el nivel en partida como el nivel base permanente.
+// Player forms require journey level, permanent base level and their canonical debut saga.
 function evolutionFormAt(id, lvl, progress = meta) {
-  const baseLevel = startLvlOf(id, progress);
-  let form = baseFormOf(id);
-  while (CHARS[form].evo && Math.min(lvl, baseLevel) >= CHARS[form].evo.lvl) form = CHARS[form].evo.to;
-  return form;
+  const limit = Math.min(lvl, startLvlOf(id, progress));
+  return characterForms(id).filter(phase => phase.level <= limit && formSagaUnlocked(phase.id, progress)).at(-1).id;
 }
-// Rivals keep their combat level, but cannot reveal forms the account has not unlocked.
-function enemyFormAt(id, lvl) {
-  return evolutionFormAt(id, lvl);
+// Rivals ignore permanent player upgrades, but keep combat-level and story-saga gates.
+function enemyFormAt(id, lvl, progress = meta) {
+  return characterForms(id).filter(phase => phase.level <= lvl && formSagaUnlocked(phase.id, progress)).at(-1).id;
 }
 function formMovesAt(id, lvl, exactForm = false, progress = meta) {
   const c = CHARS[id];
-  const limit = !exactForm && c.evo && startLvlOf(id, progress) < c.evo.lvl ? c.evo.lvl - 1 : lvl;
+  const limit = !exactForm && c.evo && !characterPhaseUnlocked(c.evo.to, progress) ? c.evo.lvl - 1 : lvl;
   const moves = c.learnset.filter(([level]) => level <= Math.min(lvl, limit)).map(([,move]) => move).slice(-2);
   return moves.length ? moves : [c.learnset[0][1]];
 }
 function syncEvolution(f, progress = meta) {
   if (!CHARS[f.id] || !CHARS[baseFormOf(f.id)].evo) return f;
   const old = CHARS[f.id], nextId = evolutionFormAt(f.id, f.lvl, progress), next = CHARS[nextId];
-  if (f.id === nextId && f.evolutionRulesVersion === 2) return f;
+  if (f.id === nextId && f.evolutionRulesVersion === 3) return f;
   // Apply only the base-stat difference, preserving equipment, fusion and event bonuses.
   const deltaHP = hpAt(next.base[0], f.lvl) - hpAt(old.base[0], f.lvl);
   f.maxhp += deltaHP;
@@ -67,7 +76,7 @@ function syncEvolution(f, progress = meta) {
   });
   f.id = nextId;
   f.moves = formMovesAt(nextId, f.lvl, false, progress);
-  f.evolutionRulesVersion = 2;
+  f.evolutionRulesVersion = 3;
   return f;
 }
 
@@ -844,7 +853,7 @@ function makeChar(id, lvl, isEnemy = false, exactForm = false) {
     spd: Math.floor(statAt(c.base[5], lvl) * diffMult),
     atkBonus: 0, defBonus: 0, spatkBonus: 0, spdefBonus: 0,
     xp: 0, moves, ultCharge: 0, moveRulesVersion: 2,
-    ...(!isEnemy && !exactForm ? {evolutionRulesVersion:2} : {}),
+    ...(!isEnemy && !exactForm ? {evolutionRulesVersion:3} : {}),
   };
 }
 // AI forms follow combat level; only story encounters apply difficulty scaling.
@@ -905,8 +914,8 @@ function gainXP(f, amount, log) {
       }
     }
     // transformación
-    if (c.evo && f.lvl >= c.evo.lvl && startLvlOf(f.id) >= c.evo.lvl) {
-      const to = c.evo.to;
+    const to = evolutionFormAt(f.id, f.lvl);
+    if (to !== f.id) {
       msgs.push(`✨ ¡${c.name} se transforma en ${CHARS[to].name}!`);
       f.id = to;
       const nc = CHARS[to];
@@ -2982,21 +2991,23 @@ function showNakamaPicker(opts) {
   ov.className = 'overlay nakama-picker-overlay';
   if (opts.allowedIds) ov.classList.add('challenge-nakama-picker');
   ov.innerHTML = `<section class="modal nakama-picker" role="dialog" aria-modal="true" aria-labelledby="nakama-picker-title" aria-describedby="nakama-picker-hint">
-    <header class="nakama-picker-header"><div><small>TU TRIPULACIÓN</small><h2 id="nakama-picker-title">${esc(opts.title || 'Elige un nakama')}</h2></div><button class="btn gray" id="np-close" aria-label="Cerrar selector">✕</button></header>
-    <p id="nakama-picker-hint">${esc(opts.hint || 'Pulsa un retrato para elegirlo. Los nakamas de otro hueco se intercambian.')}</p>
-    <div class="nakama-picker-filters">
-      <label>Nombre<input id="np-search" type="search" placeholder="Buscar nakama…" value="${esc(st.q)}" autocomplete="off"></label>
-      <label>Saga<select id="np-saga"><option value="">Todas las sagas</option>${sagas.map(s => `<option value="${esc(s.id)}" ${st.saga === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+    <div class="nakama-picker-scroll">
+      <header class="nakama-picker-header"><div><small>TU TRIPULACIÓN</small><h2 id="nakama-picker-title">${esc(opts.title || 'Elige un nakama')}</h2></div><button class="btn gray" id="np-close" aria-label="Cerrar selector">✕</button></header>
+      <p id="nakama-picker-hint">${esc(opts.hint || 'Pulsa un retrato para elegirlo. Los nakamas de otro hueco se intercambian.')}</p>
+      <div class="nakama-picker-filters">
+        <label>Nombre<input id="np-search" type="search" placeholder="Buscar nakama…" value="${esc(st.q)}" autocomplete="off"></label>
+        <label>Saga<select id="np-saga"><option value="">Todas las sagas</option>${sagas.map(s => `<option value="${esc(s.id)}" ${st.saga === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
+      </div>
+      <div class="nakama-picker-scopes" role="group" aria-label="Disponibilidad">${[['all','Todos'],['free','Fuera del equipo'],['team','En el equipo']].map(([value,label]) => `<button class="btn gray" data-scope="${value}" aria-pressed="${st.scope === value}">${label}</button>`).join('')}</div>
+      <details class="nakama-picker-more"><summary>Tipo, rareza y orden</summary><div class="nakama-picker-extra">
+        <label>Tipo<select id="np-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t => `<option value="${esc(t)}" ${st.type === t ? 'selected' : ''}>${TYPES[t].emoji} ${esc(t)}</option>`).join('')}</select></label>
+        <label>Rareza<select id="np-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r => `<option value="${r}" ${+st.rarity === r ? 'selected' : ''}>${r} estrellas</option>`).join('')}</select></label>
+        <label>Orden<select id="np-sort">${[['name','Nombre A–Z'],['usageDesc','Más usados'],['rarezaDesc','Mayor rareza'],['statTotalDesc','Stats actuales'],['atkDesc','Ataque actual'],['spatkDesc','Ataque especial actual'],['spdDesc','Velocidad actual']].map(([value,label]) => `<option value="${value}" ${st.sort === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+      </div></details>
+      <button class="btn gray usage-filter" id="np-used" aria-pressed="${st.sort === 'usageDesc'}">Más usados</button>
+      <div class="nakama-picker-summary"><span id="np-count" role="status"></span><button class="btn gray" id="np-reset">Limpiar filtros</button></div>
+      <div class="nakama-picker-roster" id="np-roster"></div>
     </div>
-    <div class="nakama-picker-scopes" role="group" aria-label="Disponibilidad">${[['all','Todos'],['free','Fuera del equipo'],['team','En el equipo']].map(([value,label]) => `<button class="btn gray" data-scope="${value}" aria-pressed="${st.scope === value}">${label}</button>`).join('')}</div>
-    <details class="nakama-picker-more"><summary>Tipo, rareza y orden</summary><div class="nakama-picker-extra">
-      <label>Tipo<select id="np-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t => `<option value="${esc(t)}" ${st.type === t ? 'selected' : ''}>${TYPES[t].emoji} ${esc(t)}</option>`).join('')}</select></label>
-      <label>Rareza<select id="np-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r => `<option value="${r}" ${+st.rarity === r ? 'selected' : ''}>${r} estrellas</option>`).join('')}</select></label>
-      <label>Orden<select id="np-sort">${[['name','Nombre A–Z'],['usageDesc','Más usados'],['rarezaDesc','Mayor rareza'],['statTotalDesc','Stats actuales'],['atkDesc','Ataque actual'],['spatkDesc','Ataque especial actual'],['spdDesc','Velocidad actual']].map(([value,label]) => `<option value="${value}" ${st.sort === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
-    </div></details>
-    <button class="btn gray usage-filter" id="np-used" aria-pressed="${st.sort === 'usageDesc'}">Más usados</button>
-    <div class="nakama-picker-summary"><span id="np-count" role="status"></span><button class="btn gray" id="np-reset">Limpiar filtros</button></div>
-    <div class="nakama-picker-roster" id="np-roster"></div>
     <footer class="nakama-picker-pages"><button class="btn gray" id="np-prev" aria-label="Página anterior">◀</button><span id="np-page" role="status"></span><button class="btn gray" id="np-next" aria-label="Página siguiente">▶</button></footer>
   </section>`;
   document.body.appendChild(ov);
@@ -3024,7 +3035,6 @@ function showNakamaPicker(opts) {
         </button><button class="nakama-picker-info" data-info="${esc(id)}" aria-label="Ver ficha de ${esc(c.name)}" title="Ver ficha">ⓘ</button>
       </article>`;
     }).join('') || '<p class="nakama-picker-empty">No hay nakamas con estos filtros. Prueba otra saga o pulsa «Limpiar filtros».</p>';
-    find('#np-roster').scrollTop = 0;
     ov.querySelectorAll('[data-id]').forEach(btn => btn.onclick = () => { close(); opts.onSelect(btn.dataset.id); });
     ov.querySelectorAll('[data-info]').forEach(btn => btn.onclick = () => {
       showCharModal(btn.dataset.info);
@@ -3145,7 +3155,7 @@ function showInventoryModal(opts = {}) {
     });
     ov.querySelector('#inv-logpose-info').onclick=()=>{
       const returnFocus=()=>ov.querySelector('#inv-logpose-info')?.focus({preventScroll:true});
-      modalInfo('🧭 Log Poses de navegación','<div class="collection-help"><p>Sirven para subir el <strong>nivel base permanente</strong> de tus nakamas y desbloquear sus evoluciones.</p><p>Se obtienen al derrotar enemigos: en East Blue, cada pirata entrega 3, cada marine 4 y cada jefe 7. La cantidad se multiplica por el número de saga.</p><p>El coste aumenta con cada nivel. El nivel máximo disponible depende de tu progreso en las sagas.</p></div>',returnFocus);
+      modalInfo('🧭 Log Poses de navegación','<div class="collection-help"><p>Sirven para subir el <strong>nivel base permanente</strong> de tus nakamas. Las evoluciones requieren además alcanzar su saga de debut y el nivel necesario en partida.</p><p>Se obtienen al derrotar enemigos: en East Blue, cada pirata entrega 3, cada marine 4 y cada jefe 7. La cantidad se multiplica por el número de saga.</p><p>El coste aumenta con cada nivel. El nivel máximo disponible depende de tu progreso en las sagas.</p></div>',returnFocus);
       const help=document.querySelector('#modal-ok').closest('.overlay');const closeHelp=()=>{help.remove();returnFocus();};
       help.querySelector('.modal').setAttribute('role','dialog');help.querySelector('.modal').setAttribute('aria-modal','true');help.querySelector('.modal').setAttribute('aria-label','Log Poses de navegación');
       bindCollectionDialog(help,closeHelp,'#modal-ok');
@@ -5284,7 +5294,14 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
   const previewId=forms.some(form=>form.id===selectedForm)?selectedForm:forms[0].id;
   const phaseIndex=forms.findIndex(form=>form.id===previewId);
   const phase=forms[phaseIndex];
-  const phaseLocked = !isLive && !characterPhaseUnlocked(previewId);
+  const phaseLevelLocked = !isLive && phase.level > startLvlOf(previewId);
+  const phaseSagaLocked = !isLive && !formSagaUnlocked(previewId);
+  const phaseLocked = phaseLevelLocked || phaseSagaLocked;
+  const phaseSagaName = formUnlockSagaName(previewId);
+  const phaseMissing = [
+    phaseLevelLocked ? `nivel base ${phase.level}` : '',
+    phaseSagaLocked ? `llegar a ${phaseSagaName}` : '',
+  ].filter(Boolean);
   const f = isLive ? migrateFighter(fOrId, !!battle?.eTeam.includes(fOrId)) : applyUpgrades(makeChar(previewId, startLvlOf(fOrId), false, true));
   const c = CHARS[f.id];
   const lore = (typeof LORE !== 'undefined' && LORE) ? (LORE[f.id] || LORE[baseFormOf(f.id)] || {}) : {};
@@ -5306,7 +5323,10 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
   const fTypes = fighterTypes(f);
   const isFru = fTypes.includes('Fruta'), isHak = fTypes.includes('Haki');
   const known = f.moves;
-  const future = c.learnset.filter(([l, m]) => (l > f.lvl || (c.evo && l >= c.evo.lvl && startLvlOf(f.id) < c.evo.lvl)) && !known.includes(m));
+  const future = c.learnset.filter(([l, m]) => (l > f.lvl || (c.evo && l >= c.evo.lvl && !characterPhaseUnlocked(c.evo.to))) && !known.includes(m));
+  const nextSagaName = c.evo ? formUnlockSagaName(c.evo.to) : '';
+  const nextSagaReached = c.evo ? formSagaUnlocked(c.evo.to) : true;
+  const nextBaseReached = c.evo ? startLvlOf(f.id) >= c.evo.lvl : true;
   const rarityTag = c.rareza ? `<span style="color:var(--gold);font-size:14px;margin-left:6px;" title="Rareza: ${c.rareza} estrellas">${'⭐'.repeat(c.rareza)}</span>` : '';
   const fusionTag = f.stars ? `<span style="color:#ff6b6b;font-size:11px;font-weight:bold;margin-left:6px;">[+${f.stars}⭐ Fusión]</span>` : '';
   const hasUpgrades = (f.hpBonus || 0) + (f.atkBonus || 0) + (f.defBonus || 0) + (f.spatkBonus || 0) + (f.spdefBonus || 0) + (f.spdBonus || 0) > 0;
@@ -5330,9 +5350,9 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
       ${!isLive&&forms.length>1?`<nav class="sheet-phase-nav" aria-label="Fases de ${esc(CHARS[forms[0].id].name)}"><button type="button" class="sheet-phase-arrow" id="sheet-phase-prev" ${phaseIndex===0?'disabled':''} aria-label="Fase anterior${phaseIndex>0?': '+esc(CHARS[forms[phaseIndex-1].id].name):''}">‹</button><button type="button" class="sheet-phase-arrow" id="sheet-phase-next" ${phaseIndex===forms.length-1?'disabled':''} aria-label="Fase siguiente${phaseIndex<forms.length-1?': '+esc(CHARS[forms[phaseIndex+1].id].name):''}">›</button></nav>`:''}
       <div class="platform" style="width:120px;height:24px;margin:-10px auto 0;background:radial-gradient(ellipse at center, #7ec850 0%, #4aa557 70%, transparent 72%);border-radius:50%;box-shadow:inset 0 0 0 2px rgba(217, 131, 46, 0.35);"></div>
       <div style="margin-top:6px;font-size:9px;color:var(--gold);"><b>Rareza:</b> ${'⭐'.repeat(c.rareza || 1)} (${c.rareza || 1} Estrellas)</div>
-      ${!isLive&&forms.length>1?`<p class="sheet-phase-caption" role="status">Fase ${phaseIndex+1} de ${forms.length} · ${phaseIndex===0?'Forma base':esc(c.name)}<br>${phaseLocked?`🔒 Bloqueada · Requiere nivel base ${phase.level}`:phaseIndex?'Desbloqueada · Requiere Nv. '+phase.level+' en partida':''}</p>`:''}
+      ${!isLive&&forms.length>1?`<p class="sheet-phase-caption" role="status">Fase ${phaseIndex+1} de ${forms.length} · ${phaseIndex===0?'Forma base':esc(c.name)}<br>${phaseLocked?`🔒 Bloqueada · Falta ${esc(phaseMissing.join(' y '))}`:phaseIndex?`Desbloqueada · Nv. ${phase.level} en partida · ${esc(phaseSagaName)}`:''}</p>`:''}
     </div>
-    ${phaseLocked?`<section class="sheet-locked-notice"><h3>Fase bloqueada</h3><p>Sube el nivel base de ${esc(CHARS[forms[0].id].name)} a <strong>${phase.level}</strong> para descubrir esta forma y probar sus ataques.</p><p>Tu nivel base: <strong>${startLvlOf(f.id)}</strong></p></section>`:''}
+    ${phaseLocked?`<section class="sheet-locked-notice"><h3>Fase bloqueada</h3><p>Para descubrir esta forma y probar sus ataques necesitas <strong>nivel base ${phase.level}</strong>, alcanzar el mismo nivel en partida y haber llegado a <strong>${esc(phaseSagaName)}</strong>.</p><p>Tu nivel base: <strong>${startLvlOf(f.id)}</strong> · Saga: <strong>${phaseSagaLocked?'pendiente':'alcanzada'}</strong></p></section>`:''}
     ${phaseLocked?'':`
     ${typeBadges(fTypes)}
     ${isLive ? xpBarHTML(f) : ''}
@@ -5386,11 +5406,11 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
     return `<div class="sheet-move"><span class="type-badge" style="background:${TYPES[mv.type]?.color || '#888'}">${mv.type.toUpperCase()}</span>
               ${mv.name} <small>${mv.power ? mv.power + ' PWR · ' + Math.round((mv.acc || 0.9) * 100) + '%' + cat : 'APOYO'}</small></div>`;
   }).join('')}
-      ${future.map(([l, m]) => `<div class="sheet-move future">🔒 Nv${l}${c.evo && l >= c.evo.lvl ? ` · nivel base ${c.evo.lvl}` : ''} — ${MOVES[m] ? MOVES[m].name : m}</div>`).join('')}
+      ${future.map(([l, m]) => `<div class="sheet-move future">🔒 Nv${l}${c.evo && l >= c.evo.lvl ? ` · nivel base ${c.evo.lvl} · ${esc(nextSagaName)}` : ''} — ${MOVES[m] ? MOVES[m].name : m}</div>`).join('')}
     </div>
     ${pInfo ? `<div class="sheet-section sheet-passive"><b>✨ Pasiva — ${pInfo.label}</b><p>${pInfo.desc}</p></div>` : ''}
     ${ultMv ? `<div class="sheet-section sheet-ultimate"><b>💥 Habilidad Definitiva — ${ultMv.name}</b><p>${ultMv.type ? `<span class="type-badge" style="background:${TYPES[ultMv.type]?.color || '#888'}">${ultMv.type.toUpperCase()}</span> ` : ''}${ultMv.power ? ultMv.power + ' PWR · ' + Math.round((ultMv.acc || 0.9) * 100) + '% precisión' : 'MOVIMIENTO DEFINITIVO'}</p></div>` : ''}
-    ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>${CHARS[c.evo.to].name} requiere nivel base ${c.evo.lvl} y nivel ${c.evo.lvl} en partida. Tu nivel base: ${startLvlOf(f.id)}. ${startLvlOf(f.id) >= c.evo.lvl ? 'Forma desbloqueada.' : 'Puedes seguir subiendo en partida, pero sus ataques se desbloquean al mejorar el nivel base.'}</p></div>` : ''}
+    ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>${CHARS[c.evo.to].name} requiere nivel base ${c.evo.lvl}, nivel ${c.evo.lvl} en partida y llegar a ${esc(nextSagaName)}. Tu nivel base: ${startLvlOf(f.id)} · Saga: ${nextSagaReached?'alcanzada':'pendiente'}. ${nextBaseReached&&nextSagaReached?'La forma se activará al alcanzar el nivel necesario en partida.':'Aún faltan requisitos permanentes para desbloquearla.'}</p></div>` : ''}
     <p class="sheet-desc">${c.desc}</p>
     `}
     <div class="actions" style="flex-direction:column;gap:6px;">
@@ -6298,7 +6318,7 @@ function getUltimateMove(f) {
   const c = CHARS[f.id] || CHARS[base];
   if (!c) return MOVES.punetazo;
 
-  if (c.evo && !battle?.opts?.local && startLvlOf(f.id) < c.evo.lvl && !battle?.eTeam.includes(f)) {
+  if (c.evo && !battle?.opts?.local && !characterPhaseUnlocked(c.evo.to) && !battle?.eTeam.includes(f)) {
     const lockedMoves = c.learnset.filter(([level]) => level >= c.evo.lvl).map(([,id]) => id);
     if (!c.ultimate || lockedMoves.includes(c.ultimate)) {
       const available = formMovesAt(f.id, f.lvl).map(id => MOVES[id]).filter(m => m?.power > 0);
@@ -8719,7 +8739,7 @@ function screenChallengeSelection(kind) {
   render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button>
     <section class="panel challenge-panel challenge-selection"><h2 id="challenge-title" tabindex="-1">${kind==='legends'?'👑 Forma tu pareja legendaria':'🏆 Elige tu luchador'}</h2>
     <p>${kind==='legends'?'Elige 2 nakamas de 5★':'Elige 1 nakama'} · Tu nivel permanente</p>
-    ${pool.length<count?'<p class="challenge-notice" role="status">No tienes suficientes personajes elegibles. Recluta legendarios o desbloquea sus formas de 5★ mejorando su nivel base.</p>':''}
+    ${pool.length<count?'<p class="challenge-notice" role="status">No tienes suficientes personajes elegibles. Recluta legendarios o desbloquea sus formas de 5★ mejorando su nivel base y avanzando por sus sagas.</p>':''}
     <div class="challenge-team-slots" id="challenge-slots"></div>
     <div id="challenge-presets"></div>
     <div id="challenge-selection-synergies"></div>

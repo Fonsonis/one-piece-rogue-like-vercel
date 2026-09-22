@@ -23,6 +23,17 @@ try {
  }
  await page.setViewportSize({width:390,height:844});
  await page.screenshot({path:'outputs/challenges/menu-mobile.png',fullPage:true});
+ await page.evaluate(()=>showNakamaPicker({title:'Elige un nakama',allowedIds:[...new Set(Object.keys(CHARS).map(baseFormOf))].filter(id=>CHARS[id]).slice(0,36),currentTeam:[],onSelect(){}}));
+ const pickerLayout=await page.evaluate(()=>{
+  const modal=document.querySelector('.nakama-picker'),scroll=document.querySelector('.nakama-picker-scroll');
+  const roster=document.querySelector('#np-roster'),footer=document.querySelector('.nakama-picker-pages');
+  scroll.scrollTop=scroll.scrollHeight;
+  return {modalOverflow:getComputedStyle(modal).overflowY,scrollOverflow:getComputedStyle(scroll).overflowY,
+   rosterOverflow:getComputedStyle(roster).overflowY,scrollable:scroll.scrollHeight>scroll.clientHeight,
+   lastClear:roster.lastElementChild.getBoundingClientRect().bottom<=footer.getBoundingClientRect().top};
+ });
+ assert.deepEqual(pickerLayout,{modalOverflow:'hidden',scrollOverflow:'auto',rosterOverflow:'visible',scrollable:true,lastClear:true});
+ await page.keyboard.press('Escape');
  await page.locator('[data-challenge="legends"]').click();
  for(const [slot,id] of [[0,'shanks'],[1,'roger']]) {
   await page.locator(`[data-challenge-slot="${slot}"]`).click();
@@ -69,5 +80,5 @@ try {
  await page.locator('#btn-start').click();
  assert.deepEqual(await page.evaluate(()=>meta.characterUsage),{shanks:10,roger:5,zoro:3});
  assert.deepEqual(errors,[]);
- console.log('PASS: horizontal menu at 320–1440px, shared presets, swap/remove, usage search in story/tower/challenges, and persistence.');
+ console.log('PASS: horizontal menu at 320–1440px, full mobile picker scroll, shared presets, swap/remove, usage search in story/tower/challenges, and persistence.');
 } finally {await browser.close();}
