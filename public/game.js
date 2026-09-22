@@ -560,7 +560,7 @@ const META_DEFAULTS = () => ({
   crewVersions: {}, // Versiones alternativas de tripulación compradas.
   formPreferences: {}, // Preferencias de formas alternativas para nuevas aventuras.
   dailySteps: { date: dailyStepsDayKey(), remaining: DAILY_STEPS_LIMIT },
-  settings: { showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 },
+  settings: { showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 2 },
 });
 let meta = META_DEFAULTS();
 function loadMeta() {
@@ -579,7 +579,7 @@ function loadMeta() {
   if (!meta.roster.includes('luffy')) {
     meta.roster.push('luffy');
   }
-  meta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 }, meta.settings || {});
+  meta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 2 }, meta.settings || {});
   autoSettings = normalizeAutoSettings(meta.settings.autoConfig);
   // Preserve saved healing choices from the previous automatic-mode panel.
   if (!meta.settings.autoBackpack && meta.settings.autoConfig) {
@@ -728,7 +728,7 @@ function importSaveFile(file) {
       const nextMeta = Object.assign(META_DEFAULTS(), data.meta);
       migrateLegacyIslandWins(nextMeta);
       preparePirateKingRewards(nextMeta);
-      nextMeta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 }, nextMeta.settings);
+      nextMeta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 2 }, nextMeta.settings);
       nextMeta.formPreferences = Object.assign({}, nextMeta.formPreferences || {});
       if (!nextMeta.roster.includes('luffy')) nextMeta.roster.push('luffy');
       const nextRun = data.run || null;
@@ -1335,7 +1335,7 @@ function topbar(showBerries = false, showAuto = showBerries, showSpeed = false, 
 
 function applyDisplayPreferences() {
   document.documentElement?.setAttribute('data-theme', meta.settings?.theme === 'dark' ? 'dark' : 'light');
-  document.documentElement?.setAttribute('data-mobile-columns', meta.settings?.mobileColumns === 2 ? '2' : '3');
+  document.documentElement?.setAttribute('data-mobile-columns', meta.settings?.mobileColumns === 3 ? '3' : '2');
 }
 function setDisplayPreference(key, value) {
   meta.settings ||= {};
@@ -1348,8 +1348,8 @@ function setDisplayPreference(key, value) {
 function mobileColumnsControl() {
   return `<label class="mobile-columns-control">Columnas en móvil
     <select data-mobile-columns-control aria-label="Columnas de nakamas en móvil">
-      <option value="2" ${meta.settings?.mobileColumns === 2 ? 'selected' : ''}>2 columnas</option>
-      <option value="3" ${meta.settings?.mobileColumns !== 2 ? 'selected' : ''}>3 columnas</option>
+      <option value="2" ${meta.settings?.mobileColumns !== 3 ? 'selected' : ''}>2 columnas · más legible</option>
+      <option value="3" ${meta.settings?.mobileColumns === 3 ? 'selected' : ''}>3 columnas · compacto</option>
     </select></label>`;
 }
 document.addEventListener('change', event => {
@@ -2903,23 +2903,23 @@ function screenSagas(focusSaga, previousScroll) {
       <div class="world-title-row"><button class="btn gray small" id="btn-back">← VOLVER</button><h1>HISTORIA · GRAND LINE</h1><button class="btn small blue" id="btn-saga-probs-all" aria-label="Probabilidades de todas las sagas">📊</button></div>
     <div class="diff-picker-bar">
       <div class="tabs" style="margin-bottom:0;flex:1;max-width:320px;">
-        <div class="tab ${storyMode === 'classic' ? 'active' : ''}" id="tab-classic">CLÁSICO</div>
-        <div class="tab ${storyMode === 'nuzlocke' ? 'active' : ''}" id="tab-nuz">NUZLOCKE</div>
+        <button type="button" class="tab ${storyMode === 'classic' ? 'active' : ''}" id="tab-classic" aria-pressed="${storyMode === 'classic'}">CLÁSICO</button>
+        <button type="button" class="tab ${storyMode === 'nuzlocke' ? 'active' : ''}" id="tab-nuz" aria-pressed="${storyMode === 'nuzlocke'}">NUZLOCKE</button>
       </div>
       <div class="diff-dropdown-container" id="diff-dropdown-container">
-        <button class="btn gold small diff-dropdown-trigger" id="btn-diff-trigger">
+        <button type="button" class="btn gold small diff-dropdown-trigger" id="btn-diff-trigger" aria-expanded="false" aria-controls="diff-dropdown-menu">
           🎯 DIFICULTAD: ${curDiffObj.emoji} ${curDiffObj.name.toUpperCase()} ▾
         </button>
         <div class="diff-dropdown-menu hidden" id="diff-dropdown-menu">
           <div class="diff-dropdown-header">🎯 SELECCIONA DIFICULTAD DE LA AVENTURA</div>
           ${DIFFICULTIES.map(d => `
-            <div class="diff-dropdown-item ${selectedDiff === d.id ? 'active' : ''}" data-diff="${d.id}">
-              <div class="diff-item-head">
+            <button type="button" class="diff-dropdown-item ${selectedDiff === d.id ? 'active' : ''}" data-diff="${d.id}" aria-pressed="${selectedDiff === d.id}">
+              <span class="diff-item-head">
                 <span>${d.emoji} <b>${d.name}</b></span>
                 <span style="font-size:8px;color:var(--gold);">x${d.mult.toFixed(2)}</span>
-              </div>
-              <div class="diff-item-desc">${d.desc}</div>
-            </div>
+              </span>
+              <span class="diff-item-desc">${d.desc}</span>
+            </button>
           `).join('')}
         </div>
       </div>
@@ -2946,10 +2946,19 @@ function screenSagas(focusSaga, previousScroll) {
     diffTrigger.onclick = e => {
       e.stopPropagation();
       diffMenu.classList.toggle('hidden');
+      diffTrigger.setAttribute('aria-expanded', String(!diffMenu.classList.contains('hidden')));
+    };
+    diffMenu.onkeydown = e => {
+      if (e.key === 'Escape') {
+        diffMenu.classList.add('hidden');
+        diffTrigger.setAttribute('aria-expanded', 'false');
+        diffTrigger.focus();
+      }
     };
     document.onclick = e => {
       if (!diffMenu.classList.contains('hidden') && !e.target.closest('#diff-dropdown-container')) {
         diffMenu.classList.add('hidden');
+        diffTrigger.setAttribute('aria-expanded', 'false');
       }
     };
   }
@@ -3634,12 +3643,12 @@ function screenStarter(sagaIdx, islandIdx = 0) {
         `;
       } else {
         slotsHTML += `
-          <div class="starter-slot-card empty-slot" data-slot="${i}">
+          <button type="button" class="starter-slot-card empty-slot" data-slot="${i}" aria-label="Elegir nakama para el hueco ${i + 1}">
             <div class="starter-slot-badge">HUECO ${i + 1}</div>
             <div style="font-size:28px;margin-bottom:4px;">➕</div>
             <div style="font-size:9.5px;font-weight:bold;color:var(--sea);">Añadir Nakama</div>
             <div style="font-size:7.5px;color:#666;margin-top:2px;">Toca para elegir</div>
-          </div>
+          </button>
         `;
       }
     }
@@ -3675,9 +3684,9 @@ function screenStarter(sagaIdx, islandIdx = 0) {
     <div class="panel">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;flex-wrap:wrap;gap:6px;">
         <h2 id="starter-team-heading" style="margin:0;">🏴‍☠️ Configuración de la Banda (${picked.length}/${maxSlots})</h2>
-        <div id="starter-logpose-info" style="font-size:9.5px;font-weight:bold;color:var(--gold);background:var(--ink);padding:4px 8px;border-radius:4px;border:1px solid var(--gold);cursor:pointer;" title="Toca para saber más sobre los Log Poses">
+        <button type="button" id="starter-logpose-info" style="font-size:9.5px;font-weight:bold;color:var(--gold);background:var(--ink);padding:4px 8px;border-radius:4px;border:1px solid var(--gold);cursor:pointer;" aria-label="Información sobre Log Poses" title="Toca para saber más sobre los Log Poses">
           🧭 Log Poses: ${meta.logPoses || 0} ℹ️
-        </div>
+        </button>
       </div>
       <p style="font-size:8.5px;color:#555;margin-bottom:12px;">Toca para elegir · Mantén pulsado para reordenar.</p>
       
@@ -4540,7 +4549,7 @@ function screenMap(activePageIdx = 0) {
                       <div class="hp-nums">PS: ${f.hp}/${f.maxhp}</div>
                       <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>${xpBarHTML(f)}
                     </div>
-                    ${run.team.length > 1 ? `<span class="btn-dismiss-slot" data-dismiss-idx="${idx}" title="Expulsar de la banda" style="color:#e74c3c;font-size:11px;cursor:pointer;padding:2px 4px;margin-left:auto;opacity:0.75;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.75">🗑️</span>` : ''}
+                    ${run.team.length > 1 ? `<button type="button" class="btn-dismiss-slot" data-dismiss-idx="${idx}" title="Expulsar de la banda" aria-label="Expulsar a ${esc(charName(f))} de la banda">🗑️</button>` : ''}
                   </div>`;
               }).join('')}
             </div>
@@ -4568,9 +4577,9 @@ function screenMap(activePageIdx = 0) {
 
       <!-- BOTONES DE NAVEGACIÓN INFERIORES -->
       <div class="map-nav-tabs">
-        <button type="button" class="tab active" id="tab-page-map" data-page="0">📍 MAPA</button>
-        <button type="button" class="tab" id="tab-page-team" data-page="1">👥 EQUIPO (${run.team.length})</button>
-        <button type="button" class="tab" id="tab-page-bag" data-page="2">🎒 MOCHILA</button>
+        <button type="button" class="tab active" id="tab-page-map" data-page="0" aria-pressed="true">📍 MAPA</button>
+        <button type="button" class="tab" id="tab-page-team" data-page="1" aria-pressed="false">👥 EQUIPO (${run.team.length})</button>
+        <button type="button" class="tab" id="tab-page-bag" data-page="2" aria-pressed="false">🎒 MOCHILA</button>
       </div>
     </div>
   `);
@@ -4582,8 +4591,9 @@ function screenMap(activePageIdx = 0) {
   tabs.forEach(tab => {
     tab.onclick = () => {
       const pageIdx = parseInt(tab.dataset.page, 10);
-      tabs.forEach(t => t.classList.remove('active'));
+      tabs.forEach(t => { t.classList.remove('active'); t.setAttribute('aria-pressed', 'false'); });
       tab.classList.add('active');
+      tab.setAttribute('aria-pressed', 'true');
       if (carousel) {
         const pageWidth = carousel.clientWidth;
         carousel.scrollTo({ left: pageIdx * pageWidth, behavior: 'smooth' });
@@ -4656,7 +4666,7 @@ function screenMap(activePageIdx = 0) {
           <div class="hp-nums">PS: ${f.hp}/${f.maxhp}</div>
           <div class="hp-mini"><i style="width:${f.hp / f.maxhp * 100}%"></i></div>${xpBarHTML(f)}
         </div>
-        ${run.team.length > 1 ? `<span class="btn-dismiss-slot" data-dismiss-idx="${idx}" title="Expulsar de la banda" style="color:#e74c3c;font-size:11px;cursor:pointer;padding:2px 4px;margin-left:auto;opacity:0.75;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.75">🗑️</span>` : ''}
+        ${run.team.length > 1 ? `<button type="button" class="btn-dismiss-slot" data-dismiss-idx="${idx}" title="Expulsar de la banda" aria-label="Expulsar a ${esc(charName(f))} de la banda">🗑️</button>` : ''}
       </div>`;
   };
 
@@ -6746,7 +6756,7 @@ function fighterCardHTML(f, side, idx, active) {
       ${isUltUnlocked ? `<div class="ult-bar" style="width:${ultPct}%"></div>` : '<div class="ult-bar-text">🔒 ULTI A NV20</div>'}
     </div>` : '';
 
-  return `<div class="fcard ${f.hp <= 0 ? 'ko' : ''} ${f === active ? 'active' : ''} ${isUltReady ? 'ult-ready' : ''}" id="fc-${side}-${idx}">
+  return `<div class="fcard ${f.hp <= 0 ? 'ko' : ''} ${f === active ? 'active' : ''} ${isUltReady ? 'ult-ready' : ''}" id="fc-${side}-${idx}" role="button" tabindex="0" aria-label="${side === 'e' ? `Ver ficha de ${esc(c.name)}` : f === active ? `Ultimate de ${esc(c.name)}${isUltReady ? ', lista para usar' : `, ${Math.floor(ultPct)}% de carga`}` : `Ver estado de ${esc(c.name)}`}">
     <div class="fcard-title">${c.name} ${rarityTag} ${fusionTag} Nv${f.lvl} <span class="fcard-tags">${tagIcons(f)}</span><span class="fcard-st">${stIcons(f)}</span>
       ${side === 'p' ? xpBarHTML(f) : ''}
     </div>
@@ -6921,7 +6931,7 @@ function battleLayoutHTML(logLines, labels = {}) {
           <section><h3>✨ ${labels.e || 'ENEMIGOS'}</h3><div id="passives-e" class="team-passive-strip" tabindex="0" role="region" aria-label="Pasivas enemigas, desplaza para ver todas">${battleTeamPassivesHTML(b.eTeam)}</div></section>
         </div>
         <div class="battle-lower-panels">
-          <section class="battle-log-panel"><h3>REGISTRO</h3><div class="battle-log" id="battle-log">${logLines.map(l => `<div>${l}</div>`).join('')}</div></section>
+          <section class="battle-log-panel"><h3>Registro del combate</h3><div class="battle-log" id="battle-log" role="log" aria-label="Acciones recientes del combate">${logLines.map(l => `<div>${l}</div>`).join('')}</div></section>
         </div>
       </div>
       <div class="battle-sidebar" id="battle-controls">${b.opts.local ? '' : controlsHTML()}</div>
@@ -6955,6 +6965,12 @@ function renderBattle(logLines) {
             } else {
               toast(`⚡ Solo el nakama activo (${charName(b.curP)}) puede lanzar su Ultimate.`);
             }
+          }
+        };
+        card.onkeydown = event => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            card.click();
           }
         };
       }

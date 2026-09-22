@@ -335,6 +335,89 @@ html .inventory-modal #inv-cards-grid { overflow:visible; max-height:none; min-h
 .sheet-character-nav small { display:block; font:12px/1.5 system-ui,sans-serif; }
 .sheet-character-nav .btn { min-width:44px; min-height:44px; }
 .char-sheet:has(.sheet-character-nav) { touch-action:pan-y; }
+
+/* Collection surfaces share an obvious reading and action order. */
+.collection-modal .collection-eyebrow,.pirate-dex .collection-eyebrow { color:var(--collection-ready); }
+.collection-modal .collection-header,.pirate-dex .collection-header { padding-bottom:10px; border-bottom:1px solid var(--collection-line); }
+.collection-modal .collection-summary,.pirate-dex .collection-summary { border-left:4px solid #c89735; }
+.collection-modal .btn:not(:disabled),.pirate-dex .btn:not(:disabled) { transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease; }
+.collection-modal .btn:not(:disabled):hover,.pirate-dex .btn:not(:disabled):hover { border-color:var(--collection-ready); box-shadow:0 3px 12px #10253320; }
+.collection-modal .btn.green:not(:disabled):hover { background:#11553c; color:#fff; }
+.collection-modal .btn.gold:not(:disabled):hover { background:#f5d98b; color:#332b16; }
+.collection-modal .collection-text-button:hover,.collection-modal .collection-summary-action:hover { color:var(--collection-ready); }
+.collection-extra { border-radius:10px; }
+.collection-extra summary { display:flex; align-items:center; gap:8px; list-style:none; }
+.collection-extra summary::-webkit-details-marker { display:none; }
+.collection-extra summary::after { content:'⌄'; margin-left:auto; font-size:20px; line-height:1; transition:transform .16s ease; }
+.collection-extra[open] summary::after { transform:rotate(180deg); }
+.collection-extra[open] summary { border-bottom:1px solid var(--collection-line); margin-bottom:12px; }
+.collection-results { min-height:32px; font-size:14px; }
+.collection-results [role="status"] { font-weight:700; color:var(--collection-ink); }
+.collection-pagination { background:var(--collection-surface); }
+.collection-pagination > span { font-size:14px; font-weight:650; color:var(--collection-ink); }
+.collection-empty { border:1px dashed var(--collection-line); border-radius:12px; background:var(--collection-soft); }
+.collection-empty h3 { color:var(--collection-ink); }
+.achievement-card { border-left:4px solid var(--collection-line); padding-left:14px; }
+.achievement-card.ready { border-left:5px solid var(--collection-ready); padding-left:13px; }
+.achievement-card.claimed { background:var(--collection-soft); }
+.achievement-status { font-size:13px; }
+.achievement-card.ready .achievement-status { color:var(--collection-ready); }
+.achievement-progress { height:10px; }
+.achievement-count { font-size:13px; }
+.achievement-reward .btn.green:not(:disabled) { min-height:46px; font-weight:750; }
+.inventory-card { box-shadow:0 2px 8px #1025330f; }
+.inventory-card.in-team { border-color:var(--collection-ready); box-shadow:inset 0 4px var(--collection-ready); }
+.inventory-profile-link { color:var(--collection-ready); font-weight:700; }
+.inventory-card .btn-upg-inv:not(:disabled) { min-height:46px; font-weight:750; }
+.inventory-card .btn-sell-base-inv { white-space:normal; }
+.inventory-shortfall { color:#954b2d; font-weight:700; }
+.inventory-card .inventory-profile:focus-visible,.inventory-card .btn:focus-visible,.pirate-dex .dex-card:focus-visible { outline:3px solid #1676b8; outline-offset:2px; }
+.pirate-dex button.dex-card.seen:hover { border-color:var(--collection-ready); box-shadow:0 5px 16px #10253324,inset 0 3px var(--collection-ready); }
+.pirate-dex button.dex-card.unknown { opacity:.75; }
+.pirate-dex .dex-help { padding:12px 14px; border:1px solid var(--collection-line); border-radius:10px; background:var(--collection-soft); font-size:14px; text-align:left; }
+.guide-modal .guide-content { scroll-padding-top:12px; }
+.guide-modal .synergy-guide-card.is-active { background:color-mix(in srgb,var(--collection-ready) 10%,var(--collection-surface)); border-color:var(--collection-ready); }
+.relic-modal .relic-card { border-left:4px solid #b98d39; }
+.sheet-character-nav { padding:7px 9px; border:1px solid var(--collection-line); border-radius:10px; background:var(--collection-soft); }
+.sheet-character-nav > span { color:var(--collection-ink,var(--ink)); font-weight:750; font-size:14px; }
+.sheet-character-nav small { font-weight:500; color:var(--collection-muted,var(--ink)); }
+html[data-theme="dark"] .inventory-shortfall { color:#ffbd9e; }
+@media(max-width:700px) {
+  .collection-modal .collection-header,.pirate-dex .collection-header { padding-bottom:8px; }
+  html .collection-modal #inv-cards-grid { gap:9px; }
+  html[data-mobile-columns="2"] .collection-modal #inv-cards-grid { grid-template-columns:repeat(2,minmax(0,1fr))!important; }
+  html[data-mobile-columns="3"] .collection-modal #inv-cards-grid { grid-template-columns:repeat(3,minmax(0,1fr))!important; }
+  .inventory-card { padding:10px; }
+  .inventory-profile { padding:6px 0; gap:5px; }
+  .inventory-profile strong { font-size:14px; }
+  .inventory-profile-link { display:block; font-size:12px; }
+  .inventory-upgrade-label { display:inline; }
+  .inventory-upgrade-short { display:none; }
+  .inventory-portrait { height:70px; }
+  html .collection-modal #inv-cards-grid .dex-sprite { --sprite-size:66px!important; }
+  .collection-modal #inv-cards-grid .btn { font-size:12px!important; white-space:normal; }
+  .inventory-level { font-size:12px; }
+  .inventory-level strong { font-size:15px; }
+  .inventory-cost,.inventory-limit,.inventory-shortfall { font-size:12px; }
+  .pirate-dex .char-controls :is(input,select) { min-height:44px; font-size:14px; }
+  .pirate-dex .grid-nav .btn,.pirate-dex .mobile-columns-control select { min-height:44px; }
+  .pirate-dex .dex-card .inventory-profile strong { font-size:14px; }
+  .pirate-dex .dex-card .inventory-profile-link { display:block; }
+  .pirate-dex .dex-card-footer { font-size:12px; }
+  .pirate-dex .dex-help { font-size:13px; }
+}
+@media(max-width:380px) {
+  .collection-modal .collection-search { grid-template-columns:1fr; }
+  .collection-modal .inventory-filters,.collection-filter-grid { grid-template-columns:1fr; }
+  .collection-summary { grid-template-columns:1fr; }
+  .collection-summary > :last-child { border-left:0; border-top:1px solid var(--collection-line); padding:8px 0 0; }
+  .achievement-card { grid-template-columns:1fr; }
+  .achievement-icon { display:none; }
+  .achievement-reward { grid-column:1; }
+}
+@media(prefers-reduced-motion:reduce) {
+  .collection-modal .btn,.pirate-dex .btn,.collection-extra summary::after { transition:none!important; }
+}
 .game-select-overlay { z-index:10020; }
 .game-select-modal { width:min(440px,100%); display:flex; flex-direction:column; max-height:85dvh; gap:12px; overflow:hidden; }
 .game-select-options { display:flex; flex-direction:column; gap:6px; overflow-y:auto; min-height:0; overscroll-behavior:contain; }

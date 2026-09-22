@@ -85,3 +85,26 @@ html[data-theme="dark"] :is(.sea-caption,.sea-belt) { color:#93c4d266; }
 
 /* Keep the return route available while scrolling a long saga chart. */
 #islands-back { position:sticky; top:max(8px,env(safe-area-inset-top)); z-index:100; min-height:44px; box-shadow:0 3px 8px #0004; }
+
+/* The active stop should lead the eye through a dense sea chart. */
+.island-atlas header { padding-block:20px; }
+.island-atlas header p { font-size:14px; }
+.island-label { transition:border-color .15s,box-shadow .15s,transform .15s; }
+.island-select:not(:disabled) { min-height:44px; }
+.island-select:not(:disabled):hover .island-label,
+.island-select:focus-visible .island-label { border-color:#a96528; box-shadow:0 5px 0 #75431d66; transform:translateY(-2px); }
+.island-stop.is-current .island-label { border:2px solid #a96528; border-top:5px solid #da8d39; background:#fff2d5; box-shadow:0 5px 0 #75431d66; }
+.island-stop.is-current .island-marker { background:#a05d15; color:#fff; border-color:#704111; }
+.island-stop.is-complete .island-label { border-color:#468b68; }
+.island-label > span,.island-label small { font-size:11px; line-height:1.4; }
+.island-info { padding:4px; }
+.island-info h3 { font:800 17px/1.4 system-ui,sans-serif; }
+.island-info .island-boss-heading { font-size:12px; font-weight:800; }
+.atlas-note { font-size:13px; }
+html[data-theme="dark"] .island-stop.is-current .island-label { color:#fff5df; background:#483827; border-color:#e8a861; }
+@media(max-width:700px) {
+ .island-atlas header { padding:14px 10px; }
+ .island-atlas header p { font-size:13px; }
+ .atlas-note { font-size:12px; }
+}
+@media(prefers-reduced-motion:reduce) { .island-label { transition:none; } }
