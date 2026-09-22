@@ -3033,23 +3033,21 @@ function showNakamaPicker(opts) {
   ov.className = 'overlay nakama-picker-overlay';
   if (opts.allowedIds) ov.classList.add('challenge-nakama-picker');
   ov.innerHTML = `<section class="modal nakama-picker" role="dialog" aria-modal="true" aria-labelledby="nakama-picker-title" aria-describedby="nakama-picker-hint">
-    <div class="nakama-picker-scroll">
-      <header class="nakama-picker-header"><div><small>TU TRIPULACIÓN</small><h2 id="nakama-picker-title">${esc(opts.title || 'Elige un nakama')}</h2></div><button class="btn gray" id="np-close" aria-label="Cerrar selector">✕</button></header>
-      <p id="nakama-picker-hint">${esc(opts.hint || 'Pulsa un retrato para elegirlo. Los nakamas de otro hueco se intercambian.')}</p>
-      <div class="nakama-picker-filters">
-        <label>Nombre<input id="np-search" type="search" placeholder="Buscar nakama…" value="${esc(st.q)}" autocomplete="off"></label>
-        <label>Saga<select id="np-saga"><option value="">Todas las sagas</option>${sagas.map(s => `<option value="${esc(s.id)}" ${st.saga === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
-      </div>
-      <div class="nakama-picker-scopes" role="group" aria-label="Disponibilidad">${[['all','Todos'],['free','Fuera del equipo'],['team','En el equipo']].map(([value,label]) => `<button class="btn gray" data-scope="${value}" aria-pressed="${st.scope === value}">${label}</button>`).join('')}</div>
-      <details class="nakama-picker-more"><summary>Tipo, rareza y orden</summary><div class="nakama-picker-extra">
-        <label>Tipo<select id="np-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t => `<option value="${esc(t)}" ${st.type === t ? 'selected' : ''}>${TYPES[t].emoji} ${esc(t)}</option>`).join('')}</select></label>
-        <label>Rareza<select id="np-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r => `<option value="${r}" ${+st.rarity === r ? 'selected' : ''}>${r} estrellas</option>`).join('')}</select></label>
-        <label>Orden<select id="np-sort">${[['name','Nombre A–Z'],['usageDesc','Más usados'],['rarezaDesc','Mayor rareza'],['statTotalDesc','Stats actuales'],['atkDesc','Ataque actual'],['spatkDesc','Ataque especial actual'],['spdDesc','Velocidad actual']].map(([value,label]) => `<option value="${value}" ${st.sort === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
-      </div></details>
-      <button class="btn gray usage-filter" id="np-used" aria-pressed="${st.sort === 'usageDesc'}">Más usados</button>
-      <div class="nakama-picker-summary"><span id="np-count" role="status"></span><button class="btn gray" id="np-reset">Limpiar filtros</button></div>
-      <div class="nakama-picker-roster" id="np-roster"></div>
+    <header class="nakama-picker-header"><div><small>TU TRIPULACIÓN</small><h2 id="nakama-picker-title">${esc(opts.title || 'Elige un nakama')}</h2></div><button class="btn gray" id="np-close" aria-label="Cerrar selector">✕</button></header>
+    <p id="nakama-picker-hint">${esc(opts.hint || 'Pulsa un retrato para elegirlo. Los nakamas de otro hueco se intercambian.')}</p>
+    <div class="nakama-picker-filters">
+      <label>Nombre<input id="np-search" type="search" placeholder="Buscar nakama…" value="${esc(st.q)}" autocomplete="off"></label>
+      <label>Saga<select id="np-saga"><option value="">Todas las sagas</option>${sagas.map(s => `<option value="${esc(s.id)}" ${st.saga === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
     </div>
+    <div class="nakama-picker-scopes" role="group" aria-label="Disponibilidad">${[['all','Todos'],['free','Fuera del equipo'],['team','En el equipo']].map(([value,label]) => `<button class="btn gray" data-scope="${value}" aria-pressed="${st.scope === value}">${label}</button>`).join('')}</div>
+    <details class="nakama-picker-more"><summary>Tipo, rareza y orden</summary><div class="nakama-picker-extra">
+      <label>Tipo<select id="np-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t => `<option value="${esc(t)}" ${st.type === t ? 'selected' : ''}>${TYPES[t].emoji} ${esc(t)}</option>`).join('')}</select></label>
+      <label>Rareza<select id="np-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r => `<option value="${r}" ${+st.rarity === r ? 'selected' : ''}>${r} estrellas</option>`).join('')}</select></label>
+      <label>Orden<select id="np-sort">${[['name','Nombre A–Z'],['usageDesc','Más usados'],['rarezaDesc','Mayor rareza'],['statTotalDesc','Stats actuales'],['atkDesc','Ataque actual'],['spatkDesc','Ataque especial actual'],['spdDesc','Velocidad actual']].map(([value,label]) => `<option value="${value}" ${st.sort === value ? 'selected' : ''}>${label}</option>`).join('')}</select></label>
+    </div></details>
+    <button class="btn gray usage-filter" id="np-used" aria-pressed="${st.sort === 'usageDesc'}">Más usados</button>
+    <div class="nakama-picker-summary"><span id="np-count" role="status"></span><button class="btn gray" id="np-reset">Limpiar filtros</button></div>
+    <div class="nakama-picker-roster" id="np-roster"></div>
     <footer class="nakama-picker-pages"><button class="btn gray" id="np-prev" aria-label="Página anterior">◀</button><span id="np-page" role="status"></span><button class="btn gray" id="np-next" aria-label="Página siguiente">▶</button></footer>
   </section>`;
   document.body.appendChild(ov);
@@ -3077,6 +3075,7 @@ function showNakamaPicker(opts) {
         </button><button class="nakama-picker-info" data-info="${esc(id)}" aria-label="Ver ficha de ${esc(c.name)}" title="Ver ficha">ⓘ</button>
       </article>`;
     }).join('') || '<p class="nakama-picker-empty">No hay nakamas con estos filtros. Prueba otra saga o pulsa «Limpiar filtros».</p>';
+    find('#np-roster').scrollTop = 0;
     ov.querySelectorAll('[data-id]').forEach(btn => btn.onclick = () => { close(); opts.onSelect(btn.dataset.id); });
     ov.querySelectorAll('[data-info]').forEach(btn => btn.onclick = () => {
       showCharModal(btn.dataset.info);

@@ -1,7 +1,7 @@
 .nakama-picker-overlay { padding:12px; }
-.modal.nakama-picker { position:relative; width:100%; max-width:780px; height:min(850px,calc(100dvh - 24px)); max-height:calc(100dvh - 24px); padding:0; overflow:hidden; color:var(--ink); font:14px/1.4 system-ui,sans-serif; }
-.nakama-picker-scroll { height:100%; min-height:0; overflow-y:auto; overscroll-behavior:contain; padding:18px 18px 90px; scroll-padding:12px 0 90px; }
-.nakama-picker-scroll > * + * { margin-top:10px; }
+.modal.nakama-picker { width:100%; max-width:780px; max-height:calc(100dvh - 24px); padding:18px; display:flex; flex-direction:column; gap:10px; overflow-y:auto; color:var(--ink); font:14px/1.4 system-ui,sans-serif; }
+.modal.nakama-picker { overscroll-behavior-y:contain; touch-action:pan-y pinch-zoom; padding-bottom:max(24px, env(safe-area-inset-bottom)); }
+.modal.nakama-picker > * { flex-shrink:0; }
 .nakama-picker-header { display:flex; justify-content:space-between; align-items:center; gap:12px; }
 .nakama-picker-header small { color:var(--sea); font-weight:700; letter-spacing:2px; }
 .nakama-picker .nakama-picker-header h2 { margin:4px 0 0; font:700 20px/1.3 system-ui,sans-serif; color:var(--ink); text-align:left; }
@@ -20,7 +20,7 @@ html[data-theme="dark"] .nakama-picker-scopes .btn[aria-pressed="true"] { backgr
 .nakama-picker-extra { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; padding:0 0 8px; }
 .nakama-picker-summary { display:flex; align-items:center; justify-content:space-between; gap:8px; font-size:13px; }
 .nakama-picker-summary .btn { padding:6px 10px; }
-.nakama-picker-roster { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; min-height:0; overflow:visible; padding:4px; border:1px solid #91aaa9; border-radius:8px; background:var(--paper-dark); }
+.nakama-picker-roster { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; min-height:150px; overflow:visible; flex:0 0 auto; padding:4px; border:1px solid #91aaa9; border-radius:8px; background:var(--paper-dark); }
 .nakama-picker-card { position:relative; min-width:0; border:2px solid #91aaa9; border-radius:7px; background:var(--paper); }
 .nakama-picker-card.in-team { border-color:var(--sea); }
 .nakama-picker-pick { display:flex; flex-direction:column; align-items:center; gap:4px; width:100%; height:100%; padding:6px; background:transparent; color:var(--ink); border:0; border-radius:5px; cursor:pointer; font:12px/1.3 system-ui,sans-serif; }
@@ -29,15 +29,12 @@ html[data-theme="dark"] .nakama-picker-scopes .btn[aria-pressed="true"] { backgr
 .nakama-picker-badge { align-self:flex-start; min-height:24px; padding:0 30px 0 0; font-size:10px; color:var(--sea); font-weight:700; text-align:left; }
 .nakama-picker-pick .type-badges { justify-content:center; flex-wrap:wrap; }
 .nakama-picker-info { position:absolute; top:0; right:0; width:44px; height:44px; border:0; background:transparent; color:var(--sea); font:22px system-ui,sans-serif; cursor:pointer; border-radius:5px; }
-.nakama-picker-pages { position:absolute; right:14px; bottom:14px; left:14px; z-index:3; display:flex; align-items:center; justify-content:space-between; gap:10px; margin:0; padding:10px; border:1px solid #91aaa9; border-radius:12px; background:var(--paper); box-shadow:0 4px 20px rgba(8,40,51,.25); }
+.nakama-picker-pages { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-shrink:0; }
 .nakama-picker-pages .btn { min-width:48px; }
 .nakama-picker-empty { grid-column:1/-1; padding:20px; text-align:center; }
-#inventory-modal-overlay .modal > #np-roster { flex:1 1 auto; }
+#inventory-modal-overlay .modal > #np-roster { flex:0 0 auto; }
 @media(max-width:540px) {
-  .nakama-picker-overlay { padding:8px; }
-  .modal.nakama-picker { height:calc(100dvh - 16px); max-height:calc(100dvh - 16px); }
-  .nakama-picker-scroll { padding:12px 12px 84px; scroll-padding:8px 0 84px; }
-  .nakama-picker-scroll > * + * { margin-top:8px; }
+  .modal.nakama-picker { padding:12px 12px max(24px, env(safe-area-inset-bottom)); gap:8px; }
   .nakama-picker .nakama-picker-header h2 { font-size:17px; }
   .nakama-picker-filters { grid-template-columns:1fr; gap:6px; }
   .nakama-picker-extra { grid-template-columns:1fr; }
@@ -46,5 +43,4 @@ html[data-theme="dark"] .nakama-picker-scopes .btn[aria-pressed="true"] { backgr
   .nakama-picker-pick { padding:4px; }
   .nakama-picker-scopes .btn { font-size:12px; }
   .nakama-picker-badge { font-size:9px; }
-  .nakama-picker-pages { right:8px; bottom:8px; left:8px; padding:8px; }
 }
