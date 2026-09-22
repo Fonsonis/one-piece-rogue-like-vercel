@@ -35,7 +35,7 @@ test('every character gets deterministic, drawable ultimate art in both directio
   draw(recording.ctx,p,.58,{reduced:true,hit:false,sprite});recording.drain();
  }
  assert.equal(h.randomCalls(),randomBefore,'No gameplay RNG for visuals');
- for(const id of ['luffy','luffy2','luffy3','luffy4','luffy5','zoro','law','kuma','teach','marco','aokiji'])assert.ok(profiles.find(p=>p.id===id)?.authored,id);
+ for(const id of ['luffy','luffy2','luffy3','luffy4-boundman','luffy4','luffy4-tankman','luffy5','zoro','law','kuma','teach','marco','aokiji'])assert.ok(profiles.find(p=>p.id===id)?.authored,id);
  console.log(`Ultimate art: ${profiles.length} characters, ${families.length} visual families, ${profiles.filter(p=>p.authored).length} character-specific directions.`);
 });
 function integrationHarness(withArt,broken=false) {
@@ -103,7 +103,7 @@ test('a failed canvas cannot leak an overlay or interrupt the game',()=>{
 test('sprite rendering uses atlas cells only, with a distinct movement for each Luffy Gear',()=>{
  const h=artHarness(),draw=h.exec('UltimateFX.drawFrame'),choreo=h.exec('UltimateFX.choreography'),recording=canvasRecorder();
  const motions=new Set();
- for(const id of ['luffy','luffy2','luffy3','luffy4','luffy5','zoro','sanji','law','ace']){
+ for(const id of ['luffy','luffy2','luffy3','luffy4-boundman','luffy4','luffy4-tankman','luffy5','zoro','sanji','law','ace']){
   const p=h.exec(`UltimateArtProfiles.resolve('${id}',CHARS['${id}'],getUltimateMove({id:'${id}',lvl:100}))`);
   if(id.startsWith('luffy'))motions.add(p.motion);
   assert.equal(choreo(p,0).pose,0);assert.equal(choreo(p,1).pose,0);assert.equal(choreo(p,1).travel,0);
@@ -171,7 +171,7 @@ test('Luffy sheet previews use the ultimate of the displayed Gear',()=>{
  `);
  // Install a no-op sheet renderer first so this test exercises only the sheet adapter.
  h.exec(`showCharModal=()=>{};`);h.exec(read('integration.js'));
- for(const id of ['luffy','luffy2','luffy3','luffy4','luffy5']){
+ for(const id of ['luffy','luffy2','luffy3','luffy4-boundman','luffy4','luffy4-tankman','luffy5']){
   h.exec(`stage.dataset.character='${id}';showCharModal({id:'${id}',lvl:100});previewButton.onclick();`);
   assert.equal(h.exec('effects.at(-1).technique'),h.exec(`getUltimateMove({id:'${id}',lvl:(CHARS['${id}'].evo?.lvl||101)-1}).name`));
  }

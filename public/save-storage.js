@@ -14,7 +14,7 @@
       if (data.meta[key] !== undefined && (!Array.isArray(data.meta[key]) || data.meta[key].some(id => typeof id !== 'string'))) throw new Error('Progreso inválido.');
     }
     if (data.meta.reachedSagas && new Set(data.meta.reachedSagas).size !== data.meta.reachedSagas.length) throw new Error('Progreso inválido.');
-    for (const key of ['wins', 'nuzWins', 'upgrades', 'global', 'stats', 'settings', 'sagaClears', 'sagaDiffWins', 'teamPresets', 'characterUsage', 'charUpgrades', 'islandProgress', 'sagaStats', 'pirateKingRewards', 'relicEquipment', 'relicCopies']) {
+    for (const key of ['wins', 'nuzWins', 'upgrades', 'global', 'stats', 'settings', 'sagaClears', 'sagaDiffWins', 'teamPresets', 'characterUsage', 'charUpgrades', 'formPreferences', 'islandProgress', 'sagaStats', 'pirateKingRewards', 'relicEquipment', 'relicCopies']) {
       if (data.meta[key] !== undefined && !record(data.meta[key])) throw new Error('Progreso inválido.');
     }
     if (Object.values(data.meta.characterUsage || {}).some(n => !Number.isSafeInteger(n) || n < 0)) throw new Error('Contadores de uso inválidos.');

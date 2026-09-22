@@ -78,6 +78,10 @@ const MOVES = {
   gatlinggoma:   { name: 'Gatling de Goma',     type: 'Golpe',   power: 90, acc: 0.85 },
   jetpistol:     { name: 'Jet Pistol',          type: 'Golpe',   power: 110, acc: 0.9 },
   kingkonggun:   { name: 'Black Mamba',         type: 'Golpe',   power: 140, acc: 0.8 }, // Legacy id retained for saves.
+  boundkonggun:  { name: 'Kong Gun',             type: 'Haki',    power: 120, acc: 0.9 },
+  leobazooka:    { name: 'Leo Bazooka',          type: 'Golpe',   power: 130, acc: 0.85 },
+  boundkingkong: { name: 'King Kong Gun',        type: 'Haki',    power: 145, acc: 0.8 },
+  tankcannonball:{ name: 'Gomu Gomu no Cannonball', type: 'Haki', power: 145, acc: 0.82 },
   colliershoot:  { name: 'Collier Shoot',       type: 'Golpe',   power: 65, acc: 0.95 },
   mutonshoot:    { name: 'Mouton Shot',         type: 'Golpe',   power: 85, acc: 0.9 },
   cabezazo:      { name: 'Cabezazo',            type: 'Golpe',   power: 55, acc: 0.95 },
@@ -205,15 +209,29 @@ const CHARS = {
     name: 'Luffy Gear 3', emoji: '👒', types: ['Golpe', 'Fruta'],
     base: [34, 19, 12, 15], rareza: 3,
     learnset: [[25, 'gigantpistol'], [30, 'hakiarm'], [35, 'elephantgun']],
-    evo: { lvl: EVOLUTION_LEVELS.gear4, to: 'luffy4' }, ultimate: 'elephantgatling',
+    evo: { lvl: EVOLUTION_LEVELS.gear4, to: 'luffy4-boundman' }, ultimate: 'elephantgatling',
     desc: 'Gear Third: huesos inflados y puños gigantes. Gear Fourth al nivel 40.',
+  },
+  'luffy4-boundman': {
+    name: 'Luffy Gear 4 · Boundman', emoji: '👒', types: ['Golpe', 'Fruta', 'Haki'],
+    base: [42, 25, 18, 16], rareza: 4, formBase: 'luffy', formLevel: EVOLUTION_LEVELS.gear4,
+    alternateForms: ['luffy4', 'luffy4-tankman'],
+    learnset: [[40, 'boundkonggun'], [40, 'hakiarm'], [44, 'leobazooka'], [48, 'boundkingkong']],
+    evo: { lvl: EVOLUTION_LEVELS.gear5, to: 'luffy5' }, ultimate: 'boundkingkong',
+    desc: 'Boundman: fuerza, elasticidad y Haki comprimidos en un cuerpo que rebota sin parar.',
   },
   luffy4: {
     name: 'Luffy Gear 4 · Snakeman', emoji: '👒', types: ['Golpe', 'Fruta', 'Haki'],
-    base: [39, 23, 15, 19], rareza: 4,
+    base: [39, 23, 15, 19], rareza: 4, formBase: 'luffy', formLevel: EVOLUTION_LEVELS.gear4,
     learnset: [[40, 'konggun'], [40, 'hakiarm'], [44, 'culverin'], [48, 'kingkonggun']],
-    evo: { lvl: EVOLUTION_LEVELS.gear5, to: 'luffy5' }, ultimate: 'kingkonggun',
-    desc: 'Snakeman: cuerpo ágil, brazos de Haki y puñetazos que cambian de dirección. Gear Fifth al nivel 50.',
+    ultimate: 'kingkonggun',
+    desc: 'Snakeman: cuerpo ágil, brazos de Haki y puñetazos que cambian de dirección.',
+  },
+  'luffy4-tankman': {
+    name: 'Luffy Gear 4 · Tankman', emoji: '👒', types: ['Golpe', 'Fruta', 'Haki'],
+    base: [48, 20, 23, 10], rareza: 4, formBase: 'luffy', formLevel: EVOLUTION_LEVELS.gear4,
+    learnset: [[40, 'hakiarm'], [40, 'tankcannonball']], ultimate: 'tankcannonball',
+    desc: 'Tankman · Full Version: una defensa colosal que devuelve al rival disparado como una bala de cañón.',
   },
   luffy5: {
     name: 'Luffy Gear 5', emoji: '☀️', types: ['Golpe', 'Fruta', 'Haki'],
@@ -1610,7 +1628,10 @@ CHARS.ivankov.evo={lvl:30,to:'ivankov-female'};
 CHARS.caesar.rareza=5;CHARS.caesar.bossLevelRarity=3;
 CHARS.zunesha.rareza=5;
 
-const EVOLVED_FORMS = new Set(Object.values(CHARS).filter(c => c.evo).map(c => c.evo.to));
+const EVOLVED_FORMS = new Set([
+  ...Object.values(CHARS).filter(c => c.evo).map(c => c.evo.to),
+  ...Object.entries(CHARS).filter(([,c]) => c.formBase).map(([id]) => id),
+]);
 
 // ============ EXTENSIÓN DE STATS ============
 // Amplía cada base [hp, atk, def, spd] a [hp, atk, def, spatk, spdef, spd].
@@ -1666,6 +1687,7 @@ for (const [id, s] of Object.entries(SAGA_FIXES)) if (CHARS[id]) CHARS[id].saga 
 // Every evolution inherits its base saga, including historical and Im phases.
 for (let pass=0;pass<5;pass++) for (const c of Object.values(CHARS)) {
   if(c.evo) CHARS[c.evo.to].saga=c.saga;
+  if(c.formBase && CHARS[c.formBase]) c.saga=CHARS[c.formBase].saga;
 }
 
 // Canonical story gate for every playable phase. This is intentionally separate
@@ -1681,7 +1703,8 @@ const FORM_UNLOCK_SAGAS = Object.freeze({
   gyojin: ['nami-sorcery','franky-shogun','pekoms-animal','pekoms-hybrid'],
   punkhazard: ['momonosuke-animal'],
   zou: ['jack-animal'],
-  wholecake: ['luffy4','morgans-animal','morgans-hybrid','tamago-animal','tamago-hybrid','carrot-sulong','pekoms-sulong'],
+  dressrosa: ['luffy4-boundman'],
+  wholecake: ['luffy4','luffy4-tankman','morgans-animal','morgans-hybrid','tamago-animal','tamago-hybrid','carrot-sulong','pekoms-sulong'],
   wano: [
     'luffy5','kaido-animal','kaido-hybrid','yamato-animal','yamato-hybrid','king-animal','king-hybrid','queen-animal','queen-hybrid',
     'drake-hybrid','orochi-animal','orochi-hybrid','jack-hybrid','ulti-animal','ulti-hybrid','pageone-animal','pageone-hybrid',

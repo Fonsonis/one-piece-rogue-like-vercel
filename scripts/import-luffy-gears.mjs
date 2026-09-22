@@ -1,5 +1,5 @@
-// Pack the three image_gen sheets into the existing four-cell animation format.
-// Usage: node scripts/import-luffy-gears.mjs [luffy3] (requires the local sharp dev tool).
+// Pack the image_gen sheets into the existing four-cell animation format.
+// Usage: node scripts/import-luffy-gears.mjs [luffy4-boundman] (requires the local sharp dev tool).
 import fs from 'node:fs';
 import sharp from 'sharp';
 import {createHash} from 'node:crypto';
@@ -13,7 +13,9 @@ function box(data,width,height,left=0,right=width){
 }
 for(const [id,cuts,ratio,chromaGreen=false] of [
  ['luffy3',[0,500,1020,1740,2169],1,true],
+ ['luffy4-boundman',[0,535,1070,1740,2170],1.1],
  ['luffy4',[0,435,970,1707,2172],1.2],
+ ['luffy4-tankman',[0,535,1070,1740,2170],1.05],
  ['luffy5',[0,474,943,1684,2172],1]
 ]){
  const selected=process.argv.slice(2);

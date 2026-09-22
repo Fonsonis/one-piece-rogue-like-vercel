@@ -35,7 +35,7 @@ test('sheet upgrade spends the current cost, keeps the base phase and preserves 
  assert.equal(overlays.length,1);
  assert.equal(ov.querySelector('.modal').scrollTop,140);
  assert.match(ov.html,/data-character="luffy"/);
- assert.match(ov.html,/Fase 1 de 5/);
+ assert.match(ov.html,/Fase 1 de 7/);
  assert.match(ov.html,/Subir a Nivel 21/);
  ov.querySelector('#sheet-upg-btn').onclick();
  assert.equal(h.exec("startLvlOf('luffy')"),21);

@@ -11,7 +11,7 @@
 <p id="description">Gear 5 crece, levanta la pierna y da un pisotón. Elige una forma, reproduce su ataque o examínalo a cámara lenta.</p>
 <canvas width="840" height="420" aria-label="Vista de la ultimate de Gear 5 contra Kaido"></canvas>
 <div class="controls">
-<label>Forma <select id="form"><option value="luffy">Luffy · Bazooka</option><option value="luffy2">Gear 2 · Jet Whip</option><option value="luffy3">Gear 3 · Martillo gigante</option><option value="luffy4">Gear 4 · Snakeman</option><option value="luffy5" selected>Gear 5 · Pisotón gigante</option></select></label>
+<label>Forma <select id="form"><option value="luffy">Luffy · Bazooka</option><option value="luffy2">Gear 2 · Jet Whip</option><option value="luffy3">Gear 3 · Martillo gigante</option><option value="luffy4-boundman">Gear 4 · Boundman</option><option value="luffy4">Gear 4 · Snakeman</option><option value="luffy4-tankman">Gear 4 · Tankman</option><option value="luffy5" selected>Gear 5 · Pisotón gigante</option></select></label>
 <button id="play" disabled>Reproducir</button>
 <label>Velocidad <select id="speed"><option value="1">Normal</option><option value="0.35">Cámara lenta</option></select></label>
 <label class="scrub">Fotograma <input id="frame" type="range" min="0" max="1000" value="0"><output id="percent">0 %</output></label>
@@ -27,7 +27,7 @@
 const canvas=document.querySelector('canvas'),ctx=canvas.getContext('2d');
 const play=document.querySelector('#play'),frame=document.querySelector('#frame'),speed=document.querySelector('#speed'),status=document.querySelector('#status');
 const form=document.querySelector('#form');
-const ids=['luffy','luffy2','luffy3','luffy4','luffy5'];
+const ids=['luffy','luffy2','luffy3','luffy4-boundman','luffy4','luffy4-tankman','luffy5'];
 const requested=new URLSearchParams(location.search).get('form');
 if(ids.includes(requested))form.value=requested;
 const textures=await Promise.all(ids.map(id=>UltimateFX.loadSprite(id)));

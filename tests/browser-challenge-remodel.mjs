@@ -8,7 +8,7 @@ page.on('pageerror',e=>errors.push(e.message));
 fs.mkdirSync('outputs/challenges',{recursive:true});
 try {
  await page.goto('http://127.0.0.1:4175/');await page.waitForSelector('#mode-challenge');
- await page.evaluate(()=>{meta.accXp=xpForAccLevel(35);meta.sagaDiffWins=Object.fromEntries(SAGAS.slice(0,5).map(s=>[s.id,{3:true}]));meta.roster=['luffy','shanks','mihawk'];meta.charUpgrades={shanks:42,mihawk:45};screenChallenges();});
+ await page.evaluate(()=>{meta.accXp=xpForAccLevel(35);meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.roster=['luffy','shanks','mihawk'];meta.charUpgrades={shanks:42,mihawk:45};screenChallenges();});
  for(const kind of ['tournament','legends'])for(const width of [320,390,1440]) {
   await page.setViewportSize({width,height:844});
   await page.evaluate(kind=>{meta.challenge=null;startChallenge(kind,kind==='legends'?['shanks','mihawk']:['shanks']);},kind);
@@ -29,7 +29,7 @@ try {
   assert.match(await page.locator(`[data-challenge="${kind}"]`).innerText(),/CONTINUAR/i);
   await page.locator(`[data-challenge="${kind}"]`).click();
  }
- await page.evaluate(()=>{endChallengeBattle(true);endChallengeBattle(true);screenChallenges();});
+ await page.evaluate(()=>{for(let i=0;i<10&&!meta.challenge.finished;i++)endChallengeBattle(true);screenChallenges();});
  assert.equal(await page.locator('#challenge-resume,#challenge-relics').count(),0);
  await page.locator('[data-challenge="legends"]').click();
  assert.equal(await page.locator('[data-claim-relic]').count(),3);
@@ -39,7 +39,10 @@ try {
  await page.setViewportSize({width:390,height:844});
  await page.screenshot({path:'outputs/challenges/remodel-menu-mobile.png'});
  await page.evaluate(()=>{meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.charUpgrades.luffy=44;showCharModal('luffy');});
- for(let i=0;i<4;i++)await page.locator('#sheet-phase-next').click();
+ assert.equal(await page.locator('[data-gear4-choice]').count(),3);
+ await page.locator('[data-gear4-choice="luffy4-tankman"]').click();
+ assert.equal(await page.evaluate(()=>meta.formPreferences.luffyGear4),'luffy4-tankman');
+ for(let i=0;i<6;i++)await page.locator('#sheet-phase-next').click();
  assert.match(await page.locator('.sheet-phase-caption').innerText(),/Bloqueada.*50/);
  assert.equal(await page.locator('.art-preview-button,.ultimate-preview-button,.sheet-stats,.sheet-move').count(),0);
  assert.equal(await page.locator('.char-sheet-sprite').evaluate(el=>getComputedStyle(el).filter),'brightness(0)');
