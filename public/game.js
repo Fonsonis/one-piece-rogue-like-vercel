@@ -1198,6 +1198,7 @@ function toggleMute() {
   if (chkBtn) {
     chkBtn.className = `btn small ${isMuted ? 'gray' : 'blue'}`;
     chkBtn.textContent = isMuted ? '🔇 MÚSICA: OFF' : '🎵 MÚSICA: ON';
+    chkBtn.setAttribute('aria-pressed', String(!isMuted));
   }
 }
 
@@ -1374,73 +1375,49 @@ function showSettingsModal() {
   const settingsBattle = battle && !battle.over ? battle : null;
   const wasWaiting = settingsBattle?.waiting;
   const settingsRun = run;
+  const previousFocus = document.activeElement;
   const onMap = !!document.getElementById?.('island-carousel');
   if (onMap) { clearTimeout(autoTimer); autoTimer = null; }
   if (settingsBattle) pauseBattle();
 
   ov.innerHTML = `
-    <div class="modal" style="max-width:440px;width:90%;">
-      <h2 style="margin-top:0;color:var(--sea);font-size:14px;border-bottom:2px solid var(--gold);padding-bottom:6px;">⚙️ AJUSTES DE JUEGO</h2>
-      <div class="display-settings">
-        <label for="setting-theme">Aspecto del juego</label>
-        <select id="setting-theme"><option value="light" ${meta.settings.theme !== 'dark' ? 'selected' : ''}>Claro · Egghead</option><option value="dark" ${meta.settings.theme === 'dark' ? 'selected' : ''}>Oscuro · Egghead</option></select>
-        ${mobileColumnsControl()}
-        <p>El aspecto y las columnas se guardan en este dispositivo.</p>
-      </div>
-      <fieldset class="bag-auto-settings"><legend>🤖 Modo automático</legend><p>Configura la ruta, encuentros, compras y uso de objetos. Si la mochila está llena, guarda lo que quepa y deja el excedente.</p><button class="btn blue" id="setting-auto-config">Configurar modo automático</button></fieldset>
-      <fieldset class="bag-auto-settings">
-        <legend>🎒 Uso automático de la mochila</legend>
-        <label><input type="checkbox" id="setting-bag-auto" ${bagAuto.enabled ? 'checked' : ''}> Usar objetos automáticamente</label>
-        <p>Funciona aunque el avance automático esté pausado. Se comprueba al volver al mapa y al inicio de cada ronda.</p>
-        <label for="setting-bag-where">Dónde usar objetos</label>
-        <select id="setting-bag-where"><option value="both" ${bagAuto.where === 'both' ? 'selected' : ''}>Isla y combate</option><option value="map" ${bagAuto.where === 'map' ? 'selected' : ''}>Solo en la isla</option><option value="combat" ${bagAuto.where === 'combat' ? 'selected' : ''}>Solo en combate</option></select>
-        <label for="setting-bag-threshold">Curar con estos PS o menos</label>
-        <select id="setting-bag-threshold">${[0,25,50,75,99].map(n=>`<option value="${n}" ${bagAuto.threshold === n ? 'selected' : ''}>${n === 0 ? 'No curar automáticamente' : n === 99 ? 'Cualquier daño' : n + '% de PS'}</option>`).join('')}</select>
-        <span>Objetos permitidos</span>
-        ${['carne','carnereal','bocadillo','sake'].map(id=>`<label><input type="checkbox" data-setting-bag-item="${id}" ${bagAuto.items[id] ? 'checked' : ''}> ${ITEMS[id].emoji} ${ITEMS[id].name}</label>`).join('')}
-        <p>Prioriza la cura más pequeña que cubra el daño. Máximo un objeto por nakama en cada comprobación. El sake revive a un caído y respeta Nuzlocke. Frutas, mejoras y carteles conservan su uso actual.</p>
-      </fieldset>
-      <fieldset class="bag-auto-settings">
-        <legend>🎒 Uso manual en combate</legend>
-        <label><input type="checkbox" id="setting-bag-quick-use" ${meta.settings.quickBattleItems === true ? 'checked' : ''}> Usar objetos sin confirmación</label>
-        <p>Al pulsar un objeto durante el combate se usa una unidad al instante. Puedes pulsar varios seguidos sin abrir su ficha.</p>
-      </fieldset>
-      <div style="display:flex;flex-direction:column;gap:12px;margin:16px 0;">
-        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.05);padding:10px;border-radius:6px;border:1px solid #ccc;">
-          <div style="flex:1;padding-right:10px;">
-            <div style="font-size:9.5px;font-weight:bold;color:var(--ink);">🎵 Música de Fondo</div>
-            <div style="font-size:7.5px;color:#555;margin-top:2px;">Activar o silenciar la música ambiental y soundtracks de batalla.</div>
+    <div class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title" aria-describedby="settings-intro">
+      <header class="settings-header">
+        <div><span class="settings-eyebrow">PREFERENCIAS</span><h2 id="settings-title">⚙️ Ajustes del juego</h2><p id="settings-intro">Personaliza cómo ves y juegas. Los cambios se guardan al instante.</p></div>
+        <button type="button" class="settings-close" id="btn-close-settings" aria-label="Cerrar ajustes">✕</button>
+      </header>
+      <div class="settings-body">
+        <section class="settings-section" aria-labelledby="settings-display-title">
+          <div class="settings-section-heading"><span aria-hidden="true">🎨</span><div><h3 id="settings-display-title">Aspecto</h3><p>Adapta la pantalla a tu forma de jugar.</p></div></div>
+          <div class="settings-control"><label for="setting-theme">Tema visual</label><select id="setting-theme"><option value="light" ${meta.settings.theme !== 'dark' ? 'selected' : ''}>Claro · Egghead</option><option value="dark" ${meta.settings.theme === 'dark' ? 'selected' : ''}>Oscuro · Egghead</option></select></div>
+          <div class="settings-control">${mobileColumnsControl()}</div>
+        </section>
+        <section class="settings-section" aria-labelledby="settings-sound-title">
+          <div class="settings-section-heading"><span aria-hidden="true">🎵</span><div><h3 id="settings-sound-title">Sonido</h3><p>Controla lo que escuchas durante la partida.</p></div></div>
+          <div class="settings-toggle-row"><div><strong>Música de fondo</strong><p>Ambiente y música de combate.</p></div><button type="button" class="btn small ${isMuted ? 'gray' : 'blue'}" id="chk-music-toggle" aria-pressed="${!isMuted}">${isMuted ? '🔇 MÚSICA: OFF' : '🎵 MÚSICA: ON'}</button></div>
+          <label class="settings-toggle-row settings-toggle-label" for="chk-custom-sounds"><span><strong>Sonidos caseros <small>Próximamente</small></strong><span class="settings-hint">Efectos para habilidades, ataques y eventos.</span></span><input type="checkbox" id="chk-custom-sounds" ${customSounds ? 'checked' : ''}></label>
+        </section>
+        <section class="settings-section" aria-labelledby="settings-game-title">
+          <div class="settings-section-heading"><span aria-hidden="true">🧭</span><div><h3 id="settings-game-title">Durante la partida</h3><p>Decide cuánta ayuda quieres al jugar.</p></div></div>
+          <label class="settings-toggle-row settings-toggle-label" for="chk-event-confirm"><span><strong>Confirmar eventos del mapa</strong><span class="settings-hint">Muestra qué hay en un nodo antes de entrar.</span></span><input type="checkbox" id="chk-event-confirm" ${showConfirm ? 'checked' : ''}></label>
+          <label class="settings-toggle-row settings-toggle-label" for="setting-bag-quick-use"><span><strong>Usar objetos al tocarlos</strong><span class="settings-hint">En combate, consume una unidad sin abrir su ficha.</span></span><input type="checkbox" id="setting-bag-quick-use" ${meta.settings.quickBattleItems === true ? 'checked' : ''}></label>
+        </section>
+        <details class="settings-section settings-advanced" ${bagAuto.enabled ? 'open' : ''}>
+          <summary><span aria-hidden="true">🤖</span><span><strong>Automatización</strong><small>Ruta, encuentros y objetos de la mochila</small></span><span class="settings-chevron" aria-hidden="true">⌄</span></summary>
+          <div class="settings-advanced-body">
+            <div class="settings-advanced-block"><h3>Modo automático</h3><p>Configura ruta, combates y compras.</p><button type="button" class="btn blue" id="setting-auto-config">Configurar modo automático</button></div>
+            <fieldset class="settings-bag-settings"><legend>Uso automático de la mochila</legend>
+              <label class="settings-toggle-row settings-toggle-label" for="setting-bag-auto"><span><strong>Usar objetos automáticamente</strong><span class="settings-hint">También funciona con el avance automático pausado.</span></span><input type="checkbox" id="setting-bag-auto" ${bagAuto.enabled ? 'checked' : ''}></label>
+              <div class="settings-control"><label for="setting-bag-where">Dónde usar objetos</label><select id="setting-bag-where"><option value="both" ${bagAuto.where === 'both' ? 'selected' : ''}>Isla y combate</option><option value="map" ${bagAuto.where === 'map' ? 'selected' : ''}>Solo en la isla</option><option value="combat" ${bagAuto.where === 'combat' ? 'selected' : ''}>Solo en combate</option></select></div>
+              <div class="settings-control"><label for="setting-bag-threshold">Curar con estos PS o menos</label><select id="setting-bag-threshold">${[0,25,50,75,99].map(n=>`<option value="${n}" ${bagAuto.threshold === n ? 'selected' : ''}>${n === 0 ? 'No curar automáticamente' : n === 99 ? 'Cualquier daño' : n + '% de PS'}</option>`).join('')}</select></div>
+              <span class="settings-item-title">Objetos permitidos</span><div class="settings-items">${['carne','carnereal','bocadillo','sake'].map(id=>`<label><input type="checkbox" data-setting-bag-item="${id}" ${bagAuto.items[id] ? 'checked' : ''}> ${ITEMS[id].emoji} ${ITEMS[id].name}</label>`).join('')}</div>
+              <p class="settings-note">Se usa un objeto por nakama en cada revisión. El sake revive y respeta Nuzlocke.</p>
+            </fieldset>
           </div>
-          <button class="btn small ${isMuted ? 'gray' : 'blue'}" id="chk-music-toggle" style="min-width:100px;">
-            ${isMuted ? '🔇 MÚSICA: OFF' : '🎵 MÚSICA: ON'}
-          </button>
-        </div>
-
-        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.05);padding:10px;border-radius:6px;border:1px solid #ccc;">
-          <div style="flex:1;padding-right:10px;">
-            <div style="font-size:9.5px;font-weight:bold;color:var(--ink);">📜 Confirmación de Eventos en Mapa</div>
-            <div style="font-size:7.5px;color:#555;margin-top:2px;">Muestra una pantalla informativa antes de entrar a cada nodo con la opción de entrar o volver.</div>
-          </div>
-          <label style="cursor:pointer;">
-            <input type="checkbox" id="chk-event-confirm" ${showConfirm ? 'checked' : ''} style="transform:scale(1.3);cursor:pointer;">
-          </label>
-        </div>
-
-        <div style="display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,0.05);padding:10px;border-radius:6px;border:1px solid #ccc;">
-          <div style="flex:1;padding-right:10px;">
-            <div style="font-size:9.5px;font-weight:bold;color:var(--ink);">🔊 Sonidos Caseros <span style="font-size:7.5px;color:var(--red);font-weight:bold;">(No implementado)</span></div>
-            <div style="font-size:7.5px;color:#555;margin-top:2px;">Efectos de sonido grabados para habilidades, ataques y eventos del juego.</div>
-          </div>
-          <label style="cursor:pointer;">
-            <input type="checkbox" id="chk-custom-sounds" ${customSounds ? 'checked' : ''} style="transform:scale(1.3);cursor:pointer;">
-          </label>
-        </div>
+        </details>
       </div>
-      <div style="text-align:right;margin-top:16px;">
-        <button class="btn gold small" id="btn-save-settings">GUARDAR Y CERRAR</button>
-      </div>
-    </div>
-  `;
+      <footer class="settings-footer"><span>✓ Guardado automáticamente</span><button type="button" class="btn green" id="btn-save-settings">Listo</button></footer>
+    </div>`;
   document.body.appendChild(ov);
 
   ov.querySelector('#setting-bag-auto').onchange = e => setAutoBackpackSettings({enabled:e.target.checked});
@@ -1479,10 +1456,22 @@ function showSettingsModal() {
     closed = true; ov.remove();
     if (settingsBattle && battle === settingsBattle && !battle.over && !wasWaiting) resumeBattle();
     else if (!settingsBattle && onMap && run === settingsRun) screenMap(2);
+    if (previousFocus?.isConnected) previousFocus.focus({preventScroll:true});
   };
   ov.querySelector('#btn-save-settings').onclick = close;
+  ov.querySelector('#btn-close-settings').onclick = close;
   ov.querySelector('#setting-auto-config').onclick = () => showAutoSettingsModal(ov, close);
   ov.onclick = e => { if (e.target === ov) close(); };
+  ov.addEventListener('keydown', e => {
+    if (ov.classList.contains('auto-config-overlay')) return;
+    if (e.key === 'Escape') { e.preventDefault(); close(); return; }
+    if (e.key !== 'Tab') return;
+    const focusable = [...ov.querySelectorAll('button,select,input,summary')].filter(el => el.getClientRects().length && !el.disabled);
+    if (!focusable.length) return;
+    if (e.shiftKey && document.activeElement === focusable[0]) { e.preventDefault(); focusable.at(-1).focus(); }
+    else if (!e.shiftKey && document.activeElement === focusable.at(-1)) { e.preventDefault(); focusable[0].focus(); }
+  });
+  ov.querySelector('#btn-close-settings').focus({preventScroll:true});
 }
 
 function showNodeConfirmModal(r, i) {
@@ -2026,8 +2015,8 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
   currentAchCategory = initialCategory;
   const previousFocus = document.activeElement;
   const visibleStaticList = STATIC_ACHIEVEMENTS.concat(SAGA_DIFF_ACHIEVEMENTS, ISLAND_DIFF_ACHIEVEMENTS).filter(isVisibleAch);
-  let query = '', state = 'all', sort = 'ready', page = 0, filtersOpen = false;
-  const pageSize = 20, number = value => Number(value).toLocaleString('es');
+  let query = '', state = 'all', sort = 'ready', visibleCount = 40, filtersOpen = false, visibleItems = [];
+  const batchSize = 40, number = value => Number(value).toLocaleString('es');
   const describe = (a, progressive) => {
     const tier = progressive ? getClaimedProgTier(a) : 0;
     const claimed = progressive ? tier >= a.goals.length : !!meta.claimedAch[a.id];
@@ -2062,9 +2051,9 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
       (state==='all'||state===status) && (!q || `${a.title} ${a.desc}`.toLocaleLowerCase('es').includes(q))
     ).sort((a,b)=>sort === 'ready' ? Number(b.ready)-Number(a.ready) :
       (sort === 'progress-desc' ? -1 : 1) * (Math.min(1,a.value/a.goal)-Math.min(1,b.value/b.goal)));
-    const pages = Math.max(1,Math.ceil(items.length/pageSize));page=Math.min(page,pages-1);
+    visibleItems = items;
     const {totalCompleted,totalAchievements} = getAchievementsInfo();
-    return `<header class="collection-header"><div><span class="collection-eyebrow">Tu aventura</span><h2 id="ach-title" tabindex="-1">Logros de pirata</h2></div><button class="btn gray collection-close" id="ach-close" aria-label="Cerrar logros">Cerrar <span aria-hidden="true">×</span></button></header>
+    return `<button class="btn gray collection-close" id="ach-close" aria-label="Cerrar logros">Cerrar <span aria-hidden="true">×</span></button><div class="achievements-scroll"><header class="collection-header"><div><span class="collection-eyebrow">Tu aventura</span><h2 id="ach-title" tabindex="-1">Logros de pirata</h2></div></header>
       <div class="collection-summary"><div><strong>${number(totalCompleted)} <small>/ ${number(totalAchievements)}</small></strong><span>Objetivos completados</span></div><div class="achievement-summary-actions"><button class="collection-summary-action" id="ach-show-ready"><strong>${number(readyCount)}</strong><span>Por reclamar →</span></button><button class="btn green" id="ach-claim-all" ${readyCount?'':'disabled'}>Reclamar todo${readyCount?` · +${number(readyFame)} Fama`:''}</button></div></div>
       <div class="collection-search"><label for="ach-search">Buscar logro<input id="ach-search" type="search" placeholder="Nombre, isla u objetivo" value="${collectionText(query)}"></label><label for="ach-state">Estado<select id="ach-state">${[['all','Todos'],['ready','Por reclamar'],['progress','En progreso'],['claimed','Completados']].map(([v,l])=>`<option value="${v}" ${state===v?'selected':''}>${l}</option>`).join('')}</select></label></div>
       <details class="collection-extra" ${filtersOpen?'open':''}><summary>Filtros${currentAchCategory!=='all'||currentAchSaga!=='all'||sort!=='ready'?' · activos':''}</summary><div class="collection-filter-grid">
@@ -2072,9 +2061,9 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
         <label for="ach-category">Tipo de logro<select id="ach-category">${[['all','Todos los tipos'],['prog','Progresivos'],['sagas','Sagas'],['islas','Islas'],['desafios','Desafíos']].map(([v,l])=>`<option value="${v}" ${currentAchCategory===v?'selected':''}>${l}</option>`).join('')}</select></label>
         <label for="ach-saga">Saga<select id="ach-saga">${[['all','Todas las sagas'],['global','Globales'],...SAGAS.map(s=>[s.id,s.name])].map(([v,l])=>`<option value="${v}" ${currentAchSaga===v?'selected':''}>${l}</option>`).join('')}</select></label>
       </div></details>
-      <div class="collection-results"><span role="status">${number(items.length)} logros${items.length?` · ${number(page*pageSize+1)}–${number(Math.min((page+1)*pageSize,items.length))}`:''}</span><button class="collection-text-button" id="ach-reset">Limpiar filtros</button></div>
-      <div class="achieve-list-container collection-list" aria-label="Lista de logros" tabindex="0">${items.slice(page*pageSize,(page+1)*pageSize).map(renderCard).join('')||'<div class="collection-empty"><h3>No hay logros con estos filtros</h3><p>Prueba otra búsqueda o limpia los filtros.</p></div>'}</div>
-      <nav class="collection-pagination" aria-label="Páginas de logros"><button class="btn gray" data-ach-page="-1" ${page===0?'disabled':''} aria-label="Página anterior de logros">← Anterior</button><span>Página ${page+1} de ${pages}</span><button class="btn gray" data-ach-page="1" ${page===pages-1?'disabled':''} aria-label="Página siguiente de logros">Siguiente →</button></nav>`;
+      <div class="collection-results"><span id="ach-results-count" role="status">${number(items.length)} logros · ${number(Math.min(visibleCount,items.length))} visibles</span><button class="collection-text-button" id="ach-reset">Limpiar filtros</button></div>
+      <div class="achieve-list-container collection-list" aria-label="Lista de logros">${items.slice(0,visibleCount).map(renderCard).join('')||'<div class="collection-empty"><h3>No hay logros con estos filtros</h3><p>Prueba otra búsqueda o limpia los filtros.</p></div>'}</div>
+      ${visibleCount<items.length?`<button class="btn gray achievements-more" id="ach-more">Mostrar más logros · ${number(Math.min(batchSize,items.length-visibleCount))} siguientes</button>`:''}</div>`;
   };
   document.querySelector('#achievements-overlay')?.remove();
   const ov = document.createElement('div');ov.id='achievements-overlay';ov.className='overlay collection-overlay';
@@ -2090,34 +2079,55 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
   const refresh=(selector,scroll=0,cursor=null)=>{
     filtersOpen=ov.querySelector('details').open;
     ov.querySelector('.modal').innerHTML=renderContent();bindEvents();
-    ov.querySelector('.collection-list').scrollTop=scroll;
+    ov.querySelector('.achievements-scroll').scrollTop=scroll;
     const target=ov.querySelector(selector)||ov.querySelector('#ach-title');
     target.focus({preventScroll:true});if(cursor!==null)target.setSelectionRange?.(cursor,cursor);
   };
+  const revealMore=()=>{
+    if(visibleCount>=visibleItems.length)return;
+    const next=visibleItems.slice(visibleCount,visibleCount+batchSize);
+    visibleCount+=next.length;
+    ov.querySelector('.achieve-list-container').insertAdjacentHTML('beforeend',next.map(renderCard).join(''));
+    ov.querySelector('#ach-results-count').textContent=`${number(visibleItems.length)} logros · ${number(visibleCount)} visibles`;
+    const more=ov.querySelector('#ach-more');
+    if(more){
+      if(visibleCount>=visibleItems.length){
+        const focused=document.activeElement===more;
+        more.remove();
+        if(focused)ov.querySelector('.achieve-list-container article:last-child')?.focus({preventScroll:true});
+      }
+      else more.textContent=`Mostrar más logros · ${number(Math.min(batchSize,visibleItems.length-visibleCount))} siguientes`;
+    }
+    bindClaimButtons();
+  };
+  const bindClaimButtons=()=>{
+    ov.querySelectorAll('[data-claim]:not([data-bound]),[data-claim-prog]:not([data-bound])').forEach(btn=>{btn.dataset.bound='true';btn.onclick=()=>{
+      const progressive=!!btn.dataset.claimProg,id=btn.dataset.claimProg||btn.dataset.claim;
+      const scroll=ov.querySelector('.achievements-scroll').scrollTop;
+      const fame=claimAchievement(id,progressive);if(!fame)return;
+      saveMeta();syncFameUI();toast(`🏆 ¡Recompensa recibida: +${number(fame)} Fama!`);
+      refresh(`[data-achievement="${id}"]`,scroll);
+    };});
+  };
   const bindEvents=()=>{
     ov.querySelector('#ach-close').onclick=close;
-    ov.querySelector('#ach-search').oninput=e=>{query=e.target.value;page=0;refresh('#ach-search',0,e.target.selectionStart);};
-    for(const [id,update] of [['ach-sort',v=>sort=v],['ach-state',v=>state=v],['ach-category',v=>currentAchCategory=v],['ach-saga',v=>currentAchSaga=v]])ov.querySelector('#'+id).onchange=e=>{update(e.target.value);page=0;refresh('#'+id);};
-    ov.querySelector('#ach-show-ready').onclick=()=>{state='ready';query='';currentAchCategory='all';currentAchSaga='all';page=0;refresh('#ach-state');};
+    ov.querySelector('#ach-search').oninput=e=>{query=e.target.value;visibleCount=batchSize;refresh('#ach-search',0,e.target.selectionStart);};
+    for(const [id,update] of [['ach-sort',v=>sort=v],['ach-state',v=>state=v],['ach-category',v=>currentAchCategory=v],['ach-saga',v=>currentAchSaga=v]])ov.querySelector('#'+id).onchange=e=>{update(e.target.value);visibleCount=batchSize;refresh('#'+id);};
+    ov.querySelector('#ach-show-ready').onclick=()=>{state='ready';query='';currentAchCategory='all';currentAchSaga='all';visibleCount=batchSize;refresh('#ach-state');};
     ov.querySelector('#ach-claim-all').onclick=()=>{
       const button=ov.querySelector('#ach-claim-all');button.disabled=true;
-      const scroll=ov.querySelector('.collection-list').scrollTop;
+      const scroll=ov.querySelector('.achievements-scroll').scrollTop;
       const result=claimAllAchievements();
       if(!result.count){button.disabled=false;return;}
       syncFameUI();toast(`🏆 ${number(result.count)} recompensas reclamadas: +${number(result.total)} Fama`);
       refresh('#ach-claim-all',scroll);
     };
-    ov.querySelector('#ach-reset').onclick=()=>{query='';state='all';sort='ready';currentAchCategory='all';currentAchSaga='all';page=0;refresh('#ach-search');};
-    ov.querySelectorAll('[data-ach-page]').forEach(btn=>btn.onclick=()=>{page+=Number(btn.dataset.achPage);refresh('.collection-list');});
-    ov.querySelectorAll('[data-claim],[data-claim-prog]').forEach(btn=>btn.onclick=()=>{
-      const progressive=!!btn.dataset.claimProg,id=btn.dataset.claimProg||btn.dataset.claim;
-      const scroll=ov.querySelector('.collection-list').scrollTop;
-      const fame=claimAchievement(id,progressive);if(!fame)return;
-      saveMeta();syncFameUI();toast(`🏆 ¡Recompensa recibida: +${number(fame)} Fama!`);
-      refresh(`[data-achievement="${id}"]`,scroll);
-    });
+    ov.querySelector('#ach-reset').onclick=()=>{query='';state='all';sort='ready';currentAchCategory='all';currentAchSaga='all';visibleCount=batchSize;refresh('#ach-search');};
+    ov.querySelector('#ach-more')?.addEventListener('click',revealMore);
+    ov.querySelector('.achievements-scroll').onscroll=e=>{if(e.target.scrollHeight-e.target.scrollTop-e.target.clientHeight<500)revealMore();};
+    bindClaimButtons();
   };
-  bindEvents();if(typeof savedScrollTop==='number')ov.querySelector('.collection-list').scrollTop=savedScrollTop;
+  bindEvents();if(typeof savedScrollTop==='number')ov.querySelector('.achievements-scroll').scrollTop=savedScrollTop;
   ov.onclick=e=>{if(e.target===ov)close();};
   bindCollectionDialog(ov,close,'#ach-title');
 }
@@ -5553,6 +5563,7 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
   const isMaxLvl = f.lvl >= cap;
   const selectableCrews = !isLive ? crewOptions(fOrId) : [];
   const crewPreference = isLive ? fighterCrew(f) : preferredCrew(fOrId);
+  const sheetFaction = crewPreference ? CREW_BY_ID[crewPreference] : null;
   const crewChoiceHTML = selectableCrews.length > 1 ? `<section class="sheet-section sheet-gear4 sheet-crew-choice" aria-labelledby="sheet-crew-title">
     <b id="sheet-crew-title">🏴‍☠️ Versiones de tripulación</b>
     <div class="sheet-gear4-options">${selectableCrews.map(id=>{
@@ -5628,9 +5639,8 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
       ${isFru ? '<b>🍈 Tag FRUTA</b> — recibe la mitad de daño de atacantes sin HAKI. ' : ''}
       ${isHak ? '<b>👁️ Tag HAKI</b> — sus ataques anulan la defensa pasiva de los usuarios FRUTA.' : ''}
     </div>` : ''}
-    ${crewPreference ? `<div class="sheet-line" style="color:var(--sea);"><b>${CREW_BY_ID[crewPreference].emoji} ${esc(CREW_BY_ID[crewPreference].name)}</b> — cuenta para esta sinergia de tripulación</div>` : ''}
+    ${(sheetFaction || lore.faccion) ? `<div class="sheet-line" style="color:var(--sea);"><b>Facción:</b> ${sheetFaction ? `${sheetFaction.emoji} ${esc(sheetFaction.name)} — cuenta para esta sinergia de tripulación` : esc(lore.faccion)}</div>` : ''}
     ${lore.clase ? `<div class="sheet-line"><b>Clase:</b> ${lore.clase}</div>` : ''}
-    ${lore.faccion ? `<div class="sheet-line"><b>Facción:</b> ${lore.faccion}</div>` : ''}
     <div class="sheet-stats">
       ${stats.map(([label, val, max, bonus]) => `
         <div class="sheet-stat"><label>${label}</label>

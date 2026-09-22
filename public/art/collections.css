@@ -423,3 +423,19 @@ html[data-theme="dark"] .inventory-shortfall { color:#ffbd9e; }
 .game-select-options { display:flex; flex-direction:column; gap:6px; overflow-y:auto; min-height:0; overscroll-behavior:contain; }
 .game-select-options .btn { flex:none; min-height:44px; white-space:normal; text-align:left; font:14px/1.4 system-ui,sans-serif; }
 .game-select-options [aria-pressed="true"] { border-color:var(--sea); box-shadow:inset 4px 0 var(--sea); font-weight:700; }
+
+/* Achievements follow the inventory's single scrolling surface. */
+.modal.collection-modal.achievements-modal { position:relative; display:block; padding:0; overflow:hidden; height:min(850px,calc(100dvh - 32px)); }
+.achievements-modal .achievements-scroll { height:100%; overflow-y:auto; overscroll-behavior:contain; padding:22px 22px 36px; scroll-padding-top:16px; }
+.achievements-scroll > * + * { margin-top:12px; }
+.achievements-modal .collection-header { padding-right:120px; }
+.achievements-modal #ach-close { position:absolute; top:16px; right:22px; z-index:3; background:var(--collection-surface); box-shadow:0 3px 14px #08283335; }
+.achievements-modal .collection-extra { max-height:none; overflow:visible; }
+.achievements-modal .achieve-list-container { overflow:visible; min-height:0; max-height:none; padding:0; scrollbar-gutter:auto; }
+.achievements-modal .achievements-more { display:block; width:100%; margin:16px 0 0; }
+@media(max-width:600px) {
+  .modal.collection-modal.achievements-modal { height:calc(100dvh - 16px); }
+  .achievements-modal .achievements-scroll { padding:14px 14px 30px; }
+  .achievements-modal #ach-close { top:10px; right:12px; }
+  .achievements-modal .collection-header { padding-right:100px; }
+}
