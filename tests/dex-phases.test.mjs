@@ -13,14 +13,14 @@ test('every catalog form belongs to exactly one ordered base entry, with cumulat
   assert.equal(forms[0].level,0);
   for(let i=1;i<forms.length;i++)assert.ok(forms[i].level>=forms[i-1].level);
  }
- assert.equal(h.exec("characterForms('luffy5').map(f=>f.id).join(',')"),'luffy,luffy2,luffy3,luffy4,luffy5');
+ assert.equal(h.exec("characterForms('luffy5').map(f=>f.id).join(',')"),'luffy,luffy2,luffy3,luffy4-boundman,luffy4,luffy4-tankman,luffy5');
 });
 
 test('legacy evolved sightings count once and reveal the base without rewriting the save',()=>{
  const h=combatHarness();h.exec("meta.dex=['luffy2','luffy5','zoro','missing'];meta.recruited=['luffy5'];meta.roster=['luffy'];const before=JSON.stringify(meta);");
  assert.equal(h.exec('dexBaseIds(meta.dex).length'),2);
  assert.equal(h.exec("dexEntrySeen('luffy')"),true);
- const card=h.exec("dexCardHTML('luffy5')");assert.match(card,/data-id="luffy"/);assert.match(card,/dex-card seen/);assert.match(card,/5 fases/);
+ const card=h.exec("dexCardHTML('luffy5')");assert.match(card,/data-id="luffy"/);assert.match(card,/dex-card seen/);assert.match(card,/7 fases/);
  assert.equal(h.exec('JSON.stringify(meta)===before'),true);
  assert.equal(h.exec("countInDex(['luffy','luffy2','luffy5','zoro'])"),2);
  assert.equal(h.exec("PROGRESSIVE_ACHIEVEMENTS.find(a=>a.id==='dex').check()"),2);

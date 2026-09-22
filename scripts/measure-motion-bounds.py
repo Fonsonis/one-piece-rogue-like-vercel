@@ -1,11 +1,15 @@
 """Measure alpha bounds only; never modify the sprites. Re-run after changing atlas art/motions."""
-import json, math
+import json, math, sys
 from pathlib import Path
 from PIL import Image
 root=Path(__file__).resolve().parents[1]
 sizing=json.loads((root/'docs/sprite-sizing.json').read_text())
-metrics={}; css=['/* All four poses plus conservative +/-13deg recoil, 8% stretch, 15px lunge and shadows. */']
+selected=set(sys.argv[1:])
+metrics=json.loads((root/'docs/motion-bounds.json').read_text()) if selected else {}
+css=(root/'public/art/motion-bounds.css').read_text().splitlines() if selected else ['/* All four poses plus conservative +/-13deg recoil, 8% stretch, 15px lunge and shadows. */']
+if selected: css=[line for line in css if not any(f'[data-character="{id}"]' in line for id in selected)]
 for id, info in sizing.items():
+    if selected and id not in selected: continue
     im=Image.open(root/f'public/art/characters/{id}.png').convert('RGBA')
     scale=info['atlasScale']; center=(info['guardBounds'][0]+info['guardBounds'][2])/2
     bounds=[]; points=[]
@@ -31,4 +35,4 @@ for id, info in sizing.items():
     css.append(f'[data-character="{id}"]{{--motion-fit-x:{192/(2*half):.8f};--motion-fit-y:{192/(top+bottom):.8f};--motion-floor:{bottom/192:.8f};--motion-center:{centerShift/192:.8f}}}')
 (root/'public/art/motion-bounds.css').write_text('\n'.join(css)+'\n')
 (root/'docs/motion-bounds.json').write_text(json.dumps(metrics,separators=(',',':'))+'\n')
-print(f'Measured all 4 poses and motion envelope for {len(metrics)} characters.')
+print(f'Measured all 4 poses and motion envelope for {len(selected) if selected else len(metrics)} characters.')

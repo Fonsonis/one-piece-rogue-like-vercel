@@ -50,7 +50,9 @@
   group('luffy','rubber','gatling',{count:7});
   group('luffy2','rubber','jet',{count:10,color:'#ff8a91'});
   group('luffy3','rubber','giant',{count:1});
+  group('luffy4-boundman','rubber','boundman',{count:1,color:'#bb2638',accent:'#ffe1c7'});
   group('luffy4','rubber','snakeman',{count:3,color:'#d96065',accent:'#ffceb5'});
+  group('luffy4-tankman','rubber','tankman',{count:1,color:'#7c1028',accent:'#ff4a62'});
   group('luffy5 joyboy','sun','dawn',{count:5});
   group('zoro','slash','three-swords',{count:3});
   group('zoro2','slash','ashura',{count:9,color:'#ae85e0'});

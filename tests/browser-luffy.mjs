@@ -11,7 +11,7 @@ fs.mkdirSync('outputs/luffy',{recursive:true});
 try{
  await page.goto('http://127.0.0.1:4175/gear5-preview.html',{waitUntil:'networkidle'});
  await page.waitForFunction(()=>!document.querySelector('#play').disabled);
- for(const id of ['luffy','luffy2','luffy3','luffy4','luffy5']){
+ for(const id of ['luffy','luffy2','luffy3','luffy4-boundman','luffy4','luffy4-tankman','luffy5']){
   await page.locator('#form').selectOption(id);
   for(const phase of [0,480,640]){
    await page.locator('#frame').fill(String(phase));
@@ -23,9 +23,9 @@ try{
  await page.screenshot({path:'outputs/luffy/preview-mobile.png'});
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
  await page.goto('http://127.0.0.1:4175/',{waitUntil:'networkidle'});
- await page.evaluate(()=>{maxStartLvlCap=()=>100;meta.charUpgrades={luffy:95};});
- for(const id of ['luffy4','luffy5']){
-  await page.evaluate(id=>{document.querySelectorAll('.overlay').forEach(el=>el.remove());showCharModal(id);},id);
+ await page.evaluate(()=>{maxStartLvlCap=()=>100;meta.charUpgrades={luffy:95};meta.reachedSagas=SAGAS.map(s=>s.id);});
+ for(const id of ['luffy4-boundman','luffy4','luffy4-tankman','luffy5']){
+  await page.evaluate(id=>{document.querySelectorAll('.overlay').forEach(el=>el.remove());showCharModal(id,null,id);},id);
   await page.locator('.art-preview-button').click();
   if(id==='luffy5')await page.waitForSelector('.ultimate-scene[data-presentation="attack"][data-phase="attack"]');
   else {const motion=await page.locator('.char-sheet-hero .dex-sprite').evaluate(sprite=>{
@@ -43,5 +43,5 @@ try{
   await page.evaluate(()=>UltimateFX.cancelAll());
  }
  assert.deepEqual(errors,[]);
- console.log('Five Luffy attacks, mobile preview, Snakeman and Gear 5 sheet/ultimate verified without errors.');
+ console.log('Seven Luffy forms, mobile preview, all Gear 4 variants and Gear 5 sheet/ultimate verified without errors.');
 }finally{await browser.close();}

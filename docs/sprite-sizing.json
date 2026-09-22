@@ -10045,5 +10045,39 @@
     ],
     "atlasScale": 0.9846153846153846,
     "portraitScale": 1.0025316455696203
+  },
+  "luffy4-boundman": {
+    "ratio": 1.1,
+    "guardBounds": [
+      41,
+      68,
+      152,
+      180
+    ],
+    "portraitBounds": [
+      18,
+      18,
+      175,
+      176
+    ],
+    "atlasScale": 1.2571428571428573,
+    "portraitScale": 0.918987341772152
+  },
+  "luffy4-tankman": {
+    "ratio": 1.05,
+    "guardBounds": [
+      35,
+      36,
+      158,
+      180
+    ],
+    "portraitBounds": [
+      29,
+      18,
+      164,
+      176
+    ],
+    "atlasScale": 0.9333333333333333,
+    "portraitScale": 0.8772151898734177
   }
 }

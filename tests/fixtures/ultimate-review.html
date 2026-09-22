@@ -6,7 +6,7 @@
 <script>
 const select=document.querySelector('#review-char'),slider=document.querySelector('#review-frame');
 select.innerHTML=Object.entries(CHARS).map(([id,c])=>`<option value="${id}">${c.name}</option>`).join('');select.value='law';
-const levelFor=id=>({luffy:19,luffy2:20,luffy3:35,luffy4:70,luffy5:100})[id]||100;
+const levelFor=id=>({luffy:19,luffy2:20,luffy3:35,'luffy4-boundman':70,luffy4:70,'luffy4-tankman':70,luffy5:100})[id]||100;
 const spec=id=>UltimateArtProfiles.resolve(id,CHARS[id],MOVES[CHARS[id].ultimate]||getUltimateMove({id,lvl:levelFor(id)}),baseFormOf(id));
 function stopReview(){document.querySelector('.review-controls').style.display='';document.querySelector('.review-dock')?.remove();UltimateFX.cancelAll();document.querySelectorAll('.overlay').forEach(x=>x.remove());if(battle){clearTimeout(battle.timer);battle.over=true;}autoMode=false;}
 function stageHTML(id){return `<div class="review-stage" data-review-id="${id}"><div class="one dex-sprite" data-character="${id}" style="--sprite-atlas:url('/art/characters/${id}.png');--sprite-portrait:url('/art/portraits/${id}.png')"></div><div class="two dex-sprite" data-character="kaido" style="--sprite-atlas:url('/art/characters/kaido.png');--sprite-portrait:url('/art/portraits/kaido.png')"></div><canvas></canvas><div class="review-heading">${CHARS[id].name} · ${spec(id).technique}</div></div>`;}

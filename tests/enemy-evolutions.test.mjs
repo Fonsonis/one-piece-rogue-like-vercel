@@ -12,7 +12,8 @@ test('all enemy identities follow combat level and unlocked sagas, never permane
    const levels=new Set([1,65,100,...forms.flatMap(f=>[Math.max(1,f.level-1),Math.max(1,f.level)])]);
    for(const permanent of [5,20,40,100]) for(const level of levels) {
     meta.charUpgrades={[baseFormOf(id)]:permanent-5};
-    const expected=forms.filter(f=>f.level<=level).at(-1).id;
+    let expected=forms.filter(f=>f.level<=level).at(-1).id;
+    if(baseFormOf(id)==='luffy'&&expected==='luffy4-tankman')expected='luffy4';
     const actual=makeEnemy(id,level),exact=makeChar(expected,level,false,true);
     for(const key of ['id','lvl','hp','maxhp','atk','def','spatk','spdef','spd','moves'])
      if(JSON.stringify(actual[key])!==JSON.stringify(exact[key]))failures.push(id+':'+level+':'+key);
@@ -113,7 +114,8 @@ test('every evolution follows its canonical saga frontier for players and enemie
    meta.reachedSagas=SAGAS.slice(0,frontier+1).map(s=>s.id);
    meta.charUpgrades=Object.fromEntries(bases.map(id=>[id,95]));
    for(const id of bases) {
-    const expected=characterForms(id).filter(phase=>phase.level<=100&&(!formUnlockSaga(phase.id)||SAGAS.findIndex(s=>s.id===formUnlockSaga(phase.id))<=frontier)).at(-1).id;
+    let expected=characterForms(id).filter(phase=>phase.level<=100&&(!formUnlockSaga(phase.id)||SAGAS.findIndex(s=>s.id===formUnlockSaga(phase.id))<=frontier)).at(-1).id;
+    if(id==='luffy'&&expected==='luffy4-tankman')expected='luffy4';
     const enemy=enemyFormAt(id,100),player=evolutionFormAt(id,100);
     if(enemy!==expected)failures.push('enemy:'+SAGAS[frontier].id+':'+id+':'+enemy+':'+expected);
     if(player!==expected)failures.push('player:'+SAGAS[frontier].id+':'+id+':'+player+':'+expected);

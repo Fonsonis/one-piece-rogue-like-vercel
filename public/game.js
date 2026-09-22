@@ -12,7 +12,9 @@ const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;',
 // Mapa forma evolucionada -> forma base (para el roster de iniciales)
 const BASE_OF = {};
 for (const [id, c] of Object.entries(CHARS)) if (c.evo) BASE_OF[c.evo.to] = id;
+for (const [id, c] of Object.entries(CHARS)) if (c.formBase) BASE_OF[id] = c.formBase;
 function baseFormOf(id) { while (BASE_OF[id]) id = BASE_OF[id]; return id; }
+const LUFFY_GEAR4_FORMS = Object.freeze(['luffy4-boundman', 'luffy4', 'luffy4-tankman']);
 
 // The Dex groups forms for presentation without rewriting legacy discovery records.
 function characterForms(id) {
@@ -20,6 +22,11 @@ function characterForms(id) {
   let form=baseFormOf(id),level=0;
   while(CHARS[form]&&!forms.some(entry=>entry.id===form)) {
     forms.push({id:form,level});
+    for (const alternate of CHARS[form].alternateForms || []) {
+      if (CHARS[alternate] && !forms.some(entry => entry.id === alternate)) {
+        forms.push({id:alternate,level:CHARS[alternate].formLevel ?? level});
+      }
+    }
     const evo=CHARS[form].evo;if(!evo)break;
     level=Math.max(level,evo.lvl);form=evo.to;
   }
@@ -40,6 +47,13 @@ function characterPhaseUnlocked(id, progress = meta) {
   const phase = characterForms(id).find(form => form.id === id);
   return !!phase && phase.level <= startLvlOf(id, progress) && formSagaUnlocked(id, progress);
 }
+function preferredLuffyGear4(progress = meta, requested = progress.formPreferences?.luffyGear4) {
+  const unlocked = LUFFY_GEAR4_FORMS.filter(id => formSagaUnlocked(id, progress));
+  if (unlocked.includes(requested)) return requested;
+  // Preserve the legacy Snakeman default once Whole Cake is available; before
+  // that point Boundman is the only canonical Gear 4 form.
+  return unlocked.includes('luffy4') ? 'luffy4' : unlocked[0] || null;
+}
 function dexBaseIds(ids=[]) { return [...new Set(ids.filter(id=>CHARS[id]).map(baseFormOf))]; }
 function dexEntrySeen(id) { return characterForms(id).some(form=>meta.dex.includes(form.id)); }
 function dexFilteredBases(state) {
@@ -49,13 +63,24 @@ function dexFilteredBases(state) {
 }
 
 // Player forms require journey level, permanent base level and their canonical debut saga.
-function evolutionFormAt(id, lvl, progress = meta) {
+function evolutionFormAt(id, lvl, progress = meta, gear4Choice = progress.formPreferences?.luffyGear4) {
   const limit = Math.min(lvl, startLvlOf(id, progress));
-  return characterForms(id).filter(phase => phase.level <= limit && formSagaUnlocked(phase.id, progress)).at(-1).id;
+  const available = characterForms(id).filter(phase => phase.level <= limit && formSagaUnlocked(phase.id, progress));
+  let nextId = available.at(-1).id;
+  if (baseFormOf(id) === 'luffy' && limit >= EVOLUTION_LEVELS.gear4 && nextId !== 'luffy5') {
+    nextId = preferredLuffyGear4(progress, gear4Choice) || nextId;
+  }
+  return nextId;
 }
 // Rivals ignore permanent player upgrades, but keep combat-level and story-saga gates.
 function enemyFormAt(id, lvl, progress = meta) {
-  return characterForms(id).filter(phase => phase.level <= lvl && formSagaUnlocked(phase.id, progress)).at(-1).id;
+  const available = characterForms(id).filter(phase => phase.level <= lvl && formSagaUnlocked(phase.id, progress));
+  let nextId = available.at(-1).id;
+  if (baseFormOf(id) === 'luffy' && lvl >= EVOLUTION_LEVELS.gear4 && nextId !== 'luffy5') {
+    nextId = formSagaUnlocked('luffy4', progress) ? 'luffy4' :
+      (formSagaUnlocked('luffy4-boundman', progress) ? 'luffy4-boundman' : nextId);
+  }
+  return nextId;
 }
 function formMovesAt(id, lvl, exactForm = false, progress = meta) {
   const c = CHARS[id];
@@ -65,8 +90,8 @@ function formMovesAt(id, lvl, exactForm = false, progress = meta) {
 }
 function syncEvolution(f, progress = meta) {
   if (!CHARS[f.id] || !CHARS[baseFormOf(f.id)].evo) return f;
-  const old = CHARS[f.id], nextId = evolutionFormAt(f.id, f.lvl, progress), next = CHARS[nextId];
-  if (f.id === nextId && f.evolutionRulesVersion === 3) return f;
+  const old = CHARS[f.id], nextId = evolutionFormAt(f.id, f.lvl, progress, f.gear4Form), next = CHARS[nextId];
+  if (f.id === nextId && f.evolutionRulesVersion === 4) return f;
   // Apply only the base-stat difference, preserving equipment, fusion and event bonuses.
   const deltaHP = hpAt(next.base[0], f.lvl) - hpAt(old.base[0], f.lvl);
   f.maxhp += deltaHP;
@@ -76,7 +101,7 @@ function syncEvolution(f, progress = meta) {
   });
   f.id = nextId;
   f.moves = formMovesAt(nextId, f.lvl, false, progress);
-  f.evolutionRulesVersion = 3;
+  f.evolutionRulesVersion = 4;
   return f;
 }
 
@@ -483,6 +508,7 @@ const META_DEFAULTS = () => ({
   logPoses: 0,
   starPity: 0,
   charUpgrades: {},
+  formPreferences: {}, // Preferencias de formas alternativas para nuevas aventuras.
   dailySteps: { date: dailyStepsDayKey(), remaining: DAILY_STEPS_LIMIT },
   settings: { showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 },
 });
@@ -495,6 +521,7 @@ function loadMeta() {
   meta.logPoses = meta.logPoses || 0;
   meta.starPity = meta.starPity || 0;
   meta.charUpgrades = meta.charUpgrades || {};
+  meta.formPreferences = Object.assign({}, meta.formPreferences || {});
   meta.dailySteps = normalizeDailySteps(meta.dailySteps);
   meta.roster = meta.roster || [];
   if (!meta.roster.includes('luffy')) {
@@ -650,6 +677,7 @@ function importSaveFile(file) {
       migrateLegacyIslandWins(nextMeta);
       preparePirateKingRewards(nextMeta);
       nextMeta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 }, nextMeta.settings);
+      nextMeta.formPreferences = Object.assign({}, nextMeta.formPreferences || {});
       if (!nextMeta.roster.includes('luffy')) nextMeta.roster.push('luffy');
       const nextRun = data.run || null;
       normalizeReachedSagas(nextMeta, nextRun);
@@ -681,6 +709,9 @@ function importSaveFile(file) {
 }
 function validateGameSave(data) {
   const progress=data.meta,t=progress.challenge;
+  if (progress.formPreferences?.luffyGear4 !== undefined && !LUFFY_GEAR4_FORMS.includes(progress.formPreferences.luffyGear4)) {
+    throw new Error('Preferencia de Gear 4 incompatible.');
+  }
   const equipment=Object.entries(progress.relicEquipment||{});
   if(equipment.some(([id,r])=>!CHARS[id]||baseFormOf(id)!==id||!RELICS[r]||!progress.relics?.includes(r))||
     new Set(equipment.map(([,r])=>r)).size!==equipment.length) throw new Error('Equipo de reliquias incompatible.');
@@ -805,6 +836,11 @@ function loadRun() {
   prepareBackpack(run);
 }
 function migrateFighter(f, isEnemy = false, progress = meta) {
+  if (!isEnemy && CHARS[f.id] && baseFormOf(f.id) === 'luffy') {
+    const savedChoice = LUFFY_GEAR4_FORMS.includes(f.gear4Form) ? f.gear4Form :
+      (LUFFY_GEAR4_FORMS.includes(f.id) ? f.id : progress.formPreferences?.luffyGear4);
+    f.gear4Form = preferredLuffyGear4(progress, savedChoice);
+  }
   const current = CHARS[f.id];
   if (current && (f.moveRulesVersion || 0) < 2) {
     // El aprendizaje es automático: actualizar únicamente las fichas corregidas.
@@ -840,7 +876,8 @@ function xpBarHTML(f) {
 }
 
 function makeChar(id, lvl, isEnemy = false, exactForm = false) {
-  if (!isEnemy && !exactForm) id = evolutionFormAt(id, lvl);
+  const gear4Form = !isEnemy && !exactForm && baseFormOf(id) === 'luffy' ? preferredLuffyGear4(meta) : null;
+  if (!isEnemy && !exactForm) id = evolutionFormAt(id, lvl, meta, gear4Form);
   const c = CHARS[id];
   const moves = formMovesAt(id, lvl, isEnemy || exactForm);
   let diffMult = 1.0;
@@ -859,7 +896,8 @@ function makeChar(id, lvl, isEnemy = false, exactForm = false) {
     spd: Math.floor(statAt(c.base[5], lvl) * diffMult),
     atkBonus: 0, defBonus: 0, spatkBonus: 0, spdefBonus: 0,
     xp: 0, moves, ultCharge: 0, moveRulesVersion: 2,
-    ...(!isEnemy && !exactForm ? {evolutionRulesVersion:3} : {}),
+    ...(!isEnemy && !exactForm ? {evolutionRulesVersion:4} : {}),
+    ...(gear4Form ? {gear4Form} : {}),
   };
 }
 // AI forms follow combat level; only story encounters apply difficulty scaling.
@@ -920,7 +958,7 @@ function gainXP(f, amount, log) {
       }
     }
     // transformación
-    const to = evolutionFormAt(f.id, f.lvl);
+    const to = evolutionFormAt(f.id, f.lvl, meta, f.gear4Form);
     if (to !== f.id) {
       msgs.push(`✨ ¡${c.name} se transforma en ${CHARS[to].name}!`);
       f.id = to;
@@ -5244,7 +5282,7 @@ function addToTeam(f, done) {
     if (newLvl > oldLvl) {
       existing.lvl = newLvl;
       existing.xp = f.xp || 0;
-      existing.id = evolutionFormAt(existing.id, existing.lvl);
+      existing.id = evolutionFormAt(existing.id, existing.lvl, meta, existing.gear4Form);
       const c = CHARS[existing.id];
       if (c) {
         existing.maxhp = hpAt(c.base[0], existing.lvl);
@@ -5377,6 +5415,20 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
   const upgCost = logPoseUpgradeCost(f.lvl);
   const canAffordUpg = (meta.logPoses || 0) >= upgCost;
   const isMaxLvl = f.lvl >= cap;
+  const showGear4Choice = !isLive && baseFormOf(fOrId) === 'luffy';
+  const gear4Preference = preferredLuffyGear4(meta);
+  const gear4ChoiceHTML = showGear4Choice ? `<section class="sheet-section sheet-gear4" aria-labelledby="sheet-gear4-title">
+    <b id="sheet-gear4-title">☁️ Gear 4 para nuevas aventuras</b>
+    <div class="sheet-gear4-options">${LUFFY_GEAR4_FORMS.map(id => {
+      const levelReady = startLvlOf('luffy') >= EVOLUTION_LEVELS.gear4;
+      const sagaReady = formSagaUnlocked(id);
+      const unlocked = levelReady && sagaReady;
+      const label = CHARS[id].name.replace('Luffy Gear 4 · ', '');
+      const missing = [levelReady ? '' : `nivel base ${EVOLUTION_LEVELS.gear4}`, sagaReady ? '' : formUnlockSagaName(id)].filter(Boolean).join(' y ');
+      return `<button type="button" class="btn small gear4-choice${gear4Preference===id?' selected':''}" data-gear4-choice="${id}" aria-pressed="${gear4Preference===id}" ${unlocked?'':`disabled title="Falta ${esc(missing)}"`}><span>${esc(label)}</span><small>${unlocked?(gear4Preference===id?'Elegido':'Elegir'):`🔒 ${esc(missing)}`}</small></button>`;
+    }).join('')}</div>
+    <p>La elección se guarda para las próximas aventuras. La tripulación de una aventura ya iniciada conserva su forma.</p>
+  </section>` : '';
 
   const ov = existingOverlay || document.createElement('div');
   const previousFocus=document.activeElement;
@@ -5394,6 +5446,7 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
       <div style="margin-top:6px;font-size:9px;color:var(--gold);"><b>Rareza:</b> ${'⭐'.repeat(c.rareza || 1)} (${c.rareza || 1} Estrellas)</div>
       ${!isLive&&forms.length>1?`<p class="sheet-phase-caption" role="status">Fase ${phaseIndex+1} de ${forms.length} · ${phaseIndex===0?'Forma base':esc(c.name)}<br>${phaseLocked?`🔒 Bloqueada · Falta ${esc(phaseMissing.join(' y '))}`:phaseIndex?`Desbloqueada · Nv. ${phase.level} en partida · ${esc(phaseSagaName)}`:''}</p>`:''}
     </div>
+    ${gear4ChoiceHTML}
     ${phaseLocked?`<section class="sheet-locked-notice"><h3>Fase bloqueada</h3><p>Para descubrir esta forma y probar sus ataques necesitas <strong>nivel base ${phase.level}</strong>, alcanzar el mismo nivel en partida y haber llegado a <strong>${esc(phaseSagaName)}</strong>.</p><p>Tu nivel base: <strong>${startLvlOf(f.id)}</strong> · Saga: <strong>${phaseSagaLocked?'pendiente':'alcanzada'}</strong></p></section>`:''}
     ${phaseLocked?'':`
     ${typeBadges(fTypes)}
@@ -5474,6 +5527,19 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
       });
     };
   }
+  (ov.querySelectorAll?.('[data-gear4-choice]') || []).forEach(button => button.onclick = () => {
+    if (button.disabled) return;
+    meta.formPreferences = Object.assign({}, meta.formPreferences, {luffyGear4:button.dataset.gear4Choice});
+    saveMeta();
+    const scrollTop=ov.querySelector('.modal').scrollTop;
+    showCharModal(fOrId,ov,previewId);
+    queueMicrotask(()=>{
+      if(!ov.isConnected)return;
+      ov.querySelector('.modal').scrollTop=scrollTop;
+      ov.querySelector(`[data-gear4-choice="${meta.formPreferences.luffyGear4}"]`)?.focus({preventScroll:true});
+    });
+    toast(`☁️ ${CHARS[meta.formPreferences.luffyGear4].name} elegida para nuevas aventuras.`);
+  });
   const relicSelect=ov.querySelector('#sheet-relic-select');
   if(relicSelect)relicSelect.onchange=()=>{
     const next=relicSelect.value,current=meta.relicEquipment?.[relicBase];
@@ -8561,7 +8627,7 @@ function challengeOpponentPool(kind, picked = []) {
   const limit = challengeSagaLimit(), excluded = new Set(picked.map(baseFormOf));
   const available = id => {
     // The catalog groups every Gear under East Blue; rivals follow its story debut.
-    const saga = ({luffy2:'water7',luffy3:'water7',luffy4:'dressrosa',luffy5:'wano'})[id] || CHARS[id].saga;
+    const saga = CHARS[id].unlockSaga || CHARS[id].saga;
     const index = SAGAS.findIndex(s => s.id === saga);
     return index >= 0 && index <= limit;
   };

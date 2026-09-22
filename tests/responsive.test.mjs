@@ -6,7 +6,7 @@ const sizing=JSON.parse(fs.readFileSync('docs/sprite-sizing.json','utf8'));
 const css=fs.readFileSync('public/art/motion-bounds.css','utf8');
 
 test('all catalog sprites fit the stage throughout attack, recoil and KO, including mirrored enemies',()=>{
- assert.equal(Object.keys(metrics).length,591);
+ assert.equal(Object.keys(metrics).length,593);
  let checked=0;
  for(const [id,m] of Object.entries(metrics)){
    assert.ok(css.includes(`[data-character="${id}"]`));

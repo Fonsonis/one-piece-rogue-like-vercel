@@ -8,6 +8,7 @@ test('every evolution requires permanent level, journey level and its saga at th
  const chains=JSON.parse(h.exec('JSON.stringify(Object.entries(CHARS).filter(([,c])=>c.evo).map(([id,c])=>[id,baseFormOf(id),c.evo.lvl,c.evo.to]))'));
  assert.equal(chains.length,126);
  for(const [id,base,level,to] of chains){
+  if(to==='luffy4-boundman')h.exec("meta.formPreferences={luffyGear4:'luffy4-boundman'};");
   h.exec(`meta.charUpgrades={${base}:${level-6}};`);
   assert.equal(h.exec(`makeChar('${to}',100).id`),id,`${to} locked one permanent level before threshold`);
   h.exec(`meta.charUpgrades.${base}++;`);
@@ -33,9 +34,30 @@ test('the canonical saga catalog covers every evolution exactly once',()=>{
  assert.deepEqual(Array.from(audit.missing),[]);
  assert.deepEqual(Array.from(audit.invalid),[]);
  assert.deepEqual(Array.from(audit.taggedBases),[]);
- for(const [id,saga] of Object.entries({zoro2:'eastblue',luffy2:'water7',luffy4:'wholecake',luffy5:'wano','sanji-diable':'water7','sanji-ifrit':'wano','jack-animal':'zou','lucci-awakened':'egghead','im-revealed':'elbaph'}))
+ for(const [id,saga] of Object.entries({zoro2:'eastblue',luffy2:'water7','luffy4-boundman':'dressrosa',luffy4:'wholecake','luffy4-tankman':'wholecake',luffy5:'wano','sanji-diable':'water7','sanji-ifrit':'wano','jack-animal':'zou','lucci-awakened':'egghead','im-revealed':'elbaph'}))
   assert.equal(h.exec(`CHARS['${id}'].unlockSaga`),saga,id);
  assert.equal(h.exec("Object.entries(CHARS).filter(([id])=>id.endsWith('-young')&&BASE_OF[id]).every(([,c])=>c.unlockSaga==='elbaph')"),true);
+});
+
+test('Luffy can choose each unlocked Gear 4 without leaking that preference to enemies or active journeys',()=>{
+ const h=combatHarness();
+ h.exec(`maxStartLvlCap=()=>100;meta.charUpgrades={luffy:95};meta.reachedSagas=['eastblue'];
+  markSagaReached(SAGAS.findIndex(s=>s.id==='dressrosa'));`);
+ assert.equal(h.exec("makeChar('luffy',40).id"),'luffy4-boundman');
+ assert.equal(h.exec("enemyFormAt('luffy',40)"),'luffy4-boundman');
+ h.exec(`markSagaReached(SAGAS.findIndex(s=>s.id==='zou'));meta.formPreferences={luffyGear4:'luffy4-tankman'};`);
+ assert.equal(h.exec("makeChar('luffy',49).id"),'luffy4-boundman','Zou cannot select Whole Cake forms');
+ h.exec(`markSagaReached(SAGAS.findIndex(s=>s.id==='wholecake'));meta.formPreferences={luffyGear4:'luffy4-tankman'};var tank=makeChar('luffy',45);`);
+ assert.equal(h.exec('tank.id'),'luffy4-tankman');
+ assert.equal(h.exec("enemyFormAt('luffy',45)"),'luffy4','enemy canon does not inherit the player choice');
+ h.exec(`meta.formPreferences.luffyGear4='luffy4-boundman';syncEvolution(tank);`);
+ assert.equal(h.exec('tank.id'),'luffy4-tankman','an active journey keeps its snapshotted Gear 4');
+ assert.equal(h.exec("makeChar('luffy',45).id"),'luffy4-boundman','new journeys use the new choice');
+ h.exec(`meta.formPreferences.luffyGear4='luffy4';`);
+ assert.equal(h.exec("makeChar('luffy',45).id"),'luffy4');
+ h.exec(`markSagaReached(SAGAS.findIndex(s=>s.id==='wano'));`);
+ assert.equal(h.exec("makeChar('luffy',50).id"),'luffy5','Gear 5 keeps its level and Wano gate');
+ assert.equal(h.exec(`(()=>{meta.formPreferences.luffyGear4='not-a-form';try{validateGameSave(GameSaveStorage.payload(meta,null));return false;}catch{return true;}})()`),true,'invalid imported choices are rejected');
 });
 
 test('player forms need saga, permanent level and journey level independently',()=>{
