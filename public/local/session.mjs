@@ -1,4 +1,4 @@
-export const RULES = 'egghead-local-3';
+export const RULES = 'egghead-local-4';
 export const DEFAULT_TEAM = ['luffy', 'zoro', 'nami', 'sanji', 'usopp', 'chopper'];
 export const BOSSES = ['kaido', 'bigmom', 'shanks', 'teach', 'newgate'];
 const cleanName = name => String(name || 'Pirata').replace(/[\x00-\x1f<>]/g, '').trim().slice(0, 24) || 'Pirata';
@@ -14,20 +14,21 @@ export function bracketPairs(ids, random = Math.random) {
   return Array.from({ length: size / 2 }, (_, i) => ordered.slice(i * 2, i * 2 + 2));
 }
 export class LocalSession {
-  constructor({ host, name, engine, send = () => false, onChange = () => {}, onError = () => {}, now = () => Date.now() }) {
+  constructor({ host, name, engine, send = () => false, onChange = () => {}, onError = () => {}, denDenAvailable = () => 4, consumeDenDen = () => true, now = () => Date.now(), roomId = globalThis.crypto?.randomUUID?.().replaceAll('-', '') || '0'.repeat(32) }) {
     this.host = host; this.engine = engine; this.send = send; this.onChange = onChange; this.onError = onError; this.now = now;
-    this.self = host ? 'host' : null; this.name = cleanName(name); this.visible = true; this.lastHost = now();
+    this.denDenAvailable=denDenAvailable; this.consumeDenDen=consumeDenDen;
+    this.self = host ? 'host' : null; this.name = cleanName(name); this.roomId = roomId; this.visible = true; this.lastHost = now();
     this.peers = new Map(); this.arenas = new Map(); this.counter = 0; this.nextTick = 0;
     this.roster = engine.ownedRoster(); this.lastBroadcast = 0;
     this.view = { phase: 'lobby', mode: 'duel', size: 3, boss: 'kaido', round: 0, champion: null, paused: false,
-      players: host ? [{ id: 'host', name: this.name, roster: [...this.roster], team: this.roster.slice(0, 3), ready: false, connected: true, visible: true }] : [], matches: [] };
+      players: host ? [{ id: 'host', name: this.name, roster: [...this.roster], team: this.roster.slice(0, 3), ready: false, connected: true, visible: true, denDen: denDenAvailable() }] : [], matches: [] };
   }
   notify() { this.onChange(this.view); }
   addPeer(id, send) {
     if (!this.host) return;
     this.peers.set(id, { send, lastSeen: this.now(), visible: true, connected: true });
   }
-  connected() { if (!this.host) this.send({ type: 'hello', rules: RULES, name: this.name, roster: this.roster }); }
+  connected() { if (!this.host) this.send({ type: 'hello', rules: RULES, name: this.name, roster: this.roster, denDen: this.denDenAvailable() }); }
   disconnect(id) {
     if (!this.host) { this.view.paused = true; this.notify(); return; }
     const peer = this.peers.get(id); if (peer) peer.connected = false;
@@ -51,7 +52,7 @@ export class LocalSession {
     if (!this.engine.validTeam(team, this.view.size) || team.some(id => !this.roster.includes(id))) throw new Error('Escoge una tripulación completa con personajes de tu cuenta, sin repetir nakamas.');
     this.action({ type: 'select', team });
   }
-  ready(value) { this.action({ type: 'ready', ready: !!value }); }
+  ready(value) { this.action({ type: 'ready', ready: !!value, denDen: this.denDenAvailable() }); }
   ultimate(match) { this.action({ type: 'command', match, action: 'ultimate' }); }
   relay(match, index) { this.action({ type: 'command', match, action: 'relay', index }); }
   action(packet) { this.host ? this.receive('host', packet) : this.send(packet); }
@@ -61,6 +62,9 @@ export class LocalSession {
       if (packet.type === 'reject') { this.onError(String(packet.message).slice(0, 200)); return; }
       if (packet.type !== 'state' || packet.rules !== RULES || !validView(packet.view, this.engine)) return;
       if (typeof packet.self !== 'string' || !packet.view.players.some(p => p.id === packet.self)) return;
+      if (this.view.phase==='lobby' && packet.view.phase==='playing' && packet.view.mode==='coop' && !this.consumeDenDen()) {
+        this.send({type:'leave'}); this.onError('No se pudo gastar un den den mushi. Revisa el guardado y vuelve a crear la sala.'); return;
+      }
       this.self = packet.self; this.view = packet.view; this.lastHost = this.now(); this.notify(); return;
     }
     const peer = this.peers.get(id);
@@ -75,7 +79,7 @@ export class LocalSession {
         if (this.view.phase !== 'lobby' || this.view.players.length >= max) {
           peer?.send({ type: 'reject', message: 'La sala está completa o ya ha comenzado.' }); return;
         }
-        player = { id, name: cleanName(packet.name), roster: [...packet.roster], team: packet.roster.slice(0, this.view.size), ready: false, connected: true, visible: true };
+        player = { id, name: cleanName(packet.name), roster: [...packet.roster], team: packet.roster.slice(0, this.view.size), ready: false, connected: true, visible: true, denDen:Number.isInteger(packet.denDen)?Math.max(0,Math.min(4,packet.denDen)):0 };
         this.view.players.push(player);
       }
       player.connected = true; this.broadcast(); return;
@@ -89,7 +93,10 @@ export class LocalSession {
     if (packet.type === 'leave') { this.disconnect(id); return; }
     if (this.view.phase === 'lobby') {
       if (packet.type === 'select' && this.engine.validTeam(packet.team, this.view.size) && packet.team.every(id => player.roster.includes(id))) { player.team = [...packet.team]; player.ready = false; }
-      if (packet.type === 'ready' && typeof packet.ready === 'boolean') player.ready = packet.ready && ownsTeam(player, this.view.size, this.engine);
+      if (packet.type === 'ready' && typeof packet.ready === 'boolean') {
+        player.denDen=Number.isInteger(packet.denDen)?Math.max(0,Math.min(4,packet.denDen)):0;
+        player.ready = packet.ready && ownsTeam(player, this.view.size, this.engine) && (this.view.mode!=='coop' || player.denDen>0);
+      }
       this.broadcast(); return;
     }
     if (packet.type === 'command' && !this.view.paused && typeof packet.match === 'string') {
@@ -109,6 +116,12 @@ export class LocalSession {
     const v = this.view, n = v.players.length;
     if (n < (v.mode === 'tournament' ? 3 : 2) || n > (v.mode === 'duel' ? 2 : 8)) throw new Error(v.mode === 'tournament' ? 'El torneo necesita de 3 a 8 jugadores.' : 'Faltan jugadores para empezar.');
     if (v.players.some(p => !p.ready || !p.connected || !p.visible || !ownsTeam(p, v.size, this.engine))) throw new Error('Todos deben tener un equipo completo de su cuenta, estar conectados y listos.');
+    if (v.mode==='coop') {
+      v.players[0].denDen=this.denDenAvailable();
+      if (v.players.some(p=>p.denDen<1)) throw new Error('Cada jugador necesita un den den mushi para el desafío contra el yonkou.');
+      if (!this.consumeDenDen()) throw new Error('No se pudo gastar el den den mushi. Revisa el guardado local.');
+      v.players[0].denDen=this.denDenAvailable();
+    }
     v.phase = 'playing'; v.round = 1; v.matches = []; v.champion = null; this.arenas.clear();
     if (v.mode === 'tournament') this.makeRound(bracketPairs(v.players.map(p => p.id)));
     else this.addMatch(v.players.map(p => p.id));
@@ -117,6 +130,7 @@ export class LocalSession {
   addMatch(ids, attempt = 1) {
     const participants = ids.filter(Boolean), matchId = `match-${++this.counter}`;
     const match = { id: matchId, round: this.view.round, players: participants, winner: null, status: 'playing', attempt, battle: null };
+    if (this.view.mode === 'coop') match.rewardId = `${this.roomId}:${matchId}`;
     if (participants.length === 1) { match.status = 'bye'; match.winner = participants[0]; }
     else {
       const b = this.engine.create(participants.map(id => this.view.players.find(p => p.id === id)), { mode: this.view.mode, boss: this.view.boss });
@@ -200,7 +214,8 @@ export function validView(v, engine) {
         typeof p.name !== 'string' || p.name.length > 24 || !validRoster(p.roster, engine) || !Array.isArray(p.team) || p.team.length > v.size ||
         p.team.some(id => !p.roster.includes(id)) || !engine.validSelection(p.team) ||
         new Set(p.team).size !== p.team.length || ((p.ready || v.phase !== 'lobby') && !ownsTeam(p, v.size, engine)) ||
-        ['ready', 'connected', 'visible'].some(key => typeof p[key] !== 'boolean')) return false;
+        ['ready', 'connected', 'visible'].some(key => typeof p[key] !== 'boolean') ||
+        !Number.isInteger(p.denDen) || p.denDen<0 || p.denDen>4) return false;
     ids.add(p.id);
   }
   const characterIds = new Set(engine.roster.map(c => c.id));
@@ -208,6 +223,7 @@ export function validView(v, engine) {
     if (!m || typeof m.id !== 'string' || !/^match-\d+$/.test(m.id) || !Number.isInteger(m.round) || m.round < 1 || m.round > 3 ||
         !Array.isArray(m.players) || m.players.length < 1 || m.players.length > 8 || m.players.some(id => !ids.has(id)) ||
         !['playing', 'done', 'bye', 'replay'].includes(m.status) ||
+        (v.mode === 'coop' && (typeof m.rewardId !== 'string' || !/^[a-f0-9]{32}:match-\d+$/.test(m.rewardId) || !m.rewardId.endsWith(`:${m.id}`))) ||
         (m.winner !== null && !ids.has(m.winner) && !['alliance', 'yonko'].includes(m.winner))) return false;
     const b = m.battle;
     if (!b) { if (m.status !== 'bye') return false; continue; }

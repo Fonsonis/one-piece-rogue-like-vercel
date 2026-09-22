@@ -15,3 +15,5 @@
 body:has(#local-arena)>.dmg-pop{z-index:2200}
 body:has(#local-arena)>.ultimate-scene{z-index:2201}
 @media(max-width:600px){#local-arena{height:calc(100dvh - 160px);min-height:570px}.local-game:has(#local-arena) .local-header{padding-bottom:6px}.local-game:has(#local-arena) .local-eyebrow{display:none}.local-game:has(#local-arena) .local-header h1{font-size:20px}}
+
+.local-den-den{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:44px;padding:8px 12px;border:1px solid #62a0a1;border-radius:9px;background:#e5f5f0;color:#194d53;font:700 14px/1.4 system-ui,sans-serif}.local-den-den>span{font-size:22px}.local-den-den strong{white-space:nowrap}.local-den-den small{flex-basis:100%;font:600 11px/1.4 system-ui,sans-serif}

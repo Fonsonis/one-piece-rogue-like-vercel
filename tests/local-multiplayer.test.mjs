@@ -158,6 +158,39 @@ test('readiness, changed settings, malformed packets, pause and recovery are enf
   assert.equal(s.view.matches[0].battle.revision, 1); // Reanuda un ataque, sin ráfaga de turnos atrasados.
   s.receive(guestId(1), { type: 'ping', visible: false }); s.pulse(); assert.equal(s.view.paused, true);
 });
+test('yonko match IDs are unique across rematches and travel in the validated host state', () => {
+  const { s, api, heartbeat, advance } = room();
+  s.roomId = 'f'.repeat(32);
+  s.configure({ mode: 'coop' });
+  for (const p of s.view.players) s.receive(p.id, { type: 'ready', ready: true, denDen:4 });
+  s.start();
+  const first = s.view.matches[0].rewardId;
+  assert.equal(first, `${'f'.repeat(32)}:match-1`);
+  assert.equal(validView(JSON.parse(JSON.stringify(s.view)), api), true);
+  const bad = JSON.parse(JSON.stringify(s.view)); bad.matches[0].rewardId = 'invalid';
+  assert.equal(validView(bad, api), false);
+  const b = s.arenas.get(s.view.matches[0].id); b.over = true; b.winner = 'p';
+  advance(); heartbeat(); s.pulse();
+  assert.equal(s.view.champion, 'alliance');
+  s.reset();
+  for (const p of s.view.players) s.receive(p.id, { type: 'ready', ready: true, denDen:3 });
+  s.start();
+  assert.notEqual(s.view.matches[0].rewardId, first);
+});
+test('yonko cannot start without one den den mushi per player and spends one on a real start', () => {
+  const {s}=room(); let remaining=1, spent=0;
+  s.denDenAvailable=()=>remaining;
+  s.consumeDenDen=()=>{if(!remaining)return false;remaining--;spent++;return true;};
+  s.configure({mode:'coop'});
+  s.receive('host',{type:'ready',ready:true,denDen:1});
+  s.receive(guestId(1),{type:'ready',ready:true,denDen:0});
+  assert.throws(()=>s.start());
+  assert.equal(spent,0);
+  s.receive(guestId(1),{type:'ready',ready:true,denDen:1});
+  s.start();
+  assert.equal(spent,1);
+  assert.equal(remaining,0);
+});
 const signal = { v: 1, type: 'offer', room: 'a'.repeat(32), link: 'b'.repeat(32), sdp: 'v=0\r\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\na=fingerprint:sha-256 AA:BB\r\na=ice-ufrag:test\r\na=candidate:1 1 udp 2122260223 192.168.1.10 50000 typ host\r\n' };
 test('QR token roundtrip rejects corrupt data and nonlocal candidates', async () => {
   const token = await encodeSignal(signal); assert.deepEqual(await decodeSignal(token), signal);

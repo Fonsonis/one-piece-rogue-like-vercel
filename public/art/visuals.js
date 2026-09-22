@@ -16,12 +16,12 @@
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]));
 
-  charIcon = function(id, px = 26) {
+  charIcon = function(id, px = 26, crewId = null) {
     if (!Object.hasOwn(CHARS, id) || !/^[a-zA-Z0-9_-]+$/.test(id)) {
       return originalIcon.apply(this, arguments);
     }
     const size = Number.isFinite(Number(px)) ? Math.max(12, Math.min(256, Number(px))) : 26;
-    const spriteId = CHARS[id].spriteId || id;
+    const spriteId = crewSkinFor(id, crewId) || CHARS[id].spriteId || id;
     return `<span class="dex-sprite" role="img" aria-label="${escape(CHARS[id].name)}" data-character="${id}" style="--sprite-size:${size}px;--sprite-atlas:url('/art/characters/${spriteId}.png');--sprite-portrait:url('/art/portraits/${spriteId}.png')"></span>`;
   };
 
