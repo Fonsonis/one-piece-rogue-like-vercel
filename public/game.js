@@ -15,6 +15,52 @@ for (const [id, c] of Object.entries(CHARS)) if (c.evo) BASE_OF[c.evo.to] = id;
 for (const [id, c] of Object.entries(CHARS)) if (c.formBase) BASE_OF[id] = c.formBase;
 function baseFormOf(id) { while (BASE_OF[id]) id = BASE_OF[id]; return id; }
 const LUFFY_GEAR4_FORMS = Object.freeze(['luffy4-boundman', 'luffy4', 'luffy4-tankman']);
+const CREW_VERSION_PRICE = 100000;
+const CREW_SKINS = Object.freeze({
+  aokiji:{blackbeard:'aokiji-blackbeard'},
+  robin:{straw:'robin-straw',baroque:'robin-baroque'},
+  jinbe:{sun:'jinbe-sun'},
+  crocodile:{baroque:'crocodile-baroque',crossguild:'crocodile-crossguild'},
+  oden:{whitebeard:'oden-whitebeard',roger:'oden-roger'},
+  teach:{whitebeard:'teach-whitebeard'},
+  law:{donquixote:'law-donquixote'},
+  shanks:{roger:'shanks-roger'},
+  buggy:{roger:'buggy-roger',crossguild:'buggy-crossguild'},
+  hachi:{sun:'hachi-sun'},
+  galdino:{crossguild:'galdino-crossguild'},
+  dazbones:{crossguild:'dazbones-crossguild'},
+  izo:{kozuki:'izo-kozuki'},
+  praline:{sun:'praline-sun'},
+  inuarashi:{kozuki:'inuarashi-kozuki'},
+  nekomamushi:{kozuki:'nekomamushi-kozuki'},
+  drake:{beasts:'drake-beasts'},
+  newgate:{rocks:'newgate-young'},bigmom:{rocks:'bigmom-young'},
+  kaido:{rocks:'kaido-young'},shiki:{rocks:'shiki-young'},john:{rocks:'john-young'},
+  sanji:{germa:'sanji-raid'},
+});
+function crewOptions(id) { return CREW_OPTIONS[baseFormOf(id)] || []; }
+function defaultCrew(id) {
+  const base=baseFormOf(id),options=crewOptions(base);
+  return options.includes(CREW_DEFAULTS[base]) ? CREW_DEFAULTS[base] : options[0] || null;
+}
+function crewVersionUnlocked(id, crewId, progress = meta) {
+  const base=baseFormOf(id);
+  return crewOptions(base).includes(crewId) && (crewId===defaultCrew(base) ||
+    !!progress?.crewVersions?.[base]?.includes(crewId));
+}
+function preferredCrew(id, progress = meta) {
+  const base = baseFormOf(id);
+  const saved = progress?.formPreferences?.crews?.[base];
+  return crewVersionUnlocked(base,saved,progress) ? saved : defaultCrew(base);
+}
+function fighterCrew(f) {
+  const options = crewOptions(f.id);
+  return options.includes(f.crewId) ? f.crewId : preferredCrew(f.id);
+}
+function crewSkinFor(id, crewId) {
+  const base=baseFormOf(id);
+  return id===base ? CREW_SKINS[base]?.[crewId || preferredCrew(base)] : null;
+}
 
 // The Dex groups forms for presentation without rewriting legacy discovery records.
 function characterForms(id) {
@@ -506,8 +552,12 @@ const META_DEFAULTS = () => ({
   challenge: null,
   soloWins: 0,
   logPoses: 0,
+  localYonkoReward: null,
+  denDenMushis: null,
   starPity: 0,
   charUpgrades: {},
+  charUpgradeSpent: {}, // Log Poses invertidos realmente en niveles base.
+  crewVersions: {}, // Versiones alternativas de tripulación compradas.
   formPreferences: {}, // Preferencias de formas alternativas para nuevas aventuras.
   dailySteps: { date: dailyStepsDayKey(), remaining: DAILY_STEPS_LIMIT },
   settings: { showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 },
@@ -521,6 +571,8 @@ function loadMeta() {
   meta.logPoses = meta.logPoses || 0;
   meta.starPity = meta.starPity || 0;
   meta.charUpgrades = meta.charUpgrades || {};
+  meta.charUpgradeSpent = meta.charUpgradeSpent || {};
+  meta.crewVersions = meta.crewVersions || {};
   meta.formPreferences = Object.assign({}, meta.formPreferences || {});
   meta.dailySteps = normalizeDailySteps(meta.dailySteps);
   meta.roster = meta.roster || [];
@@ -712,6 +764,16 @@ function validateGameSave(data) {
   if (progress.formPreferences?.luffyGear4 !== undefined && !LUFFY_GEAR4_FORMS.includes(progress.formPreferences.luffyGear4)) {
     throw new Error('Preferencia de Gear 4 incompatible.');
   }
+  if (progress.crewVersions && (typeof progress.crewVersions!=='object' || Array.isArray(progress.crewVersions) ||
+    Object.entries(progress.crewVersions).some(([id,versions])=>baseFormOf(id)!==id || !Array.isArray(versions) ||
+      versions.some(crew=>!crewOptions(id).includes(crew) || crew===defaultCrew(id)) || new Set(versions).size!==versions.length))) {
+    throw new Error('Versiones de tripulación incompatibles.');
+  }
+  if (progress.formPreferences?.crews &&
+    (typeof progress.formPreferences.crews !== 'object' || Array.isArray(progress.formPreferences.crews) ||
+      Object.entries(progress.formPreferences.crews).some(([id,crew])=>baseFormOf(id)!==id || !crewVersionUnlocked(id,crew,progress)))) {
+    throw new Error('Preferencia de tripulación incompatible.');
+  }
   const equipment=Object.entries(progress.relicEquipment||{});
   if(equipment.some(([id,r])=>!CHARS[id]||baseFormOf(id)!==id||!RELICS[r]||!progress.relics?.includes(r))||
     new Set(equipment.map(([,r])=>r)).size!==equipment.length) throw new Error('Equipo de reliquias incompatible.');
@@ -754,7 +816,8 @@ function validateGameSave(data) {
   }
   if ([...Object.keys(r.items || {}), ...Object.keys(r.pendingLoot || {})].some(id => !Object.hasOwn(ITEMS,id))) throw new Error('Objeto desconocido en la mochila.');
   if (r.startingTeam?.some(id => !CHARS[id] || baseFormOf(id) !== id)) throw new Error('Equipo inicial incompatible.');
-  if (!SAGAS[r.saga]?.islands[r.islandIdx] || r.team.some(f => !CHARS[f.id] || f.moves.some(id => !MOVES[id]))) throw new Error('Viaje incompatible.');
+  if (!SAGAS[r.saga]?.islands[r.islandIdx] || r.team.some(f => !CHARS[f.id] || f.moves.some(id => !MOVES[id]) ||
+    (f.crewId != null && !crewOptions(f.id).includes(f.crewId)))) throw new Error('Viaje incompatible.');
   if (r.mapIdx !== undefined && r.mapIdx >= islandMapCount(SAGAS[r.saga].islands[r.islandIdx])) throw new Error('Mapa de isla incompatible.');
   if (r.map.rows.some(row => row.some(node => !NODE_TYPES[node.type]))) throw new Error('Mapa incompatible.');
 }
@@ -836,6 +899,7 @@ function loadRun() {
   prepareBackpack(run);
 }
 function migrateFighter(f, isEnemy = false, progress = meta) {
+  if (CHARS[f.id] && !crewOptions(f.id).includes(f.crewId)) f.crewId = isEnemy ? defaultCrew(f.id) : preferredCrew(f.id, progress);
   if (!isEnemy && CHARS[f.id] && baseFormOf(f.id) === 'luffy') {
     const savedChoice = LUFFY_GEAR4_FORMS.includes(f.gear4Form) ? f.gear4Form :
       (LUFFY_GEAR4_FORMS.includes(f.id) ? f.id : progress.formPreferences?.luffyGear4);
@@ -876,6 +940,7 @@ function xpBarHTML(f) {
 }
 
 function makeChar(id, lvl, isEnemy = false, exactForm = false) {
+  const crewId = isEnemy ? defaultCrew(id) : preferredCrew(id);
   const gear4Form = !isEnemy && !exactForm && baseFormOf(id) === 'luffy' ? preferredLuffyGear4(meta) : null;
   if (!isEnemy && !exactForm) id = evolutionFormAt(id, lvl, meta, gear4Form);
   const c = CHARS[id];
@@ -898,11 +963,14 @@ function makeChar(id, lvl, isEnemy = false, exactForm = false) {
     xp: 0, moves, ultCharge: 0, moveRulesVersion: 2,
     ...(!isEnemy && !exactForm ? {evolutionRulesVersion:4} : {}),
     ...(gear4Form ? {gear4Form} : {}),
+    ...(crewId ? {crewId} : {}),
   };
 }
 // AI forms follow combat level; only story encounters apply difficulty scaling.
 function makeEnemy(id, lvl, scaleDifficulty = false) {
-  return makeChar(enemyFormAt(id, lvl), lvl, scaleDifficulty, true);
+  const enemy = makeChar(enemyFormAt(id, lvl), lvl, scaleDifficulty, true);
+  enemy.crewId = defaultCrew(id);
+  return enemy;
 }
 
 // Aplica las mejoras permanentes del Barco (solo a personajes del jugador)
@@ -2283,31 +2351,31 @@ function screenHome() {
   render(`
     ${topbar(false)}
     <div class="subtitle">AVENTURA ROGUELIKE · EGGHEAD EDITION</div>
+    <section class="home-play" aria-label="Modos de juego">
+    <div class="home-section-heading"><span>01 · ELIGE TU AVENTURA</span><small>Continúa tu viaje o empieza uno nuevo</small></div>
     <div class="modes">
-      <div class="mode-card" id="mode-story">
-        <div class="mode-art story"></div>
-        <div class="mode-title">Historia</div>
-        <div class="mode-btn">${run ? 'CONTINUAR VIAJE' : 'ZARPAR'}</div>
-      </div>
-      <div class="mode-card ${towerUnlocked ? '' : 'locked'}" id="mode-tower">
-        <div class="mode-art tower"></div>
-        <div class="mode-title">Torre Marine</div>
-        <div class="mode-btn">${towerUnlocked ? 'ENTRAR' : '🔒 NV. CUENTA 20'}</div>
-      </div>
-      <div class="mode-card ${challengeUnlocked ? '' : 'locked'}" id="mode-challenge">
-        <div class="mode-art challenge"></div>
-        <div class="mode-title">Desafíos</div>
-        <div class="mode-btn">${challengeUnlocked ? 'ENTRAR' : '🔒 NV. CUENTA 35'}</div>
-      </div>
+      <button type="button" class="mode-card mode-card-primary" id="mode-story">
+        <span class="mode-art story" aria-hidden="true"></span>
+        <span class="mode-title">Historia</span>
+        <span class="mode-btn">${run ? 'CONTINUAR VIAJE' : 'ZARPAR'}</span>
+      </button>
+      <button type="button" class="mode-card ${towerUnlocked ? '' : 'locked'}" id="mode-tower" ${towerUnlocked ? '' : 'disabled'}>
+        <span class="mode-art tower" aria-hidden="true"></span>
+        <span class="mode-title">Torre Marine</span>
+        <span class="mode-btn">${towerUnlocked ? 'ENTRAR' : '🔒 NV. CUENTA 20'}</span>
+      </button>
+      <button type="button" class="mode-card ${challengeUnlocked ? '' : 'locked'}" id="mode-challenge" ${challengeUnlocked ? '' : 'disabled'}>
+        <span class="mode-art challenge" aria-hidden="true"></span>
+        <span class="mode-title">Desafíos</span>
+        <span class="mode-btn">${challengeUnlocked ? 'ENTRAR' : '🔒 NV. CUENTA 35'}</span>
+      </button>
     </div>
+    </section>
+    <div class="home-section-heading home-section-heading-secondary"><span>02 · JUEGA A TU MANERA</span><small>Partidas rápidas y multijugador</small></div>
     <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? 'Doble salto · recupera 25 pasos cada 1.000 m' : '🔒 Se desbloquea al nivel 1 de cuenta'}</small></span></button>
     <button class="local-menu-button" id="btn-local"><span aria-hidden="true">⚔️</span><span><strong>MULTIJUGADOR LOCAL</strong><small>Duelo · Torneo · Alianza contra un yonko · Conexión por QR</small></span></button>
-    <div class="home-install-actions">
-      <button class="btn green small" id="btn-offline">${nativeAndroid ? '↻ Buscar actualización Android' : '⬇ Descargar APK para Android'}</button>
-      ${nativeAndroid ? '<small id="android-update-status" role="status" aria-live="polite"></small>' : ''}
-      ${nativeAndroid ? '<small>El juego completo ya está guardado en esta APK y funciona sin conexión.</small>' : '<button class="btn gray small" id="btn-browser-offline">Preparar navegador sin internet</button>'}
-    </div>
     ${pendingPirateKingRewards().length ? `<div class="panel"><button class="btn gold" id="btn-king-rewards">👑 ELEGIR LEGENDARIO · ${pendingPirateKingRewards().length} recompensa(s) de Rey Pirata</button></div>` : ''}
+    <div class="home-section-heading home-section-heading-secondary"><span>03 · PREPARA TU TRIPULACIÓN</span><small>Consulta, mejora y consigue recompensas</small></div>
     <div class="home-main-buttons">
       <button class="btn blue small" id="btn-dex">
         <span>📖 Dex</span>
@@ -2317,22 +2385,20 @@ function screenHome() {
         <span>🎒 Inventario</span>
         <span style="font-size:8px;opacity:0.85;margin-top:2px;">(${(meta.roster || []).length})</span>
       </button>
-      <button class="btn gold small" id="btn-ship">
+      <button class="btn gold small home-action-shop" id="btn-ship">
         <span>🏪 Tienda</span>
         <span style="font-size:8px;opacity:0.85;margin-top:2px;">(⭐${meta.fame})</span>
       </button>
-      <button class="btn gold small" id="btn-achievements">
+      <button class="btn gold small ${hasUnclaimedAch ? 'home-action-ready' : ''}" id="btn-achievements">
         <span style="position:relative;">🏆 Logros${hasUnclaimedAch ? ' <span class="ach-badge-dot" style="background:#e74c3c;color:#fff;font-size:7px;border-radius:50%;padding:1px 4px;margin-left:2px;font-weight:bold;animation:pulse 1s infinite alternate;border:1px solid #fff;">!</span>' : ''}</span>
         <span style="font-size:8px;opacity:0.85;margin-top:2px;">(${completedAch}/${totalAchCount})</span>
       </button>
     </div>
-    <div style="text-align:center;margin-top:8px;">
-      <button class="btn red small" id="btn-logpose-gacha" style="padding:7px 16px;font-size:9.5px;font-weight:bold;width:100%;max-width:280px;box-shadow:0 2px 6px rgba(231,76,60,0.4);">
+    <div class="home-market-actions">
+      <button class="btn red small" id="btn-logpose-gacha">
         <img class="carteles-menu-icon" src="/art/cross-guild-map.png" alt="" aria-hidden="true" draggable="false"> CARTELES (🧭 ${meta.logPoses || 0})
       </button>
-    </div>
-    <div style="text-align:center;margin-top:8px;">
-      <button class="btn gray small" id="btn-guide" style="padding:6px 14px;font-size:9px;">📊 Tipos y Sinergias</button>
+      <button class="btn gray small" id="btn-guide">📊 Tipos y Sinergias</button>
     </div>
     <div style="text-align:center;margin-top:14px;display:flex;flex-direction:column;gap:6px;align-items:center;">
       <div class="home-account-status">
@@ -2347,6 +2413,11 @@ function screenHome() {
       <button class="btn small gold" id="btn-import">📂 IMPORTAR JSON</button>
       <input type="file" id="file-import" accept=".json,application/json" style="display:none;">
     </div>
+    <div class="home-install-actions">
+      <button class="btn green small" id="btn-offline">${nativeAndroid ? '↻ Buscar actualización Android' : '⬇ Descargar APK para Android'}</button>
+      ${nativeAndroid ? '<small id="android-update-status" role="status" aria-live="polite"></small>' : ''}
+      ${nativeAndroid ? '<small>El juego completo ya está guardado en esta APK y funciona sin conexión.</small>' : '<button class="btn gray small" id="btn-browser-offline">Preparar navegador sin internet</button>'}
+    </div>
     <div class="footer-note">
       Réplica del juego fan <a href="https://one-piece-rogue-like-vercel.vercel.app/" target="_blank" rel="noopener noreferrer">GrandLineLike</a>. Sin ánimo de lucro.<br>No afiliado con Eiichiro Oda, Shueisha ni Toei Animation.<br>
       One Piece y sus personajes son propiedad de sus respectivos dueños.
@@ -2355,7 +2426,11 @@ function screenHome() {
   $('#mode-story').onclick = () => run ? screenMap() : screenSagas();
   $('#btn-local').onclick = async () => {
     const btn = $('#btn-local'); btn.disabled = true;
-    try { const { openLocal } = await import('./local/ui.mjs'); await openLocal(); }
+    try {
+      const [{ openLocal }, { claimYonkoReward }, { denDenRemaining, spendDenDen }] = await Promise.all([import('./local/ui.mjs'), import('./local/rewards.mjs'), import('./local/den-den.mjs')]);
+      await openLocal({ awardYonkoWin: view => claimYonkoReward(meta, view, saveMeta),
+        denDenAvailable: () => denDenRemaining(meta), consumeDenDen: () => spendDenDen(meta,saveMeta) });
+    }
     catch (e) { toast('No se pudo abrir el modo local. Recarga el juego e inténtalo de nuevo.'); }
     finally { btn.disabled = false; }
   };
@@ -3186,7 +3261,7 @@ function showInventoryModal(opts = {}) {
         <button class="inventory-profile btn-info-inv" data-id="${id}" aria-label="Ver ficha de ${collectionText(c.name)}"><span class="inventory-portrait" aria-hidden="true">${charIcon(displayId,80)}</span><strong>${c.name}</strong><span class="inventory-profile-link">Ver ficha ↗</span></button>
         ${characterSortStatHTML(displayId,invViewState.sort)}<div class="inventory-level">Nivel base <strong>${level}</strong></div><div class="type-badges">${typeBadges(c.types)}</div>
         <p class="inventory-relic">${relic?`🏺 ${esc(relic.name)}<br><span>${relic.character===id?'Afinidad activa':'Boost común activo'}</span>`:'Sin reliquia equipada'}</p>
-        <div class="inventory-upgrade">${maxed?`<span class="inventory-limit">Límite de saga: Nv. ${cap}</span><button class="btn btn-upg-inv" data-id="${id}" disabled aria-label="Nivel máximo de saga alcanzado"><span class="inventory-upgrade-label">Nivel máximo</span><span class="inventory-upgrade-short" aria-hidden="true">Máx.</span></button>`:`<span class="inventory-cost" title="${number(cost)} Log Poses">Coste: <strong>${compact(cost)} 🧭</strong></span><button class="btn gold btn-upg-inv" data-id="${id}" ${canAfford?'':'disabled'} aria-label="Mejorar a ${collectionText(c.name)} al nivel base ${level+1} por ${number(cost)} Log Poses"><span class="inventory-upgrade-label">Subir a Nv. ${level+1}</span><span class="inventory-upgrade-short" aria-hidden="true">↑ Lv. ${level+1}</span></button>${canAfford?'':`<span class="inventory-shortfall">Faltan ${compact(cost-(meta.logPoses||0))} 🧭</span>`}`}</div>
+        <div class="inventory-upgrade">${maxed?`<span class="inventory-limit">Límite de saga: Nv. ${cap}</span><button class="btn btn-upg-inv" data-id="${id}" disabled aria-label="Nivel máximo de saga alcanzado"><span class="inventory-upgrade-label">Nivel máximo</span><span class="inventory-upgrade-short" aria-hidden="true">Máx.</span></button>`:`<span class="inventory-cost" title="${number(cost)} Log Poses">Coste: <strong>${compact(cost)} 🧭</strong></span><button class="btn gold btn-upg-inv" data-id="${id}" ${canAfford?'':'disabled'} aria-label="Mejorar a ${collectionText(c.name)} al nivel base ${level+1} por ${number(cost)} Log Poses"><span class="inventory-upgrade-label">Subir a Nv. ${level+1}</span><span class="inventory-upgrade-short" aria-hidden="true">↑ Lv. ${level+1}</span></button>${canAfford?'':`<span class="inventory-shortfall">Faltan ${compact(cost-(meta.logPoses||0))} 🧭</span>`}`}${level>5?`<button class="btn gray small btn-sell-base-inv" data-id="${id}" aria-label="Vender niveles base de ${collectionText(c.name)} y recuperar ${number(Math.floor(charBaseLevelSpent(id)/2))} Log Poses">Vender niveles · +${compact(Math.floor(charBaseLevelSpent(id)/2))} 🧭</button>`:''}</div>
       </article>`;
     }).join('');
     const filtered=invViewState.type||+invViewState.rarity||invViewState.saga;
@@ -3228,6 +3303,9 @@ function showInventoryModal(opts = {}) {
       scroller.scrollTop=grid.getBoundingClientRect().top-scroller.getBoundingClientRect().top+scroller.scrollTop-64;});
     ov.querySelectorAll('.btn-upg-inv').forEach(btn=>btn.onclick=()=>{
       if(upgradeCharLvl(btn.dataset.id))refresh(`.btn-upg-inv[data-id="${btn.dataset.id}"]:not(:disabled),.btn-info-inv[data-id="${btn.dataset.id}"]`);
+    });
+    ov.querySelectorAll('.btn-sell-base-inv').forEach(btn=>btn.onclick=()=>{
+      showSellBaseLevelsConfirmModal(btn.dataset.id,()=>refresh(`.btn-info-inv[data-id="${btn.dataset.id}"]`));
     });
     ov.querySelectorAll('.btn-info-inv').forEach(btn=>btn.onclick=()=>{
       showCharModal(btn.dataset.id,null,null,filterSortChars(allUnlocked,invViewState,id=>evolutionFormAt(id,startLvlOf(id))));
@@ -3797,6 +3875,46 @@ function startLvlOf(id, progress = meta) {
   return Math.min(rawLvl, cap);
 }
 
+function charBaseLevelSpent(id, progress = meta) {
+  const base = baseFormOf(id);
+  const levels = Math.max(0, Math.floor(Number(progress.charUpgrades?.[base]) || 0));
+  if (!levels) return 0;
+  const recorded = progress.charUpgradeSpent?.[base];
+  if (Number.isSafeInteger(recorded) && recorded >= 0) return recorded;
+  // Los guardados antiguos no tenían libro de gastos. Sus precios originales
+  // coinciden hasta Nv.30 y eran superiores a los actuales después de Nv.30.
+  let spent = 0;
+  for (let level = 5; level < 5 + levels; level++) spent += logPoseUpgradeCost(level);
+  return spent;
+}
+
+function sellCharBaseLevels(id) {
+  const base = baseFormOf(id);
+  const levels = Math.max(0, Math.floor(Number(meta.charUpgrades?.[base]) || 0));
+  if (!levels) return 0;
+  const refund = Math.floor(charBaseLevelSpent(base) / 2);
+  if (!Number.isSafeInteger(refund) || refund <= 0) return 0;
+  meta.logPoses = (meta.logPoses || 0) + refund;
+  delete meta.charUpgrades[base];
+  delete meta.charUpgradeSpent?.[base];
+  saveMeta();
+  return refund;
+}
+
+function buyCrewVersion(id, crewId) {
+  const base=baseFormOf(id);
+  if (!crewOptions(base).includes(crewId)) return false;
+  if (crewVersionUnlocked(base,crewId)) return true;
+  if (!meta.roster?.includes(base) || (meta.logPoses || 0) < CREW_VERSION_PRICE) return false;
+  const oldBalance=meta.logPoses, oldVersions=meta.crewVersions;
+  meta.logPoses-=CREW_VERSION_PRICE;
+  meta.crewVersions={...oldVersions,[base]:[...new Set([...(oldVersions?.[base] || []),crewId])]};
+  if (saveMeta() === true) return true;
+  meta.logPoses=oldBalance;
+  meta.crewVersions=oldVersions;
+  return false;
+}
+
 function upgradeCharLvl(id) {
   const base = baseFormOf(id);
   meta.charUpgrades = meta.charUpgrades || {};
@@ -3813,6 +3931,8 @@ function upgradeCharLvl(id) {
     return false;
   }
   meta.logPoses -= cost;
+  meta.charUpgradeSpent = meta.charUpgradeSpent || {};
+  meta.charUpgradeSpent[base] = charBaseLevelSpent(base) + cost;
   meta.charUpgrades[base] = (meta.charUpgrades[base] || 0) + 1;
   for (const team of [run?.team, tower?.team]) {
     for (const f of team || []) if (baseFormOf(f.id) === base) {
@@ -4414,7 +4534,7 @@ function screenMap(activePageIdx = 0) {
                 return `
                   <div class="team-slot ${f.hp <= 0 ? 'dead' : ''}" data-idx="${idx}" draggable="true">
                     <span class="drag-handle">≡</span>
-                    <span class="emoji">${charIcon(f.id, 36)}</span>
+                    <span class="emoji">${charIcon(f.id, 36, f.crewId)}</span>
                     <div class="info">${idx + 1}. <b>${charName(f)}</b> ${rarityTag}${fusionTag}<br>Nv${f.lvl}
                       ${typeBadges(fighterTypes(f))}
                       <div class="hp-nums">PS: ${f.hp}/${f.maxhp}</div>
@@ -4530,7 +4650,7 @@ function screenMap(activePageIdx = 0) {
     return `
       <div class="team-slot ${f.hp <= 0 ? 'dead' : ''}" data-idx="${idx}" draggable="true">
         <span class="drag-handle">≡</span>
-        <span class="emoji">${charIcon(f.id, 36)}</span>
+        <span class="emoji">${charIcon(f.id, 36, f.crewId)}</span>
         <div class="info">${idx + 1}. <b>${charName(f)}</b> ${rarityTag}${fusionTag}<br>Nv${f.lvl}
           ${typeBadges(fighterTypes(f))}
           <div class="hp-nums">PS: ${f.hp}/${f.maxhp}</div>
@@ -4709,7 +4829,7 @@ function useItemFromMap(id) {
         const isSel = selectedIndices.includes(idx);
         const fTypes = fighterTypes(f);
         return `<div class="shop-item fruit-select-item" data-idx="${idx}" style="cursor:pointer;background:${isSel ? 'rgba(255,215,0,0.18)' : 'rgba(0,0,0,0.2)'};border:${isSel ? '2px solid var(--gold)' : '1px solid #555'};border-radius:6px;padding:6px 10px;">
-              <span class="emoji">${charIcon(f.id, 24)}</span>
+              <span class="emoji">${charIcon(f.id, 24, f.crewId)}</span>
               <div class="info">
                 <b>${charName(f)}</b> <small>(Nv.${f.lvl})</small><br>
                 ${typeBadges(fTypes)}
@@ -4794,7 +4914,7 @@ function useItemFromMap(id) {
       return `
         <div class="shop-item item-target-row ${canUse ? 'clickable' : ''}" data-idx="${idx}"
           style="cursor:${canUse ? 'pointer' : 'not-allowed'};opacity:${canUse ? 1 : 0.55};background:rgba(0,0,0,0.2);border:1px solid #555;border-radius:6px;padding:6px 10px;display:flex;align-items:center;gap:10px;">
-          <span class="emoji">${charIcon(f.id, 28)}</span>
+          <span class="emoji">${charIcon(f.id, 28, f.crewId)}</span>
           <div class="info" style="flex:1;">
             <b>${charName(f)}</b> <small>(Nv.${f.lvl})</small><br>
             <small>${isDead ? '☠️ Derrotado (Usa Sake)' : isFull ? '💚 PS al máximo' : `PS: ${f.hp}/${f.maxhp}`}</small>
@@ -4826,7 +4946,7 @@ function useItemFromMap(id) {
       return `
         <div class="shop-item item-target-row ${isDead ? 'clickable' : ''}" data-idx="${idx}"
           style="cursor:${isDead ? 'pointer' : 'not-allowed'};opacity:${isDead ? 1 : 0.55};background:rgba(0,0,0,0.2);border:1px solid #555;border-radius:6px;padding:6px 10px;display:flex;align-items:center;gap:10px;">
-          <span class="emoji">${charIcon(f.id, 28)}</span>
+          <span class="emoji">${charIcon(f.id, 28, f.crewId)}</span>
           <div class="info" style="flex:1;">
             <b>${charName(f)}</b> <small>(Nv.${f.lvl})</small><br>
             <small>${isDead ? '☠️ Derrotado (Toca para revivir)' : '💚 Consciente'}</small>
@@ -4851,7 +4971,7 @@ function useItemFromMap(id) {
       return `
         <div class="shop-item item-target-row clickable" data-idx="${idx}"
           style="cursor:pointer;background:rgba(0,0,0,0.2);border:1px solid #555;border-radius:6px;padding:6px 10px;display:flex;align-items:center;gap:10px;">
-          <span class="emoji">${charIcon(f.id, 28)}</span>
+          <span class="emoji">${charIcon(f.id, 28, f.crewId)}</span>
           <div class="info" style="flex:1;">
             <b>${charName(f)}</b> <small>(Nv.${f.lvl})</small><br>
             <small>${isAtk ? `ATQ actual: ${f.atk} (+2 ATQ)` : `DEF actual: ${f.def} (+2 DEF)`}</small>
@@ -5066,7 +5186,7 @@ function wildTeamPreviewHTML() {
     <header><h3 id="wild-team-title">Tu equipo</h3><span>${members.filter(f=>f.hp>0).length}/${members.length} en pie</span></header>
     <div class="wild-team-grid">${members.map(f=>{
       const hp=Math.max(0,Math.min(100,f.hp/f.maxhp*100));
-      return `<div class="wild-team-member ${f.hp<=0?'ko':''}"><span class="wild-team-portrait" aria-hidden="true">${charIcon(f.id,42)}</span><div><strong>${esc(charName(f))}</strong><small>Nv${f.lvl} · ${Math.max(0,f.hp)}/${f.maxhp} PS</small><span class="hp-mini"><i style="width:${hp}%"></i></span>${typeBadges(fighterTypes(f))}</div></div>`;
+      return `<div class="wild-team-member ${f.hp<=0?'ko':''}"><span class="wild-team-portrait" aria-hidden="true">${charIcon(f.id,42,f.crewId)}</span><div><strong>${esc(charName(f))}</strong><small>Nv${f.lvl} · ${Math.max(0,f.hp)}/${f.maxhp} PS</small><span class="hp-mini"><i style="width:${hp}%"></i></span>${typeBadges(fighterTypes(f))}</div></div>`;
     }).join('')}</div>
   </section>`;
 }
@@ -5421,6 +5541,16 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
   const upgCost = logPoseUpgradeCost(f.lvl);
   const canAffordUpg = (meta.logPoses || 0) >= upgCost;
   const isMaxLvl = f.lvl >= cap;
+  const selectableCrews = !isLive ? crewOptions(fOrId) : [];
+  const crewPreference = isLive ? fighterCrew(f) : preferredCrew(fOrId);
+  const crewChoiceHTML = selectableCrews.length > 1 ? `<section class="sheet-section sheet-gear4 sheet-crew-choice" aria-labelledby="sheet-crew-title">
+    <b id="sheet-crew-title">🏴‍☠️ Versiones de tripulación</b>
+    <div class="sheet-gear4-options">${selectableCrews.map(id=>{
+      const crew=CREW_BY_ID[id], unlocked=crewVersionUnlocked(fOrId,id);
+      const canBuy=ownsCharacter && (meta.logPoses || 0)>=CREW_VERSION_PRICE;
+      return `<button type="button" class="btn small gear4-choice${crewPreference===id?' selected':''}" data-crew-choice="${id}" aria-pressed="${crewPreference===id}" ${unlocked?'':canBuy?'':`disabled title="${ownsCharacter?'Faltan Log Poses':'Recluta al personaje primero'}"`}><span>${crew.emoji} ${esc(crew.name)}</span><small>${crewPreference===id?'Elegida':unlocked?'Elegir versión':`Comprar · ${CREW_VERSION_PRICE.toLocaleString('es')} 🧭`}</small></button>`;
+    }).join('')}</div><p>La versión habitual está incluida. Cada alternativa cuesta 100.000 Log Poses una sola vez; después podrás cambiar gratis. La versión elegida determina la sinergia y apariencia de nuevas aventuras.</p>
+  </section>` : '';
   const showGear4Choice = !isLive && baseFormOf(fOrId) === 'luffy';
   const gear4Preference = preferredLuffyGear4(meta);
   const gear4ChoiceHTML = showGear4Choice ? `<section class="sheet-section sheet-gear4" aria-labelledby="sheet-gear4-title">
@@ -5442,16 +5572,17 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
   ov.sheetNavigation = navigation || ov.sheetNavigation || null;
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal char-sheet ${phaseLocked?'phase-locked':''}" role="dialog" aria-modal="true" aria-label="Ficha de ${collectionText(c.name)}">
-    <h2><span style="font-size:26px;vertical-align:middle;">${phaseLocked?'🔒':charIcon(f.id, 34)}</span> ${c.name}${phaseLocked?'':rarityTag+fusionTag} <small>${phaseLocked?'Bloqueada':'Nv.'+f.lvl}</small></h2>
+    <h2><span style="font-size:26px;vertical-align:middle;">${phaseLocked?'🔒':charIcon(f.id, 34, f.crewId)}</span> ${c.name}${phaseLocked?'':rarityTag+fusionTag} <small>${phaseLocked?'Bloqueada':'Nv.'+f.lvl}</small></h2>
     <div class="char-sheet-hero" data-phase-locked="${phaseLocked}" style="text-align:center;padding:12px;margin:8px 0 12px;background:radial-gradient(ellipse at center, rgba(232, 200, 50, 0.22) 0%, rgba(0,0,0,0.35) 75%);border:2px solid var(--gold);border-radius:8px;position:relative;">
       <div class="char-sheet-sprite" data-character="${f.id}" style="display:inline-block;filter:drop-shadow(3px 5px 8px rgba(0,0,0,0.6));">
-        ${charIcon(f.id, 90)}
+        ${charIcon(f.id, 90, f.crewId)}
       </div>
       ${!isLive&&forms.length>1?`<nav class="sheet-phase-nav" aria-label="Fases de ${esc(CHARS[forms[0].id].name)}"><button type="button" class="sheet-phase-arrow" id="sheet-phase-prev" ${phaseIndex===0?'disabled':''} aria-label="Fase anterior${phaseIndex>0?': '+esc(CHARS[forms[phaseIndex-1].id].name):''}">‹</button><button type="button" class="sheet-phase-arrow" id="sheet-phase-next" ${phaseIndex===forms.length-1?'disabled':''} aria-label="Fase siguiente${phaseIndex<forms.length-1?': '+esc(CHARS[forms[phaseIndex+1].id].name):''}">›</button></nav>`:''}
       <div class="platform" style="width:120px;height:24px;margin:-10px auto 0;background:radial-gradient(ellipse at center, #7ec850 0%, #4aa557 70%, transparent 72%);border-radius:50%;box-shadow:inset 0 0 0 2px rgba(217, 131, 46, 0.35);"></div>
       <div style="margin-top:6px;font-size:9px;color:var(--gold);"><b>Rareza:</b> ${'⭐'.repeat(c.rareza || 1)} (${c.rareza || 1} Estrellas)</div>
       ${!isLive&&forms.length>1?`<p class="sheet-phase-caption" role="status">Fase ${phaseIndex+1} de ${forms.length} · ${phaseIndex===0?'Forma base':esc(c.name)}<br>${phaseLocked?`🔒 Bloqueada · Falta ${esc(phaseMissing.join(' y '))}`:phaseIndex?`Desbloqueada · Nv. ${phase.level} en partida · ${esc(phaseSagaName)}`:''}</p>`:''}
     </div>
+    ${crewChoiceHTML}
     ${gear4ChoiceHTML}
     ${phaseLocked?`<section class="sheet-locked-notice"><h3>Fase bloqueada</h3><p>Para descubrir esta forma y probar sus ataques necesitas <strong>nivel base ${phase.level}</strong>, alcanzar el mismo nivel en partida y haber llegado a <strong>${esc(phaseSagaName)}</strong>.</p><p>Tu nivel base: <strong>${startLvlOf(f.id)}</strong> · Saga: <strong>${phaseSagaLocked?'pendiente':'alcanzada'}</strong></p></section>`:''}
     ${phaseLocked?'':`
@@ -5480,13 +5611,14 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
             ⬆️ Subir a Nivel ${f.lvl + 1} (${upgCost} 🧭)
           </button>
         `}
+        ${ownsCharacter && startLvlOf(f.id)>5?`<button class="btn small gray" id="sheet-sell-base-btn" style="font-size:8.5px;padding:4px 10px;">Vender niveles base · +${Math.floor(charBaseLevelSpent(f.id)/2).toLocaleString('es')} 🧭</button>`:''}
       </div>
     ` : ''}
     ${isFru || isHak ? `<div class="sheet-line">
       ${isFru ? '<b>🍈 Tag FRUTA</b> — recibe la mitad de daño de atacantes sin HAKI. ' : ''}
       ${isHak ? '<b>👁️ Tag HAKI</b> — sus ataques anulan la defensa pasiva de los usuarios FRUTA.' : ''}
     </div>` : ''}
-    ${c.nakama ? '<div class="sheet-line" style="color:var(--sea);"><b>🏴‍☠️ Nakama de la banda</b> — activa Espíritu de Tripulación</div>' : ''}
+    ${crewPreference ? `<div class="sheet-line" style="color:var(--sea);"><b>${CREW_BY_ID[crewPreference].emoji} ${esc(CREW_BY_ID[crewPreference].name)}</b> — cuenta para esta sinergia de tripulación</div>` : ''}
     ${lore.clase ? `<div class="sheet-line"><b>Clase:</b> ${lore.clase}</div>` : ''}
     ${lore.faccion ? `<div class="sheet-line"><b>Facción:</b> ${lore.faccion}</div>` : ''}
     <div class="sheet-stats">
@@ -5546,6 +5678,21 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
     });
     toast(`☁️ ${CHARS[meta.formPreferences.luffyGear4].name} elegida para nuevas aventuras.`);
   });
+  (ov.querySelectorAll?.('[data-crew-choice]') || []).forEach(button => button.onclick = () => {
+    const crewId=button.dataset.crewChoice,base=baseFormOf(fOrId);
+    if (!crewOptions(base).includes(crewId)) return;
+    if (!crewVersionUnlocked(base,crewId) && !buyCrewVersion(base,crewId)) {
+      toast('⚠️ No se pudo comprar la versión. Comprueba tus Log Poses y el guardado.');
+      return;
+    }
+    const previousPreferences=meta.formPreferences;
+    meta.formPreferences={...previousPreferences,crews:{...previousPreferences?.crews,[base]:crewId}};
+    if (!saveMeta()) { meta.formPreferences=previousPreferences; toast('⚠️ No se pudo guardar la versión elegida.'); return; }
+    const scrollTop=ov.querySelector('.modal').scrollTop;
+    showCharModal(fOrId,ov,previewId);
+    queueMicrotask(()=>{if(ov.isConnected){ov.querySelector('.modal').scrollTop=scrollTop;ov.querySelector(`[data-crew-choice="${crewId}"]`)?.focus({preventScroll:true});}});
+    toast(`${CREW_BY_ID[crewId].emoji} ${CHARS[base].name}: ${CREW_BY_ID[crewId].name} para nuevas aventuras.`);
+  });
   const relicSelect=ov.querySelector('#sheet-relic-select');
   if(relicSelect)relicSelect.onchange=()=>{
     const next=relicSelect.value,current=meta.relicEquipment?.[relicBase];
@@ -5577,6 +5724,13 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
       });
     };
   }
+  const sellBaseBtn = ov.querySelector('#sheet-sell-base-btn');
+  if (sellBaseBtn) sellBaseBtn.onclick = () => showSellBaseLevelsConfirmModal(f.id, () => {
+    const scrollTop = ov.querySelector('.modal').scrollTop;
+    showCharModal(fOrId, ov);
+    ov.querySelector('.modal').scrollTop = scrollTop;
+    ov.querySelector('#sheet-close')?.focus({preventScroll:true});
+  });
   const dismissBtn = ov.querySelector('#sheet-dismiss-btn');
   if (dismissBtn) {
     dismissBtn.onclick = () => {
@@ -6285,13 +6439,13 @@ const SYNERGIES = {
     d2: '+18% de daño general, +10% de CRIT_CHANCE y anula la evasión (EVA) del enemigo'
   },
   Nakama: {
-    name: 'Espíritu de Tripulación',
-    d1: '+10% al ataque, defensas y velocidad si ningún miembro comparte tipo primario',
+    name: 'Sombrero de Paja',
+    d1: '+10% al ataque, defensas y velocidad de la banda',
     d2: 'Un aliado que caiga a 0 PS sobrevive con 1 PS una vez por viaje'
   },
 };
 const synEmoji = t => t === 'Nakama' ? '🏴‍☠️' : TYPES[t].emoji;
-const isNakamaChar = f => !!(charData(f).nakama || (CHARS[baseFormOf(f.id)] && CHARS[baseFormOf(f.id)].nakama));
+const isNakamaChar = f => fighterCrew(f) === 'straw';
 
 function synergyCount(team, type) {
   return team.filter(f => f.hp > 0 && (type === 'Nakama' ? isNakamaChar(f) : fighterTypes(f).includes(type))).length;
@@ -6307,23 +6461,60 @@ function synergyBonus(team, type, first, second) {
   const tier = synergyTier(team, type);
   return tier === 2 ? second * synergyBoost(team, type) : tier === 1 ? first : 0;
 }
+function crewCount(team, id) { return team.filter(f => f.hp > 0 && fighterCrew(f) === id).length; }
+function crewTier(team, id) { const count=crewCount(team,id); return count>=3?2:count>=2?1:0; }
+function allianceTier(team, id) {
+  if (id === 'strawheart') return crewCount(team,'straw') >= 1 && crewCount(team,'heart') >= 1 &&
+    crewCount(team,'straw') + crewCount(team,'heart') >= 3 ? 1 : 0;
+  if (id === 'wano') return ['luffy','law','kid'].every(id => team.some(f => f.hp>0 && baseFormOf(f.id)===id)) ? 1 : 0;
+  return 0;
+}
+function crewBonus(team, stat) {
+  let bonus=0;
+  for (const crew of CREW_GROUPS) {
+    if (crew.id === 'straw') continue; // conserva Espíritu de Tripulación
+    const tier=crewTier(team,crew.id);
+    if (!tier) continue;
+    if (crew.first===stat) bonus=Math.max(bonus,crew.amount*(tier===2?1.5:1));
+    if (tier===2 && crew.second===stat) bonus=Math.max(bonus,crew.secondary);
+  }
+  if (allianceTier(team,'strawheart') && stat==='heal') bonus=Math.max(bonus,.08);
+  if (allianceTier(team,'wano') && stat==='crit') bonus=Math.max(bonus,.08);
+  return bonus;
+}
+function crewStatMult(team, stat) {
+  return 1 + crewBonus(team,stat) + (stat==='atk' && allianceTier(team,'wano') ? .06 : 0);
+}
 function teamSynergies(team) {
-  return Object.keys(SYNERGIES).map(t => ({ t, tier: synergyTier(team, t) })).filter(x => x.tier > 0);
+  return [
+    ...Object.keys(SYNERGIES).map(t => ({t,tier:synergyTier(team,t)})),
+    ...CREW_GROUPS.filter(crew => crew.id!=='straw').map(crew => ({t:`crew:${crew.id}`,tier:crewTier(team,crew.id)})),
+    {t:'alliance:strawheart',tier:allianceTier(team,'strawheart')},
+    {t:'alliance:wano',tier:allianceTier(team,'wano')},
+  ].filter(x => x.tier>0);
+}
+function synergyLabel(t) {
+  if (t.startsWith('crew:')) { const crew=CREW_BY_ID[t.slice(5)]; return {emoji:crew.emoji,name:crew.name,description:`+${Math.round(crew.amount*100)}% ${crew.first}; con 3 miembros, +${Math.round(crew.secondary*100)}% ${crew.second} adicional`}; }
+  if (t==='alliance:strawheart') return {emoji:'🤝',name:'Alianza Sombrero–Heart',description:'+8% a la curación del equipo'};
+  if (t==='alliance:wano') return {emoji:'⚔️',name:'Tres capitanes de Wano',description:'+6% al ataque y +8% a críticos'};
+  return {emoji:synEmoji(t),name:t,description:SYNERGIES[t].d1};
 }
 function synChipsHTML(team) {
   const list = teamSynergies(team);
   if (!list.length) return '<span class="syn-none">sin sinergias</span>';
-  return list.map(({ t, tier }) =>
-    `<span class="syn-chip t${tier}" title="${SYNERGIES[t].name}: ${tier === 2 ? SYNERGIES[t].d2 : SYNERGIES[t].d1}${synergyBoost(team,t)>1 ? ' · 6/6: bonus numéricos reforzados (25% → 35%)' : ''}">${synEmoji(t)} ${t} ${tier === 2 ? 'Ⅱ' : 'Ⅰ'}${synergyBoost(team,t)>1 ? ' ★ 6/6' : ''}</span>`
-  ).join('');
+  return list.map(({ t, tier }) => {
+    const label=synergyLabel(t),base=SYNERGIES[t];
+    return `<span class="syn-chip t${tier}" title="${esc(base?(tier===2?base.d2:base.d1):label.description)}">${label.emoji} ${esc(label.name)} ${tier===2?'Ⅱ':'Ⅰ'}</span>`;
+  }).join('');
 }
 
 function activeSynergiesHTML(team) {
   const active = teamSynergies(team);
   if (!active.length) return '<p class="synergy-empty">Sin sinergias activas. Reúne 2 nakamas con el mismo tag para activar el nivel I.</p>';
-  return '<div class="active-synergy-grid">' + active.map(({t,tier}) =>
-    `<article class="active-synergy-card"><header><b>${synEmoji(t)} ${t}</b><span>Nivel ${tier === 2 ? 'II' : 'I'} · ${synergyCount(team,t)} nakamas</span></header><p>${tier === 2 ? SYNERGIES[t].d2 : SYNERGIES[t].d1}</p>${synergyBoost(team,t)>1 ? '<strong>★ 6/6 · Bonus numéricos ×1,4</strong>' : ''}</article>`
-  ).join('') + '</div>';
+  return '<div class="active-synergy-grid">' + active.map(({t,tier}) => {
+    const label=synergyLabel(t),base=SYNERGIES[t];
+    return `<article class="active-synergy-card"><header><b>${label.emoji} ${esc(label.name)}</b><span>Nivel ${tier===2?'II':'I'}</span></header><p>${esc(base?(tier===2?base.d2:base.d1):label.description)}</p></article>`;
+  }).join('') + '</div>';
 }
 
 // ---------- Tags de naturaleza ----------
@@ -6331,11 +6522,10 @@ const hasFruta = f => fighterTypes(f).includes('Fruta');
 // HAKI: tipo propio o concedido por la sinergia Haki del equipo (nivel I+)
 const hasHaki = f => fighterTypes(f).includes('Haki') || (f.moves || []).some(id => MOVES[id]?.type === 'Haki') ||
   (battle && synergyTier(teamOf(f), 'Haki') >= 1);
-// Nakama I: +10% a todas las estadísticas si ningún miembro comparte tipo primario
+// Sombrero de Paja: el vínculo de la tripulación no depende de tipos primarios.
 function nakamaStatMult(team) {
   if (synergyTier(team, 'Nakama') < 1) return 1;
-  const prim = team.filter(f => f.hp > 0).map(f => charData(f).types[0]);
-  return new Set(prim).size === prim.length ? 1 + synergyBonus(team, 'Nakama', .10, .10) : 1;
+  return 1 + synergyBonus(team, 'Nakama', .10, .10);
 }
 
 // Modal informativo con todas las sinergias y el estado del equipo actual
@@ -6344,17 +6534,21 @@ function showSynergyModal(team) {
   ov.className = 'overlay collection-overlay';
   ov.innerHTML = `<div class="modal collection-modal guide-modal" role="dialog" aria-modal="true" aria-label="Guía de sinergias y tipos">
     <h2 style="flex-shrink:0;">🧩 Sinergias de equipo</h2>
-    <p style="font-size:8px;text-align:center;margin-bottom:10px;flex-shrink:0;">2 nakamas vivos del mismo tag: nivel I. 3 o más: nivel II.
-    Con 6/6 del mismo tag, sus bonus numéricos aumentan un 40 % (por ejemplo, 25 % → 35 %). Los efectos absolutos se mantienen.</p>
+    <p style="font-size:8px;text-align:center;margin-bottom:10px;flex-shrink:0;">Los tipos y tripulaciones se activan con 2 miembros vivos; 3 alcanzan nivel II. Cada personaje cuenta solo para la tripulación elegida. Las alianzas conservan las bandas originales.</p>
     <div class="collection-list guide-content">
       ${Object.keys(SYNERGIES).map(t => {
     const tier = team ? synergyTier(team, t) : 0;
     const s = SYNERGIES[t];
     return `<div class="sheet-section synergy-guide-card ${tier ? 'is-active' : ''}">
             <b>${synEmoji(t)} ${t} — ${s.name}${team ? ` · ${synergyCount(team,t)} nakamas` : ''} ${tier ? `<span style="color:var(--accent);">— ACTIVA ${tier === 2 ? 'Ⅱ' : 'Ⅰ'}</span>` : ''}</b>
-            <p>Ⅰ: ${s.d1}<br>Ⅱ: ${s.d2}<br><b>6/6:</b> ${t === 'Nakama' ? 'Bonus de estadísticas +14 % si no repiten tipo primario; la protección conserva 1 PS.' : 'Bonus numéricos ×1,4; sin duplicar inmunidades ni efectos garantizados.'}${team && synergyBoost(team,t)>1 ? ' ★ ACTIVO' : ''}</p>
+            <p>Ⅰ: ${s.d1}<br>Ⅱ: ${s.d2}<br><b>6/6:</b> ${t === 'Nakama' ? 'Bonus de estadísticas +14 %; la protección conserva 1 PS.' : 'Bonus numéricos ×1,4; sin duplicar inmunidades ni efectos garantizados.'}${team && synergyBoost(team,t)>1 ? ' ★ ACTIVO' : ''}</p>
           </div>`;
   }).join('')}
+      <h3>🏴‍☠️ Tripulaciones y facciones principales</h3>
+      ${CREW_GROUPS.filter(crew=>crew.id!=='straw').map(crew=>`<div class="sheet-section synergy-guide-card ${team&&crewTier(team,crew.id)?'is-active':''}"><b>${crew.emoji} ${esc(crew.name)}${team?` · ${crewCount(team,crew.id)} miembros`:''}</b><p>${esc(synergyLabel(`crew:${crew.id}`).description)}</p></div>`).join('')}
+      <h3>🤝 Alianzas</h3>
+      <div class="sheet-section synergy-guide-card ${team&&allianceTier(team,'strawheart')?'is-active':''}"><b>Sombrero de Paja + Heart</b><p>Al menos 3 aliados entre ambas bandas, con uno de cada una: +8% curación.</p></div>
+      <div class="sheet-section synergy-guide-card ${team&&allianceTier(team,'wano')?'is-active':''}"><b>Tres capitanes de Wano</b><p>Luffy, Law y Kid juntos: +6% ataque y +8% crítico.</p></div>
     </div>
     <div class="actions guide-actions">
       <button class="btn blue" id="syn-chart">📊 TABLA DE DEBILIDADES</button>
@@ -6565,7 +6759,7 @@ function fighterCardHTML(f, side, idx, active) {
       ${combatStatsHTML(f)}
     </div>
     <div class="fcard-sprite" data-character="${f.id}">
-      <span class="sprite ${side === 'e' ? 'flip' : ''}">${charIcon(f.id, 64)}</span>
+      <span class="sprite ${side === 'e' ? 'flip' : ''}">${charIcon(f.id, 64, f.crewId)}</span>
       <div class="platform"></div>
     </div>
   </div>`;
@@ -6581,7 +6775,7 @@ function showBattleCrew() {
   ov.innerHTML = `<div class="modal battle-crew-modal"><h2>👥 Bandas en combate</h2>
     ${[['Tu banda',b.pTeam,b.curP],['Enemigos',b.eTeam,b.curE]].map(([label,team,active],side)=>`
       <h3>${label}</h3>${team.map((f,index)=>`<button class="battle-crew-row" data-crew-side="${side}" data-crew-index="${index}">
-        ${charIcon(f.id,36)}<span><b>${charName(f)}</b> · Nv${f.lvl}<small>${f.hp}/${f.maxhp} PS · ${f.hp <= 0 ? 'Fuera de combate' : b.opts.duos ? 'En combate' : f === active ? 'Activo' : 'En reserva'}</small></span><span>ℹ️</span>
+        ${charIcon(f.id,36,f.crewId)}<span><b>${charName(f)}</b> · Nv${f.lvl}<small>${f.hp}/${f.maxhp} PS · ${f.hp <= 0 ? 'Fuera de combate' : b.opts.duos ? 'En combate' : f === active ? 'Activo' : 'En reserva'}</small></span><span>ℹ️</span>
       </button>`).join('')}`).join('')}
     <div class="actions"><button class="btn green" data-close-crew>VOLVER AL COMBATE</button></div></div>`;
   document.body.appendChild(ov);
@@ -6631,7 +6825,7 @@ function reservesHTML() {
       const active = f === b.curP;
       const disabled = active || f.hp <= 0 || b.switchUsed || b.over || b.waiting || b.curP?.hp <= 0 || b.curE?.hp <= 0;
       return `<button class="battle-reserve ${active ? 'is-active' : ''} ${f.hp <= 0 ? 'is-ko' : ''}" data-reserve="${index}" ${disabled ? 'disabled' : ''} aria-label="${active ? 'Activo' : 'Relevar con'} ${charName(f)}, ${f.hp}/${f.maxhp} PS">
-        ${charIcon(f.id, 80)}<b>${charName(f)}</b>
+        ${charIcon(f.id, 80, f.crewId)}<b>${charName(f)}</b>
         <span class="hp-bar"><i class="${hpBarClass(f)}" style="width:${clamp(f.hp / f.maxhp * 100, 0, 100)}%"></i></span>
         <small>${f.hp}/${f.maxhp} PS · ${f.hp <= 0 ? 'KO' : active ? 'Activo' : 'Reserva'}</small>
       </button>`;
@@ -6880,6 +7074,7 @@ function critChanceFor(att) {
   const tD = synergyTier(team, 'Disparo');
   if (tD) c += synergyBonus(team, 'Disparo', .10, .20);
   c += synergyBonus(team, 'Haki', 0, .10);
+  c += crewBonus(team,'crit');
   c += relicRule(att).critical || 0;
   return Math.min(.75, c);
 }
@@ -6898,6 +7093,7 @@ function evaChanceFor(dfd) {
   if (isP(dfd, 'smoker')) e += 0.20;
   const tV = synergyTier(teamOf(dfd), 'Viento');
   if (tV) e += synergyBonus(teamOf(dfd), 'Viento', .08, .18);
+  e += crewBonus(teamOf(dfd),'eva');
   return Math.min(.60, e);
 }
 
@@ -6909,8 +7105,8 @@ function calcDamage(att, dfd, mv, crit, variance) {
   if (isP(dfd, 'luffy') && mv.type === 'Rayo') eff = 0;
   const atkTeam = teamOf(att), defTeam = teamOf(dfd);
   // Categoría: físico usa ATQ vs DEF; especial usa ESP_ATQ vs ESP_DEF
-  let atkStat = (phys ? att.atk : att.spatk) * nakamaStatMult(atkTeam) * battleItemMult(att,'atk');
-  let defStat = (phys ? dfd.def : dfd.spdef) * nakamaStatMult(defTeam) * battleItemMult(dfd,'def');
+  let atkStat = (phys ? att.atk : att.spatk) * nakamaStatMult(atkTeam) * crewStatMult(atkTeam,phys?'atk':'spatk') * battleItemMult(att,'atk');
+  let defStat = (phys ? dfd.def : dfd.spdef) * nakamaStatMult(defTeam) * crewStatMult(defTeam,phys?'def':'spdef') * battleItemMult(dfd,'def');
   atkStat *= relicStatMult(att);
   defStat *= relicStatMult(dfd);
   const relic = relicRule(att);
@@ -6947,6 +7143,7 @@ function calcDamage(att, dfd, mv, crit, variance) {
   const base = ((2 * att.lvl / 5 + 2) * mv.power * atkStat / Math.max(1, defStat)) / 50 + 2;
   const r = variance ?? (0.85 + Math.random() * 0.15);
   let dmg = base * eff * r * relicDamageMult(att,dfd,mv);
+  dmg *= 1 - crewBonus(defTeam,'hp');
   dmg *= (phys ? ar.physical : ar.special) || 1;
   dmg *= ar.types?.[mv.type] || 1;
   dmg *= dr.reduction || 1;
@@ -7126,7 +7323,7 @@ function scheduleRound(delay) {
 
 function effectiveSpeed(f) {
   const rule = passiveRule(f);
-  let speed = f.spd * nakamaStatMult(teamOf(f)) * (rule.speed || 1) * relicStatMult(f) * (relicRule(f).speed || 1);
+  let speed = f.spd * nakamaStatMult(teamOf(f)) * crewStatMult(teamOf(f),'spd') * (rule.speed || 1) * relicStatMult(f) * (relicRule(f).speed || 1);
   const tier = synergyTier(teamOf(f), 'Rayo');
   if (tier) speed *= 1 + synergyBonus(teamOf(f), 'Rayo', .20, .40);
   if (f.st?.slow) speed *= 1 - (f.st.slowRate || .15);
@@ -7212,7 +7409,7 @@ function afterRound() {
     if (water) heal += synergyBonus(team, 'Agua', .04, .08);
     const opposingTeam = b.pTeam.includes(act) ? b.eTeam : b.pTeam;
     const blocked = synergyTier(opposingTeam,'Oscuridad') === 2;
-    return {drain, heal:blocked ? 0 : Math.floor((heal * act.maxhp + drain) * healScaleNow())};
+    return {drain, heal:blocked ? 0 : Math.floor(((heal + crewBonus(team,'heal')) * act.maxhp + drain) * healScaleNow())};
   });
   actors.forEach((act,i) => {
     if (!act || act.hp <= 0) return;
@@ -7983,7 +8180,7 @@ const UPG_STATS = [
 ];
 let shipBuyLock = 0;
 let shipSearchQ = '';
-const shipTraining = { selected: null, saga: '', teamOnly: false, page: 0 };
+const shipTraining = { selected: null, saga: '', type: '', rarity: 0, sort: 'name', teamOnly: false, page: 0 };
 function groupUpgradeRoster(ids) {
   const groups = [...SAGAS.map(s => ({id:s.id,name:s.name})), {id:'other',name:'OTROS'}];
   const known = new Set(groups.map(g => g.id));
@@ -7991,6 +8188,14 @@ function groupUpgradeRoster(ids) {
     const saga = CHARS[id]?.saga;
     return (known.has(saga) ? saga : 'other') === g.id;
   })})).filter(g => g.ids.length);
+}
+
+function filterShipRoster(roster, state, query = '', team = []) {
+  const teamIds = new Set(team.map(id => baseFormOf(id)));
+  return filterSortChars(groupUpgradeRoster(roster)
+    .filter(group => !state.saga || group.id === state.saga)
+    .flatMap(group => group.ids), {...state,q:query})
+    .filter(id => !state.teamOnly || teamIds.has(baseFormOf(id)));
 }
 
 function upgCost(lvl) { return 30 + lvl * 10; }
@@ -8033,6 +8238,30 @@ function showSellStatsConfirmModal(id, spent, refund, onConfirm) {
     onConfirm();
   };
   ov.onclick = e => { if (e.target === ov) ov.remove(); };
+}
+
+function showSellBaseLevelsConfirmModal(id, onConfirm) {
+  const base = baseFormOf(id);
+  const levels = Math.max(0, Math.floor(Number(meta.charUpgrades?.[base]) || 0));
+  if (!levels) return;
+  const spent = charBaseLevelSpent(base);
+  const refund = Math.floor(spent / 2);
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal" role="dialog" aria-modal="true" aria-label="Vender niveles base de ${esc(CHARS[base].name)}" style="max-width:420px;text-align:center;">
+    <h2>🧭 Vender niveles base</h2>
+    <p>${esc(CHARS[base].name)} volverá de Nv. ${5 + levels} a Nv. 5 para futuras aventuras. Has invertido ${spent.toLocaleString('es')} Log Poses y recibirás el 50%: <strong>+${refund.toLocaleString('es')} 🧭</strong>.</p>
+    <div class="actions"><button class="btn gray" id="sell-base-cancel">Cancelar</button><button class="btn red" id="sell-base-confirm">Vender niveles</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#sell-base-cancel').onclick = () => ov.remove();
+  ov.querySelector('#sell-base-confirm').onclick = () => {
+    ov.remove();
+    const paid = sellCharBaseLevels(base);
+    if (paid) { toast(`🧭 +${paid.toLocaleString('es')} Log Poses por los niveles base de ${CHARS[base].name}.`); onConfirm?.(); }
+  };
+  ov.onclick = e => { if (e.target === ov) ov.remove(); };
+  ov.querySelector('#sell-base-cancel').focus();
 }
 
 function screenShip() {
@@ -8087,7 +8316,11 @@ function screenShip() {
             <option value="">Todas las sagas</option>
             ${groupUpgradeRoster(roster).map(g => `<option value="${g.id}" ${shipTraining.saga === g.id ? 'selected' : ''}>${g.name}</option>`).join('')}
           </select>
+          <select id="ship-training-type" aria-label="Filtrar por tipo"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t=>`<option value="${t}" ${shipTraining.type===t?'selected':''}>${t}</option>`).join('')}</select>
+          <select id="ship-training-rarity" aria-label="Filtrar por rareza"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r=>`<option value="${r}" ${+shipTraining.rarity===r?'selected':''}>${r} ${r===1?'estrella':'estrellas'}</option>`).join('')}</select>
+          <select id="ship-training-sort" aria-label="Ordenar nakamas">${[['name','Nombre A–Z'],['usageDesc','Más usados'],['rarezaDesc','Mayor rareza'],['rarezaAsc','Menor rareza'],['statTotalDesc','Mayor fuerza actual']].map(([v,l])=>`<option value="${v}" ${shipTraining.sort===v?'selected':''}>${l}</option>`).join('')}</select>
           <button class="btn small gray" id="ship-training-team" aria-pressed="${shipTraining.teamOnly}" ${run?.team?.length ? '' : 'disabled'}>Mi equipo</button>
+          <button class="btn small gray" id="ship-training-reset">Limpiar filtros</button>
         </div>
         <div id="ship-roster-list"></div>
       </section>
@@ -8162,11 +8395,7 @@ function screenShip() {
 
   const renderRosterUI = () => {
     const q = (shipSearchQ || '').trim().toLocaleLowerCase('es');
-    const teamIds = new Set((run?.team || []).map(f => baseFormOf(f.id)));
-    const filteredRoster = groupUpgradeRoster(roster)
-      .filter(g => !shipTraining.saga || g.id === shipTraining.saga)
-      .flatMap(g => g.ids)
-      .filter(id => (!shipTraining.teamOnly || teamIds.has(baseFormOf(id))) && CHARS[id].name.toLocaleLowerCase('es').includes(q));
+    const filteredRoster = filterShipRoster(roster, shipTraining, q, (run?.team || []).map(f => f.id));
     const container = $('#ship-roster-list');
     if (!container) return;
     const pageSize = 8;
@@ -8303,6 +8532,15 @@ function screenShip() {
   const searchInput = $('#ship-search-q');
   if (searchInput) searchInput.oninput = e => { shipSearchQ = e.target.value; shipTraining.page = 0; renderRosterUI(); };
   $('#ship-training-saga').onchange = e => { shipTraining.saga = e.target.value; shipTraining.page = 0; renderRosterUI(); };
+  for (const [selector,key] of [['#ship-training-type','type'],['#ship-training-rarity','rarity'],['#ship-training-sort','sort']]) {
+    $(selector).onchange = e => { shipTraining[key] = e.target.value; shipTraining.page = 0; renderRosterUI(); };
+  }
+  $('#ship-training-reset').onclick = () => {
+    shipSearchQ = '';
+    Object.assign(shipTraining,{saga:'',type:'',rarity:0,sort:'name',teamOnly:false,page:0});
+    screenShip();
+    $('#ship-search-q')?.focus();
+  };
   $('#ship-training-team').onclick = e => {
     shipTraining.teamOnly = !shipTraining.teamOnly;
     shipTraining.page = 0;

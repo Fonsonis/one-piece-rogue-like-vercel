@@ -1732,6 +1732,51 @@ const NAKAMA_STARTERS = ['luffy'];
 const STRAW_HAT_MEMBERS = ['luffy', 'zoro', 'nami', 'usopp', 'sanji',
   'chopper', 'robin', 'franky', 'brook', 'jinbe'].filter(id => CHARS[id]);
 
+// Afiliaciones de personajes base. Una alianza no cambia la tripulación de
+// sus miembros: sus reglas se calculan por separado en el motor de combate.
+const CREW_GROUPS = Object.freeze([
+  ['straw','Sombrero de Paja','🏴‍☠️','luffy zoro nami usopp sanji chopper robin franky brook jinbe','atk','spd'],
+  ['heart','Piratas Heart','💛','law bepo jeanbart','heal','def'],
+  ['kid','Piratas de Kid','⚙️','kid killer','crit','atk'],
+  ['marine','Marina','⚓','coby helmeppo tashigi smoker morgan nezumi ripper jango fullbody hina garp bogard brandnew tsuru momonga onigumo doberman johngiant strawberry yamakaji sengoku akainu aokiji kizaru fujitora ryokugyu tbone sentomaru saul drake dragon-young','def','spdef'],
+  ['blackbeard','Piratas de Barbanegra','🌑','teach burgess vanaugur lafitte docq stronger shiryu devon sanjuanwolf pizarro vascoshot aokiji','spatk','atk'],
+  ['baroque','Baroque Works','🐊','crocodile robin gem mikita galdino marianne mr4 merrychristmas bentham dazbones paula','eva','spatk'],
+  ['crossguild','Cross Guild','🎯','buggy crocodile mihawk galdino dazbones','crit','spd'],
+  ['whitebeard','Piratas de Barbablanca','🐋','newgate marco ace jozu vista thatch izo haruta atmos fossa curiel namur blenheim rakuyo blamenco kingdew speedjiru oden teach','hp','heal'],
+  ['roger','Piratas de Roger','👑','roger rayleigh gaban crocus oden shanks buggy','spd','crit'],
+  ['rocks','Piratas de Rocks','☠️','xebec newgate bigmom kaido shiki john','atk','hp'],
+  ['beasts','Piratas de las Bestias','🐉','kaido king queen jack ulti pageone whoswho sasaki blackmaria holdem speed babanuki dobon daifugo batman gazelleman baohuang sheepshead ginrummy hawkins apoo drake fugan jaki goki','hp','def'],
+  ['bigmom','Piratas de Big Mom','🍬','bigmom katakuri pudding pekoms streusen tamago bobbin cracker brulee perospero daifuku oven opera smoothie montdor amande galette snack flampe moscato bavarois anana chiffon praline zeus2 prometheus napoleon hera','spdef','heal'],
+  ['redhair','Piratas del Pelirrojo','🔴','shanks benn luckyroux yasopp rockstar','crit','def'],
+  ['sun','Piratas del Sol','☀️','fishertiger jinbe aladine praline hachi wadatsumi','heal','hp'],
+  ['arlong','Piratas de Arlong','🦈','arlong chuu kuroobi hachi','atk','spdef'],
+  ['buggy','Piratas de Buggy','🎪','buggy mohji cabaji piratapayaso','eva','crit'],
+  ['kuja','Piratas Kuja','🐍','hancock sandersonia marigold gloriosa marguerite','eva','crit'],
+  ['thriller','Piratas Thriller Bark','🦇','moria perona absalom hogback cindry kumashi hildon tararan oars ryuma','spatk','hp'],
+  ['donquixote','Familia Donquixote','🃏','doflamingo trebol diamante pica sugar jora senorpink laog dellinger machvise gladius baby5 buffalo monet vergo rocinante law','spatk','crit'],
+  ['revolution','Revolucionarios','✊','dragon sabo ivankov inazuma koala hack karasu betty morley lindbergh kuma ginny','spd','heal'],
+  ['cp','CP9 / CP0','🕵️','lucci kaku blueno kalifa jabra kumadori fukuro spandam nero stussy','eva','atk'],
+  ['germa','Germa 66','🧬','judge reiju ichiji niji yonji sora cosette sanji','spdef','spd'],
+  ['kozuki','Kozuki y Vainas Rojas','🌸','oden momonosuke hiyori toki sukiyaki denjiro kiku ashuradoji kawamatsu kinemon raizo inuarashi nekomamushi izo kanjuro','def','heal'],
+  ['minks','Minks de Zou','🐾','inuarashi nekomamushi carrot pedro wanda shishilian roddy blackback giovanni concelot miyagi tristan','spd','hp'],
+  ['grandfleet','Gran Flota Sombrero de Paja','⛵','cavendish suleiman bartolomeo gambia sai boo chinjao ideo bluegilly abdullah jeet leo hajrudin stansen gerd goldberg road orlumbus columbus','atk','def'],
+].map(([id,name,emoji,members,first,second],index) => Object.freeze({
+  id,name,emoji,members:Object.freeze(members.split(' ').filter(member => CHARS[member])),
+  // Cada banda tiene una combinación y magnitud propias. La progresión de
+  // 2/3 miembros conserva la lectura de nivel I/II de las sinergias actuales.
+  first,second,amount:.07+(index%5)*.01,secondary:.03+(Math.floor(index/5)%4)*.01,
+})));
+const CREW_BY_ID = Object.freeze(Object.fromEntries(CREW_GROUPS.map(group => [group.id,group])));
+const CREW_OPTIONS = Object.freeze(Object.fromEntries(Object.keys(CHARS).map(id => [id,CREW_GROUPS.filter(group => group.members.includes(id)).map(group => group.id)])));
+const CREW_DEFAULTS = Object.freeze({
+  aokiji:'marine', robin:'straw', jinbe:'straw', oden:'kozuki', teach:'blackbeard',
+  buggy:'crossguild', crocodile:'crossguild', mihawk:'crossguild', franky:'straw', brook:'straw',
+  shanks:'redhair', newgate:'whitebeard', bigmom:'bigmom', kaido:'beasts', drake:'marine',
+  shiryu:'blackbeard', hachi:'arlong', wadatsumi:'sun', law:'heart',
+  sanji:'straw', galdino:'crossguild', dazbones:'crossguild', izo:'whitebeard',
+  inuarashi:'minks', nekomamushi:'minks', praline:'bigmom',
+});
+
 const SAGAS = SAGA_DEFS.map((d, i) => {
   // Dificultad entre sagas aumenta de forma exponencial (East Blue: 8, Alabasta: 15, Skypiea: 22...)
   // Insertar Sabaody no eleva los niveles de las sagas que ya existían.

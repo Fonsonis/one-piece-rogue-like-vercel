@@ -14,7 +14,7 @@
       if (data.meta[key] !== undefined && (!Array.isArray(data.meta[key]) || data.meta[key].some(id => typeof id !== 'string'))) throw new Error('Progreso inválido.');
     }
     if (data.meta.reachedSagas && new Set(data.meta.reachedSagas).size !== data.meta.reachedSagas.length) throw new Error('Progreso inválido.');
-    for (const key of ['wins', 'nuzWins', 'upgrades', 'global', 'stats', 'settings', 'sagaClears', 'sagaDiffWins', 'teamPresets', 'characterUsage', 'charUpgrades', 'formPreferences', 'islandProgress', 'sagaStats', 'pirateKingRewards', 'relicEquipment', 'relicCopies']) {
+    for (const key of ['wins', 'nuzWins', 'upgrades', 'global', 'stats', 'settings', 'sagaClears', 'sagaDiffWins', 'teamPresets', 'characterUsage', 'charUpgrades', 'charUpgradeSpent', 'crewVersions', 'formPreferences', 'islandProgress', 'sagaStats', 'pirateKingRewards', 'relicEquipment', 'relicCopies']) {
       if (data.meta[key] !== undefined && !record(data.meta[key])) throw new Error('Progreso inválido.');
     }
     if (Object.values(data.meta.characterUsage || {}).some(n => !Number.isSafeInteger(n) || n < 0)) throw new Error('Contadores de uso inválidos.');
@@ -29,6 +29,9 @@
     const dailySteps=data.meta.dailySteps;
     if(dailySteps!==undefined&&(!record(dailySteps)||!/^\d{4}-\d{2}-\d{2}$/.test(dailySteps.date)||
         !Number.isSafeInteger(dailySteps.remaining)||dailySteps.remaining<0||dailySteps.remaining>1000)) throw new Error('Pasos diarios inválidos.');
+    const denDen=data.meta.denDenMushis;
+    if (denDen!==undefined && denDen!==null && (!record(denDen) || !/^\d{4}-\d{2}-\d{2}$/.test(denDen.date) ||
+        !Number.isSafeInteger(denDen.remaining) || denDen.remaining<0 || denDen.remaining>4)) throw new Error('Den den mushis inválidos.');
     const t=data.meta.challenge;
     if(t!==undefined&&t!==null){
       const teamSize=t.kind==='legends'?2:1;

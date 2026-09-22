@@ -70,6 +70,74 @@
 }
 #app:has(.shop-sticky-bar) > .topbar .logo { display:none; }
 #app:has(.shop-sticky-bar) .panel > :is(h2,p) { font:600 13px/1.5 system-ui,sans-serif!important; margin:8px 0; padding:4px 0; }
+
+/* Home: a clear route from play to preparation, with actions that read as controls. */
+#app .home-section-heading { display:flex; align-items:baseline; justify-content:space-between; flex-wrap:wrap; gap:6px 16px; margin:18px 0 10px; padding-bottom:8px; border-bottom:2px solid #b5c9bc; color:#294e5b; }
+#app .home-section-heading span { font:800 clamp(11px,1.4vw,14px)/1.5 'Press Start 2P',monospace; }
+#app .home-section-heading small { font:600 13px/1.4 system-ui,sans-serif; color:#506d73; }
+#app .home-section-heading-secondary { margin-top:25px; }
+#app .modes { align-items:stretch; }
+#app .mode-card { display:flex; flex-direction:column; padding:0; min-width:0; color:inherit; font:inherit; overflow:hidden; text-align:center; }
+#app .mode-card .mode-art { width:100%; flex:0 0 auto; }
+#app .mode-card .mode-title { width:100%; flex:1 0 auto; }
+#app .mode-card .mode-btn { width:100%; margin-top:auto; }
+#app .mode-card-primary { border:2px solid #b84e39; box-shadow:0 6px 0 #ae493631,0 12px 24px #24475422; }
+#app .mode-card-primary .mode-title { color:#743322; }
+#app .mode-card-primary .mode-btn { background:#bd4d36; color:#fff; border-top-color:#a63c2c; }
+#app .mode-card:not(.locked):not(.mode-card-primary) .mode-btn { background:#2f6c82; color:#fff; }
+#app .mode-card.locked { filter:none; opacity:.68; }
+#app .mode-card:focus-visible { outline:3px solid #0c667e; outline-offset:4px; }
+#app .runner-menu-button,#app .local-menu-button { width:min(100%,720px); margin:10px auto; min-height:86px; padding:12px 18px; border-radius:10px; text-align:left; }
+#app .runner-menu-button { background:#e8f0df; border:2px solid #5f9380; }
+#app .runner-menu-button strong { color:#1c5d52; }
+#app .runner-menu-button small { color:#375f5d; line-height:1.6; }
+#app .local-menu-button { display:flex; background:linear-gradient(115deg,#164d65,#176b70); border:2px solid #2f8b80; box-shadow:0 5px 0 #173f4c33; }
+#app .local-menu-button strong { color:#fff8d9; }
+#app .local-menu-button small { color:#e5f4ef; opacity:1; }
+#app .home-main-buttons { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); max-width:720px; gap:10px; margin-top:0; }
+#app .home-main-buttons .btn { min-height:70px; padding:9px 6px; line-height:1.5; border-width:2px; box-shadow:0 5px 0 #1d394626; }
+#app .home-main-buttons .btn > span:last-child { font:700 12px/1.4 system-ui,sans-serif!important; opacity:.95!important; }
+#app .home-main-buttons #btn-dex { background:#316b8a; border-color:#214f69; }
+#app .home-main-buttons #btn-inventory { background:#635582; border-color:#493b65; }
+#app .home-main-buttons #btn-ship { background:#e9bc5b; border-color:#a47a25; color:#3c3525; }
+#app .home-main-buttons #btn-achievements { background:#fff4d9; border-color:#ba934e; color:#604620; }
+#app .home-main-buttons #btn-achievements.home-action-ready { background:#dcab3f; border-color:#85591c; box-shadow:0 0 0 3px #f3d984,0 5px 0 #1d394626; }
+#app .home-market-actions { display:flex; justify-content:center; flex-wrap:wrap; gap:10px; margin:12px auto 0; max-width:720px; }
+#app .home-market-actions .btn { min-height:48px; padding:8px 14px; font-size:11px; line-height:1.45; }
+#app #btn-logpose-gacha { background:#ad493a; border-color:#863729; box-shadow:0 4px 0 #82342833; }
+#app .home-install-actions { max-width:720px; margin:18px auto 0; padding-top:14px; border-top:1px solid #b9c9be; }
+#app .home-install-actions .btn { flex-basis:230px; max-width:340px; }
+html[data-theme="dark"] #app .home-section-heading { color:#e4f0df; border-color:#607e80; }
+html[data-theme="dark"] #app .home-section-heading small { color:#bed2cf; }
+html[data-theme="dark"] #app .mode-card-primary { border-color:#e49a77; }
+html[data-theme="dark"] #app .mode-card-primary .mode-title { color:#f5c8ad; }
+html[data-theme="dark"] #app .mode-card-primary .mode-btn { background:#a94f39; color:#fff; }
+html[data-theme="dark"] #app .mode-card:not(.locked):not(.mode-card-primary) .mode-btn { background:#356b7a; color:#fff; }
+html[data-theme="dark"] #app .runner-menu-button { background:#254b44; border-color:#659982; }
+html[data-theme="dark"] #app .runner-menu-button :is(strong,small) { color:#eef8de; }
+html[data-theme="dark"] #app .home-main-buttons #btn-achievements { background:#715c3b; border-color:#b59358; color:#fff8df; }
+html[data-theme="dark"] #app .home-main-buttons #btn-achievements.home-action-ready { background:#b5812c; color:#fff; }
+@media(max-width:700px) {
+  #app .home-section-heading { margin-top:14px; }
+  #app .home-section-heading-secondary { margin-top:20px; }
+  #app .home-section-heading span { font-size:10px; }
+  #app .home-section-heading small { font-size:12px; }
+  #app .modes { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+  #app .mode-card { width:100%; max-width:none; }
+  #app .mode-card-primary { grid-column:1/-1; }
+  #app .mode-card-primary .mode-art { height:140px; }
+  #app .mode-card:not(.mode-card-primary) .mode-art { height:90px; }
+  #app .mode-card:not(.mode-card-primary) .mode-title { font-size:11px; }
+  #app .mode-card:not(.mode-card-primary) .mode-btn { font-size:10px; }
+  #app .home-main-buttons { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  #app .home-main-buttons .btn { min-height:58px; font-size:10px; }
+  #app .runner-menu-button,#app .local-menu-button { min-height:72px; }
+}
+@media(max-width:390px) {
+  #app .home-section-heading small { flex-basis:100%; }
+  #app .home-market-actions .btn { width:100%; }
+}
+@media(prefers-reduced-motion:reduce) { #app .mode-card:hover { transform:none; } }
 @media(max-height:620px) {
  #app:has(#starter-slots-container) .preset-bar .btn { font-size:8px!important; white-space:nowrap; min-height:24px; }
  #app:has(#starter-slots-container) .starter-slot-card > div:not(.starter-slot-badge) { margin-block:1px!important; }

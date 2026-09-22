@@ -102,7 +102,7 @@ test('Dex discovery rules are preserved and every known character resolves to it
     meta.dex=[]; meta.recruited=[]; meta.roster=[];
     const unseen=dexCardHTML('luffy');
     meta.dex=['luffy'];
-    return {unseen,seen:dexCardHTML('luffy'),icons:Object.keys(CHARS).map(id=>({id:CHARS[id].spriteId || id,html:charIcon(id,46)}))};
+    return {unseen,seen:dexCardHTML('luffy'),icons:Object.keys(CHARS).map(id=>({id:crewSkinFor(id) || CHARS[id].spriteId || id,html:charIcon(id,46)}))};
   })()`, ctx);
   assert.ok(!result.unseen.includes('art/characters/'));
   assert.ok(result.unseen.includes('❔'));
