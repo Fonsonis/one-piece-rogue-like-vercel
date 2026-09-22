@@ -10,16 +10,17 @@ test('Elbaph appends eight playable stages and unlocks from Egghead after Sabaod
  assert.equal(h.exec('sagaUnlocked(14)'),false);
  h.exec('meta.sagaDiffWins={egghead:{2:true}}');assert.equal(h.exec('sagaUnlocked(14)'),false);
  h.exec('meta.sagaDiffWins.egghead[3]=true');assert.equal(h.exec('sagaUnlocked(14)'),true);
+ h.exec("markSagaReached(SAGAS.findIndex(s=>s.id==='elbaph'));");
  assert.equal(h.exec('SAGAS[14].islands.every(i=>i.boss.length && i.pool.length && i.boss.every(id=>CHARS[id]))'),true);
  assert.equal(h.exec("SAGAS[13].islands.every(i=>!i.boss.includes('im')&&!i.pool.includes('im'))"),true);
  assert.equal(h.exec("SAGAS[14].islands.at(-1).boss[0]"),'im');
- assert.equal(h.exec("makeEnemy('im',SAGAS[14].islands.at(-1).bossLvl[0]).id"),'im');
- h.exec("meta.charUpgrades.im=95");
+ assert.equal(h.exec("makeEnemy('im',SAGAS[14].islands.at(-1).bossLvl[0]).id"),'im-revealed');
+ h.exec("meta.charUpgrades.im=0");
  assert.equal(h.exec("makeEnemy('im',SAGAS[14].islands.at(-1).bossLvl[0]).id"),'im-revealed');
 });
 
-test('God Valley unlocks on base and journey level 30; preserves recruitment, saga and passive identity',()=>{
- const h=combatHarness();h.exec('maxStartLvlCap=()=>100');
+test('God Valley unlocks on saga, base and journey level 30; preserves recruitment, saga and passive identity',()=>{
+ const h=combatHarness();h.exec("maxStartLvlCap=()=>100;meta.sagaDiffWins={};markSagaReached(SAGAS.findIndex(s=>s.id==='elbaph'));");
  const ids=Array.from(h.exec('GOD_VALLEY_FORMS'));
  assert.equal(ids.length,19);
  for(const id of ids){
@@ -39,7 +40,7 @@ test('God Valley unlocks on base and journey level 30; preserves recruitment, sa
 });
 
 test('Im phases are separate from Gunko and old fighters retain bonuses, XP and KO on migration',()=>{
- const h=combatHarness();h.exec('maxStartLvlCap=()=>100');
+ const h=combatHarness();h.exec("maxStartLvlCap=()=>100;meta.sagaDiffWins={};markSagaReached(SAGAS.findIndex(s=>s.id==='elbaph'));");
  for(const [level,id] of [[24,'im'],[25,'im-gunko'],[39,'im-gunko'],[40,'im-revealed']]){
   h.exec(`meta.charUpgrades={im:${level-5}}`);
   assert.equal(h.exec(`makeChar('im',100).id`),id);
@@ -71,8 +72,8 @@ test('every new phase has its own four-frame atlas, portrait and catalog destina
  assert.ok(fs.statSync('public/art/scenes/elbaph.webp').size>1000);
 });
 
-test('all five Gorosei have playable transformations gated by both levels, with matching base identities',()=>{
- const h=combatHarness();h.exec('maxStartLvlCap=()=>100');
+test('all five Gorosei have playable transformations gated by saga and both levels, with matching base identities',()=>{
+ const h=combatHarness();h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));');
  assert.deepEqual(Array.from(h.exec('Object.keys(GOROSEI_FORMS)')).sort(),['jupeter','mars','nusjuro','saturn','warcury']);
  const phases=JSON.parse(h.exec('JSON.stringify(Object.entries(GOROSEI_FORMS).flatMap(([base,forms])=>forms.map(([kind,,level])=>[base,`${base}-${kind}`,level])))'));
  for(const [base,id,level] of phases){

@@ -25,9 +25,20 @@ function characterForms(id) {
   }
   return forms;
 }
-function characterPhaseUnlocked(id) {
+function formUnlockSaga(id) { return CHARS[id]?.unlockSaga || ''; }
+function formUnlockSagaName(id) {
+  const sagaId = formUnlockSaga(id);
+  return SAGAS.find(saga => saga.id === sagaId)?.name || sagaId;
+}
+function formSagaUnlocked(id, progress = meta) {
+  const sagaId = formUnlockSaga(id);
+  if (!sagaId) return true;
+  const sagaIndex = SAGAS.findIndex(saga => saga.id === sagaId);
+  return sagaIndex >= 0 && sagaReached(sagaIndex, progress);
+}
+function characterPhaseUnlocked(id, progress = meta) {
   const phase = characterForms(id).find(form => form.id === id);
-  return !!phase && phase.level <= startLvlOf(id);
+  return !!phase && phase.level <= startLvlOf(id, progress) && formSagaUnlocked(id, progress);
 }
 function dexBaseIds(ids=[]) { return [...new Set(ids.filter(id=>CHARS[id]).map(baseFormOf))]; }
 function dexEntrySeen(id) { return characterForms(id).some(form=>meta.dex.includes(form.id)); }
@@ -37,27 +48,25 @@ function dexFilteredBases(state) {
   return filterSortChars(dexBaseIds(matches),{...state,q:'',saga:'',type:'',rarity:0});
 }
 
-// Las formas requieren tanto el nivel en partida como el nivel base permanente.
+// Player forms require journey level, permanent base level and their canonical debut saga.
 function evolutionFormAt(id, lvl, progress = meta) {
-  const baseLevel = startLvlOf(id, progress);
-  let form = baseFormOf(id);
-  while (CHARS[form].evo && Math.min(lvl, baseLevel) >= CHARS[form].evo.lvl) form = CHARS[form].evo.to;
-  return form;
+  const limit = Math.min(lvl, startLvlOf(id, progress));
+  return characterForms(id).filter(phase => phase.level <= limit && formSagaUnlocked(phase.id, progress)).at(-1).id;
 }
-// Rivals keep their combat level, but cannot reveal forms the account has not unlocked.
-function enemyFormAt(id, lvl) {
-  return evolutionFormAt(id, lvl);
+// Rivals ignore permanent player upgrades, but keep combat-level and story-saga gates.
+function enemyFormAt(id, lvl, progress = meta) {
+  return characterForms(id).filter(phase => phase.level <= lvl && formSagaUnlocked(phase.id, progress)).at(-1).id;
 }
 function formMovesAt(id, lvl, exactForm = false, progress = meta) {
   const c = CHARS[id];
-  const limit = !exactForm && c.evo && startLvlOf(id, progress) < c.evo.lvl ? c.evo.lvl - 1 : lvl;
+  const limit = !exactForm && c.evo && !characterPhaseUnlocked(c.evo.to, progress) ? c.evo.lvl - 1 : lvl;
   const moves = c.learnset.filter(([level]) => level <= Math.min(lvl, limit)).map(([,move]) => move).slice(-2);
   return moves.length ? moves : [c.learnset[0][1]];
 }
 function syncEvolution(f, progress = meta) {
   if (!CHARS[f.id] || !CHARS[baseFormOf(f.id)].evo) return f;
   const old = CHARS[f.id], nextId = evolutionFormAt(f.id, f.lvl, progress), next = CHARS[nextId];
-  if (f.id === nextId && f.evolutionRulesVersion === 2) return f;
+  if (f.id === nextId && f.evolutionRulesVersion === 3) return f;
   // Apply only the base-stat difference, preserving equipment, fusion and event bonuses.
   const deltaHP = hpAt(next.base[0], f.lvl) - hpAt(old.base[0], f.lvl);
   f.maxhp += deltaHP;
@@ -67,7 +76,7 @@ function syncEvolution(f, progress = meta) {
   });
   f.id = nextId;
   f.moves = formMovesAt(nextId, f.lvl, false, progress);
-  f.evolutionRulesVersion = 2;
+  f.evolutionRulesVersion = 3;
   return f;
 }
 
@@ -457,6 +466,7 @@ function normalizeDailySteps(value, now = new Date()) {
 const META_DEFAULTS = () => ({
   wins: {}, nuzWins: {}, dex: [], recruited: [], roster: [], towerRecord: 0,
   fame: 0, upgrades: {}, accXp: 0, global: {}, defeated: [],
+  reachedSagas: ['eastblue'], // sagas visitadas; distinto de las sagas disponibles en el selector
   sagaClears: {}, // id base -> nº de sagas conquistadas con ese nakama en la banda
   sagaDiffWins: {}, // sagaId -> { diffLevel: true }
   pirateKingRewards: {}, // sagaId -> 'pending' o ID del legendario elegido
@@ -500,6 +510,7 @@ function loadMeta() {
         [id,id==='sake' ? autoSettings.revive : autoSettings.healItems.includes(id)]))};
   }
   migrateLegacyIslandWins(meta);
+  normalizeReachedSagas(meta, loadedSave?.run);
   preparePirateKingRewards(meta);
   if (!meta.totalIslands) {
     const totalWins = Object.values(meta.wins || {}).reduce((a, b) => a + b, 0) +
@@ -641,6 +652,7 @@ function importSaveFile(file) {
       nextMeta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 3 }, nextMeta.settings);
       if (!nextMeta.roster.includes('luffy')) nextMeta.roster.push('luffy');
       const nextRun = data.run || null;
+      normalizeReachedSagas(nextMeta, nextRun);
       if (nextRun) {
         ensureStartingTeam(nextRun);
         if (nextRun.mode === 'nuzlocke') nextRun.team = nextRun.team.filter(f => f.hp > 0);
@@ -688,6 +700,9 @@ function validateGameSave(data) {
   if (Object.keys(data.meta.sagaStats || {}).some(id => !SAGAS.some(s => s.id === id))) throw new Error('Contadores de saga incompatibles.');
   for (const key of ['dex', 'recruited', 'roster', 'defeated']) {
     if (data.meta[key]?.some(id => !CHARS[id])) throw new Error('Personaje desconocido.');
+  }
+  if (data.meta.reachedSagas?.some((id,index,ids) => !SAGAS.some(saga=>saga.id===id) || ids.indexOf(id)!==index)) {
+    throw new Error('Progreso de sagas incompatible.');
   }
   const r = data.run;
   for (const [key, islands] of Object.entries(data.meta.islandProgress || {})) {
@@ -844,7 +859,7 @@ function makeChar(id, lvl, isEnemy = false, exactForm = false) {
     spd: Math.floor(statAt(c.base[5], lvl) * diffMult),
     atkBonus: 0, defBonus: 0, spatkBonus: 0, spdefBonus: 0,
     xp: 0, moves, ultCharge: 0, moveRulesVersion: 2,
-    ...(!isEnemy && !exactForm ? {evolutionRulesVersion:2} : {}),
+    ...(!isEnemy && !exactForm ? {evolutionRulesVersion:3} : {}),
   };
 }
 // AI forms follow combat level; only story encounters apply difficulty scaling.
@@ -905,8 +920,8 @@ function gainXP(f, amount, log) {
       }
     }
     // transformación
-    if (c.evo && f.lvl >= c.evo.lvl && startLvlOf(f.id) >= c.evo.lvl) {
-      const to = c.evo.to;
+    const to = evolutionFormAt(f.id, f.lvl);
+    if (to !== f.id) {
       msgs.push(`✨ ¡${c.name} se transforma en ${CHARS[to].name}!`);
       f.id = to;
       const nc = CHARS[to];
@@ -2374,6 +2389,42 @@ function sagaUnlocked(i, progress = meta) {
   return sagaMaxDiffCleared(prevSaga.id, progress) >= 3;
 }
 
+// Evolution canon follows sagas the player has actually visited, not merely
+// sagas that are available in the selector. Older saves are reconstructed from
+// direct evidence and then stored as one chronological prefix.
+function normalizeReachedSagas(progress, journey = null) {
+  if (!progress || typeof progress !== 'object') return ['eastblue'];
+  let highest = 0;
+  const note = sagaId => {
+    const index = SAGAS.findIndex(saga=>saga.id===sagaId);
+    if (index > highest) highest = index;
+  };
+  for (const sagaId of progress.reachedSagas || []) note(sagaId);
+  for (const [sagaId,wins] of Object.entries(progress.sagaDiffWins || {})) {
+    if (wins && Object.values(wins).some(Boolean)) note(sagaId);
+  }
+  for (const key of ['wins','nuzWins']) for (const [sagaId,wins] of Object.entries(progress[key] || {})) {
+    if (Number(wins) > 0) note(sagaId);
+  }
+  for (const key of Object.keys(progress.islandProgress || {})) note(key.split(':')[0]);
+  const recentSaga = progress.lastCompletedIsland?.saga;
+  if (Number.isInteger(recentSaga)) note(SAGAS[recentSaga]?.id);
+  if (Number.isInteger(journey?.saga)) note(SAGAS[journey.saga]?.id);
+  progress.reachedSagas = SAGAS.slice(0, highest + 1).map(saga=>saga.id);
+  return progress.reachedSagas;
+}
+function markSagaReached(i, progress = meta) {
+  if (!Number.isInteger(i) || !SAGAS[i]) return normalizeReachedSagas(progress);
+  normalizeReachedSagas(progress);
+  const highest = Math.max(i, ...progress.reachedSagas.map(id=>SAGAS.findIndex(saga=>saga.id===id)));
+  progress.reachedSagas = SAGAS.slice(0, highest + 1).map(saga=>saga.id);
+  return progress.reachedSagas;
+}
+function sagaReached(i, progress = meta) {
+  if (!Number.isInteger(i) || !SAGAS[i]) return false;
+  return normalizeReachedSagas(progress).includes(SAGAS[i].id);
+}
+
 // Desbloqueo secuencial de dificultades por saga:
 // Dificultad 1 (Grumete) siempre disponible. Para Dificultad N (N > 1), se requiere haber superado la N-1 en esa misma saga.
 const sagaDiffUnlocked = (sagaId, diffId) => {
@@ -3145,7 +3196,7 @@ function showInventoryModal(opts = {}) {
     });
     ov.querySelector('#inv-logpose-info').onclick=()=>{
       const returnFocus=()=>ov.querySelector('#inv-logpose-info')?.focus({preventScroll:true});
-      modalInfo('🧭 Log Poses de navegación','<div class="collection-help"><p>Sirven para subir el <strong>nivel base permanente</strong> de tus nakamas y desbloquear sus evoluciones.</p><p>Se obtienen al derrotar enemigos: en East Blue, cada pirata entrega 3, cada marine 4 y cada jefe 7. La cantidad se multiplica por el número de saga.</p><p>El coste aumenta con cada nivel. El nivel máximo disponible depende de tu progreso en las sagas.</p></div>',returnFocus);
+      modalInfo('🧭 Log Poses de navegación','<div class="collection-help"><p>Sirven para subir el <strong>nivel base permanente</strong> de tus nakamas. Las evoluciones requieren además alcanzar su saga de debut y el nivel necesario en partida.</p><p>Se obtienen al derrotar enemigos: en East Blue, cada pirata entrega 3, cada marine 4 y cada jefe 7. La cantidad se multiplica por el número de saga.</p><p>El coste aumenta con cada nivel. El nivel máximo disponible depende de tu progreso en las sagas.</p></div>',returnFocus);
       const help=document.querySelector('#modal-ok').closest('.overlay');const closeHelp=()=>{help.remove();returnFocus();};
       help.querySelector('.modal').setAttribute('role','dialog');help.querySelector('.modal').setAttribute('aria-modal','true');help.querySelector('.modal').setAttribute('aria-label','Log Poses de navegación');
       bindCollectionDialog(help,closeHelp,'#modal-ok');
@@ -4198,6 +4249,7 @@ function startingSupplies() {
 function startRun(sagaIdx, starterIds, islandIdx = 0, islandRepeat = null) {
   const saga = SAGAS[sagaIdx];
   if (!saga?.islands[islandIdx] || !islandAvailable(sagaIdx,islandIdx)) return;
+  markSagaReached(sagaIdx);
   const items = startingSupplies();
   const berries = 300 + (meta.global.berriesplus3 ? 700 : meta.global.berriesplus2 ? 400 : meta.global.berriesplus ? 200 : 0);
 
@@ -5284,7 +5336,14 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
   const previewId=forms.some(form=>form.id===selectedForm)?selectedForm:forms[0].id;
   const phaseIndex=forms.findIndex(form=>form.id===previewId);
   const phase=forms[phaseIndex];
-  const phaseLocked = !isLive && !characterPhaseUnlocked(previewId);
+  const phaseLevelLocked = !isLive && phase.level > startLvlOf(previewId);
+  const phaseSagaLocked = !isLive && !formSagaUnlocked(previewId);
+  const phaseLocked = phaseLevelLocked || phaseSagaLocked;
+  const phaseSagaName = formUnlockSagaName(previewId);
+  const phaseMissing = [
+    phaseLevelLocked ? `nivel base ${phase.level}` : '',
+    phaseSagaLocked ? `llegar a ${phaseSagaName}` : '',
+  ].filter(Boolean);
   const f = isLive ? migrateFighter(fOrId, !!battle?.eTeam.includes(fOrId)) : applyUpgrades(makeChar(previewId, startLvlOf(fOrId), false, true));
   const c = CHARS[f.id];
   const lore = (typeof LORE !== 'undefined' && LORE) ? (LORE[f.id] || LORE[baseFormOf(f.id)] || {}) : {};
@@ -5306,7 +5365,10 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
   const fTypes = fighterTypes(f);
   const isFru = fTypes.includes('Fruta'), isHak = fTypes.includes('Haki');
   const known = f.moves;
-  const future = c.learnset.filter(([l, m]) => (l > f.lvl || (c.evo && l >= c.evo.lvl && startLvlOf(f.id) < c.evo.lvl)) && !known.includes(m));
+  const future = c.learnset.filter(([l, m]) => (l > f.lvl || (c.evo && l >= c.evo.lvl && !characterPhaseUnlocked(c.evo.to))) && !known.includes(m));
+  const nextSagaName = c.evo ? formUnlockSagaName(c.evo.to) : '';
+  const nextSagaReached = c.evo ? formSagaUnlocked(c.evo.to) : true;
+  const nextBaseReached = c.evo ? startLvlOf(f.id) >= c.evo.lvl : true;
   const rarityTag = c.rareza ? `<span style="color:var(--gold);font-size:14px;margin-left:6px;" title="Rareza: ${c.rareza} estrellas">${'⭐'.repeat(c.rareza)}</span>` : '';
   const fusionTag = f.stars ? `<span style="color:#ff6b6b;font-size:11px;font-weight:bold;margin-left:6px;">[+${f.stars}⭐ Fusión]</span>` : '';
   const hasUpgrades = (f.hpBonus || 0) + (f.atkBonus || 0) + (f.defBonus || 0) + (f.spatkBonus || 0) + (f.spdefBonus || 0) + (f.spdBonus || 0) > 0;
@@ -5330,9 +5392,9 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
       ${!isLive&&forms.length>1?`<nav class="sheet-phase-nav" aria-label="Fases de ${esc(CHARS[forms[0].id].name)}"><button type="button" class="sheet-phase-arrow" id="sheet-phase-prev" ${phaseIndex===0?'disabled':''} aria-label="Fase anterior${phaseIndex>0?': '+esc(CHARS[forms[phaseIndex-1].id].name):''}">‹</button><button type="button" class="sheet-phase-arrow" id="sheet-phase-next" ${phaseIndex===forms.length-1?'disabled':''} aria-label="Fase siguiente${phaseIndex<forms.length-1?': '+esc(CHARS[forms[phaseIndex+1].id].name):''}">›</button></nav>`:''}
       <div class="platform" style="width:120px;height:24px;margin:-10px auto 0;background:radial-gradient(ellipse at center, #7ec850 0%, #4aa557 70%, transparent 72%);border-radius:50%;box-shadow:inset 0 0 0 2px rgba(217, 131, 46, 0.35);"></div>
       <div style="margin-top:6px;font-size:9px;color:var(--gold);"><b>Rareza:</b> ${'⭐'.repeat(c.rareza || 1)} (${c.rareza || 1} Estrellas)</div>
-      ${!isLive&&forms.length>1?`<p class="sheet-phase-caption" role="status">Fase ${phaseIndex+1} de ${forms.length} · ${phaseIndex===0?'Forma base':esc(c.name)}<br>${phaseLocked?`🔒 Bloqueada · Requiere nivel base ${phase.level}`:phaseIndex?'Desbloqueada · Requiere Nv. '+phase.level+' en partida':''}</p>`:''}
+      ${!isLive&&forms.length>1?`<p class="sheet-phase-caption" role="status">Fase ${phaseIndex+1} de ${forms.length} · ${phaseIndex===0?'Forma base':esc(c.name)}<br>${phaseLocked?`🔒 Bloqueada · Falta ${esc(phaseMissing.join(' y '))}`:phaseIndex?`Desbloqueada · Nv. ${phase.level} en partida · ${esc(phaseSagaName)}`:''}</p>`:''}
     </div>
-    ${phaseLocked?`<section class="sheet-locked-notice"><h3>Fase bloqueada</h3><p>Sube el nivel base de ${esc(CHARS[forms[0].id].name)} a <strong>${phase.level}</strong> para descubrir esta forma y probar sus ataques.</p><p>Tu nivel base: <strong>${startLvlOf(f.id)}</strong></p></section>`:''}
+    ${phaseLocked?`<section class="sheet-locked-notice"><h3>Fase bloqueada</h3><p>Para descubrir esta forma y probar sus ataques necesitas <strong>nivel base ${phase.level}</strong>, alcanzar el mismo nivel en partida y haber llegado a <strong>${esc(phaseSagaName)}</strong>.</p><p>Tu nivel base: <strong>${startLvlOf(f.id)}</strong> · Saga: <strong>${phaseSagaLocked?'pendiente':'alcanzada'}</strong></p></section>`:''}
     ${phaseLocked?'':`
     ${typeBadges(fTypes)}
     ${isLive ? xpBarHTML(f) : ''}
@@ -5386,11 +5448,11 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
     return `<div class="sheet-move"><span class="type-badge" style="background:${TYPES[mv.type]?.color || '#888'}">${mv.type.toUpperCase()}</span>
               ${mv.name} <small>${mv.power ? mv.power + ' PWR · ' + Math.round((mv.acc || 0.9) * 100) + '%' + cat : 'APOYO'}</small></div>`;
   }).join('')}
-      ${future.map(([l, m]) => `<div class="sheet-move future">🔒 Nv${l}${c.evo && l >= c.evo.lvl ? ` · nivel base ${c.evo.lvl}` : ''} — ${MOVES[m] ? MOVES[m].name : m}</div>`).join('')}
+      ${future.map(([l, m]) => `<div class="sheet-move future">🔒 Nv${l}${c.evo && l >= c.evo.lvl ? ` · nivel base ${c.evo.lvl} · ${esc(nextSagaName)}` : ''} — ${MOVES[m] ? MOVES[m].name : m}</div>`).join('')}
     </div>
     ${pInfo ? `<div class="sheet-section sheet-passive"><b>✨ Pasiva — ${pInfo.label}</b><p>${pInfo.desc}</p></div>` : ''}
     ${ultMv ? `<div class="sheet-section sheet-ultimate"><b>💥 Habilidad Definitiva — ${ultMv.name}</b><p>${ultMv.type ? `<span class="type-badge" style="background:${TYPES[ultMv.type]?.color || '#888'}">${ultMv.type.toUpperCase()}</span> ` : ''}${ultMv.power ? ultMv.power + ' PWR · ' + Math.round((ultMv.acc || 0.9) * 100) + '% precisión' : 'MOVIMIENTO DEFINITIVO'}</p></div>` : ''}
-    ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>${CHARS[c.evo.to].name} requiere nivel base ${c.evo.lvl} y nivel ${c.evo.lvl} en partida. Tu nivel base: ${startLvlOf(f.id)}. ${startLvlOf(f.id) >= c.evo.lvl ? 'Forma desbloqueada.' : 'Puedes seguir subiendo en partida, pero sus ataques se desbloquean al mejorar el nivel base.'}</p></div>` : ''}
+    ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>${CHARS[c.evo.to].name} requiere nivel base ${c.evo.lvl}, nivel ${c.evo.lvl} en partida y llegar a ${esc(nextSagaName)}. Tu nivel base: ${startLvlOf(f.id)} · Saga: ${nextSagaReached?'alcanzada':'pendiente'}. ${nextBaseReached&&nextSagaReached?'La forma se activará al alcanzar el nivel necesario en partida.':'Aún faltan requisitos permanentes para desbloquearla.'}</p></div>` : ''}
     <p class="sheet-desc">${c.desc}</p>
     `}
     <div class="actions" style="flex-direction:column;gap:6px;">
@@ -6298,7 +6360,7 @@ function getUltimateMove(f) {
   const c = CHARS[f.id] || CHARS[base];
   if (!c) return MOVES.punetazo;
 
-  if (c.evo && !battle?.opts?.local && startLvlOf(f.id) < c.evo.lvl && !battle?.eTeam.includes(f)) {
+  if (c.evo && !battle?.opts?.local && !characterPhaseUnlocked(c.evo.to) && !battle?.eTeam.includes(f)) {
     const lockedMoves = c.learnset.filter(([level]) => level >= c.evo.lvl).map(([,id]) => id);
     if (!c.ultimate || lockedMoves.includes(c.ultimate)) {
       const available = formMovesAt(f.id, f.lvl).map(id => MOVES[id]).filter(m => m?.power > 0);
@@ -8719,7 +8781,7 @@ function screenChallengeSelection(kind) {
   render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button>
     <section class="panel challenge-panel challenge-selection"><h2 id="challenge-title" tabindex="-1">${kind==='legends'?'👑 Forma tu pareja legendaria':'🏆 Elige tu luchador'}</h2>
     <p>${kind==='legends'?'Elige 2 nakamas de 5★':'Elige 1 nakama'} · Tu nivel permanente</p>
-    ${pool.length<count?'<p class="challenge-notice" role="status">No tienes suficientes personajes elegibles. Recluta legendarios o desbloquea sus formas de 5★ mejorando su nivel base.</p>':''}
+    ${pool.length<count?'<p class="challenge-notice" role="status">No tienes suficientes personajes elegibles. Recluta legendarios o desbloquea sus formas de 5★ mejorando su nivel base y avanzando por sus sagas.</p>':''}
     <div class="challenge-team-slots" id="challenge-slots"></div>
     <div id="challenge-presets"></div>
     <div id="challenge-selection-synergies"></div>

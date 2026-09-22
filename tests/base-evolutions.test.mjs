@@ -2,9 +2,9 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {combatHarness} from './balance-harness.mjs';
 
-test('every evolution requires both permanent and journey levels at its exact threshold',()=>{
+test('every evolution requires permanent level, journey level and its saga at the exact threshold',()=>{
  const h=combatHarness();
- h.exec('maxStartLvlCap=()=>100;');
+ h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));');
  const chains=JSON.parse(h.exec('JSON.stringify(Object.entries(CHARS).filter(([,c])=>c.evo).map(([id,c])=>[id,baseFormOf(id),c.evo.lvl,c.evo.to]))'));
  assert.equal(chains.length,126);
  for(const [id,base,level,to] of chains){
@@ -17,8 +17,40 @@ test('every evolution requires both permanent and journey levels at its exact th
  }
 });
 
+test('the canonical saga catalog covers every evolution exactly once',()=>{
+ const h=combatHarness();
+ const audit=h.exec(`(()=>{
+  const targets=Object.values(CHARS).filter(c=>c.evo).map(c=>c.evo.to);
+  return {
+   count:targets.length,unique:new Set(targets).size,
+   missing:targets.filter(id=>!CHARS[id].unlockSaga),
+   invalid:targets.filter(id=>!SAGAS.some(s=>s.id===CHARS[id].unlockSaga)),
+   taggedBases:Object.keys(CHARS).filter(id=>!BASE_OF[id]&&CHARS[id].unlockSaga),
+  };
+ })()`);
+ assert.equal(audit.count,126);
+ assert.equal(audit.unique,126);
+ assert.deepEqual(Array.from(audit.missing),[]);
+ assert.deepEqual(Array.from(audit.invalid),[]);
+ assert.deepEqual(Array.from(audit.taggedBases),[]);
+ for(const [id,saga] of Object.entries({zoro2:'eastblue',luffy2:'water7',luffy4:'wholecake',luffy5:'wano','sanji-diable':'water7','sanji-ifrit':'wano','jack-animal':'zou','lucci-awakened':'egghead','im-revealed':'elbaph'}))
+  assert.equal(h.exec(`CHARS['${id}'].unlockSaga`),saga,id);
+ assert.equal(h.exec("Object.entries(CHARS).filter(([id])=>id.endsWith('-young')&&BASE_OF[id]).every(([,c])=>c.unlockSaga==='elbaph')"),true);
+});
+
+test('player forms need saga, permanent level and journey level independently',()=>{
+ const h=combatHarness();
+ h.exec(`maxStartLvlCap=()=>100;meta.charUpgrades={sanji:95};meta.sagaDiffWins={};markSagaReached(SAGAS.findIndex(s=>s.id==='water7'));`);
+ assert.equal(h.exec("makeChar('sanji',40).id"),'sanji-diable','Wano form hidden before reaching Wano');
+ h.exec("markSagaReached(SAGAS.findIndex(s=>s.id==='wano'));");
+ assert.equal(h.exec("makeChar('sanji',39).id"),'sanji-raid','journey threshold remains intact');
+ assert.equal(h.exec("makeChar('sanji',40).id"),'sanji-ifrit');
+ h.exec('meta.charUpgrades.sanji=34;');
+ assert.equal(h.exec("makeChar('sanji',100).id"),'sanji-raid','permanent threshold remains intact');
+});
+
 test('Robin and Franky unlock their faithful level 40 combat forms and reserved techniques',()=>{
- const h=combatHarness();h.exec('maxStartLvlCap=()=>100;meta.charUpgrades={robin:35,franky:35};');
+ const h=combatHarness();h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.charUpgrades={robin:35,franky:35};');
  assert.equal(h.exec("makeChar('robin',39).id"),'robin');
  assert.equal(h.exec("makeChar('robin',39).moves.includes('demoniofleur')"),false);
  assert.equal(h.exec("makeChar('robin',40).id"),'robin-demoniofleur');
@@ -72,7 +104,7 @@ test('legacy evolved allies fall back without losing XP, upgrades, fusion bonuse
 
 test('buying the threshold level unlocks a high-level journey fighter without healing a KO',()=>{
  const h=combatHarness();
- h.exec(`maxStartLvlCap=()=>100;meta.charUpgrades={luffy:14};meta.logPoses=10000000;
+ h.exec(`maxStartLvlCap=()=>100;meta.charUpgrades={luffy:14};meta.sagaDiffWins={};markSagaReached(SAGAS.findIndex(s=>s.id==='water7'));meta.logPoses=10000000;
  run={saga:0,mode:'classic',team:[makeChar('luffy',60)],items:{}};const f=run.team[0];f.xp=99;f.hp=0;f.maxhp+=9;f.atk+=7;
  const originalLevel=f.lvl;upgradeCharLvl('luffy');`);
  assert.equal(h.exec('f.id'),'luffy2');assert.equal(h.exec('f.lvl'),60);

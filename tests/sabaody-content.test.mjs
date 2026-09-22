@@ -39,7 +39,7 @@ test('new Sabaody and Straw Hat forms all have packaged sprites and portraits',(
 });
 
 test('Zoro Nami and Sanji advance through their new forms with separate level gates',()=>{
- const h=combatHarness();h.exec('maxStartLvlCap=()=>100');
+ const h=combatHarness();h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));');
  for(const [base,phases] of [['zoro',[[20,'zoro2'],[30,'zoro-enma'],[40,'zoro-kingofhell']]],['nami',[[20,'nami2'],[30,'nami-sorcery'],[40,'nami-zeus']]],['sanji',[[20,'sanji-diable'],[30,'sanji-raid'],[40,'sanji-ifrit']]]]){
   for(const [level,id] of phases){
    h.exec(`meta.charUpgrades={${base}:${level-6}}`);assert.notEqual(h.exec(`makeChar('${base}',100).id`),id);
@@ -62,7 +62,7 @@ test('Zou has two stages, relocates its cast and unlocks Whole Cake through its 
 });
 
 test('shown Sulong forms unlock at 40, preserve identities and never invent Pedro Sulong',()=>{
- const h=combatHarness();h.exec('maxStartLvlCap=()=>100');
+ const h=combatHarness();h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));');
  assert.equal(h.exec('SULONG_FORMS.length'),11);
  assert.equal(h.exec("CHARS['pedro-sulong']"),undefined);
  for(const base of Array.from(h.exec('SULONG_FORMS'))){
@@ -77,7 +77,7 @@ test('shown Sulong forms unlock at 40, preserve identities and never invent Pedr
 });
 
 test('Momonosuke retains child dragon then unlocks adult and full-grown dragon without losing upgrades',()=>{
- const h=combatHarness();h.exec('maxStartLvlCap=()=>100');
+ const h=combatHarness();h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));');
  for(const [level,id] of [[20,'momonosuke-animal'],[30,'momonosuke-adult'],[40,'momonosuke-dragon']]){
   h.exec(`meta.charUpgrades={momonosuke:${level-5}}`);
   assert.equal(h.exec(`makeChar('momonosuke',${level}).id`),id);

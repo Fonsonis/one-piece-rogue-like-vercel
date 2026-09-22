@@ -84,6 +84,20 @@ test('legacy local saves migrate without deleting the old copy; JSON remains com
   assert.ok(memory.has('oplike_meta'));
 });
 
+test('reached saga history migrates from sparse saves and survives a portable roundtrip',()=>{
+  const h=harness();
+  h.run(`const sparse={sagaDiffWins:{water7:{1:true},wholecake:{3:true}},islandProgress:{'zou:classic:1':[]}};
+    normalizeReachedSagas(sparse,null);
+    const portable=GameSaveStorage.parse(JSON.stringify(GameSaveStorage.payload(sparse,null)));
+    validateGameSave(portable);`);
+  assert.deepEqual(Array.from(h.run('sparse.reachedSagas')),Array.from(h.run("SAGAS.slice(0,SAGAS.findIndex(s=>s.id==='wholecake')+1).map(s=>s.id)")));
+  assert.deepEqual(Array.from(h.run('portable.meta.reachedSagas')),Array.from(h.run('sparse.reachedSagas')));
+  h.run(`const active={};const journey=sampleRun();journey.saga=SAGAS.findIndex(s=>s.id==='zou');normalizeReachedSagas(active,journey);`);
+  assert.deepEqual(Array.from(h.run('active.reachedSagas')),Array.from(h.run("SAGAS.slice(0,SAGAS.findIndex(s=>s.id==='zou')+1).map(s=>s.id)")));
+  assert.throws(()=>h.run("validateGameSave(GameSaveStorage.payload({reachedSagas:['eastblue','unknown']},null))"));
+  assert.throws(()=>h.run("GameSaveStorage.validate(GameSaveStorage.payload({reachedSagas:['eastblue','eastblue']},null))"));
+});
+
 test('import commits meta and run together, accepts original JSON and restores settings defaults',()=>{
   const h=harness();
   h.run(`const portable=GameSaveStorage.payload({...meta,fame:99,settings:{customSounds:true}},sampleRun());portable.user='invitado';

@@ -4,7 +4,7 @@ import {combatHarness} from './balance-harness.mjs';
 
 test('Luffy keeps his base stats and evolves at 20/25/40/50 with matching stars and signatures',()=>{
  const h=combatHarness();
- h.exec('maxStartLvlCap=()=>100;meta.charUpgrades={luffy:95};');
+ h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.charUpgrades={luffy:95};');
  assert.deepEqual(Array.from(h.exec('CHARS.luffy.base')),[24,12,8,10,7,10]);
  for(const [lvl,id,stars,ult] of [[5,'luffy',1,'gatlinggoma'],[19,'luffy',1,'gatlinggoma'],[20,'luffy2',2,'jetgatling'],[24,'luffy2',2,'jetgatling'],[25,'luffy3',3,'elephantgatling'],[39,'luffy3',3,'elephantgatling'],[40,'luffy4',4,'kingkonggun'],[49,'luffy4',4,'kingkonggun'],[50,'luffy5',5,'bajranggun']]){
   assert.equal(h.exec(`makeChar('luffy',${lvl}).id`),id);
@@ -22,7 +22,7 @@ test('Luffy keeps his base stats and evolves at 20/25/40/50 with matching stars 
 
 test('old Luffy saves migrate once, preserving HP deficit, KO, XP, boosts, fusion and upgrades',()=>{
  const h=combatHarness();
- h.exec('maxStartLvlCap=()=>100;meta.charUpgrades={luffy:95};');
+ h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.charUpgrades={luffy:95};');
  for(const [lvl,dead] of [[30,false],[35,false],[70,false],[100,false],[100,true]]) {
   assert.equal(h.exec(`(()=>{
    const f=makeChar('luffy2',${lvl},true);delete f.gearRulesVersion;
@@ -41,7 +41,7 @@ test('old Luffy saves migrate once, preserving HP deficit, KO, XP, boosts, fusio
 
 test('fusion crossing multiple Gear levels uses final form stats and starting inventory rarity',()=>{
  const h=combatHarness();
- h.exec('maxStartLvlCap=()=>100;meta.charUpgrades={luffy:95};');
+ h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.charUpgrades={luffy:95};');
  assert.equal(h.exec(`(()=>{
   const f=makeChar('luffy',10);run={mode:'classic',saga:0,team:[f],items:{}};
   addToTeam(makeChar('luffy',100));const base=makeChar('luffy',100);
