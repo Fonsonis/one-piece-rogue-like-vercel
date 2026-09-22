@@ -1,0 +1,119 @@
+/* Shared wayfinding and accessible controls across game screens. */
+:root {
+  --ux-ink:#244655;
+  --ux-muted:#506b73;
+  --ux-line:#b6c9c2;
+  --ux-surface:#fffdf7;
+  --ux-highlight:#fff3cc;
+  --ux-action:#236d59;
+}
+
+/* Keep a readable rhythm across screens built at different times. */
+#app > .panel:not(.challenge-panel),
+#app > .challenge-panel { background:var(--ux-surface); }
+#app > .panel > h2,
+.modal > h2,
+.modal > header h2 { line-height:1.5; }
+#app > .panel > p,
+.modal > p { color:var(--ux-muted); font-size:clamp(12px,1.25vw,14px); line-height:1.6; }
+#app > .back-btn { margin-bottom:12px; }
+#app .back-btn,
+.collection-close { min-height:40px; }
+
+/* Main decisions should be visually distinct from navigation and utilities. */
+:is(.starter-launch-actions,.tower-launch,.challenge-launch,.modal .actions) .btn.green:not(:disabled),
+:is(.starter-launch-actions,.tower-launch,.challenge-launch) .btn.blue:not(:disabled),
+#btn-leave,
+#btn-save-settings { background:#216e59; border-color:#175744; color:#fff; font-weight:800; box-shadow:0 3px 0 #14463466,0 6px 18px #14463422; }
+:is(.starter-launch-actions,.tower-launch,.challenge-launch) .btn:not(:disabled) { min-height:46px; }
+:is(.starter-launch-actions,.tower-launch,.challenge-launch) .btn:disabled { opacity:1; background:#d9e2dc; color:#52676a; border-color:#9fb5ae; }
+.modal .actions { border-top:1px solid var(--ux-line); }
+
+/* Form controls remain perceivable for both mouse and touch use. */
+:is(.panel,.modal,.world-controls) :is(input:not([type=checkbox]):not([type=radio]),select,textarea) {
+  max-width:100%; min-height:40px; background:#fffefb; color:var(--ux-ink);
+  border:1.5px solid #8ca9aa; border-radius:9px;
+}
+:is(.panel,.modal,.world-controls) :is(input,select,textarea)::placeholder { color:#647c82; opacity:1; }
+:is(.panel,.modal,.world-controls) label { line-height:1.5; }
+:is(.panel,.modal,.world-controls) input[type=checkbox] { min-width:18px; min-height:18px; accent-color:#236d59; vertical-align:middle; }
+:is(button,input,select,textarea,summary,[tabindex]):focus-visible {
+  outline:3px solid #087aac!important; outline-offset:3px!important;
+}
+:is(.panel,.modal) button:disabled { cursor:not-allowed; }
+
+/* Give disabled and selected states a second signal beyond colour. */
+.tab[aria-pressed=true] { font-weight:800; box-shadow:inset 0 -3px 0 #f1bd54; }
+.diff-dropdown-item { display:block; width:100%; text-align:left; font:inherit; }
+.diff-item-desc { display:block; }
+.diff-dropdown-item[aria-pressed=true] { border-left:4px solid #f1bd54; }
+.starter-slot-card.empty-slot { display:flex; flex-direction:column; align-items:center; justify-content:center; width:100%; color:var(--ux-ink); font:inherit; }
+.starter-slot-card.empty-slot:focus-visible { background:var(--ux-highlight); }
+#starter-logpose-info { font-family:inherit; min-height:36px; }
+.btn-dismiss-slot { flex:none; margin-left:auto; min-width:36px; min-height:36px; border:1px solid #c67d72; border-radius:9px; background:#fff3f0; color:#a43e32; font-size:16px; }
+.btn-dismiss-slot:hover { background:#ffe1dc; }
+
+/* Secondary information gets clear grouping instead of tiny inline labels. */
+.team-synergy-summary,
+.tower-selection-bar,
+.collection-summary { border-radius:12px; }
+.team-synergy-summary { padding:10px; background:#eef4ef; border:1px solid var(--ux-line); }
+.team-synergy-summary h3 { margin:0 0 6px; color:var(--ux-ink); }
+.syn-none { color:var(--ux-muted); }
+.tower-selection-bar { background:#f0f5ee; border:1px solid var(--ux-line); padding:10px; }
+.map-nav-tabs .tab[aria-pressed=true] { border-color:#1c6d86; }
+.map-nav-tabs .tab { min-height:44px; }
+.map-node.reachable { outline:2px solid #0a536e; outline-offset:2px; }
+
+/* Combat: show the active fighters and the charged move at a glance. */
+.battle-side .side-head { border-bottom:1px solid #8aaab2; padding-bottom:7px; }
+.battle-side .fcard.active { border-width:2px; box-shadow:0 0 0 2px #e9c56e,0 5px 16px #061d2c44; }
+.battle-side .fcard.ult-ready { outline:3px solid #edbf58; outline-offset:2px; }
+.battle-side .fcard[role=button] { cursor:pointer; }
+.battle-side .fcard[role=button]:focus-visible { outline:3px solid #25adcf!important; outline-offset:3px!important; }
+.battle-reserve.is-active { outline:2px solid #e9c56e; outline-offset:1px; }
+.battle-log-panel > h3 { font:800 12px/1.4 system-ui,sans-serif; letter-spacing:.03em; }
+.battle-sidebar .btn:not(:disabled) { min-height:44px; }
+
+/* Settings need the same sizing and hierarchy as the rest of the UI. */
+.overlay .display-settings,
+.overlay .bag-auto-settings { margin-block:12px; padding:14px; border:1px solid var(--ux-line); border-radius:12px; background:#f7faf6; }
+.overlay .bag-auto-settings legend { padding:0 5px; color:var(--ux-ink); font-weight:800; }
+.overlay .bag-auto-settings p,
+.overlay .display-settings p { color:var(--ux-muted); font-size:12px; line-height:1.55; }
+.overlay .bag-auto-settings label { display:inline-flex; align-items:center; gap:7px; margin:4px 8px 4px 0; }
+
+@media (max-width:600px) {
+  #app > .panel:not(:has(.map-board)) { padding:14px; }
+  #app > .panel > h2 { font-size:clamp(14px,4vw,17px); }
+  .modal { line-height:1.55; }
+  .modal .actions .btn { min-height:44px; }
+  .starter-launch-actions { display:grid; grid-template-columns:1fr; gap:8px; }
+  .starter-launch-actions .btn { width:100%; }
+  .overlay :is(input:not([type=checkbox]),select,textarea) { font-size:16px!important; }
+}
+
+html[data-theme="dark"] {
+  --ux-ink:#dcebea;
+  --ux-muted:#c4d9da;
+  --ux-line:#567781;
+  --ux-surface:#1c303c;
+  --ux-highlight:#315b5a;
+  --ux-action:#86bda5;
+}
+html[data-theme="dark"] #app > .panel,
+html[data-theme="dark"] #app > .challenge-panel { background:var(--ux-surface); }
+html[data-theme="dark"] :is(.panel,.modal,.world-controls) :is(input:not([type=checkbox]):not([type=radio]),select,textarea) { background:#142733; color:#e3eeed; border-color:#73939b; }
+html[data-theme="dark"] :is(.panel,.modal,.world-controls) :is(input,select,textarea)::placeholder { color:#aec9cc; }
+html[data-theme="dark"] :is(.starter-launch-actions,.tower-launch,.challenge-launch,.modal .actions) .btn.green:not(:disabled),
+html[data-theme="dark"] :is(.starter-launch-actions,.tower-launch,.challenge-launch) .btn.blue:not(:disabled),
+html[data-theme="dark"] :is(#btn-leave,#btn-save-settings) { background:#396f5d; border-color:#80a890; color:#fff; }
+html[data-theme="dark"] .team-synergy-summary,
+html[data-theme="dark"] .tower-selection-bar,
+html[data-theme="dark"] .overlay :is(.display-settings,.bag-auto-settings) { background:#243d46; border-color:var(--ux-line); }
+html[data-theme="dark"] .btn-dismiss-slot { background:#493438; color:#ffc4b8; border-color:#a97470; }
+html[data-theme="dark"] .diff-dropdown-item[aria-pressed=true] { color:#fff; }
+
+@media (prefers-reduced-motion:reduce) {
+  :is(.btn,.tab,.mode-card,.map-node) { animation:none!important; transition:none!important; }
+}

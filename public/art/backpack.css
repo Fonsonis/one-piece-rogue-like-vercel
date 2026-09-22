@@ -78,3 +78,56 @@ html[data-theme="dark"] .bag-continuation { background:repeating-linear-gradient
 
 .backpacks { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:18px; }
 @media(max-width:700px) { .backpacks { grid-template-columns:minmax(0,1fr); } }
+
+/* A clear capacity summary and a single prominent organize action per bag. */
+.backpacks { gap:clamp(14px,2vw,24px); align-items:start; }
+.backpack:not(.backpack-combat) { padding:14px; border:1px solid #a7b8b1; border-radius:12px; background:var(--paper); box-shadow:0 4px 14px #1a3d4820; }
+.backpack:not(.backpack-combat) .bag-heading { align-items:center; margin-bottom:12px; padding-bottom:10px; border-bottom:1px solid #a7b8b1; }
+.backpack:not(.backpack-combat) .bag-heading strong { font:800 16px/1.4 system-ui,sans-serif; }
+.backpack:not(.backpack-combat) .bag-heading > span { padding:5px 9px; border-radius:99px; background:#dcefeb; color:#20564f; font:800 13px/1.3 system-ui,sans-serif; }
+.backpack:not(.backpack-combat) .bag-grid { width:100%; max-width:420px; }
+.backpack:not(.backpack-combat) .bag-cell { min-height:82px; }
+.backpack .bag-empty { color:#d0dcda; border-color:#78999c; }
+.backpack .bag-empty > span:last-child { opacity:.7; }
+.backpack .bag-slot-number { opacity:.8; font-weight:700; }
+.backpack .bag-quantity { padding:2px 4px; border-radius:4px; background:#fff8dc; color:#30424a; }
+.backpack .bag-item-name { line-height:1.3; }
+.backpack:not(.backpack-combat) > [data-bag-organize] { display:block; width:100%; max-width:420px; min-height:44px; margin:12px auto 0; padding:8px; border:2px solid #39768a; border-radius:7px; background:#2d7087; color:#fff; font:800 12px/1.3 system-ui,sans-serif; }
+.backpack:not(.backpack-combat) > [data-bag-organize]:hover { background:#245a70; }
+.backpack .bag-help { max-width:55ch; margin:12px auto 0; color:var(--ink); font:13px/1.55 system-ui,sans-serif; }
+.bag-pending { border:2px solid #b47a32; border-radius:9px; background:#fff3dc; color:#493817; }
+.bag-pending > b { font:800 14px/1.4 system-ui,sans-serif; }
+.bag-pending p { margin:5px 0 10px; font:13px/1.5 system-ui,sans-serif; }
+.bag-pending-item { gap:8px; font-size:13px; }
+.bag-pending-item button { min-height:44px; padding:8px 12px; border-radius:6px; font:700 12px/1.3 system-ui,sans-serif; }
+.bag-pending-item [data-bag-collect] { background:#2d7357; color:#fff; border-color:#1e6046; }
+.bag-organizer { width:min(100%,560px); }
+.bag-organizer > h2 { font:800 20px/1.4 system-ui,sans-serif; }
+.bag-organizer > p { font:14px/1.55 system-ui,sans-serif; }
+.bag-organizer label { display:block; margin:14px 0; font-weight:700; }
+.bag-organizer select { min-height:44px; border-radius:7px; }
+.bag-organizer .bag-cell { min-height:62px; }
+.bag-organizer > p[role="status"] { padding:9px 12px; border-left:4px solid #3b8490; border-radius:4px; background:var(--paper-dark); }
+.bag-organizer .actions .btn,.bag-item-modal .actions .btn { min-height:44px; font:700 12px/1.4 system-ui,sans-serif; }
+.bag-item-modal p { font:14px/1.55 system-ui,sans-serif; }
+.backpack :is(button,select):focus-visible,.bag-organizer :is(button,select):focus-visible,.bag-item-modal button:focus-visible { outline:3px solid #15718b; outline-offset:3px; }
+.backpack-combat .bag-heading strong,.battle-log-panel > h3 { font:800 12px/1.4 system-ui,sans-serif; }
+.backpack-combat .bag-heading > span { font-size:12px; }
+.backpack-combat .bag-item-name { display:block; font:700 10px/1.1 system-ui,sans-serif; }
+.backpack-combat .bag-cell { min-height:60px; }
+.backpack-combat .bag-slot-number,.backpack-combat .bag-quantity { font-size:10px; }
+html[data-theme="dark"] .backpack:not(.backpack-combat) .bag-heading > span { background:#244f52; color:#e2f5ec; }
+html[data-theme="dark"] .bag-pending { background:#3e3426; color:#f4e8d0; border-color:#cca35d; }
+html[data-theme="dark"] .bag-quantity { background:#1b3641; color:#edf1e6; }
+@media(max-width:700px) {
+  .backpack:not(.backpack-combat) { padding:12px; }
+  .backpack-combat .bag-heading strong,.battle-log-panel > h3 { font-size:11px; }
+  .backpack-combat .bag-item-name { display:block; font-size:10px; }
+  .backpack-combat .bag-quantity { font-size:10px; }
+  .backpack-combat .bag-cell { min-height:62px; }
+}
+@media(max-width:390px) {
+  .backpack:not(.backpack-combat) .bag-heading strong { font-size:14px; }
+  .backpack:not(.backpack-combat) .bag-heading > span { font-size:11px; }
+  .backpack:not(.backpack-combat) .bag-cell { min-height:74px; }
+}

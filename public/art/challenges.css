@@ -178,3 +178,36 @@ html[data-theme="dark"] #app .challenge-arena #challenge-fight { color:#172c35; 
   .legends-arena .challenge-contender figcaption { margin:0; }
   .legends-arena .challenge-contender figcaption strong { font-size:12px; }
 }
+
+/* One obvious action per challenge screen, with readable supporting choices. */
+#app .challenge-hub { border-top:5px solid #d58a35; }
+#app .challenge-hub > h2 { margin-bottom:8px; }
+.challenge-event { border-radius:14px; border-top-width:5px; box-shadow:0 5px 0 #173d4a20; }
+.challenge-event .challenge-emblem { display:grid; place-items:center; width:58px; height:58px; border-radius:50%; background:#dcecf0; font-size:30px; }
+.challenge-event.legends .challenge-emblem { background:#f7e7bc; }
+.challenge-event .challenge-format { margin-bottom:6px; font-weight:650; color:var(--sea); }
+#app .challenge-event .btn { min-height:52px; font-weight:800; font-size:14px; border-radius:9px; }
+#app .challenge-event .btn:disabled { opacity:.66; }
+.challenge-selection > p:first-of-type { margin-top:-8px; color:var(--sea); font-weight:650; }
+.challenge-slot { border-radius:12px; box-shadow:0 4px 0 #15384a1a; }
+.challenge-slot:has(.challenge-slot-pick:not(:disabled):hover),
+.challenge-slot:has(.challenge-slot-pick:focus-visible) { border-color:#ad711e; }
+.challenge-slot-pick { min-height:170px; border-width:2px; }
+.challenge-slot-pick:not(:disabled):hover { background:#e5f1eb; border-color:#af7329; }
+#app .challenge-panel .challenge-launch { position:sticky; bottom:8px; z-index:5; padding:14px; border:2px solid #9bacaa; background:var(--paper); box-shadow:0 8px 24px #10253328; }
+#app .challenge-panel .challenge-launch p { margin:0; font-weight:750; }
+#app .challenge-panel .challenge-launch .btn { min-height:52px; font-weight:800; border-radius:8px; }
+.challenge-progress li[aria-current] { opacity:1; }
+.challenge-series-status { font-weight:650; }
+#app .challenge-arena .challenge-fight-actions .btn { font-weight:800; }
+#app .challenge-view-tabs .btn[aria-pressed="true"] { box-shadow:0 2px 6px #10253324,inset 0 -3px 0 var(--arena-accent); font-weight:800; }
+.challenge-arena .challenge-rules summary { min-height:44px; }
+html[data-theme="dark"] .challenge-event .challenge-emblem { background:#35566a; }
+html[data-theme="dark"] .challenge-event.legends .challenge-emblem { background:#675028; }
+html[data-theme="dark"] .challenge-slot-pick:not(:disabled):hover { background:#30505b; }
+@media(max-width:540px) {
+ .challenge-event { align-items:stretch; padding:14px 10px; }
+ .challenge-event .challenge-emblem { align-self:center; width:46px; height:46px; font-size:24px; }
+ #app .challenge-panel .challenge-launch { bottom:4px; }
+ .challenge-slot-pick { min-height:145px; }
+}

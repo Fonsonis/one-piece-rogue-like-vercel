@@ -53,3 +53,20 @@ test('sheet respects insufficient funds and stops offering upgrades at the saga 
  assert.equal(ov.querySelector('#sheet-upg-btn'),null);
  assert.match(ov.html,/Nivel máximo alcanzado/);
 });
+
+test('faction in the sheet follows the purchased crew version and matches its synergy',()=>{
+ const {h,overlays}=modalHarness();
+ h.exec("meta.roster=['robin'];meta.logPoses=100000;saveMeta=()=>true;var priorRobin=makeChar('robin',20);showCharModal('robin');");
+ const ov=overlays[0];
+ assert.match(ov.html,/<b>Facción:<\/b>[^<]*Sombrero de Paja/);
+ assert.doesNotMatch(ov.html,/<b>Facción:<\/b>[^<]*Baroque Works/);
+ assert.equal(h.exec("buyCrewVersion('robin','baroque')"),true);
+ h.exec("meta.formPreferences.crews={robin:'baroque'};");
+ h.ctx.sheet=ov;
+ h.exec("showCharModal('robin',sheet);");
+ assert.match(ov.html,/<b>Facción:<\/b>[^<]*Baroque Works/);
+ assert.doesNotMatch(ov.html,/<b>Facción:<\/b>[^<]*Sombrero de Paja/);
+ assert.ok(h.exec("(()=>{const team=[makeChar('robin',20),makeChar('gem',20)];return crewTier(team,'baroque')===1&&crewTier(team,'straw')===0;})()"));
+ h.exec("showCharModal(priorRobin,sheet);");
+ assert.match(ov.html,/<b>Facción:<\/b>[^<]*Sombrero de Paja/);
+});
