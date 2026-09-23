@@ -507,6 +507,55 @@ button { font-family: inherit; cursor: pointer; }
 .poster.empty { opacity: .35; filter: grayscale(1); }
 .poster.hit { opacity: 1; border-color: var(--green); background: #dff2df; }
 
+/* Mercado de carteles del menú principal */
+.logpose-market-modal { width:min(500px,calc(100vw - 24px)); max-width:500px; padding:16px; }
+.logpose-market-header { text-align:center; }
+.logpose-market-header > span { display:block; margin-bottom:3px; color:var(--red); font:700 7px/1.4 'Press Start 2P',monospace; letter-spacing:1px; }
+.logpose-market-header h2 { margin:0 0 7px; }
+.logpose-market-header p { max-width:430px; margin:0 auto; color:#59666a; font:600 11px/1.45 system-ui,sans-serif; }
+.logpose-market-rules { display:grid; gap:3px; margin:10px 0; padding:8px 10px; border:1px solid #d6c7a8; border-radius:8px; background:#f4ead3; color:#4a4336; text-align:center; font:10px/1.4 system-ui,sans-serif; }
+.logpose-market-rules small { color:#6d665a; font-size:9px; }
+.logpose-market-status { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px; margin-bottom:10px; }
+.logpose-market-status > div { display:grid; place-items:center; gap:2px; min-width:0; padding:8px 5px; border:1px solid #dba949; border-radius:8px; background:#fff5d9; color:#5e4524; text-align:center; }
+.logpose-market-status > div:last-child { border-color:#df9d51; background:#fff0de; }
+.logpose-market-status > div.ready { border-color:#58a86f; background:#e5f4e8; color:#285d39; }
+.logpose-market-status small { min-height:10px; font:700 7px/1.35 'Press Start 2P',monospace; }
+.logpose-market-status strong { font:800 13px/1.35 system-ui,sans-serif; }
+.logpose-market-status span { color:#746b5e; font:9px/1.3 system-ui,sans-serif; }
+.logpose-saga-picker { margin:0 0 9px; padding:8px; border:1px solid #b8c4c1; border-radius:8px; background:#e9efed; }
+.logpose-saga-picker > header { display:flex; align-items:center; justify-content:space-between; gap:8px; margin:0 1px 7px; color:#304448; font:10px/1.3 system-ui,sans-serif; }
+.logpose-saga-picker > header div { display:grid; gap:1px; }
+.logpose-saga-picker > header small { color:#69797b; font-size:9px; }
+.logpose-saga-picker > header > span { flex:none; padding:3px 6px; border-radius:999px; background:#d6e7dd; color:#2f7551; font:700 9px/1.3 system-ui,sans-serif; }
+.logpose-saga-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px; max-height:174px; overflow-y:auto; overscroll-behavior:contain; scrollbar-width:thin; }
+.saga-block-pill { display:flex; align-items:center; justify-content:space-between; gap:5px; min-width:0; min-height:42px; padding:6px 7px; border:1px solid #66a77e; border-radius:7px; background:#f1faf4; color:#294d38; font:9px/1.3 system-ui,sans-serif; text-align:left; cursor:pointer; }
+.saga-block-pill.blocked { border-color:#c57c76; background:#f8e8e5; color:#6c302d; }
+.saga-block-pill:focus-visible { outline:3px solid var(--gold); outline-offset:2px; }
+.saga-block-name { min-width:0; overflow-wrap:anywhere; }
+.saga-block-state { flex:none; color:#26804b; font-size:8px; font-weight:800; white-space:nowrap; }
+.saga-block-pill.blocked .saga-block-state { color:#b04740; }
+.logpose-block-note { display:block; margin:6px 1px 0; color:#68777a; font:8px/1.35 system-ui,sans-serif; }
+.logpose-market-cost { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; padding:8px 10px; border:1px solid #d2c9b4; border-radius:8px; background:#f8f3e7; color:#3d484a; font:10px/1.35 system-ui,sans-serif; }
+.logpose-market-cost > span { display:grid; gap:1px; font-weight:700; }
+.logpose-market-cost small { color:#7c7568; font-size:8px; font-weight:400; }
+.logpose-market-cost strong { flex:none; color:#9b6417; font:800 14px/1.2 system-ui,sans-serif; }
+.logpose-market-actions { display:grid!important; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:7px!important; margin:0!important; padding:0!important; }
+.logpose-market-actions .btn { min-width:0; min-height:42px; margin:0; }
+
+@media(max-width:420px) {
+  .logpose-market-modal { width:calc(100vw - 16px)!important; padding:12px!important; }
+  .logpose-market-header p { font-size:10px; }
+  .logpose-market-rules { margin:8px 0; padding:7px; }
+  .logpose-market-rules small { font-size:8px; }
+  .logpose-market-status { gap:6px; margin-bottom:8px; }
+  .logpose-market-status > div { padding:7px 4px; }
+  .logpose-saga-picker { padding:7px; margin-bottom:7px; }
+  .logpose-saga-grid { max-height:150px; }
+  .saga-block-pill { min-height:38px; padding:5px 6px; font-size:8.5px; }
+  .saga-block-state { font-size:7.5px; }
+  .logpose-market-cost { margin-bottom:7px; padding:7px 9px; }
+}
+
 /* Login / registro */
 .auth-input {
   width: 100%; padding: 9px; border: 2px solid var(--ink); background: #fff;
@@ -1016,12 +1065,12 @@ button, .mode-card, .saga-row, .map-node, .team-slot, .dex-card, .poster, .item-
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
-  width: 310px;
-  background: rgba(22, 26, 38, 0.96);
+  width: 390px;
+  background: linear-gradient(165deg, rgba(18, 38, 52, 0.98), rgba(24, 28, 39, 0.98));
   border: 3px solid var(--gold);
   border-radius: 6px;
   box-shadow: 0 10px 25px rgba(0, 0, 0, 0.8), var(--shadow);
-  padding: 8px;
+  padding: 10px;
   z-index: 250;
   backdrop-filter: blur(8px);
 }
@@ -1029,41 +1078,67 @@ button, .mode-card, .saga-row, .map-node, .team-slot, .dex-card, .poster, .item-
   font-size: 8px;
   color: var(--gold);
   text-align: center;
-  padding-bottom: 6px;
-  margin-bottom: 6px;
+  padding: 3px 4px 10px;
+  margin-bottom: 8px;
   border-bottom: 1px dashed rgba(255, 255, 255, 0.2);
 }
-.diff-dropdown-item {
-  padding: 8px 10px;
-  border-radius: 4px;
+.world-controls .diff-dropdown-item {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 10px;
+  border-radius: 8px;
   cursor: pointer;
   margin-bottom: 4px;
   background: rgba(255, 255, 255, 0.06);
   color: #fff;
-  border: 1px solid transparent;
+  border: 1px solid rgba(255,255,255,.14);
+  text-align: left;
+  font: 11px/1.4 system-ui, sans-serif;
   transition: all 0.15s ease;
 }
-.diff-dropdown-item:hover {
+.world-controls .diff-item-icon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255,255,255,.22);
+  border-radius: 50%;
+  background: rgba(255,255,255,.08);
+  font-size: 20px;
+}
+.world-controls .diff-item-copy { display: contents; }
+.world-controls .diff-dropdown-item:hover {
   background: rgba(232, 200, 50, 0.2);
   border-color: var(--gold);
 }
-.diff-dropdown-item.active {
+.world-controls .diff-dropdown-item.active {
   background: rgba(232, 200, 50, 0.35);
   border-color: var(--gold);
   box-shadow: inset 0 0 6px rgba(232, 200, 50, 0.5);
 }
-.diff-item-head {
+.world-controls .diff-item-head {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  font-size: 9.5px;
+  min-width: 0;
+  min-height: 38px;
+  font-size: 12px;
 }
-.diff-item-desc {
-  font-size: 7.5px;
+.world-controls .diff-item-multiplier { padding: 3px 5px; border-radius: 999px; background: rgba(232,200,50,.16); color: var(--gold); font-size: 8px; }
+.world-controls .diff-item-desc {
+  display: block;
+  grid-column: 1 / -1;
+  font: 10px/1.4 system-ui, sans-serif;
   color: #bbb;
-  margin-top: 3px;
+  margin-top: 0;
   line-height: 1.4;
 }
+.world-controls .diff-dropdown-item.pirate-king { border-color:#e8c832; background:linear-gradient(120deg,rgba(232,200,50,.2),rgba(255,255,255,.06)); }
+.world-controls .diff-dropdown-item.pirate-king .diff-item-icon { border-color:#e8c832; background:#6d5319; box-shadow:0 0 12px rgba(232,200,50,.28); }
+.world-controls .diff-item-reward { grid-column:1/-1; display:block; margin-top:2px; padding:5px 7px; border:1px solid #e8c83299; border-radius:5px; background:#e8c83218; color:#ffe79a; font:700 10px/1.4 system-ui,sans-serif; }
 .diff-locked-tag {
   font-size: 7px;
   color: #ff6b6b;
@@ -1079,6 +1154,10 @@ button, .mode-card, .saga-row, .map-node, .team-slot, .dex-card, .poster, .item-
   .diff-picker-bar { flex-direction: column; align-items: stretch; gap: 8px; }
   .diff-dropdown-container { width: 100%; }
   .diff-dropdown-trigger { width: 100%; text-align: center; }
+  .world-controls .diff-dropdown-item { grid-template-columns:28px minmax(0,1fr); gap:4px 7px; padding:6px 7px; }
+  .world-controls .diff-item-icon { width:28px; height:28px; font-size:15px; }
+  .world-controls .diff-item-head { min-height:28px; font-size:10px; }
+  .world-controls .diff-item-desc { font-size:9.5px; }
 }
 .btn.purple { background: #7c3aed; color: #fff; }
 

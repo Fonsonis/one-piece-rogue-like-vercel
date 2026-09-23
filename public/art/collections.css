@@ -199,9 +199,9 @@ html .collection-modal #inv-cards-grid { display:grid; grid-template-columns:rep
 .pirate-dex > * + * { margin-top:12px; }
 .pirate-dex .dex-header { margin:0; }
 .pirate-dex .dex-header h2 { margin:2px 0 0; padding:0; border:0; font:750 27px/1.2 system-ui,sans-serif; color:var(--collection-ink); text-align:left; }
-.pirate-dex .dex-progress { background:var(--collection-soft); border-color:var(--collection-line); }
+.pirate-dex .dex-progress { grid-template-columns:repeat(3,minmax(0,1fr)); background:var(--collection-soft); border-color:var(--collection-line); }
 .pirate-dex .dex-progress > span { color:var(--collection-ink); font:13px/1.4 system-ui,sans-serif; }
-.pirate-dex .dex-progress > span:last-child { border-left:1px solid var(--collection-line); padding-left:16px; }
+.pirate-dex .dex-progress > span + span { border-left:1px solid var(--collection-line); padding-left:16px; }
 .pirate-dex .dex-progress strong { display:block; font-size:24px; line-height:1.2; }
 .pirate-dex .dex-progress small { font-size:15px; font-weight:500; }
 .pirate-dex .dex-progress span span { display:block; margin-top:3px; color:var(--collection-muted); }
@@ -219,6 +219,9 @@ html .collection-modal #inv-cards-grid { display:grid; grid-template-columns:rep
 .pirate-dex .dex-card .inventory-profile { pointer-events:none; }
 .pirate-dex .dex-card .inventory-portrait { height:80px; font-size:34px; }
 .pirate-dex .dex-card-footer { display:flex; align-items:center; justify-content:space-between; gap:6px; width:100%; min-height:28px; margin-top:auto; padding-top:7px; border-top:1px solid var(--collection-line); color:var(--collection-muted); font-size:11px; }
+.pirate-dex .dex-status-badge { display:inline-flex; align-items:center; min-height:24px; padding:3px 7px; border:1px solid var(--collection-line); border-radius:999px; background:var(--collection-soft); color:var(--collection-ink); font-weight:750; }
+.pirate-dex .dex-status-veteran .dex-status-badge { border-color:#b98d39; background:#f3dfaa; color:#5b4313; }
+.pirate-dex .dex-status-recruited .dex-status-badge { border-color:#337d8a; background:#d9edf0; color:#174f59; }
 .pirate-dex .dex-rarity-full { margin:2px 0 5px; font-size:10px; }
 .pirate-dex .dex-help { margin:10px 0 0; font:13px/1.5 system-ui,sans-serif; color:var(--collection-muted); text-align:center; }
 
@@ -227,6 +230,8 @@ html[data-theme="dark"] .panel.pirate-dex.collection-page { --collection-ink:#ef
 html[data-theme="dark"] .achievement-card.ready { background:linear-gradient(90deg,#1c4436,var(--collection-surface) 75%); border-color:#65ac87; }
 html[data-theme="dark"] .achievement-progress { background:#496365; } html[data-theme="dark"] .achievement-progress i { background:#6ccca2; }
 html[data-theme="dark"] .inventory-rarity { background:#503f1b; color:#ffe2a0; }
+html[data-theme="dark"] .pirate-dex .dex-status-veteran .dex-status-badge { background:#604b1d; color:#ffe4a3; }
+html[data-theme="dark"] .pirate-dex .dex-status-recruited .dex-status-badge { background:#214c59; color:#bdebf0; }
 html[data-theme="dark"] .collection-modal :is(button,input,select,summary):focus-visible { outline-color:#7bcaff; }
 
 @media(max-width:700px) {
@@ -283,6 +288,9 @@ html[data-theme="dark"] .collection-modal :is(button,input,select,summary):focus
   .panel.pirate-dex.collection-page { padding:14px; border-radius:14px; }
   .pirate-dex .dex-header h2 { font-size:21px; }
   .pirate-dex .dex-card { padding:6px 4px; font:12px/1.25 system-ui,sans-serif; }
+  .pirate-dex .dex-status-badge { min-height:22px; max-width:100%; padding:2px 5px; font-size:10px; line-height:1.25; white-space:normal; }
+  .pirate-dex .dex-card-footer { flex-direction:column; align-items:flex-start; min-height:42px; }
+  .pirate-dex .dex-forms-count { white-space:nowrap; }
   .pirate-dex .dex-card .emoji { display:flex; align-items:center; justify-content:center; height:52px; min-height:0; margin:0 0 3px; }
   html .pirate-dex .grid9 .dex-sprite { --sprite-size:52px!important; }
   .pirate-dex .inventory-profile strong { font-size:12px; }
@@ -411,6 +419,8 @@ html[data-theme="dark"] .inventory-shortfall { color:#ffbd9e; }
   .collection-modal .inventory-filters,.collection-filter-grid { grid-template-columns:1fr; }
   .collection-summary { grid-template-columns:1fr; }
   .collection-summary > :last-child { border-left:0; border-top:1px solid var(--collection-line); padding:8px 0 0; }
+  .pirate-dex .dex-progress { grid-template-columns:1fr; }
+  .pirate-dex .dex-progress > span + span { border-left:0; border-top:1px solid var(--collection-line); padding:8px 0 0; }
   .achievement-card { grid-template-columns:1fr; }
   .achievement-icon { display:none; }
   .achievement-reward { grid-column:1; }

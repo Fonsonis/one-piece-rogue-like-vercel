@@ -7,7 +7,7 @@ const worldMapCSS=fs.readFileSync('public/art/world-map.css','utf8');
 
 function setup() {
  const h=combatHarness(),nodes=new Map();
- const node=s=>{if(!nodes.has(s))nodes.set(s,{dataset:{},scrollTop:0,scrollHeight:16000,clientHeight:500,offsetTop:15400,offsetHeight:195,classList:{add(){},remove(){}}});return nodes.get(s);};
+ const node=s=>{if(!nodes.has(s))nodes.set(s,{dataset:{},scrollTop:0,scrollHeight:16000,clientHeight:500,offsetTop:15400,offsetHeight:195,classList:{add(){},remove(){}},focus(){}});return nodes.get(s);};
  h.ctx.document.querySelector=node;
  h.ctx.document.querySelectorAll=()=>[];
  h.exec(`let html='';render=s=>html=s;storyMode='classic';selectedDiff=1;run=null;meta.sagaDiffWins={};meta.islandProgress={};`);
@@ -28,6 +28,16 @@ test('one chart renders every saga and island in reverse order, preserving modes
  assert.ok(html.indexOf('id="world-saga-8"')<html.indexOf('RED LINE · NUEVO MUNDO'));
  assert.ok(html.indexOf('RED LINE · NUEVO MUNDO')<html.indexOf('id="world-saga-7"'));
  for(const id of ['tab-classic','tab-nuz','btn-diff-trigger','btn-saga-probs-all'])assert.ok(html.includes(`id="${id}"`));
+ assert.match(html,/Rey Pirata/);assert.match(html,/1 legendario 5★ de esa saga garantizado/);
+});
+
+test('choosing a saga sends the ship to its first island',()=>{
+ const {h,node}=setup(),buttons=[2].map(index=>({dataset:{jumpSaga:String(index)},setAttribute(){}}));
+ h.ctx.document.querySelectorAll=selector=>selector==='[data-jump-saga]'?buttons:[];
+ h.exec("screenSagas();let sailedTo='';worldNavigator={travelTo:id=>(sailedTo=id,true)};");
+ buttons[0].onclick();
+ assert.equal(h.exec('sailedTo'),'skypiea-0');
+ assert.equal(node('#world-jump').dataset.saga,'2');
 });
 
 test('the vertical chart keeps a stable viewport, reaches East Blue and settles on complete island cards',()=>{

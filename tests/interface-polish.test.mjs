@@ -59,3 +59,22 @@ test('catalogue excludes defeated five-star characters while random posters keep
   for(const id of ids)assert.ok(h.exec(`CHARS[${JSON.stringify(id)}].rareza`)<5);
   assert.ok(h.exec('poolByRareza(5).length')>0);
 });
+
+test('main-menu poster market uses a compact status and saga picker layout',()=>{
+  const h=combatHarness();let markup='';
+  const control={};
+  const overlay={
+    set innerHTML(value){markup=value;},
+    querySelectorAll(){return [];},
+    querySelector(){return control;}
+  };
+  h.ctx.document.querySelector=()=>null;
+  h.ctx.document.createElement=()=>overlay;
+  h.ctx.document.body={appendChild(){}};
+  h.exec(`sagaUnlocked=()=>true;meta.logPoses=1250;meta.starPity=240;showLogPoseGachaModal()`);
+  assert.match(markup,/logpose-market-status/);
+  assert.match(markup,/logpose-saga-grid/);
+  assert.match(markup,/logpose-market-cost/);
+  assert.match(markup,/aria-pressed="false"/);
+  assert.match(markup,/JUGAR ·/);
+});

@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {combatHarness} from './balance-harness.mjs';
+import fs from 'node:fs';
 
 test('shop roster combines saga, type, rarity, team, search, and ordering', () => {
   const h = combatHarness();
@@ -9,6 +10,16 @@ test('shop roster combines saga, type, rarity, team, search, and ordering', () =
   assert.deepEqual(Array.from(h.exec(`filterShipRoster(${ids},{saga:'',type:'',rarity:0,sort:'name',teamOnly:true},'', ['luffy','robin'])`)), ['luffy','robin']);
   assert.deepEqual(Array.from(h.exec(`filterShipRoster(${ids},{saga:'',type:'',rarity:0,sort:'name',teamOnly:false},'na')`)), ['nami']);
   assert.deepEqual(Array.from(h.exec(`filterShipRoster(${ids},{saga:'',type:'',rarity:0,sort:'rarezaDesc',teamOnly:false})`)).slice(-1), ['luffy']);
+});
+
+test('mobile training shows a three by three roster page and all six stats in a three-column grid', () => {
+  const h = combatHarness(),css = fs.readFileSync('public/art/training-shop.css','utf8');
+  assert.equal(h.exec('TRAINING_PAGE_SIZE'),9);
+  assert.equal(h.exec('UPG_STATS.length'),6);
+  assert.match(css,/@media\(max-width:600px\)[\s\S]*?training-portraits[^}]*repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(css,/@media\(max-width:390px\)[\s\S]*?training-portraits[^}]*repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(css,/@media\(max-width:600px\)[\s\S]*?training-detail \.ship-upgs[^}]*repeat\(3,minmax\(0,1fr\)\)/);
+  assert.match(css,/@media\(max-width:390px\)[\s\S]*?training-detail \.ship-upgs[^}]*repeat\(3,minmax\(0,1fr\)\)/);
 });
 
 test('base-level resale returns half the recorded actual Log Pose spend once', () => {
