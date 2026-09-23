@@ -12,7 +12,7 @@ body:has(.world-map) { width:100%; max-width:none; height:100dvh; min-height:0; 
 .world-controls .tabs { flex:1; }
 .world-controls .tab { font-size:8px; min-height:40px; display:grid; place-items:center; padding:6px; }
 .world-controls .diff-dropdown-trigger { font-size:8px; white-space:normal; }
-.world-controls .diff-dropdown-menu { max-height:min(420px,60dvh); overflow:auto; max-width:calc(100vw - 24px); }
+.world-controls .diff-dropdown-menu { max-height:min(620px,calc(100dvh - 178px)); overflow:auto; max-width:calc(100vw - 24px); }
 .world-nav { font-size:8px; }
 .world-nav select { flex:1; min-width:0; height:40px; border:1px solid var(--line); border-radius:3px; background:var(--paper); color:var(--ink); font:10px 'Press Start 2P',monospace; padding:6px; }
 .world-map { position:relative; height:100%; min-height:0; overflow:auto; overscroll-behavior:contain; overflow-anchor:none; scroll-snap-type:y proximity; scroll-padding-block:calc(50% - 125px); container-type:size; border:1px solid var(--line); border-radius:4px; background:transparent; scrollbar-color:#628f94 #d2e7df; }
@@ -63,7 +63,7 @@ html[data-theme="dark"] .world-saga-details,html[data-theme="dark"] .world-islan
   .world-controls .diff-picker-bar { display:flex; flex-direction:row; flex-wrap:nowrap; }
   .world-controls .diff-dropdown-container { flex:1; min-width:0; }
   .world-controls .diff-dropdown-trigger { width:100%; padding:6px; font-size:7px; line-height:1.6; }
-  .world-controls .diff-dropdown-menu { right:0; left:auto; width:300px; }
+  .world-controls .diff-dropdown-menu { right:0; left:auto; width:min(390px,calc(100vw - 16px)); }
   /* Leave enough vertical room for a complete card. This prevents the next
      island from looking like a clipped duplicate at the viewport edge. */
   .world-stop { height:max(250px,72cqh); }

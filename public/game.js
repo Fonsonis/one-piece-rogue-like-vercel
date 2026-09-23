@@ -518,7 +518,7 @@ const DIFFICULTIES = [
   { id: 2, name: 'Pirata', emoji: '🏴‍☠️', mult: 1.30, desc: 'Desafiante (rivales +30% atributos)' },
   { id: 3, name: 'Capitán', emoji: '⚔️', mult: 1.65, desc: 'Difícil (rivales +65% atributos — algo menor que la saga posterior)' },
   { id: 4, name: 'Supernova', emoji: '⚡', mult: 2.15, desc: 'Muy Difícil (rivales +115% atributos — muy superior al jefe de la saga posterior)' },
-  { id: 5, name: 'Rey Pirata', emoji: '👑', mult: 2.75, desc: 'Extremo (rivales +175% atributos — equivalente al jefe de la 2ª saga posterior)' },
+  { id: 5, name: 'Rey Pirata', emoji: '👑', mult: 2.75, desc: 'Extremo (rivales +175% atributos — equivalente al jefe de la 2ª saga posterior)', reward: 'Primera victoria por saga: 1 legendario 5★ de esa saga garantizado.' },
 ];
 let selectedDiff = 1;
 
@@ -2151,40 +2151,49 @@ function showLogPoseGachaModal() {
 
     const sagaItemsHTML = unlockedSagas.map(s => {
       const isBlocked = logPoseBlockedSagaIds.includes(s.id);
-      return `<div class="saga-block-pill ${isBlocked ? 'blocked' : 'active'}" data-saga="${s.id}" style="cursor:pointer;padding:6px 8px;border-radius:6px;border:1px solid ${isBlocked ? '#e74c3c' : '#2ecc71'};background:${isBlocked ? 'rgba(231,76,60,0.15)' : 'rgba(46,204,113,0.15)'};font-size:8.5px;display:flex;align-items:center;justify-content:space-between;gap:6px;">
-        <span>📜 <b>${s.name}</b></span>
-        <span style="font-weight:bold;color:${isBlocked ? '#e74c3c' : '#2ecc71'};">${isBlocked ? '🔒 BLOQUEADA (+200)' : '✓ ACTIVA'}</span>
-      </div>`;
+      return `<button type="button" class="saga-block-pill ${isBlocked ? 'blocked' : 'active'}" data-saga="${s.id}" aria-pressed="${isBlocked}">
+        <span class="saga-block-name">📜 <b>${s.name}</b></span>
+        <span class="saga-block-state">${isBlocked ? '🔒 +200' : '✓ ACTIVA'}</span>
+      </button>`;
     }).join('');
 
     return `
-      <h2>🎰 Mercado de Carteles</h2>
-      <p style="font-size:8.5px;text-align:center;margin-bottom:6px;line-height:1.8;">
-        Gasta tus Log Poses para destapar carteles de SE BUSCA de tus sagas desbloqueadas.<br>
-        ¡Pueden tocarte reclutas de 1⭐ hasta 5⭐ legendarios!<br>
-        Duplicados: 3⭐ → 50 🧭 · 4⭐ → 500 🧭 · 5⭐ → 1000 🧭.<br>
-        Con 500 estrellas acumuladas, el siguiente premio es un legendario nuevo de las sagas seleccionadas; si ya tienes todos, recibes 1000 🧭.
-      </p>
-      <div style="font-size:10px;text-align:center;margin-bottom:6px;color:var(--gold);font-weight:bold;background:rgba(255,215,0,0.1);padding:6px;border-radius:6px;border:1px solid var(--gold);">
-        🧭 Saldo: <b>${meta.logPoses} Log Poses</b>
+      <header class="logpose-market-header">
+        <span>CROSS GUILD</span>
+        <h2 id="logpose-market-title">🎰 Mercado de Carteles</h2>
+        <p>Destapa un cartel de tus sagas activas y consigue un recluta de 1⭐ a 5⭐.</p>
+      </header>
+      <div class="logpose-market-rules" aria-label="Recompensas de los carteles">
+        <span><b>Duplicados</b> · 3⭐ 50 🧭 · 4⭐ 500 🧭 · 5⭐ 1000 🧭</span>
+        <small>Al llegar a 500⭐, el siguiente premio es un legendario nuevo; si ya los tienes todos, recibes 1000 🧭.</small>
       </div>
-      <div style="font-size:9.5px;text-align:center;margin-bottom:10px;color:#f39c12;background:rgba(243,156,18,0.12);padding:6px 10px;border-radius:6px;border:1px solid rgba(243,156,18,0.4);display:flex;align-items:center;justify-content:center;gap:6px;">
-        <span>⭐ Estrellas acumuladas (Pity): <b>${meta.starPity || 0} / 500</b></span>
-        ${(meta.starPity || 0) >= 500 ? '<span style="color:#2ecc71;font-weight:bold;">¡LEGENDARIO ASEGURADO!</span>' : ''}
+      <div class="logpose-market-status">
+        <div>
+          <small>SALDO</small>
+          <strong>🧭 ${meta.logPoses}</strong>
+          <span>Log Poses</span>
+        </div>
+        <div class="${(meta.starPity || 0) >= 500 ? 'ready' : ''}">
+          <small>GARANTÍA LEGENDARIA</small>
+          <strong>⭐ ${Math.min(meta.starPity || 0, 500)} / 500</strong>
+          <span>${(meta.starPity || 0) >= 500 ? '¡ASEGURADA!' : 'Estrellas acumuladas'}</span>
+        </div>
       </div>
-      <div style="font-size:8.5px;margin-bottom:6px;font-weight:bold;color:#aaa;">
-        🛡️ Bloquear sagas para que no salgan en los carteles (+200 🧭 cada una):
+      <section class="logpose-saga-picker">
+        <header>
+          <div><b>Elige las sagas</b><small>Toca una para excluirla</small></div>
+          <span>${unlockedSagas.length - logPoseBlockedSagaIds.length} activas</span>
+        </header>
+        <div class="logpose-saga-grid">${sagaItemsHTML}</div>
+        <small class="logpose-block-note">Cada saga excluida suma 200 🧭. Debe quedar al menos una activa.</small>
+      </section>
+      <div class="logpose-market-cost">
+        <span>Coste total<small>Base 1000${logPoseBlockedSagaIds.length ? ` + ${blockCost} por ${logPoseBlockedSagaIds.length} excluida(s)` : ''}</small></span>
+        <strong>🧭 ${totalCost}</strong>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(140px, 1fr));gap:6px;max-height:160px;overflow-y:auto;margin-bottom:10px;padding:4px;background:rgba(0,0,0,0.2);border-radius:6px;">
-        ${sagaItemsHTML}
-      </div>
-      <div style="font-size:9px;text-align:center;margin-bottom:12px;color:#fff;background:rgba(255,255,255,0.05);padding:6px;border-radius:6px;">
-        <b>Coste de la tirada:</b> <span style="color:var(--gold);font-weight:bold;">🧭 ${totalCost} Log Poses</span>
-        <small style="display:block;color:#888;font-size:7.5px;">(Base 1000 🧭 ${logPoseBlockedSagaIds.length ? ` + ${blockCost} 🧭 por ${logPoseBlockedSagaIds.length} saga(s) bloqueada(s)` : ''})</small>
-      </div>
-      <div class="actions" style="flex-direction:column;gap:6px;">
+      <div class="actions logpose-market-actions">
         <button class="btn red" id="lp-start-gacha" ${canAfford ? '' : 'disabled'}>
-          🎰 JUGAR CARTELES — 🧭 ${totalCost} Log Poses
+          🎰 JUGAR · 🧭 ${totalCost}
         </button>
         <button class="btn gray" id="lp-close-modal">CERRAR</button>
       </div>
@@ -2197,7 +2206,7 @@ function showLogPoseGachaModal() {
   const ov = document.createElement('div');
   ov.id = 'logpose-gacha-overlay';
   ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal" style="max-width:500px;">${renderModalContent()}</div>`;
+  ov.innerHTML = `<div class="modal logpose-market-modal" role="dialog" aria-modal="true" aria-labelledby="logpose-market-title">${renderModalContent()}</div>`;
   document.body.appendChild(ov);
 
   const bindEvents = () => {
@@ -2923,12 +2932,10 @@ function screenSagas(focusSaga, previousScroll) {
         <div class="diff-dropdown-menu hidden" id="diff-dropdown-menu">
           <div class="diff-dropdown-header">🎯 SELECCIONA DIFICULTAD DE LA AVENTURA</div>
           ${DIFFICULTIES.map(d => `
-            <button type="button" class="diff-dropdown-item ${selectedDiff === d.id ? 'active' : ''}" data-diff="${d.id}" aria-pressed="${selectedDiff === d.id}">
-              <span class="diff-item-head">
-                <span>${d.emoji} <b>${d.name}</b></span>
-                <span style="font-size:8px;color:var(--gold);">x${d.mult.toFixed(2)}</span>
-              </span>
-              <span class="diff-item-desc">${d.desc}</span>
+            <button type="button" class="diff-dropdown-item ${selectedDiff === d.id ? 'active' : ''} ${d.reward ? 'pirate-king' : ''}" data-diff="${d.id}" aria-pressed="${selectedDiff === d.id}">
+              <span class="diff-item-icon" aria-hidden="true">${d.emoji}</span>
+              <span class="diff-item-copy"><span class="diff-item-head"><b>${d.name}</b><span class="diff-item-multiplier">x${d.mult.toFixed(2)}</span></span>
+              <span class="diff-item-desc">${d.desc}</span>${d.reward ? `<span class="diff-item-reward">🎁 ${d.reward}</span>` : ''}</span>
             </button>
           `).join('')}
         </div>
@@ -3494,9 +3501,10 @@ function bindWorldMapNavigation(focusSaga, previousScroll) {
   document.querySelectorAll('[data-jump-saga]').forEach(button => button.onclick = () => {
     const index = Number(button.dataset.jumpSaga);
     const target = $(`#world-island-${index}-0`);
-    chart.scrollTop = worldStopTop(chart,target) - 16;
     updateWorldSagaPicker(index);
     $('#world-saga-picker').open = false;
+    const sailed = worldNavigator?.travelTo(`${SAGAS[index].id}-0`);
+    if (!sailed) chart.scrollTop = worldStopTop(chart,target) - 16;
     $('#world-jump').focus();
   });
   worldNavigator = globalThis.WorldVoyage?.mount(chart, {
@@ -6181,41 +6189,41 @@ function screenShop() {
   const sellItemsHTML = sellItems.length ? sellItems.map(([id, n]) => {
     const it = ITEMS[id];
     const sellPrice = Math.floor(it.price * 0.75);
-    return `<div class="shop-item" style="border-color:rgba(46,204,113,0.3);background:rgba(46,204,113,0.05);">
+    return `<div class="shop-item journey-shop-item is-selling">
       <span class="emoji">${it.emoji}</span>
       <div class="info">
-        <b>${it.name}</b> <span style="font-size:8.5px;color:#aaa;">(Tienes: ${n})</span> — Venta (75%): <span class="price" style="color:#2ecc71;font-weight:bold;">+${berriesHTML(sellPrice)}</span></div>
-      <button class="btn small green" data-sell="${id}">VENDER</button>
+        <b>${it.name}</b> <span class="shop-owned">Tienes: ${n}</span><small>Venta al 75% · <span class="shop-sale-price">+${berriesHTML(sellPrice)}</span></small></div>
+      <button class="btn small green" data-sell="${id}" aria-label="Vender ${it.name}">VENDER</button>
     </div>`;
-  }).join('') : '<div style="font-size:8.5px;color:#888;text-align:center;padding:8px;background:rgba(0,0,0,0.15);border-radius:6px;margin-bottom:10px;">Tu bolsa está vacía. No tienes objetos para vender.</div>';
+  }).join('') : '<div class="journey-shop-empty">Tu bolsa está vacía. No tienes objetos para vender.</div>';
 
   render(`
     ${topbar(true, false)}
-    <div class="panel">
+    <div class="panel journey-shop">
       <h2>🏪 Tienda del puerto</h2>
 
-      <div style="font-size:9.5px;background:rgba(255,215,0,0.12);padding:6px 10px;border-radius:6px;border:1px solid var(--gold);margin-bottom:10px;text-align:center;">
-        <b>🎒 Isla: ${backpackUsed(run.items,false)}/${backpackCapacity()} · Combate: ${backpackUsed(run.items,true)}/${backpackCapacity()} casillas</b><br>${inventorySummary || 'Vacía'}
+      <div class="journey-shop-summary">
+        <b>🎒 Isla ${backpackUsed(run.items,false)}/${backpackCapacity()} · ⚔️ Combate ${backpackUsed(run.items,true)}/${backpackCapacity()}</b><span>${inventorySummary || 'Bolsa vacía'}</span>
       </div>
 
-      <h3 style="margin-top:10px;margin-bottom:6px;font-size:11px;color:var(--gold);">🛒 COMPRAR PROVISIONES</h3>
-      ${stock.map(id => {
+      <h3 class="journey-shop-heading buy-heading">🛒 Comprar provisiones</h3>
+      <div class="journey-shop-list">${stock.map(id => {
     const it = ITEMS[id];
     const owned = (run && run.items && run.items[id]) || 0;
-    return `<div class="shop-item">
+    return `<div class="shop-item journey-shop-item">
           <span class="emoji">${it.emoji}</span>
           <div class="info">
-            <b>${it.name}</b> <span style="font-size:8.5px;color:var(--gold);font-weight:bold;margin-left:4px;">(Tienes: ${owned})</span> — <span class="price">${berriesHTML(it.price)}</span><br>
+            <b>${it.name}</b> <span class="shop-owned">Tienes: ${owned}</span><span class="price">${berriesHTML(it.price)}</span>
             <small>${it.desc} · ${it.slotSize} casilla${it.slotSize > 1 ? 's' : ''} / ${backpackStackLimit()} uds.</small>
           </div>
-          <button class="btn small ${run.berries >= it.price && backpackFits(run,id) ? 'green' : 'gray'}" data-buy="${id}" ${run.berries >= it.price && backpackFits(run,id) ? '' : 'disabled'}>${backpackFits(run,id) ? 'COMPRAR' : 'SIN ESPACIO'}</button>
+          <button class="btn small ${run.berries >= it.price && backpackFits(run,id) ? 'green' : 'gray'}" data-buy="${id}" aria-label="Comprar ${it.name}" ${run.berries >= it.price && backpackFits(run,id) ? '' : 'disabled'}>${backpackFits(run,id) ? 'COMPRAR' : 'SIN ESPACIO'}</button>
         </div>`;
-  }).join('')}
+  }).join('')}</div>
 
-      <h3 style="margin-top:14px;margin-bottom:6px;font-size:11px;color:#2ecc71;">💰 VENDER · 75% del valor</h3>
-      ${sellItemsHTML}
+      <h3 class="journey-shop-heading sell-heading">💰 Vender · 75% del valor</h3>
+      <div class="journey-shop-list sell-list">${sellItemsHTML}</div>
 
-      <div class="actions" style="margin-top:14px;text-align:center;">
+      <div class="actions journey-shop-actions">
         <button class="btn blue" id="btn-leave">SEGUIR VIAJE →</button>
       </div>
     </div>
@@ -8204,6 +8212,7 @@ const UPG_STATS = [
   ['spdef', 'E.DEF', '+2 E.DEF'],
   ['spd', 'VEL', '+2 VEL'],
 ];
+const TRAINING_PAGE_SIZE = 9;
 let shipBuyLock = 0;
 let shipSearchQ = '';
 const shipTraining = { selected: null, saga: '', type: '', rarity: 0, sort: 'name', teamOnly: false, page: 0 };
@@ -8424,7 +8433,7 @@ function screenShip() {
     const filteredRoster = filterShipRoster(roster, shipTraining, q, (run?.team || []).map(f => f.id));
     const container = $('#ship-roster-list');
     if (!container) return;
-    const pageSize = 8;
+    const pageSize = TRAINING_PAGE_SIZE;
     const pages = Math.max(1, Math.ceil(filteredRoster.length / pageSize));
     shipTraining.page = Math.min(shipTraining.page, pages - 1);
     if (!filteredRoster.includes(shipTraining.selected)) shipTraining.selected = filteredRoster[0] || null;
@@ -8639,16 +8648,22 @@ function dexCardHTML(id) {
   id=baseFormOf(id);
   const c = CHARS[id],forms=characterForms(id);
   const seen = dexEntrySeen(id);
-  const got = dexBaseIds(meta.recruited).includes(id);
-  const vet = dexBaseIds(meta.roster).includes(id);
-  const status=vet?'🏅 Veterano':got?'✓ Nakama':seen?'Avistado':'Sin avistar';
-  return `<button type="button" class="dex-card ${seen ? 'seen' : 'unknown'} inventory-card" data-id="${id}" ${seen?'':'disabled'} aria-label="${esc(c.name)}${seen?', ver ficha y fases':', sin avistar'}">
-    <div class="inventory-card-top"><span>${status}</span><span class="inventory-rarity" aria-label="Rareza ${c.rareza} de 5 estrellas">★ ${c.rareza}/5</span></div>
+  const status = dexCollectionStatus(id);
+  return `<button type="button" class="dex-card ${seen ? 'seen' : 'unknown'} inventory-card dex-status-${status.key}" data-id="${id}" ${seen?'':'disabled'} aria-label="${esc(c.name)}, ${status.label}${seen?', ver ficha y fases':', sin ficha disponible'}">
+    <div class="inventory-card-top"><span class="dex-status-badge">${status.icon} ${status.label}</span><span class="inventory-rarity" aria-label="Rareza ${c.rareza} de 5 estrellas">★ ${c.rareza}/5</span></div>
     <span class="inventory-profile"><span class="inventory-portrait emoji" aria-hidden="true">${seen ? charIcon(id, 70) : '❔'}</span><strong>${c.name}</strong>${seen?'<span class="inventory-profile-link">Ver ficha ↗</span>':''}</span>
     <div class="dex-rarity dex-rarity-full" aria-hidden="true">${'⭐'.repeat(c.rareza)}</div>
     ${seen?characterSortStatHTML(id,dexView.sort):''}
-    <div class="dex-card-footer"><span>${status}</span>${forms.length>1?`<span class="dex-forms-count">${forms.length} fases</span>`:''}</div>
+    <div class="dex-card-footer"><span>${c.nakama ? '🏴‍☠️ Sombrero de Paja' : 'Saga: ' + (SAGAS.find(s => s.id === c.saga)?.name || 'Grand Line')}</span>${forms.length>1?`<span class="dex-forms-count">${forms.length} fases</span>`:''}</div>
   </button>`;
+}
+
+function dexCollectionStatus(id) {
+  const base = baseFormOf(id);
+  if (isNakamaUnlocked(base)) return { key:'veteran', icon:'🏅', label:'Veterano' };
+  if (dexBaseIds(meta.recruited).includes(base)) return { key:'recruited', icon:'⚓', label:'Reclutado en viaje' };
+  if (dexEntrySeen(base)) return { key:'seen', icon:'👁', label:'Avistado' };
+  return { key:'unknown', icon:'❔', label:'Sin avistar' };
 }
 
 function screenDex() {
@@ -8660,10 +8675,10 @@ function screenDex() {
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
     <div class="panel pirate-dex collection-page">
       <header class="collection-header dex-header"><div><span class="collection-eyebrow">Tu colección</span><h2>📖 Dex Pirata</h2></div></header>
-      <div class="collection-summary dex-progress" aria-label="Progreso de la colección"><span><strong>${dexBaseIds(meta.dex).length} <small>/ ${all.length}</small></strong><span>Avistados</span></span><span><strong>${dexBaseIds(meta.recruited).length}</strong><span>Reclutados</span></span></div>
+      <div class="collection-summary dex-progress" aria-label="Progreso de la colección"><span><strong>${dexBaseIds(meta.dex).length} <small>/ ${all.length}</small></strong><span>Avistados</span></span><span><strong>${dexBaseIds(meta.recruited).length}</strong><span>Reclutados en viaje</span></span><span><strong>${dexBaseIds(meta.roster).length}</strong><span>Veteranos permanentes</span></span></div>
       <div class="dex-filter-panel"><span class="collection-eyebrow">Buscar y ordenar</span>${charControlsHTML(dexView, { sagas: sagaOpts })}</div>
       <div id="char-grid" class="collection-list"></div>
-      <p class="dex-help">Toca un personaje avistado para abrir su ficha. Cada carta reúne todas sus fases. Busca también por el nombre, tipo o rareza de una transformación. Los no avistados solo muestran su nombre.</p>
+      <p class="dex-help"><strong>Veterano</strong> significa que ya forma parte de tu cuenta; <strong>Reclutado en viaje</strong>, que se unió temporalmente a una aventura. Toca un personaje avistado para abrir su ficha y ver todas sus fases.</p>
     </div>
   `);
   $('#btn-back').onclick = screenHome;

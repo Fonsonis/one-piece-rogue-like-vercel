@@ -27,6 +27,19 @@ test('legacy evolved sightings count once and reveal the base without rewriting 
  assert.equal(h.exec("STATIC_ACHIEVEMENTS.find(a=>a.id==='dex_full').goal===dexBaseIds(Object.keys(CHARS)).length"),true);
 });
 
+test('Dex labels permanent veterans, temporary recruits, sightings, and unknown characters accurately',()=>{
+ const h=combatHarness();
+ h.exec("meta.roster=[];meta.recruited=['zoro2'];meta.dex=['zoro2','nami'];");
+ assert.equal(h.exec("dexCollectionStatus('luffy').label"),'Veterano','Luffy is always available to the account');
+ assert.equal(h.exec("dexCollectionStatus('zoro').label"),'Reclutado en viaje');
+ assert.equal(h.exec("dexCollectionStatus('nami').label"),'Avistado');
+ assert.equal(h.exec("dexCollectionStatus('buggy').label"),'Sin avistar');
+ h.exec("meta.roster=['zoro'];");
+ assert.equal(h.exec("dexCollectionStatus('zoro2').label"),'Veterano');
+ const card=h.exec("dexCardHTML('zoro2')");
+ assert.match(card,/dex-status-veteran/);assert.match(card,/Sombrero de Paja/);assert.doesNotMatch(card,/\bNakama\b/);
+});
+
 test('search and combined filters find a phase but return one base card',()=>{
  const h=combatHarness();
  assert.equal(h.exec("dexFilteredBases({q:'Gear 5'}).join(',')"),'luffy');

@@ -1,6 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {combatHarness} from './balance-harness.mjs';
+import fs from 'node:fs';
 
 function setup() {
   const h = combatHarness();
@@ -134,6 +135,17 @@ test('shop hides iron and never charges for a purchase that no longer fits', () 
   assert.equal(h.exec('run.pendingLoot.sake||0'),0);
   assert.equal(h.exec('run.items.sake'),1);
   assert.equal(h.exec('backpackUsed(run.items)'),9);
+});
+
+test('journey shop renders compact semantic lists for buying and selling', () => {
+  const h = setup();let html='';h.ctx.render=s=>{html=s;};h.ctx.document.querySelectorAll=()=>[];
+  h.exec('run.items={carne:2,sake:1};run.berries=3000;screenShop()');
+  assert.match(html,/panel journey-shop/);
+  assert.equal((html.match(/class="journey-shop-list/g)||[]).length,2);
+  assert.equal((html.match(/journey-shop-item/g)||[]).length,h.exec('PORT_SHOP_STOCK.length')+2);
+  assert.match(html,/aria-label="Comprar Carne"/);assert.match(html,/aria-label="Vender Sake de Binks"/);
+  const css=fs.readFileSync('public/art/training-shop.css','utf8');
+  assert.match(css,/@media\(max-width:600px\)[\s\S]*?journey-shop-item[^}]*grid-template-columns:28px minmax\(0,1fr\) 74px/);
 });
 
 test('combat uses the same bag, frees slots, and rejects empty, paused and Nuzlocke revive actions', () => {
