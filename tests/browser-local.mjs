@@ -10,50 +10,51 @@ const browser = await chromium.launch({ headless: true, executablePath: process.
 const base = process.env.LOCAL_TEST_URL || 'http://127.0.0.1:4173';
 mkdirSync('outputs', { recursive: true });
 const errors = [], checks = [], contexts = [];
+const rooms = new Map(); let roomCounter = 0, joinCounter = 0;
+function codeFor(index) { const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; let value = index, code = ''; for (let i = 0; i < 8; i++) { code = alphabet[value % alphabet.length] + code; value = Math.floor(value / alphabet.length); } return code; }
+function signal(body) {
+  if (body.action === 'create') { const code = codeFor(++roomCounter), hostSecret = `host-${roomCounter}`; rooms.set(code, { hostSecret, joins: new Map() }); return { ok: true, code, hostSecret }; }
+  const code = String(body.code || '').replace(/-/g, ''), room = rooms.get(code);
+  if (!room) return { ok: false, error: 'No se encuentra esa sala.' };
+  if (body.action === 'join') { const joinId = `join-${++joinCounter}`, guestSecret = `guest-${joinCounter}`; room.joins.set(joinId, { guestSecret, status: 'waiting' }); return { ok: true, code, joinId, guestSecret }; }
+  if (['host-poll','offer','complete','reject','close'].includes(body.action) && body.hostSecret !== room.hostSecret) return { ok: false, error: 'Sala caducada.' };
+  const join = room.joins.get(body.joinId);
+  if (body.action === 'host-poll') return { ok: true, code, joins: [...room.joins].map(([joinId, value]) => ({ joinId, status: value.status, answer: value.answer })) };
+  if (body.action === 'offer') { Object.assign(join, { status: 'offered', offer: body.offer }); return { ok: true, code }; }
+  if (['guest-poll','answer','cancel'].includes(body.action) && join?.guestSecret !== body.guestSecret) return { ok: false, error: 'Solicitud caducada.' };
+  if (body.action === 'guest-poll') return { ok: true, code, status: join.status, offer: join.offer, reason: join.reason };
+  if (body.action === 'answer') { Object.assign(join, { status: 'answered', answer: body.answer }); return { ok: true, code }; }
+  if (body.action === 'complete' || body.action === 'cancel') { room.joins.delete(body.joinId); return { ok: true, code }; }
+  if (body.action === 'reject') { Object.assign(join, { status: 'rejected', reason: body.reason }); return { ok: true, code }; }
+  if (body.action === 'close') { rooms.delete(code); return { ok: true, code }; }
+  return { ok: false, error: 'Operación inválida.' };
+}
 async function page(name, mobile = false) {
-  const ctx = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1200, height: 850 }, permissions: ['camera'] }); contexts.push(ctx);
+  const ctx = await browser.newContext({ viewport: mobile ? { width: 390, height: 844 } : { width: 1200, height: 850 } }); contexts.push(ctx);
+  await ctx.route('**/api/multiplayer', async route => {
+    const result = signal(JSON.parse(route.request().postData() || '{}'));
+    await route.fulfill({ status: result.ok ? 200 : 404, contentType: 'application/json', body: JSON.stringify(result) });
+  });
   const p = await ctx.newPage();
   p.on('pageerror', e => errors.push(name + ': ' + e.message));
   await p.goto(base);
   await p.evaluate(() => { meta.roster = ['luffy','zoro','nami','sanji','usopp','chopper']; });
   await p.locator('#btn-local').click(); await p.locator('#local-name').fill(name); return p;
 }
-async function imageFrames(p) {
-  await p.locator('#pair-output').waitFor({ state: 'attached' });
-  await p.waitForFunction(() => document.querySelector('#pair-output')?.value.length > 10);
-  await p.locator('#pair-animation').click();
-  const count = Number((await p.locator('#pair-frame').textContent()).match(/de (\d+)/)[1]);
-  const result = [];
-  for (let i = 0; i < count; i++) {
-    const data = await p.locator('.local-qr canvas').evaluate(c => c.toDataURL('image/png').split(',')[1]);
-    result.push(Buffer.from(data, 'base64')); await p.locator('#pair-next').click();
-  }
-  return result;
-}
-async function uploadFrames(p, frames) {
-  for (const buffer of frames) { await p.locator('#pair-file').setInputFiles({ name: 'pair.png', mimeType: 'image/png', buffer }); await p.waitForTimeout(350); }
-}
-async function connect(host, guest, qr = false) {
-  await host.locator('#local-invite').click();
-  await host.waitForFunction(() => document.querySelector('#pair-output')?.value.length > 10);
-  await guest.locator('#local-join').click();
-  if (qr) await uploadFrames(guest, await imageFrames(host));
-  else { const offer = await host.locator('#pair-output').inputValue(); await guest.locator('details').last().locator('summary').click(); await guest.locator('#pair-input').fill(offer); await guest.locator('#pair-apply').click(); }
-  await guest.waitForFunction(() => document.querySelector('#pair-output')?.value.length > 10);
-  if (qr) await uploadFrames(host, await imageFrames(guest));
-  else { const answer = await guest.locator('#pair-output').inputValue(); await host.locator('details').last().locator('summary').click(); await host.locator('#pair-input').fill(answer); await host.locator('#pair-apply').click(); }
+async function connect(host, guest) {
+  const code = await host.locator('.local-room-code strong').textContent();
+  await guest.locator('#local-code').fill(code); await guest.locator('#local-join').click();
   await guest.locator('#local-ready').waitFor({ timeout: 35000 });
-  await host.locator('.local-pair-backdrop').waitFor({ state: 'detached' });
 }
 try {
   const host = await page('Capitán', true); await host.locator('#local-create').click();
   await host.locator('#local-size').selectOption('1');
   const guest = await page('Nakama', true);
-  await connect(host, guest, true);
+  await connect(host, guest);
   assert.equal(await guest.locator('[data-pick="0"] option').count(), 6);
   assert.equal(await guest.locator('[data-pick="0"] option[value="kaido"]').count(), 0);
   await guest.locator('[data-pick="0"]').selectOption('zoro');
-  checks.push('Real QR images decoded in both directions and WebRTC data channel connected without ICE services');
+  checks.push('Room code signaling connected a direct WebRTC data channel without ICE services');
   console.log(checks.at(-1));
   await host.screenshot({ path: 'outputs/local-lobby-mobile.png', fullPage: true });
   assert.equal(await host.evaluate(() => document.querySelector('.local-game').scrollWidth <= innerWidth), true);

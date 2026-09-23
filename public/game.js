@@ -2393,7 +2393,7 @@ function screenHome() {
     </section>
     <div class="home-section-heading home-section-heading-secondary"><span>02 · JUEGA A TU MANERA</span><small>Partidas rápidas y multijugador</small></div>
     <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? 'Doble salto · recupera 25 pasos cada 1.000 m' : '🔒 Se desbloquea al nivel 1 de cuenta'}</small></span></button>
-    <button class="local-menu-button" id="btn-local"><span aria-hidden="true">⚔️</span><span><strong>MULTIJUGADOR LOCAL</strong><small>Duelo · Torneo · Alianza contra un yonko · Conexión por QR</small></span></button>
+    <button class="local-menu-button" id="btn-local"><span aria-hidden="true">⚔️</span><span><strong>MULTIJUGADOR</strong><small>Duelo · Torneo · Alianza contra un yonko · Sala por código</small></span></button>
     ${pendingPirateKingRewards().length ? `<div class="panel"><button class="btn gold" id="btn-king-rewards">👑 ELEGIR LEGENDARIO · ${pendingPirateKingRewards().length} recompensa(s) de Rey Pirata</button></div>` : ''}
     <div class="home-section-heading home-section-heading-secondary"><span>03 · PREPARA TU TRIPULACIÓN</span><small>Consulta, mejora y consigue recompensas</small></div>
     <div class="home-main-buttons">

@@ -22,4 +22,4 @@ checkScripts(source);
 rmSync(output, { recursive: true, force: true });
 cpSync(source, output, { recursive: true });
 copyFileSync(join(source, 'play.html'), resolve(output, 'index.html'));
-console.log('Juego estático listo en dist/ (sin funciones, cuentas ni base de datos).');
+console.log('Cliente del juego listo en dist/ (la señalización multijugador se despliega desde api/).');

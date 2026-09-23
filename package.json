@@ -17,15 +17,13 @@
     "desktop:exe": "npm run build && electron-builder --win nsis --x64 --publish never",
     "start": "node scripts/serve-static.mjs --production",
     "test": "npm run build && node --test tests/*.test.mjs",
-    "lint": "node --check public/game.js && node --check public/data.js && node --check public/save-storage.js && node --check public/art/visuals.js && node --check public/runner/ui.mjs && node --check public/runner/engine.mjs && node --check public/local/combat.js && node --check public/local/battle.js && node --check public/local/connection.mjs && node --check public/local/session.mjs && node --check public/local/ui.mjs && node --check public/local/offline.mjs && node --check public/local/downloads.mjs && node --check public/local/android-files.mjs && node --check public/local/android-update.mjs && node --check public/service-worker.js && node --check desktop/main.mjs && node --check desktop/preload.cjs && node --check scripts/build-android-apk.mjs && node scripts/verify-android-version.mjs"
+    "lint": "node --check public/game.js && node --check public/data.js && node --check public/save-storage.js && node --check public/art/visuals.js && node --check public/runner/ui.mjs && node --check public/runner/engine.mjs && node --check public/local/combat.js && node --check public/local/battle.js && node --check public/local/connection.mjs && node --check public/local/session.mjs && node --check public/local/signaling.mjs && node --check public/local/ui.mjs && node --check public/local/offline.mjs && node --check public/local/downloads.mjs && node --check public/local/android-files.mjs && node --check public/local/android-update.mjs && node --check public/service-worker.js && node --check api/multiplayer.mjs && node --check server/multiplayer-service.mjs && node --check desktop/main.mjs && node --check desktop/preload.cjs && node --check scripts/build-android-apk.mjs && node scripts/verify-android-version.mjs"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^7.6.9",
     "electron": "^44.4.5",
-    "electron-builder": "^26.15.3",
-    "jsqr": "1.4.0",
-    "qrcode-generator": "2.0.4"
+    "electron-builder": "^26.15.3"
   },
   "dependencies": {
     "@capacitor/android": "^7.6.9",

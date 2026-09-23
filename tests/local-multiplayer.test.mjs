@@ -1,9 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import vm from 'node:vm';
 import { combatHarness } from './balance-harness.mjs';
-import { encodeSignal, decodeSignal, qrFrames, FrameCollector, LocalLink } from '../public/local/connection.mjs';
+import { encodeSignal, decodeSignal, LocalLink } from '../public/local/connection.mjs';
 import { LocalSession, bracketPairs, validView, RULES } from '../public/local/session.mjs';
 
 function engine() {
@@ -192,19 +191,11 @@ test('yonko cannot start without one den den mushi per player and spends one on 
   assert.equal(remaining,0);
 });
 const signal = { v: 1, type: 'offer', room: 'a'.repeat(32), link: 'b'.repeat(32), sdp: 'v=0\r\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\na=fingerprint:sha-256 AA:BB\r\na=ice-ufrag:test\r\na=candidate:1 1 udp 2122260223 192.168.1.10 50000 typ host\r\n' };
-test('QR token roundtrip rejects corrupt data and nonlocal candidates', async () => {
+test('signaling token roundtrip rejects corrupt data and nonlocal candidates', async () => {
   const token = await encodeSignal(signal); assert.deepEqual(await decodeSignal(token), signal);
   await assert.rejects(decodeSignal('not a code'));
   await assert.rejects(decodeSignal(await encodeSignal({ ...signal, sdp: signal.sdp.replace('typ host', 'typ relay') })));
   await assert.rejects(decodeSignal(await encodeSignal({ ...signal, type: 'bad' })));
-  const collector = new FrameCollector();
-  const longToken = 'OPL1.' + 'a'.repeat(2200), frames = await qrFrames(longToken);
-  let result;
-  for (const frame of [...frames].reverse()) result = await collector.add(frame);
-  assert.equal(result.token, longToken);
-  assert.equal((await collector.add(frames[0])).token, longToken);
-  const other = await qrFrames('OPL1.' + 'b'.repeat(1500));
-  result = await collector.add(other[0]); assert.equal(result.received, 1);
 });
 test('WebRTC is constructed with no ICE services and checks answer identity', async () => {
   let configuration;
@@ -212,20 +203,4 @@ test('WebRTC is constructed with no ICE services and checks answer identity', as
   const link = new LocalLink({ Peer });
   assert.deepEqual(configuration.iceServers, []);
   await assert.rejects(link.accept({ ...signal, type: 'answer' }), /otra invitación/); link.close();
-});
-test('bundled QR generator and decoder roundtrip the actual pairing frame image', async () => {
-  const context = vm.createContext({ Uint8ClampedArray, Uint8Array, Int32Array, Uint32Array, Float64Array, Math });
-  vm.runInContext(fs.readFileSync('public/local/vendor/qrcode.js', 'utf8'), context);
-  vm.runInContext(fs.readFileSync('public/local/vendor/jsQR.js', 'utf8'), context);
-  const token = await encodeSignal(signal), frame = (await qrFrames(token))[0];
-  const qr = context.qrcode(0, 'M'); qr.addData(frame); qr.make();
-  const count = qr.getModuleCount(), scale = 5, width = (count + 8) * scale;
-  const pixels = new Uint8ClampedArray(width * width * 4).fill(255);
-  for (let y = 0; y < count; y++) for (let x = 0; x < count; x++) if (qr.isDark(y, x)) {
-    for (let dy = 0; dy < scale; dy++) for (let dx = 0; dx < scale; dx++) {
-      const at = (((y + 4) * scale + dy) * width + (x + 4) * scale + dx) * 4;
-      pixels[at] = pixels[at + 1] = pixels[at + 2] = 0;
-    }
-  }
-  assert.equal(context.jsQR(pixels, width, width).data, frame);
 });

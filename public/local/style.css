@@ -27,6 +27,13 @@ body:has(#local-arena)>.ultimate-scene{z-index:2201}
 .local-steps p{margin:12px 0;}
 .local-intro .local-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));}
 .local-intro .local-actions .btn{min-height:54px;font-size:16px;}
+.local-join-box{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:end;gap:12px;padding:16px;margin:18px 0;border:1px solid #c6d8d4;border-radius:12px;background:#edf7f3;}
+.local-join-box .btn{min-height:44px;}
+.local-join-box input{text-transform:uppercase;letter-spacing:.16em;font-weight:800;}
+.local-room-code{display:grid;grid-template-columns:auto auto 1fr;align-items:center;gap:10px;padding:14px 16px;margin-top:18px;border:1px dashed #258580;border-radius:12px;background:#eaf6f2;}
+.local-room-code>span,.local-room-code>small{font-size:12px;color:#416d60;}
+.local-room-code>strong{font-size:20px;letter-spacing:.12em;color:#174e55;}
+.local-room-code>small{grid-column:1/-1;}
 .local-panel{border-color:#b3c8c4;box-shadow:0 5px 18px #173b3b12;}
 .local-panel:has(.local-config){border-top:5px solid #287a84;}
 .local-panel:has(.local-team-picker){border-top:5px solid #bd8534;}
@@ -52,6 +59,9 @@ body:has(#local-arena)>.ultimate-scene{z-index:2201}
 @media(max-width:600px){
  .local-header{top:-18px;}
  .local-intro .local-actions{grid-template-columns:1fr;}
+ .local-join-box{grid-template-columns:1fr;}
+ .local-room-code{grid-template-columns:1fr;align-items:start;}
+ .local-room-code>small{grid-column:auto;}
  .local-panel{margin:12px 0;}
  .local-game .local-actions>.btn{min-width:0;}
  .local-config{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}

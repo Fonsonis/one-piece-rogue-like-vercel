@@ -1,4 +1,4 @@
-// No signaling service, STUN, TURN, analytics or remote QR endpoint.
+// Signaling only exchanges these tokens; gameplay stays on the direct WebRTC data channel.
 export const MAX_TOKEN = 24000;
 const encoder = new TextEncoder(), decoder = new TextDecoder();
 const id = () => crypto.randomUUID().replaceAll('-', '');
@@ -45,32 +45,6 @@ export async function decodeSignal(token) {
     return value;
   } catch { throw new Error('Código incompleto, incompatible o sin una dirección de red local. Genera uno nuevo.'); }
 }
-export async function qrFrames(token) {
-  const hash = base64(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(token)))).slice(0, 12);
-  const count = Math.ceil(token.length / 700);
-  return Array.from({ length: count }, (_, i) => `OPQR1|${hash}|${i}|${count}|${token.slice(i * 700, (i + 1) * 700)}`);
-}
-export class FrameCollector {
-  constructor() { this.reset(); }
-  reset() { this.key = null; this.parts = new Map(); this.count = 0; }
-  async add(text) {
-    if (typeof text !== 'string' || text.length > MAX_TOKEN) throw new Error('QR inválido.');
-    if (/^OP[ZL]1\./.test(text)) return { token: text, received: 1, count: 1 };
-    const match = /^OPQR1\|([A-Za-z0-9_-]{12})\|(\d+)\|(\d+)\|(.+)$/.exec(text);
-    if (!match) throw new Error('Este QR no pertenece al multijugador local.');
-    const [, key, indexText, countText, part] = match;
-    const index = Number(indexText), count = Number(countText);
-    if (count < 1 || count > 35 || index >= count || part.length > 700) throw new Error('QR inválido.');
-    if (key !== this.key) { this.reset(); this.key = key; this.count = count; }
-    if (count !== this.count) throw new Error('Fragmentos de QR incompatibles.');
-    this.parts.set(index, part);
-    if (this.parts.size !== count) return { received: this.parts.size, count };
-    const token = Array.from({ length: count }, (_, i) => this.parts.get(i)).join('');
-    const hash = base64(new Uint8Array(await crypto.subtle.digest('SHA-256', encoder.encode(token)))).slice(0, 12);
-    if (hash !== key) { this.reset(); throw new Error('QR incompleto. Vuelve a escanearlo.'); }
-    return { token, received: count, count };
-  }
-}
 export class LocalLink {
   constructor({ room, link, onState = () => {}, onMessage = () => {}, Peer = globalThis.RTCPeerConnection } = {}) {
     if (!Peer) throw new Error('Este navegador no admite partidas locales. Prueba un navegador actualizado.');
@@ -116,7 +90,7 @@ export class LocalLink {
     return this.gather();
   }
   async answer(signal) {
-    if (signal.type !== 'offer') throw new Error('Escanea el QR de invitación del anfitrión.');
+    if (signal.type !== 'offer') throw new Error('La sala no ha enviado una invitación válida.');
     this.room = signal.room; this.id = signal.link;
     await this.pc.setRemoteDescription({ type: signal.type, sdp: signal.sdp });
     await this.pc.setLocalDescription(await this.pc.createAnswer());
