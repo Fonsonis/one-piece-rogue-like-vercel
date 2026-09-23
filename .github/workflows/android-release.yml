@@ -1,4 +1,4 @@
-name: Publicar APK Android
+name: Publicar Android y Windows
 
 on:
   push:
@@ -10,15 +10,35 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: android-release-${{ github.ref }}
+  group: platform-release-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
   contents: write
 
 jobs:
-  apk:
+  version:
     runs-on: ubuntu-latest
+    outputs:
+      app_version_name: ${{ steps.release.outputs.app_version_name }}
+      app_version_code: ${{ steps.release.outputs.app_version_code }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: release
+        name: Preparar versión compartida
+        shell: bash
+        run: |
+          app_version_name=$(node -p "require('./package.json').version")
+          app_version_code=$(date +%s)
+          echo "app_version_name=$app_version_name" >> "$GITHUB_OUTPUT"
+          echo "app_version_code=$app_version_code" >> "$GITHUB_OUTPUT"
+
+  android:
+    needs: version
+    runs-on: ubuntu-latest
+    env:
+      APP_VERSION_NAME: ${{ needs.version.outputs.app_version_name }}
+      APP_VERSION_CODE: ${{ needs.version.outputs.app_version_code }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -31,20 +51,14 @@ jobs:
           java-version: 21
       - uses: android-actions/setup-android@v3
         with:
-          # El paquete SDK heredado `tools` ya no existe. El action lo solicita
-          # por defecto si no se indica explícitamente esta lista.
           packages: platform-tools
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - run: npm ci
       - run: node scripts/verify-android-version.mjs
-      - name: Preparar versión incremental Android
+      - name: Preparar manifiesto Android
         shell: bash
         run: |
-          app_version_name=$(node -p "require('./package.json').version")
-          app_version_code=$(date +%s)
-          node -e "const fs=require('fs');const p='public/android-version.json';const x=JSON.parse(fs.readFileSync(p));x.version=process.argv[1];x.versionCode=Number(process.argv[2]);x.downloadUrl='https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/download/android-'+process.argv[2]+'/one-piece-rogue-like.apk';fs.writeFileSync(p,JSON.stringify(x,null,2)+'\n')" "$app_version_name" "$app_version_code"
-          echo "APP_VERSION_NAME=$app_version_name" >> "$GITHUB_ENV"
-          echo "APP_VERSION_CODE=$app_version_code" >> "$GITHUB_ENV"
+          node -e "const fs=require('fs');const p='public/android-version.json';const x=JSON.parse(fs.readFileSync(p));x.version=process.env.APP_VERSION_NAME;x.versionCode=Number(process.env.APP_VERSION_CODE);x.downloadUrl='https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/download/android-'+process.env.APP_VERSION_CODE+'/one-piece-rogue-like.apk';fs.writeFileSync(p,JSON.stringify(x,null,2)+'\n')"
       - run: npm run android:sync
       - name: Verificar puente de actualización Android
         working-directory: android
@@ -86,24 +100,75 @@ jobs:
           [[ "$badging" == *"name='com.fonsonis.onepieceroguelike'"* ]]
           [[ "$badging" == *"versionCode='$APP_VERSION_CODE'"* ]]
           [[ "$badging" == *"versionName='$APP_VERSION_NAME'"* ]]
-          node -e "const m=require('./public/android-version.json'); if(m.versionCode!==Number(process.env.APP_VERSION_CODE)||m.version!==process.env.APP_VERSION_NAME||!m.downloadUrl.endsWith('/android-'+process.env.APP_VERSION_CODE+'/one-piece-rogue-like.apk')) process.exit(1)"
+          node -e "const m=require('./public/android-version.json');if(m.versionCode!==Number(process.env.APP_VERSION_CODE)||m.version!==process.env.APP_VERSION_NAME||!m.downloadUrl.endsWith('/android-'+process.env.APP_VERSION_CODE+'/one-piece-rogue-like.apk'))process.exit(1)"
       - name: Verificar APK de la PR
         if: github.event_name == 'pull_request'
         working-directory: android
         run: bash ./gradlew assembleDebug -PappVersionCode="$APP_VERSION_CODE" -PappVersionName="$APP_VERSION_NAME"
-      - name: Preparar artefacto
+      - name: Preparar artefactos Android
         if: github.event_name != 'pull_request'
         run: |
-          cp android/app/build/outputs/apk/release/app-release.apk one-piece-rogue-like.apk
-          sha256sum one-piece-rogue-like.apk > one-piece-rogue-like.apk.sha256
-      - uses: softprops/action-gh-release@v2
+          mkdir release
+          cp android/app/build/outputs/apk/release/app-release.apk release/one-piece-rogue-like.apk
+          sha256sum release/one-piece-rogue-like.apk > release/one-piece-rogue-like.apk.sha256
+          cp public/android-version.json release/android-version.json
+      - uses: actions/upload-artifact@v4
         if: github.event_name != 'pull_request'
         with:
-          tag_name: android-${{ env.APP_VERSION_CODE }}
-          name: Android ${{ env.APP_VERSION_NAME }} · compilación ${{ env.APP_VERSION_CODE }}
+          name: android-release
+          path: release/*
+          if-no-files-found: error
+
+  windows:
+    needs: version
+    runs-on: windows-latest
+    env:
+      APP_VERSION_NAME: ${{ needs.version.outputs.app_version_name }}
+      APP_VERSION_CODE: ${{ needs.version.outputs.app_version_code }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Preparar manifiesto Windows
+        shell: pwsh
+        run: |
+          node -e "const fs=require('fs');const p='public/windows-version.json';const x=JSON.parse(fs.readFileSync(p));x.version=process.env.APP_VERSION_NAME;x.build=Number(process.env.APP_VERSION_CODE);x.downloadUrl='https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/download/android-'+process.env.APP_VERSION_CODE+'/one-piece-rogue-like-setup.exe';fs.writeFileSync(p,JSON.stringify(x,null,2)+'\n')"
+      - run: npm run desktop:exe
+      - name: Preparar artefactos Windows
+        if: github.event_name != 'pull_request'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path release
+          Copy-Item outputs/windows/one-piece-rogue-like-setup.exe release/one-piece-rogue-like-setup.exe
+          Copy-Item public/windows-version.json release/windows-version.json
+          $hash = (Get-FileHash release/one-piece-rogue-like-setup.exe -Algorithm SHA256).Hash.ToLower()
+          Set-Content release/one-piece-rogue-like-setup.exe.sha256 "$hash  one-piece-rogue-like-setup.exe"
+      - uses: actions/upload-artifact@v4
+        if: github.event_name != 'pull_request'
+        with:
+          name: windows-release
+          path: release/*
+          if-no-files-found: error
+
+  release:
+    if: github.event_name != 'pull_request'
+    needs:
+      - version
+      - android
+      - windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-${{ needs.version.outputs.app_version_code }}
+          name: One Piece Rogue Like ${{ needs.version.outputs.app_version_name }} · compilación ${{ needs.version.outputs.app_version_code }}
           make_latest: true
-          files: |
-            one-piece-rogue-like.apk
-            one-piece-rogue-like.apk.sha256
-            public/android-version.json
+          files: release/*
           generate_release_notes: true
