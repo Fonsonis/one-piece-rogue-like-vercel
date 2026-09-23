@@ -146,3 +146,14 @@ html[data-theme="dark"] .challenge-panel :is(.challenge-event,.relic-card,.chall
   .battle-team-passives h3 { font-size:8px; }
   .team-passive { max-width:150px; gap:1px; }
 }
+
+/* Keep combat controls inside the viewport; long battle content scrolls above them. */
+:is(#app,#local-arena) .battle-layout { overflow:hidden; }
+:is(#app,#local-arena) .battle-layout .battle-main {
+  flex:1 1 auto;
+  height:0;
+  min-height:0;
+  overflow-y:auto;
+  overscroll-behavior:contain;
+  -webkit-overflow-scrolling:touch;
+}

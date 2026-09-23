@@ -2415,7 +2415,7 @@ function screenHome() {
     </div>
     <div class="home-market-actions">
       <button class="btn red small" id="btn-logpose-gacha">
-        <img class="carteles-menu-icon" src="/art/cross-guild-map.png" alt="" aria-hidden="true" draggable="false"> CARTELES (🧭 ${meta.logPoses || 0})
+        <img class="carteles-menu-icon" src="/art/cross-guild-menu.webp" width="64" height="64" alt="" aria-hidden="true" draggable="false"> CARTELES (🧭 ${meta.logPoses || 0})
       </button>
       <button class="btn gray small" id="btn-guide">📊 Tipos y Sinergias</button>
     </div>
@@ -9304,5 +9304,9 @@ try {
   run = null;
   loadMeta();
 }
-if (!finishRetiredJourney()) screenHome();
-if (saveReadError) toast('⚠️ No se pudo leer la partida local. La copia anterior se ha conservado; puedes importar un JSON.');
+const startGameAfterFonts = () => {
+  if (!finishRetiredJourney()) screenHome();
+  if (saveReadError) toast('⚠️ No se pudo leer la partida local. La copia anterior se ha conservado; puedes importar un JSON.');
+};
+if (document.fonts?.ready) document.fonts.ready.then(startGameAfterFonts, startGameAfterFonts);
+else startGameAfterFonts();
