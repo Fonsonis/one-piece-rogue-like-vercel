@@ -2,7 +2,7 @@
 
 Juego fan de One Piece, sin ánimo de lucro. La edición actual reúne música, sprites, 589 personajes y formas de One Piece, 15 sagas, 70 islas, logros y el minijuego Luffy Run.
 
-Todo se ejecuta en el navegador. No necesita Next.js, Cloudflare, cuentas, cookies de sesión, API, base de datos, Vercel Blob ni otro servicio de almacenamiento. Node.js solo prepara los archivos y las pruebas. Las dos bibliotecas QR se incluyen localmente y sus versiones están fijadas como dependencias de desarrollo.
+El juego y los guardados se ejecutan en el dispositivo, sin cuentas ni cookies de sesión. Node.js prepara los archivos y las pruebas. El único servicio remoto del juego es la señalización efímera del multijugador mediante una Vercel Function y Upstash Redis; no recibe guardados ni tráfico de combate.
 
 ## Recompensa de Rey Pirata
 
@@ -12,9 +12,9 @@ La elección se guarda como pendiente hasta reclamarla. Puede posponerse y recup
 
 Se han retirado los 27 personajes crossover, sus eventos, filtros, logros y recursos individuales. Los guardados antiguos eliminan esas referencias, conservando monedas y progreso de One Piece. Si una banda solo contenía personajes retirados, se cierra ese viaje y se conserva la cuenta; los viajes con nakamas de One Piece continúan. El antiguo portal final desaparece y una victoria pendiente de cerrar completa la saga sin exigir aquel combate adicional.
 
-## Multijugador local por QR
+## Multijugador por código de sala
 
-Desde el menú principal, **Multijugador local** permite jugar con dispositivos en la misma Wi-Fi o punto de acceso, sin servidor de salas, señalización externa, STUN ni TURN. WebRTC usa exclusivamente candidatos directos. El navegador del anfitrión coordina la sesión y resuelve el combate.
+Desde el menú principal, **Multijugador** permite jugar con dispositivos conectados mediante la misma Wi-Fi, red cableada o punto de acceso compartido. Ambos necesitan Internet para crear o encontrar la sala por código. La Vercel Function y Redis solo conservan durante unos minutos la oferta y respuesta de conexión; después WebRTC usa exclusivamente candidatos directos, sin STUN ni TURN. El dispositivo del anfitrión coordina la sesión y resuelve el combate.
 
 - **Duelo PvP:** dos jugadores, con equipos de 1, 3 o 6 nakamas.
 - **Torneo:** 3–8 jugadores, equipos de 1, 3 o 6, eliminación directa y sorteo inicial. Se asignan pases para completar el cuadro y los empates se repiten. Los cruces de una ronda se ejecutan en paralelo en el anfitrión; cada jugador ve su combate y los demás pueden observar. El anfitrión inicia cada ronda.
@@ -24,20 +24,18 @@ Cada jugador elige únicamente entre los personajes de su inventario permanente 
 
 Los combates comparten escenario, cartas, reservas, sinergias y efectos de ataques y definitivas con el resto del juego. El anfitrión transmite cada ataque por separado: 900 ms entre acciones y 1.200 ms tras resolver la ronda, como el combate normal a velocidad ×1. Cada participante ve su banda a la izquierda, puede ordenar la definitiva de su activo para su próximo ataque y dispone de un relevo por combate. En cooperativo, el escenario muestra por turno al aliado que está luchando y al yonko; cada jugador mantiene sus propias reservas. Los invitados reproducen los resultados y animaciones sin volver a simular el daño.
 
-La partida local no concede EXP, fama ni desbloqueos, y no modifica el viaje de historia ni su JSON. El anfitrión valida las selecciones contra el inventario que comunica cada dispositivo al entrar. Al tratarse de guardados locales sin servidor, son partidas amistosas, sin verificación central del inventario ni clasificación certificada.
+La partida no concede EXP, fama ni desbloqueos, y no modifica el viaje de historia ni su JSON. El anfitrión valida las selecciones contra el inventario que comunica cada dispositivo al entrar. Los guardados continúan siendo locales: son partidas amistosas, sin verificación central del inventario ni clasificación certificada.
 
-### Emparejar cada invitado
+### Crear o unirse a una sala
 
-1. Ambos abren el juego por HTTPS, conectados a la misma red local. No funciona la cámara en una URL HTTP de la LAN; localhost sí sirve para desarrollo en un solo equipo.
-2. El anfitrión crea la sala, elige modo/tamaño y pulsa **Invitar por QR**.
-3. El invitado pulsa **Unirse por QR** y escanea **dentro del juego** la invitación.
-4. El invitado muestra su QR de respuesta y el anfitrión lo escanea. Son dos intercambios, no un enlace a una web.
-5. Si el código ocupa varias imágenes, se alternan automáticamente. Mantén la cámara apuntando hasta completar todas; también hay controles manuales y lectura de imágenes. Copiar/pegar el código completo es una alternativa.
-6. Repite para los demás invitados. Cada invitación admite una sola conexión. Todos eligen equipo y pulsan **Estoy listo**; el anfitrión comienza.
+1. Todos abren el juego con conexión a Internet y conectados a la misma Wi-Fi, red local o punto de acceso.
+2. El anfitrión pulsa **Crear sala** y comparte el código corto que aparece, por ejemplo `ABCD-EFGH`.
+3. Cada invitado escribe su nombre y ese código, y pulsa **Unirse a la sala**. El anfitrión prepara la conexión automáticamente.
+4. Todos eligen equipo y pulsan **Estoy listo**; el anfitrión comienza. Al empezar se elimina la información temporal de la sala.
 
 Mantened las pantallas encendidas y el juego visible. La partida se pausa cuando falta un participante activo o el anfitrión está en segundo plano. Una interrupción breve se recupera si WebRTC mantiene el canal; cerrar, recargar o perder definitivamente el canal requiere crear otra sala. No hay migración de anfitrión ni recuperación de estas sesiones desde disco. En la sala se puede retirar a un invitado desconectado e invitarlo de nuevo.
 
-Las redes de invitados con aislamiento, VPN, restricciones de red local y ciertos puntos de acceso/navegadores pueden impedir la conexión. No se usa ningún servidor de retransmisión como alternativa. Verificado con navegadores aislados en un equipo; probar también entre móviles reales en la red objetivo antes de anunciar compatibilidad general.
+Las redes de invitados con aislamiento, VPN, restricciones de red local y ciertos puntos de acceso pueden impedir la conexión directa aunque el código de sala funcione. No se usa ningún servidor de retransmisión como alternativa. Los datos temporales de señalización pueden contener direcciones locales o nombres mDNS y la huella WebRTC; caducan automáticamente y no incluyen guardados, equipos ni acciones de combate.
 
 ### Descargas Android/Windows y juego sin internet
 
@@ -47,7 +45,7 @@ Dentro de la APK, ese mismo acceso cambia a **Buscar actualización Android**. C
 
 La versión de Windows usa Electron con aislamiento de contexto y sin acceso de Node desde el juego. Sirve únicamente los recursos empaquetados mediante el protocolo local `oprl://`, por lo que las rutas absolutas, los módulos y el guardado mantienen un origen estable. El instalador todavía no tiene firma digital y Windows SmartScreen puede mostrar una advertencia al abrirlo.
 
-La opción secundaria **Preparar navegador sin internet → Descargar / actualizar** almacena los recursos (~121 MB) en el navegador web. Espera la confirmación de descarga completa. Después abre **la misma dirección**; para multijugador sigue haciendo falta una red local, aunque no tenga acceso a internet. Una copia descargada se sirve desde caché sin consultar servicios de fuentes externos. Las actualizaciones se descargan con el mismo botón; una descarga fallida conserva la copia anterior.
+La opción secundaria **Preparar navegador sin internet → Descargar / actualizar** almacena los recursos (~121 MB) en el navegador web. Espera la confirmación de descarga completa. Después abre **la misma dirección**. La aventura individual puede funcionar desde caché; el multijugador siempre necesita Internet para crear o encontrar una sala. Las actualizaciones se descargan con el mismo botón y una descarga fallida conserva la copia anterior.
 
 El navegador puede desalojar los recursos por falta de espacio. Conserva una exportación JSON independiente del progreso. Esta función registra un service worker únicamente al solicitar la descarga; no precarga archivos ni sustituye el guardado sin pulsar el botón.
 
@@ -156,10 +154,11 @@ Destino original: `Fonsonis/one-piece-rogue-like-vercel` en GitHub y `one-piece-
 1. Coloca el contenido de esta edición en la raíz del repositorio. Conserva la carpeta `public/` completa, incluidos `art/`, `runner/`, `Images/`, `sprites/` y `soundtracks/`, junto con `scripts/`, `package.json`, `package-lock.json` y `vercel.json`. No subas `node_modules/`, `dist/` ni `outputs/`.
 2. En Vercel, abre el proyecto existente y comprueba que está conectado a ese repositorio y su rama `main`. Utiliza la raíz del repositorio como **Root Directory**.
 3. La configuración incluida en `vercel.json` fija **Framework Preset: Other**, **Install Command: npm ci**, **Build Command: npm run build** y **Output Directory: dist**. Elimina cualquier ajuste antiguo que apunte a una subcarpeta o a Cloudflare. Usa Node.js 22 o 24 en Vercel.
-4. Haz commit y push. La integración Git de Vercel generará el despliegue. Si esa integración está desactivada, despliega desde el panel después de subir los cambios.
-5. Abre `/`, pulsa 💾, recarga y comprueba el mensaje de guardado. `/play.html` e `/index.html` también están incluidos en la salida. Importa tu JSON anterior si estabas jugando en otro dominio.
+4. En **Storage**, conecta una base Upstash Redis al proyecto. La integración debe inyectar `KV_REST_API_URL` y `KV_REST_API_TOKEN` (o sus equivalentes `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`) en producción y previews.
+5. Haz commit y push. La integración Git de Vercel generará el despliegue. Si esa integración está desactivada, despliega desde el panel después de subir los cambios.
+6. Abre `/`, pulsa 💾, recarga y comprueba el mensaje de guardado. Crea también una sala para verificar la función y Redis. `/play.html` e `/index.html` están incluidos en la salida.
 
-No se necesitan variables de entorno ni integraciones de almacenamiento. El build copia únicamente `public/` a `dist/` y crea `index.html` a partir de `play.html`; no publica código de servidor, bases de datos ni herramientas.
+El build copia `public/` a `dist/` y crea `index.html` a partir de `play.html`. Vercel publica además `api/multiplayer.mjs` como Function. Redis es obligatorio para el multijugador; el resto del juego y sus guardados no dependen de esa base.
 
 Alternativa desde la terminal, con Vercel CLI y tu sesión iniciada: ejecuta `vercel link`, selecciona **el proyecto existente**, y después `vercel --prod`. El comando publica la versión; no lo uses hasta haber seleccionado el destino correcto.
 
@@ -172,7 +171,7 @@ npm test
 npm run lint
 ```
 
-Las pruebas verifican contenido del juego, los 589 atlas y retratos, escenarios con/sin efectos visuales, Nuzlocke, Luffy Run, JSON local, recuperación, importaciones inválidas, almacenamiento bloqueado y copia exacta de todos los recursos al despliegue. Las pruebas no requieren red. Para reproducir la comparación histórica: `node scripts/audit-balance.mjs 607b860`.
+Las pruebas verifican contenido del juego, los 589 atlas y retratos, escenarios con/sin efectos visuales, Nuzlocke, Luffy Run, JSON local, recuperación, importaciones inválidas, almacenamiento bloqueado, el protocolo de salas con un Redis simulado y la copia exacta de todos los recursos. La suite automatizada no requiere red. Para reproducir la comparación histórica: `node scripts/audit-balance.mjs 607b860`.
 
 ## Estructura
 
@@ -181,6 +180,7 @@ Las pruebas verifican contenido del juego, los 589 atlas y retratos, escenarios 
 - `scripts/build-android-apk.mjs`: genera una APK release firmada y su SHA-256.
 - `android/`: contenedor nativo de Capacitor; sus assets web se actualizan con `npm run android:sync`.
 - `desktop/`: contenedor aislado de Electron para el instalador de Windows.
+- `api/` y `server/`: función de señalización y estado efímero de las salas; no transportan la partida.
 - `scripts/serve-static.mjs`: servidor de desarrollo local; no se despliega como función.
 - `tests/`: pruebas del motor, arte, guardado y salida estática.
 - `docs/`: documentación y procedencia del arte.
