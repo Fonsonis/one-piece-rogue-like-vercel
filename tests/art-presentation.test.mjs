@@ -8,6 +8,17 @@ const data = fs.readFileSync('public/data.js', 'utf8');
 const game = fs.readFileSync('public/game.js', 'utf8').split('// ============ INICIO ============')[0];
 const art = fs.readFileSync('public/art/visuals.js', 'utf8');
 
+test('interface atlases and the home Cross Guild icon use compact WebP assets',()=>{
+ const polish=fs.readFileSync('public/art/interface-polish.css','utf8');
+ const fullMap=fs.statSync('public/art/cross-guild-map.png').size;
+ const menuIcon=fs.statSync('public/art/cross-guild-menu.webp').size;
+ assert.match(polish,/event-atlas\.webp/);
+ assert.match(polish,/ui-atlas\.webp/);
+ assert.doesNotMatch(polish,/(?:event|ui)-atlas\.png/);
+ assert.match(game,/\/art\/cross-guild-menu\.webp/);
+ assert.ok(menuIcon<fullMap/20,`Menu icon should be much smaller: ${menuIcon} vs ${fullMap}`);
+});
+
 function harness(withArt, brokenAnimation = false) {
   let seed = 81372, randomCalls = 0, animations = 0;
   const animationFrames = [];
