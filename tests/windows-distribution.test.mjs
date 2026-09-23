@@ -14,6 +14,8 @@ test('Electron empaqueta la build estática en un instalador NSIS', () => {
   assert.equal(packageJson.main, 'desktop/main.mjs');
   assert.match(packageJson.scripts['desktop:exe'], /electron-builder --win nsis --x64/);
   assert.match(packageJson.scripts['desktop:dir'], /electron-builder --dir --win --x64/);
+  assert.match(packageJson.scripts['desktop:exe'], /--publish never/);
+  assert.match(packageJson.scripts['desktop:dir'], /--publish never/);
   assert.equal(packageJson.build.appId, 'com.fonsonis.onepieceroguelike.desktop');
   assert.equal(packageJson.build.win.artifactName, 'one-piece-rogue-like-setup.${ext}');
   assert.equal(packageJson.build.nsis.deleteAppDataOnUninstall, false);
