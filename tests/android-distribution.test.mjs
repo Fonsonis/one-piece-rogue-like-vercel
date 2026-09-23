@@ -12,8 +12,9 @@ const mainActivity = readFileSync('android/app/src/main/java/com/fonsonis/onepie
 const nativeUpdater = readFileSync('android/app/src/main/java/com/fonsonis/onepieceroguelike/AndroidUpdaterPlugin.java', 'utf8');
 const workflow = readFileSync('.github/workflows/android-release.yml', 'utf8');
 
-test('el menú ofrece la APK y conserva la preparación offline del navegador', () => {
-  assert.match(game, /Descargar APK para Android/);
+test('el menú ofrece una descarga única y conserva la preparación offline del navegador', () => {
+  assert.match(game, /Descargar juego/);
+  assert.match(game, /openDownloadChooser/);
   assert.match(game, /btn-browser-offline/);
   assert.match(game, /Buscar actualización Android/);
 });
@@ -40,8 +41,8 @@ test('la APK empaqueta la build estática completa y consulta actualizaciones fi
   assert.match(workflow, /branches:\s*\n\s*- main/);
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /app_version_code=\$\(date \+%s\)/);
-  assert.match(workflow, /releases\/download\/android-'\+process\.argv\[2\]/);
+  assert.match(workflow, /releases\/download\/android-'\+process\.env\.APP_VERSION_CODE/);
   assert.match(workflow, /-PappVersionCode="\$APP_VERSION_CODE"/);
   assert.match(workflow, /assembleDebug/);
-  assert.match(workflow, /tag_name: android-\$\{\{ env\.APP_VERSION_CODE \}\}/);
+  assert.match(workflow, /tag_name: android-\$\{\{ needs\.version\.outputs\.app_version_code \}\}/);
 });

@@ -3,6 +3,7 @@
   "version": "1.2.0",
   "private": true,
   "type": "module",
+  "main": "desktop/main.mjs",
   "engines": {
     "node": ">=22"
   },
@@ -11,13 +12,18 @@
     "build": "node scripts/build-static.mjs",
     "android:sync": "npm run build && node --require ./scripts/node-user-info-shim.cjs ./node_modules/@capacitor/cli/bin/capacitor sync android",
     "android:apk": "npm run android:sync && node scripts/build-android-apk.mjs",
+    "desktop:start": "npm run build && electron .",
+    "desktop:dir": "npm run build && electron-builder --dir --win --x64",
+    "desktop:exe": "npm run build && electron-builder --win nsis --x64",
     "start": "node scripts/serve-static.mjs --production",
     "test": "npm run build && node --test tests/*.test.mjs",
-    "lint": "node --check public/game.js && node --check public/data.js && node --check public/save-storage.js && node --check public/art/visuals.js && node --check public/runner/ui.mjs && node --check public/runner/engine.mjs && node --check public/local/combat.js && node --check public/local/battle.js && node --check public/local/connection.mjs && node --check public/local/session.mjs && node --check public/local/ui.mjs && node --check public/local/offline.mjs && node --check public/local/android-files.mjs && node --check public/local/android-update.mjs && node --check public/service-worker.js && node --check scripts/build-android-apk.mjs && node scripts/verify-android-version.mjs"
+    "lint": "node --check public/game.js && node --check public/data.js && node --check public/save-storage.js && node --check public/art/visuals.js && node --check public/runner/ui.mjs && node --check public/runner/engine.mjs && node --check public/local/combat.js && node --check public/local/battle.js && node --check public/local/connection.mjs && node --check public/local/session.mjs && node --check public/local/ui.mjs && node --check public/local/offline.mjs && node --check public/local/downloads.mjs && node --check public/local/android-files.mjs && node --check public/local/android-update.mjs && node --check public/service-worker.js && node --check desktop/main.mjs && node --check desktop/preload.cjs && node --check scripts/build-android-apk.mjs && node scripts/verify-android-version.mjs"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@capacitor/cli": "^7.6.9",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
     "jsqr": "1.4.0",
     "qrcode-generator": "2.0.4"
   },
@@ -28,5 +34,40 @@
     "@capacitor/core": "^7.6.9",
     "@capacitor/filesystem": "^7.1.8",
     "@capacitor/share": "^7.0.4"
+  },
+  "build": {
+    "appId": "com.fonsonis.onepieceroguelike.desktop",
+    "productName": "One Piece Rogue Like",
+    "asar": true,
+    "directories": {
+      "output": "outputs/windows",
+      "buildResources": "assets"
+    },
+    "files": [
+      "dist/**/*",
+      "desktop/**/*",
+      "assets/icon.png",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "assets/icon.png",
+      "artifactName": "one-piece-rogue-like-setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "One Piece Rogue Like",
+      "deleteAppDataOnUninstall": false
+    }
   }
 }

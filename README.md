@@ -39,11 +39,13 @@ Mantened las pantallas encendidas y el juego visible. La partida se pausa cuando
 
 Las redes de invitados con aislamiento, VPN, restricciones de red local y ciertos puntos de acceso/navegadores pueden impedir la conexión. No se usa ningún servidor de retransmisión como alternativa. Verificado con navegadores aislados en un equipo; probar también entre móviles reales en la red objetivo antes de anunciar compatibilidad general.
 
-### APK Android y juego sin internet
+### Descargas Android/Windows y juego sin internet
 
-El botón **Descargar APK para Android** obtiene una APK firmada desde la última release de GitHub. La APK contiene la build completa (unos 123 MB), incluidos sprites, mapas, música y tipografía: se instala y arranca sin conexión desde el primer uso. El progreso se guarda en el almacenamiento local de la aplicación y las actualizaciones firmadas se pueden instalar encima sin perderlo.
+El botón **Descargar juego** abre un único selector con **APK para Android** y **EXE para Windows**. Los dos instaladores se publican juntos en la última release de GitHub e incluyen la build completa (unos 123 MB de recursos), con sprites, mapas, música y tipografía. Después de instalar, el juego arranca sin conexión y conserva el progreso en el almacenamiento local de la aplicación.
 
 Dentro de la APK, ese mismo acceso cambia a **Buscar actualización Android**. Con conexión consulta el `android-version.json` de la última release; si falla, consulta la API de GitHub para localizar la APK publicada. Compara el código de compilación instalado con el publicado, muestra el progreso y comprueba que la descarga sea una APK de esta aplicación y de la compilación esperada antes de abrir el instalador. La búsqueda y los errores quedan visibles bajo el botón. El workflow asigna un nuevo `versionCode` a cada release y verifica que coincida con la APK; las compilaciones locales usan el código de `android/app/build.gradle`. Para publicar una actualización se debe firmar con la misma clave.
+
+La versión de Windows usa Electron con aislamiento de contexto y sin acceso de Node desde el juego. Sirve únicamente los recursos empaquetados mediante el protocolo local `oprl://`, por lo que las rutas absolutas, los módulos y el guardado mantienen un origen estable. El instalador todavía no tiene firma digital y Windows SmartScreen puede mostrar una advertencia al abrirlo.
 
 La opción secundaria **Preparar navegador sin internet → Descargar / actualizar** almacena los recursos (~121 MB) en el navegador web. Espera la confirmación de descarga completa. Después abre **la misma dirección**; para multijugador sigue haciendo falta una red local, aunque no tenga acceso a internet. Una copia descargada se sirve desde caché sin consultar servicios de fuentes externos. Las actualizaciones se descargan con el mismo botón; una descarga fallida conserva la copia anterior.
 
@@ -100,7 +102,18 @@ npm run android:apk
 
 El resultado firmado se crea en `outputs/one-piece-rogue-like.apk`. En el primer build local, el script genera `.android-signing/one-piece-rogue-like.jks` y sus credenciales; ambos están ignorados por Git. Haz una copia privada de esa carpeta: perder la clave impide que Android acepte futuras versiones como actualización de la app instalada.
 
-El workflow `android-release.yml` publica la APK y su manifiesto en una release `android-<versionCode>` después de cada cambio en `main`. Requiere los secretos `ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS` y `ANDROID_KEY_PASSWORD`, obtenidos de la misma clave local.
+### Construir el EXE de Windows
+
+En Windows, Electron reutiliza la misma carpeta `dist/` y genera un instalador NSIS de 64 bits:
+
+```sh
+npm ci
+npm run desktop:exe
+```
+
+El resultado se crea en `outputs/windows/one-piece-rogue-like-setup.exe`. Para abrir la aplicación sin crear el instalador usa `npm run desktop:start`; para generar únicamente la carpeta empaquetada usa `npm run desktop:dir`.
+
+El workflow `android-release.yml` compila Android y Windows en trabajos separados y solo publica cuando ambos terminan correctamente. La APK, el EXE, sus SHA-256 y ambos manifiestos comparten una release `android-<versionCode>`, de modo que los enlaces `releases/latest` de las dos plataformas siempre apuntan al mismo conjunto. Android requiere los secretos `ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS` y `ANDROID_KEY_PASSWORD`, obtenidos de la misma clave local.
 
 ## Tripulación y relevo
 
@@ -167,6 +180,7 @@ Las pruebas verifican contenido del juego, los 589 atlas y retratos, escenarios 
 - `scripts/build-static.mjs`: prepara `dist/` y comprueba la sintaxis JavaScript.
 - `scripts/build-android-apk.mjs`: genera una APK release firmada y su SHA-256.
 - `android/`: contenedor nativo de Capacitor; sus assets web se actualizan con `npm run android:sync`.
+- `desktop/`: contenedor aislado de Electron para el instalador de Windows.
 - `scripts/serve-static.mjs`: servidor de desarrollo local; no se despliega como función.
 - `tests/`: pruebas del motor, arte, guardado y salida estática.
 - `docs/`: documentación y procedencia del arte.

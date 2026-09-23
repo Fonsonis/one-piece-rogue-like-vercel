@@ -2361,6 +2361,7 @@ function startLogPoseGacha(activeSagas) {
 // ============ PANTALLA: HOME ============
 function screenHome() {
   const nativeAndroid = globalThis.Capacitor?.isNativePlatform?.() === true && globalThis.Capacitor?.getPlatform?.() === 'android';
+  const nativeDesktop = globalThis.OnePieceDesktop?.isDesktop === true;
   playMusic('menu');
   const accLvl = accountLevel();
   const runnerUnlocked = accLvl >= 1;
@@ -2433,9 +2434,9 @@ function screenHome() {
       <input type="file" id="file-import" accept=".json,application/json" style="display:none;">
     </div>
     <div class="home-install-actions">
-      <button class="btn green small" id="btn-offline">${nativeAndroid ? '↻ Buscar actualización Android' : '⬇ Descargar APK para Android'}</button>
+      ${nativeDesktop ? '<small>La versión de Windows incluye el juego completo y funciona sin conexión.</small>' : `<button class="btn green small" id="btn-offline">${nativeAndroid ? '↻ Buscar actualización Android' : '⬇ Descargar juego'}</button>`}
       ${nativeAndroid ? '<small id="android-update-status" role="status" aria-live="polite"></small>' : ''}
-      ${nativeAndroid ? '<small>El juego completo ya está guardado en esta APK y funciona sin conexión.</small>' : '<button class="btn gray small" id="btn-browser-offline">Preparar navegador sin internet</button>'}
+      ${nativeAndroid || nativeDesktop ? '<small>Tu progreso se guarda automáticamente en este dispositivo.</small>' : '<button class="btn gray small" id="btn-browser-offline">Preparar navegador sin internet</button>'}
     </div>
     <div class="footer-note">
       Réplica del juego fan <a href="https://one-piece-rogue-like-vercel.vercel.app/" target="_blank" rel="noopener noreferrer">GrandLineLike</a>. Sin ánimo de lucro.<br>No afiliado con Eiichiro Oda, Shueisha ni Toei Animation.<br>
@@ -2454,13 +2455,18 @@ function screenHome() {
     finally { btn.disabled = false; }
   };
   $('#btn-king-rewards')?.addEventListener('click', () => showPirateKingReward(pendingPirateKingRewards()[0], screenHome));
-  $('#btn-offline').onclick = async () => {
+  if ($('#btn-offline')) $('#btn-offline').onclick = async () => {
     const button = $('#btn-offline');
     const status = $('#android-update-status');
+    if (!nativeAndroid) {
+      try { const { openDownloadChooser } = await import('./local/downloads.mjs'); openDownloadChooser(button); }
+      catch (e) { toast(e.message || 'No se pudieron mostrar las descargas.'); }
+      return;
+    }
     button.disabled = true;
     const updateStatus = message => { if (status?.isConnected) status.textContent = message; toast(message); };
     try { const { downloadAndroidApk } = await import('./local/android-update.mjs'); await downloadAndroidApk({ toast: updateStatus }); }
-    catch (e) { updateStatus(e.message || 'No se pudo abrir la descarga de Android.'); }
+    catch (e) { updateStatus(e.message || 'No se pudo buscar la actualización de Android.'); }
     finally { if (button.isConnected) button.disabled = false; }
   };
   $('#btn-browser-offline')?.addEventListener('click', async () => {
