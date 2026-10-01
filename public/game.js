@@ -104,7 +104,7 @@ function dexBaseIds(ids=[]) { return [...new Set(ids.filter(id=>CHARS[id]).map(b
 function dexEntrySeen(id) { return characterForms(id).some(form=>meta.dex.includes(form.id)); }
 function recruitDexStatusHTML(id) {
   const seen = dexEntrySeen(id);
-  return `<span class="recruit-dex-status ${seen ? 'seen' : 'unseen'}" style="display:inline-block;padding:4px 8px;margin:5px 0;border-radius:6px;background:${seen ? '#e8f4eb' : '#fff0c2'};color:#243a31;font-size:10px;font-weight:700;" aria-label="${seen ? 'Ya está en tu Dex' : 'Aún no está en tu Dex'}">${seen ? '📖 Ya en tu Dex' : '✨ Nuevo en tu Dex'}</span>`;
+  return `<span class="recruit-dex-status ${seen ? 'seen' : 'unseen'}" aria-label="${seen ? 'Ya está en tu Dex' : 'Aún no está en tu Dex'}">${seen ? '📖 Ya en tu Dex' : '✨ Nuevo en tu Dex'}</span>`;
 }
 function dexFilteredBases(state) {
   // A search or combined filters may match any phase, but return its base card only once.
@@ -883,6 +883,23 @@ function gainFame(n) {
   meta.fame += n;
   meta.accXp = (meta.accXp || 0) + n;
   saveMeta();
+}
+let runnerFamePending = false;
+let runnerFameLastSave = 0;
+function flushRunnerFame(now = Date.now()) {
+  if (!runnerFamePending) return true;
+  runnerFameLastSave = now;
+  if (!saveMeta()) return false;
+  runnerFamePending = false;
+  return true;
+}
+function creditRunnerFame(amount, now = Date.now()) {
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  meta.fame += amount;
+  meta.accXp = (meta.accXp || 0) + amount;
+  runnerFamePending = true;
+  if (now - runnerFameLastSave >= 1000) flushRunnerFame(now);
+  return amount;
 }
 
 // ---------- Estado de la partida ----------
@@ -2603,7 +2620,7 @@ function screenHome() {
     </div>
     </section>
     <div class="home-section-heading home-section-heading-secondary"><span>02 · JUEGA A TU MANERA</span><small>Partidas rápidas y multijugador</small></div>
-    <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? 'Doble salto · recupera 25 pasos cada 1.000 m' : '🔒 Se desbloquea al nivel 1 de cuenta'}</small></span></button>
+    <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? '0,5 fama por metro · 25 pasos cada 1.000 m' : '🔒 Se desbloquea al nivel 1 de cuenta'}</small></span></button>
     <button class="local-menu-button" id="btn-local"><span aria-hidden="true">⚔️</span><span><strong>MULTIJUGADOR</strong><small>Duelo · Torneo · Alianza contra un yonko · Sala por código</small></span></button>
     ${pendingPirateKingRewards().length ? `<div class="panel"><button class="btn gold" id="btn-king-rewards">👑 ELEGIR LEGENDARIO · ${pendingPirateKingRewards().length} recompensa(s) de Rey Pirata</button></div>` : ''}
     <div class="home-section-heading home-section-heading-secondary"><span>03 · PREPARA TU TRIPULACIÓN</span><small>Consulta, mejora y consigue recompensas</small></div>
@@ -2700,10 +2717,12 @@ function screenHome() {
       await openRunner({
         best: meta.runnerBest || 0,
         onSteps: amount => grantDailySteps(amount),
+        onFame: creditRunnerFame,
+        onCheckpoint: flushRunnerFame,
         onScore: score => {
           if (score > (meta.runnerBest || 0)) { meta.runnerBest = score; saveMeta(); }
         },
-        onExit: () => { screenHome(); $('#btn-runner')?.focus(); },
+        onExit: () => { flushRunnerFame(); screenHome(); $('#btn-runner')?.focus(); },
       });
     } catch (e) {
       playMusic('menu');
@@ -3086,19 +3105,19 @@ function showSagaInfoModal(sagaIdx = 0) {
       const c = CHARS[bId];
       const bLvl = (isl.bossLvl && isl.bossLvl[bIdx]) ? isl.bossLvl[bIdx] : '?';
       if (!c) return `<span>💀 ${bId} (Nv. ${bLvl})</span>`;
-      return `<div style="display:inline-flex;align-items:center;gap:6px;background:rgba(0,0,0,0.04);padding:4px 8px;border-radius:4px;border:1px solid #ddd;margin:2px;">
+      return `<div class="saga-info-boss">
         ${charIcon(bId, 22)}
         <span><b>${c.name}</b> <small style="color:var(--red);font-weight:bold;">Nv. ${bLvl}</small></span>
       </div>`;
     }).join(' ');
 
     return `
-      <div style="background:#fff;border:1px solid var(--ink);border-radius:6px;padding:8px 12px;margin-bottom:8px;text-align:left;">
+      <div class="saga-info-island">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-          <span style="font-weight:bold;font-size:10px;color:var(--gold-dark,#b8860b);">🏝️ Isla ${idx + 1}: ${isl.name}</span>
-          <span style="font-size:8px;background:var(--sky,#e0f7fa);padding:2px 6px;border-radius:4px;border:1px solid #90caf9;">Rango Nivel: Nv. ${isl.lvl ? isl.lvl[0] + ' - ' + isl.lvl[1] : '?'}</span>
+          <span class="saga-info-heading">🏝️ Isla ${idx + 1}: ${isl.name}</span>
+          <span class="saga-info-level">Rango Nivel: Nv. ${isl.lvl ? isl.lvl[0] + ' - ' + isl.lvl[1] : '?'}</span>
         </div>
-        <div style="font-size:8px;color:#555;margin-top:6px;display:flex;flex-wrap:wrap;align-items:center;gap:4px;">
+        <div class="saga-info-bosses">
           <b>Jefes:</b> ${bossesHTML || 'Sin jefes'}
         </div>
       </div>
@@ -5547,7 +5566,7 @@ function cartelesBadgeHTML() {
   const c1 = run.items.cartel || 0;
   const c2 = run.items.carteldorado || 0;
   const c3 = run.items.cartelbuster || 0;
-  return `<div style="font-size:10.5px;background:rgba(255,215,0,0.16);padding:6px 10px;border-radius:6px;border:1px solid var(--gold);margin:8px 0;color:#222;text-align:center;"><b>📜 Carteles en tu bolsa:</b> 📜 ×${c1} Recluta ${c2 ? `· 🏅 ×${c2} Dorado` : ''} ${c3 ? `· 📯 ×${c3} Buster` : ''}</div>`;
+  return `<div class="carteles-bag-badge"><b>📜 Carteles en tu bolsa:</b> 📜 ×${c1} Recluta ${c2 ? `· 🏅 ×${c2} Dorado` : ''} ${c3 ? `· 📯 ×${c3} Buster` : ''}</div>`;
 }
 
 function wildTeamPreviewHTML() {
@@ -5579,7 +5598,7 @@ function wildEncounter(wild) {
     </div>
     ${wildTeamPreviewHTML()}
     ${cartelesBadgeHTML()}
-    ${cannotRecruit ? `<div class="special-fail" style="color:var(--gold);border-color:var(--gold);background:#fffbe8;">${c.rareza === 5 ? '👑 PIRATA LEGENDARIO (5⭐)' : '⭐ PIRATA DE 4 ESTRELLAS'}<br>Solo puede conseguirse en Crossguild o en la tirada de carteles. ¡Aquí únicamente puedes combatirlo!</div>` : nuzBlock ? '<div class="special-fail">Regla Nuzlocke: ya reclutaste en esta isla (solo puedes combatir).</div>' : ''}
+    ${cannotRecruit ? `<div class="special-fail special-fail-rare">${c.rareza === 5 ? '👑 PIRATA LEGENDARIO (5⭐)' : '⭐ PIRATA DE 4 ESTRELLAS'}<br>Solo puede conseguirse en Crossguild o en la tirada de carteles. ¡Aquí únicamente puedes combatirlo!</div>` : nuzBlock ? '<div class="special-fail">Regla Nuzlocke: ya reclutaste en esta isla (solo puedes combatir).</div>' : ''}
     <div class="actions" style="flex-direction:column;align-items:stretch;">
       <button class="btn red" id="we-fight">⚔️ COMBATIR — gana XP para la banda</button>
       ${!cannotRecruit ? `

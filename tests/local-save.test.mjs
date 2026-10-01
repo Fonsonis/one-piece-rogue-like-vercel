@@ -187,21 +187,52 @@ test('upgrade saga groups cover every owned character once and in saga order',()
 });
 
 
-test('runner milestone steps are capped, saved immediately and never grant fame or account XP',()=>{
+test('runner fame is saved per metre, steps are capped and neither reward is paid twice',()=>{
  const h=harness();
  h.run('meta.dailySteps.remaining=900;saveMeta();');
- const g=new RunnerEngine({onEvent:(type,data)=>{if(type==='reward')h.run(`grantDailySteps(${data.steps})`);}});
+ let now=1000;
+ const g=new RunnerEngine({onEvent:(type,data)=>{
+  if(type==='reward')h.run(`grantDailySteps(${data.steps})`);
+  if(type==='fame')h.run(`creditRunnerFame(${data.fame},${now})`);
+  if(type==='pause'||type==='over')h.run(`flushRunnerFame(${now})`);
+ }});
+ g.start();g.spawnIn=999;g.distance=14;g.update(1/120);
+ assert.equal(harness(h.memory).run('meta.fame'),.5);
+ assert.equal(harness(h.memory).run('meta.accXp'),.5);
+ g.distance=14*3;g.update(1/120);
+ assert.equal(h.run('meta.fame'),1.5);
+ assert.equal(harness(h.memory).run('meta.fame'),.5,'later metres remain visible but are batched on disk');
+ g.pause();g.update(1);g.resume();g.update(1/120);
+ assert.equal(harness(h.memory).run('meta.fame'),1.5,'pausing flushes pending fame');
+ g.status='over';g.update(1);
+ assert.equal(harness(h.memory).run('meta.fame'),1.5);
+ now=2100;
  g.start();g.spawnIn=999;g.distance=14000;g.update(1/120);
  assert.equal(harness(h.memory).run('meta.dailySteps.remaining'),925);
- assert.equal(harness(h.memory).run('meta.fame'),0);
- assert.equal(harness(h.memory).run('meta.accXp'),0);
+ assert.equal(harness(h.memory).run('meta.fame'),501.5);
+ assert.equal(harness(h.memory).run('meta.accXp'),501.5);
  g.pause();g.update(1);g.resume();g.update(1/120);g.status='over';g.update(1);
  assert.equal(harness(h.memory).run('meta.dailySteps.remaining'),925);
  g.start();g.spawnIn=999;g.distance=14000;g.update(1/120);
  assert.equal(harness(h.memory).run('meta.dailySteps.remaining'),950);
+ assert.equal(h.run('meta.fame'),1001.5);
+ assert.equal(harness(h.memory).run('meta.fame'),1001.5,'the step milestone also saves pending fame');
+ h.run('flushRunnerFame(2200)');
+ assert.equal(harness(h.memory).run('meta.fame'),1001.5);
  h.run('meta.dailySteps.remaining=990;');assert.equal(h.run('grantDailySteps(25)'),10);
  assert.equal(harness(h.memory).run('meta.dailySteps.remaining'),1000);
  assert.equal(h.run('grantDailySteps(25)'),0);
+});
+test('runner fame batches writes for at most one second while counting every half point',()=>{
+ const h=harness();
+ h.run('creditRunnerFame(.5,1000)');
+ assert.equal(harness(h.memory).run('meta.fame'),.5);
+ h.run('creditRunnerFame(.5,1500)');
+ assert.equal(h.run('meta.fame'),1);
+ assert.equal(harness(h.memory).run('meta.fame'),.5);
+ h.run('creditRunnerFame(.5,2000)');
+ assert.equal(harness(h.memory).run('meta.fame'),1.5);
+ assert.equal(harness(h.memory).run('meta.accXp'),1.5);
 });
 
 test('Sabaody insertion migrates old journey and last port exactly once and preserves earned access',()=>{
