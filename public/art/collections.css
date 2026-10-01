@@ -317,6 +317,7 @@ html[data-theme="dark"] .collection-modal :is(button,input,select,summary):focus
 html .inventory-modal #inv-cards-grid { overflow:visible; max-height:none; min-height:0; scrollbar-gutter:auto; }
 .inventory-modal #inv-close-x { position:absolute; top:16px; right:22px; z-index:3; box-shadow:0 3px 14px #08283335; }
 .inventory-modal .collection-pagination { position:absolute; bottom:14px; left:14px; right:14px; z-index:3; margin:0; padding:10px; border:1px solid var(--collection-line); border-radius:12px; background:var(--collection-surface); box-shadow:0 4px 20px #08283340; }
+.inventory-modal .collection-pagination small { display:block; font:500 11px/1.3 system-ui,sans-serif; color:var(--collection-muted); }
 @media(max-width:600px) {
   .modal.collection-modal.inventory-modal { height:calc(100dvh - 16px); }
   .inventory-modal .inventory-scroll { padding:14px 14px 100px; }
@@ -427,6 +428,19 @@ html[data-theme="dark"] .inventory-shortfall { color:#ffbd9e; }
 }
 @media(prefers-reduced-motion:reduce) {
   .collection-modal .btn,.pirate-dex .btn,.collection-extra summary::after { transition:none!important; }
+}
+
+/* On narrow screens show the first nakama before secondary collection controls. */
+@media(max-width:600px) {
+  .inventory-modal .inventory-scroll { padding-bottom:26px; }
+  .inventory-modal:has(.collection-pagination) .inventory-scroll { padding-bottom:92px; }
+  .inventory-modal .inventory-relics-link { min-height:40px; padding:6px 10px; font:600 12px/1.3 system-ui,sans-serif; }
+  .inventory-modal .collection-summary { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; padding:8px 10px; }
+  .inventory-modal .collection-summary > :last-child { border-top:0; border-left:1px solid var(--collection-line); padding:0 0 0 8px; }
+  .inventory-modal .collection-summary strong { font-size:17px; }
+  .inventory-modal .collection-summary > * > span { font-size:11px; }
+  .inventory-modal #inv-cards-grid { touch-action:pan-y; }
+  .inventory-modal .collection-results { min-height:24px; }
 }
 .game-select-overlay { z-index:10020; }
 .game-select-modal { width:min(440px,100%); display:flex; flex-direction:column; max-height:85dvh; gap:12px; overflow:hidden; }

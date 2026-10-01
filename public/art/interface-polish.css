@@ -145,3 +145,30 @@ html[data-theme="dark"] #app .home-main-buttons #btn-achievements.home-action-re
  #app:has(#starter-slots-container) .panel > p { font-size:10px!important; }
  #app:has(#starter-slots-container) .panel > div:first-child { margin-bottom:3px!important; gap:3px!important; }
 }
+
+/* Banda: let the navigation occupy its own row and show only usable slots. */
+@media(max-width:700px) {
+  #app:has(#starter-slots-container) > #btn-back {
+    position:static;
+    display:inline-flex;
+    align-items:center;
+    min-height:44px;
+    margin:2px 0 8px;
+  }
+  #app:has(#starter-slots-container) .starter-team-grid {
+    grid-template-columns:repeat(auto-fit,minmax(min(100%,150px),1fr));
+  }
+  #app:has(#starter-slots-container) .starter-slot-card { min-height:120px; }
+  #app:has(#starter-slots-container) .starter-slot-card .btn { min-height:44px; }
+  #app:has(#starter-slots-container) .starter-slot-card .btn-info-slot,
+  #app:has(#starter-slots-container) .starter-slot-card .btn-remove-slot { min-width:44px; }
+  #app:has(#starter-slots-container) .preset-bar { display:block!important; width:100%; margin:8px 0!important; padding:0!important; background:var(--paper-dark)!important; color:var(--ink); }
+  #app:has(#starter-slots-container) .preset-bar > summary { display:flex; align-items:center; min-height:44px; padding:8px 12px; cursor:pointer; font:700 13px/1.4 system-ui,sans-serif; }
+  #app:has(#starter-slots-container) .preset-bar > div { flex-wrap:wrap!important; padding:6px; }
+  #app:has(#starter-slots-container) .preset-slot-box { flex:1 1 130px; }
+  #app:has(#starter-slots-container) .preset-bar .btn { min-height:44px; }
+  #app:has(#starter-slots-container) .starter-launch-actions { position:sticky; bottom:0; z-index:5; margin:8px -10px -10px!important; padding:10px max(10px,env(safe-area-inset-right)) max(10px,env(safe-area-inset-bottom)); background:var(--paper); border-top:1px solid #91aaa9; box-shadow:0 -5px 16px #10253325; }
+  #app:has(#starter-slots-container) #btn-zarpar { min-height:48px; font:700 13px/1.3 system-ui,sans-serif!important; }
+  #app:has(#starter-slots-container) #btn-auto-island { min-height:44px; }
+  #app:has(#starter-slots-container) .starter-locked-summary { margin:6px 0!important; font:12px/1.4 system-ui,sans-serif!important; color:var(--ink)!important; }
+}

@@ -205,6 +205,12 @@ html[data-theme="dark"] #app .challenge-arena #challenge-fight { color:#172c35; 
 html[data-theme="dark"] .challenge-event .challenge-emblem { background:#35566a; }
 html[data-theme="dark"] .challenge-event.legends .challenge-emblem { background:#675028; }
 html[data-theme="dark"] .challenge-slot-pick:not(:disabled):hover { background:#30505b; }
+.legend-challenge-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr)); gap:12px; margin-top:18px; }
+.legend-challenge-card { display:grid; grid-template-columns:72px minmax(0,1fr); align-items:center; gap:12px; padding:14px; border:2px solid #b68b28; border-radius:12px; background:var(--paper); min-width:0; }
+.legend-challenge-portrait { display:grid; place-items:center; min-height:72px; }
+#app .legend-challenge-card h3 { margin:0 0 5px; font-size:15px; }
+.legend-challenge-card p { margin:3px 0; font-size:12px; overflow-wrap:anywhere; }
+.legend-challenge-card .btn { grid-column:1 / -1; width:100%; min-height:48px; }
 @media(max-width:540px) {
  .challenge-event { align-items:stretch; padding:14px 10px; }
  .challenge-event .challenge-emblem { align-self:center; width:46px; height:46px; font-size:24px; }

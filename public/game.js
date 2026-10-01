@@ -102,6 +102,10 @@ function preferredLuffyGear4(progress = meta, requested = progress.formPreferenc
 }
 function dexBaseIds(ids=[]) { return [...new Set(ids.filter(id=>CHARS[id]).map(baseFormOf))]; }
 function dexEntrySeen(id) { return characterForms(id).some(form=>meta.dex.includes(form.id)); }
+function recruitDexStatusHTML(id) {
+  const seen = dexEntrySeen(id);
+  return `<span class="recruit-dex-status ${seen ? 'seen' : 'unseen'}" style="display:inline-block;padding:4px 8px;margin:5px 0;border-radius:6px;background:${seen ? '#e8f4eb' : '#fff0c2'};color:#243a31;font-size:10px;font-weight:700;" aria-label="${seen ? 'Ya está en tu Dex' : 'Aún no está en tu Dex'}">${seen ? '📖 Ya en tu Dex' : '✨ Nuevo en tu Dex'}</span>`;
+}
 function dexFilteredBases(state) {
   // A search or combined filters may match any phase, but return its base card only once.
   const matches=filterSortChars(Object.keys(CHARS),{...state,sort:'default'});
@@ -779,9 +783,14 @@ function validateGameSave(data) {
     new Set(equipment.map(([,r])=>r)).size!==equipment.length) throw new Error('Equipo de reliquias incompatible.');
   if(t){
     const ids=t.entrants.flatMap(e=>e.members);
-    if(ids.some(id=>!CHARS[id]||(t.kind==='legends'&&CHARS[id].rareza!==5))||
+    if(ids.some(id=>!CHARS[id]||(t.kind==='legends'&&!t.legendCharacter&&CHARS[id].rareza!==5))||
       new Set(ids.map(baseFormOf)).size!==(t.version===2?16:8)||t.pendingRelics.some(id=>!RELICS[id])||
       (t.relicReward&&!RELICS[t.relicReward])||
+      (t.legendCharacter&&(!CHARS[t.legendCharacter]||baseFormOf(t.legendCharacter)!==t.legendCharacter||
+        t.kind!=='legends'||t.entrants.some(e=>e.members.length!==1)||
+        baseFormOf(t.entrants[0].members[0])!==t.legendCharacter||
+        t.pendingRelics.some(id=>id!==`relic_${t.legendCharacter}`)||
+        (t.relicReward&&t.relicReward!==`relic_${t.legendCharacter}`)))||
       (t.series&&(t.series.members.some(id=>!CHARS[id]||baseFormOf(id)!==id)||
         t.series.members.some((id,index)=>id!==baseFormOf(t.entrants[0].members[index]))))) throw new Error('Torneo incompatible.');
   }
@@ -2140,6 +2149,7 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
 
 // ============ LOG POSE GACHA CARTELES ============
 let logPoseBlockedSagaIds = [];
+let logPoseAutoCount = 10;
 
 function showLogPoseGachaModal() {
   meta.logPoses = meta.logPoses || 0;
@@ -2196,10 +2206,16 @@ function showLogPoseGachaModal() {
         <span>Coste total<small>Base 1000${logPoseBlockedSagaIds.length ? ` + ${blockCost} por ${logPoseBlockedSagaIds.length} excluida(s)` : ''}</small></span>
         <strong>🧭 ${totalCost}</strong>
       </div>
+      <div class="logpose-auto-setup">
+        <label for="lp-auto-count">Tiradas automáticas (1–100)</label>
+        <input id="lp-auto-count" type="number" inputmode="numeric" min="1" max="100" step="1" value="${logPoseAutoCount}">
+        <span id="lp-auto-total">Total: 🧭 ${totalCost * logPoseAutoCount}</span>
+      </div>
       <div class="actions logpose-market-actions">
         <button class="btn red" id="lp-start-gacha" ${canAfford ? '' : 'disabled'}>
           🎰 JUGAR · 🧭 ${totalCost}
         </button>
+        <button class="btn gold" id="lp-auto-gacha" ${meta.logPoses >= totalCost * logPoseAutoCount ? '' : 'disabled'}>⚡ AUTO ×${logPoseAutoCount}</button>
         <button class="btn gray" id="lp-close-modal">CERRAR</button>
       </div>
     `;
@@ -2215,6 +2231,23 @@ function showLogPoseGachaModal() {
   document.body.appendChild(ov);
 
   const bindEvents = () => {
+    const updatePrice = () => {
+      const count = Number(ov.querySelector('#lp-auto-count').value);
+      const valid = Number.isInteger(count) && count >= 1 && count <= 100;
+      const cost = 1000 + logPoseBlockedSagaIds.length * 200;
+      const excluded = logPoseBlockedSagaIds.length;
+      ov.querySelector('.logpose-saga-picker > header > span').textContent = `${unlockedSagas.length - excluded} activas`;
+      ov.querySelector('.logpose-market-cost > span > small').textContent = `Base 1000${excluded ? ` + ${excluded * 200} por ${excluded} excluida(s)` : ''}`;
+      ov.querySelector('.logpose-market-cost > strong').textContent = `🧭 ${cost}`;
+      const single = ov.querySelector('#lp-start-gacha');
+      single.disabled = meta.logPoses < cost;
+      single.textContent = `🎰 JUGAR · 🧭 ${cost}`;
+      const automatic = ov.querySelector('#lp-auto-gacha');
+      automatic.disabled = !valid || meta.logPoses < cost * count;
+      automatic.textContent = `⚡ AUTO ×${valid ? count : '—'}`;
+      ov.querySelector('#lp-auto-total').textContent = valid ? `Total: 🧭 ${cost * count}` : 'Elige entre 1 y 100 tiradas';
+      if (valid) logPoseAutoCount = count;
+    };
     ov.querySelectorAll('[data-saga]').forEach(el => {
       el.onclick = () => {
         const sId = el.dataset.saga;
@@ -2227,10 +2260,17 @@ function showLogPoseGachaModal() {
           }
           logPoseBlockedSagaIds.push(sId);
         }
-        ov.querySelector('.modal').innerHTML = renderModalContent();
-        bindEvents();
+        const blocked = logPoseBlockedSagaIds.includes(sId);
+        el.classList.toggle('blocked', blocked);
+        el.classList.toggle('active', !blocked);
+        el.setAttribute('aria-pressed', String(blocked));
+        el.querySelector('.saga-block-state').textContent = blocked ? '🔒 +200' : '✓ ACTIVA';
+        updatePrice();
       };
     });
+
+    const countInput = ov.querySelector('#lp-auto-count');
+    countInput.oninput = updatePrice;
 
     const startBtn = ov.querySelector('#lp-start-gacha');
     if (startBtn) {
@@ -2246,6 +2286,31 @@ function showLogPoseGachaModal() {
       };
     }
 
+    ov.querySelector('#lp-auto-gacha').onclick = () => {
+      const count = Number(countInput.value);
+      const cost = 1000 + logPoseBlockedSagaIds.length * 200;
+      if (!Number.isInteger(count) || count < 1 || count > 100 || meta.logPoses < cost * count) return;
+      logPoseAutoCount = count;
+      const activeSagas = unlockedSagas.filter(s => !logPoseBlockedSagaIds.includes(s.id));
+      meta.logPoses -= cost * count;
+      const results = [];
+      for (let i = 0; i < count; i++) {
+        const prize = rollLogPosePrize(activeSagas);
+        if (!prize) {
+          meta.logPoses += 1000;
+          meta.starPity = 0;
+          results.push({compensation:true});
+          continue;
+        }
+        const wasInDex = dexEntrySeen(prize.prizeId);
+        const duplicateReward = awardLogPosePrize(prize.prizeId);
+        results.push({id:prize.prizeId,wasInDex,duplicateReward});
+      }
+      saveMeta();
+      ov.remove();
+      showLogPoseAutoResults(results, cost * count);
+    };
+
     const closeBtn = ov.querySelector('#lp-close-modal');
     if (closeBtn) closeBtn.onclick = () => ov.remove();
   };
@@ -2258,18 +2323,12 @@ function duplicatePosterReward(id) {
   return isNakamaUnlocked(id) ? ({3:50,4:500,5:1000}[CHARS[id].rareza] || 0) : 0;
 }
 
-function startLogPoseGacha(activeSagas) {
+function rollLogPosePrize(activeSagas) {
   meta.starPity = meta.starPity || 0;
   const activePirates = [...new Set(activeSagas.flatMap(s => sagaBasePirateIds(s.id)))];
   const guaranteed = meta.starPity >= 500;
   const newLegendaries = activePirates.filter(id => CHARS[id].rareza === 5 && !isNakamaUnlocked(id));
-  if (guaranteed && !newLegendaries.length) {
-    meta.logPoses = (meta.logPoses || 0) + 1000;
-    meta.starPity = 0;
-    saveMeta();
-    modalInfo('🧭 Compensación de legendario', 'No quedan legendarios nuevos en las sagas seleccionadas. Recibes <b>1000 Log Poses</b> en lugar de un personaje duplicado.', () => screenHome());
-    return;
-  }
+  if (guaranteed && !newLegendaries.length) return null;
   const weights = [41.5, 30, 21, 7, 0.5];
   let roll = Math.random() * 100, stopIdx = 4;
   if (meta.starPity >= 500) {
@@ -2304,6 +2363,46 @@ function startLogPoseGacha(activeSagas) {
   } else {
     meta.starPity += (stopIdx + 1);
   }
+  return {prizeId,stopIdx};
+}
+
+function awardLogPosePrize(prizeId) {
+  const duplicateReward = duplicatePosterReward(prizeId);
+  meta.logPoses = (meta.logPoses || 0) + duplicateReward;
+  registerRecruit(prizeId);
+  const base = baseFormOf(prizeId);
+  if (!meta.roster.includes(base)) meta.roster.push(base);
+  return duplicateReward;
+}
+
+function showLogPoseAutoResults(results,totalCost) {
+  const acquired = results.filter(result => result.id);
+  const newCount = acquired.filter(result => !result.wasInDex).length;
+  const recovered = results.reduce((sum,result) => sum + (result.duplicateReward || (result.compensation ? 1000 : 0)),0);
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal logpose-auto-results" role="dialog" aria-modal="true" aria-labelledby="lp-auto-title">
+    <h2 id="lp-auto-title">⚡ ${results.length} tiradas completadas</h2>
+    <p>${newCount} nuevos en la Dex · 🧭 ${totalCost} gastados · 🧭 ${recovered} recuperados</p>
+    <div class="logpose-auto-list">${results.map(result => result.compensation
+      ? '<div>🧭 Garantía completada · +1000 Log Poses</div>'
+      : `<div>${charIcon(result.id,28)} <span><b>${CHARS[result.id].name}</b><small>${'⭐'.repeat(CHARS[result.id].rareza)} · ${result.wasInDex ? 'Ya en Dex' : 'Nuevo en Dex'}${result.duplicateReward ? ` · +${result.duplicateReward} 🧭` : ''}</small></span></div>`).join('')}</div>
+    <button class="btn blue" id="lp-auto-close">VOLVER AL MENÚ</button>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#lp-auto-close').onclick = () => { ov.remove(); screenHome(); };
+}
+
+function startLogPoseGacha(activeSagas) {
+  const prize = rollLogPosePrize(activeSagas);
+  if (!prize) {
+    meta.logPoses = (meta.logPoses || 0) + 1000;
+    meta.starPity = 0;
+    saveMeta();
+    modalInfo('🧭 Compensación de legendario', 'No quedan legendarios nuevos en las sagas seleccionadas. Recibes <b>1000 Log Poses</b> en lugar de un personaje duplicado.', () => screenHome());
+    return;
+  }
+  const {prizeId,stopIdx} = prize;
   saveMeta();
 
   let current = 0;
@@ -2340,18 +2439,16 @@ function startLogPoseGacha(activeSagas) {
     if (i === stopIdx) {
       current = -1;
       const c = CHARS[prizeId];
-      const duplicateReward = duplicatePosterReward(prizeId);
-      meta.logPoses = (meta.logPoses || 0) + duplicateReward;
-      face.innerHTML = `${charIcon(prizeId, 28)}<br><span>${c.name}</span>`;
+      const wasInDex = dexEntrySeen(prizeId);
+      const dexStatus = recruitDexStatusHTML(prizeId);
+      const duplicateReward = awardLogPosePrize(prizeId);
+      face.innerHTML = `${charIcon(prizeId, 28)}<br><span>${c.name}</span><br>${dexStatus}`;
       el.classList.add('hit'); el.classList.remove('next');
-      registerRecruit(prizeId);
-      const b = baseFormOf(prizeId);
-      if (!meta.roster.includes(b)) meta.roster.push(b);
       saveMeta();
       ov.querySelectorAll('.poster').forEach(p => { p.onclick = null; });
       setTimeout(() => {
         ov.remove();
-        modalInfo(duplicateReward ? '🧭 Personaje duplicado' : '🎉 ¡Nuevo personaje reclutado!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(prizeId, 44)}</span><br><b>${c.name}</b> ${'⭐'.repeat(c.rareza)}<br><small style="color:var(--gold);">${c.types.join(' / ')}</small><br><br><span style="font-size:9px;color:var(--green);">${duplicateReward ? `Duplicado: +${duplicateReward} Log Poses` : '¡Añadido a tu Dex e Inventario de Tripulación!'}</span></div>`, () => screenHome());
+        modalInfo(duplicateReward ? '🧭 Personaje duplicado' : '🎉 ¡Nuevo personaje reclutado!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(prizeId, 44)}</span><br><b>${c.name}</b> ${'⭐'.repeat(c.rareza)}<br><small style="color:var(--gold);">${c.types.join(' / ')}</small><br><br><span style="font-size:9px;color:var(--green);">${wasInDex ? 'Ya en Dex' : 'Nuevo en Dex'} · ${duplicateReward ? `Duplicado: +${duplicateReward} Log Poses` : '¡Añadido a tu Inventario de Tripulación!'}</span></div>`, () => screenHome());
       }, 1400);
     } else {
       face.innerHTML = `💨<br><span>VACÍO</span>`;
@@ -3314,7 +3411,7 @@ function showInventoryModal(opts = {}) {
       </div></details>
       <div class="collection-results"><span role="status">${ids.length} nakamas${ids.length?` · ${page*pageSize+1}–${Math.min((page+1)*pageSize,ids.length)}`:''}</span><button class="collection-text-button" id="inv-reset">Limpiar filtros</button></div>
       <div id="inv-cards-grid" class="collection-list inventory-grid" aria-label="Lista de nakamas" tabindex="0">${cards||'<div class="collection-empty"><h3>No hay nakamas con estos filtros</h3><p>Prueba otro nombre o limpia los filtros.</p></div>'}</div>
-      </div><nav class="collection-pagination" aria-label="Páginas de nakamas"><button class="btn gray" data-inv-page="-1" ${page===0?'disabled':''} aria-label="Página anterior de nakamas">← Anterior</button><span>Página ${page+1} de ${pages}</span><button class="btn gray" data-inv-page="1" ${page===pages-1?'disabled':''} aria-label="Página siguiente de nakamas">Siguiente →</button></nav>`;
+      </div>${pages > 1 ? `<nav class="collection-pagination" aria-label="Páginas de nakamas"><button class="btn gray" data-inv-page="-1" ${page===0?'disabled':''} aria-label="Página anterior de nakamas">← Anterior</button><span>Página ${page+1} de ${pages}<small>Desliza las cartas ↔</small></span><button class="btn gray" data-inv-page="1" ${page===pages-1?'disabled':''} aria-label="Página siguiente de nakamas">Siguiente →</button></nav>` : ''}`;
   };
   document.querySelector('#inventory-modal-overlay')?.remove();
   const ov=document.createElement('div');ov.id='inventory-modal-overlay';ov.className='overlay collection-overlay';
@@ -3338,6 +3435,27 @@ function showInventoryModal(opts = {}) {
     ov.querySelectorAll('[data-inv-page]').forEach(btn=>btn.onclick=()=>{page+=Number(btn.dataset.invPage);refresh('#inv-cards-grid',true);
       const scroller=ov.querySelector('.inventory-scroll'),grid=ov.querySelector('#inv-cards-grid');
       scroller.scrollTop=grid.getBoundingClientRect().top-scroller.getBoundingClientRect().top+scroller.scrollTop-64;});
+    const grid = ov.querySelector('#inv-cards-grid');
+    let swipeStart = null;
+    grid.ontouchstart = event => {
+      if (event.touches.length !== 1) return;
+      swipeStart = { x:event.touches[0].clientX, y:event.touches[0].clientY };
+    };
+    grid.ontouchend = event => {
+      if (!swipeStart || !event.changedTouches.length) return;
+      const dx = event.changedTouches[0].clientX - swipeStart.x;
+      const dy = event.changedTouches[0].clientY - swipeStart.y;
+      swipeStart = null;
+      if (Math.abs(dx) < 55 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+      const next = page + (dx < 0 ? 1 : -1);
+      const maxPage = Math.max(1, Math.ceil(filterSortChars(allUnlocked,invViewState,id=>evolutionFormAt(id,startLvlOf(id))).length/pageSize)) - 1;
+      if (next < 0 || next > maxPage) return;
+      page = next;
+      refresh('#inv-cards-grid',true);
+      const scroller = ov.querySelector('.inventory-scroll');
+      const nextGrid = ov.querySelector('#inv-cards-grid');
+      scroller.scrollTop = nextGrid.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop - 56;
+    };
     ov.querySelectorAll('.btn-upg-inv').forEach(btn=>btn.onclick=()=>{
       if(upgradeCharLvl(btn.dataset.id))refresh(`.btn-upg-inv[data-id="${btn.dataset.id}"]:not(:disabled),.btn-info-inv[data-id="${btn.dataset.id}"]`);
     });
@@ -3633,11 +3751,7 @@ function screenStarter(sagaIdx, islandIdx = 0) {
   const renderSlotsGrid = () => {
     let slotsHTML = '';
     const cap = maxStartLvlCap();
-    for (let i = 0; i < 6; i++) {
-      if (i >= maxSlots) {
-        slotsHTML += `<div class="starter-slot-card locked-slot" aria-label="Hueco ${i + 1} bloqueado"><div class="starter-slot-badge">HUECO ${i + 1}</div><span aria-hidden="true">🔒</span><b>Bloqueado</b><small>Desbloquea más huecos en la tienda</small></div>`;
-        continue;
-      }
+    for (let i = 0; i < maxSlots; i++) {
       const id = picked[i];
       if (id && CHARS[id]) {
         const displayId = evolutionFormAt(id, startLvlOf(id));
@@ -3681,13 +3795,12 @@ function screenStarter(sagaIdx, islandIdx = 0) {
         `;
       }
     }
-    return `<div class="starter-team-grid">${slotsHTML}</div>`;
+    return `<div class="starter-team-grid">${slotsHTML}</div>${maxSlots < 6 ? `<p class="starter-locked-summary">🔒 ${6 - maxSlots} huecos más disponibles en la tienda</p>` : ''}`;
   };
 
   const renderPresetsBar = () => {
     return `
-      <div class="preset-bar" style="display:flex;flex-direction:column;gap:6px;align-items:center;margin:12px 0;background:rgba(0,0,0,0.25);padding:10px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);">
-        <span style="font-size:9px;font-weight:bold;color:var(--gold);">💾 EQUIPOS PREDEFINIDOS</span>
+      <details class="preset-bar"><summary>💾 Equipos guardados</summary>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;width:100%;">
           ${[1, 2, 3].map(slot => {
       const p = meta.teamPresets[slot] || [];
@@ -3703,7 +3816,7 @@ function screenStarter(sagaIdx, islandIdx = 0) {
               </div>`;
     }).join('')}
         </div>
-      </div>`;
+      </details>`;
   };
 
   render(`
@@ -3874,7 +3987,11 @@ function screenStarter(sagaIdx, islandIdx = 0) {
     $('#starter-synergies').innerHTML = activeSynergiesHTML(previewTeam);
     $('#starter-synergy-info').onclick = () => showSynergyModal(previewTeam);
     const presetBarCont = document.querySelector('.preset-bar');
-    if (presetBarCont) presetBarCont.outerHTML = renderPresetsBar();
+    if (presetBarCont) {
+      const wasOpen = presetBarCont.open;
+      presetBarCont.outerHTML = renderPresetsBar();
+      document.querySelector('.preset-bar').open = wasOpen;
+    }
     const lpCont = $('#starter-logpose-info');
     if (lpCont) lpCont.innerHTML = `🧭 Log Poses: ${meta.logPoses || 0} ℹ️`;
     bindEvents();
@@ -4409,11 +4526,13 @@ function showBackpackItem(owner, id, count, combat, refresh) {
 function refreshBattleBackpack() {
   const el = $('#battle-backpack');
   if (!el || !battle) return;
-  if (battle.opts?.challenge) { el.innerHTML = '<p class="challenge-no-items">🏆 Equipo de evento · sin consumibles</p>'; return; }
+  const content = el.querySelector('.battle-backpack-content');
+  if (!content) return;
+  if (battle.opts?.challenge) { content.innerHTML = '<p class="challenge-no-items">🏆 Equipo de evento · sin consumibles</p>'; return; }
   const owner = battle.tower ? tower : run;
   if (!owner) return;
-  el.innerHTML = backpackHTML(owner,true);
-  bindBackpack(el,owner,true,refreshBattleBackpack);
+  content.innerHTML = backpackHTML(owner,true);
+  bindBackpack(content,owner,true,refreshBattleBackpack);
 }
 
 function showTowerBackpack(onContinue) {
@@ -5182,14 +5301,20 @@ function doMystery(island) {
         run.berries += 200; saveRun();
         modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">Un pirata quería unirse, pero la regla Nuzlocke lo impide.<br>Te deja 200 Berries de regalo.</div>`, screenMap);
       } else {
-        const id = pickWildEnemy(island.pool);
+        const id = pick((island.pool || []).filter(candidate => CHARS[candidate]?.rareza < 4));
+        if (!id) {
+          run.berries += 200; saveRun();
+          modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">Ningún pirata de esta zona puede unirse mediante el evento. Encuentras 200 Berries en su lugar.</div>`, screenMap);
+          break;
+        }
         const recLvl = recruitLevelForCurrentSaga();
         const f = applyUpgrades(makeChar(id, recLvl));
+        const dexStatus = recruitDexStatusHTML(id);
         addToTeam(f, ok => {
           if (ok) {
             if (run.mode === 'nuzlocke') run.nuzCaught[run.islandIdx] = true;
             registerRecruit(id); saveRun();
-            modalInfo('❓ ¡Nuevo nakama!', `${eventArt}<div class="reward-list">${ev.text}<br><br><span style="font-size:30px">${charIcon(id, 40)}</span><br><b>${CHARS[id].name}</b> Nv${f.lvl}</div>`, screenMap);
+            modalInfo('❓ ¡Nuevo nakama!', `${eventArt}<div class="reward-list">${ev.text}<br><br><span style="font-size:30px">${charIcon(id, 40)}</span><br><b>${CHARS[id].name}</b> Nv${f.lvl}<br>${dexStatus}</div>`, screenMap);
           } else {
             run.berries += 100; saveRun();
             modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">Dejas marchar al pirata. Te regala 100 Berries por la molestia.</div>`, screenMap);
@@ -5232,7 +5357,7 @@ function wildTeamPreviewHTML() {
 
 function wildEncounter(wild) {
   const c = charData(wild);
-  const isLegendary = c.rareza === 5;
+  const cannotRecruit = c.rareza >= 4;
   const price = wildRecruitPrice(c);
   const nuzBlock = run.mode === 'nuzlocke' && run.nuzCaught[run.islandIdx];
   const ov = document.createElement('div');
@@ -5243,14 +5368,15 @@ function wildEncounter(wild) {
       <div class="big-emoji">${charIcon(wild.id, 56)}</div>
       <div class="char-name">${c.name} <small>Nv${wild.lvl}</small></div>
       <div class="special-stars">${'⭐'.repeat(c.rareza)}</div>
+      ${recruitDexStatusHTML(wild.id)}
       ${typeBadges(c.types)}
     </div>
     ${wildTeamPreviewHTML()}
     ${cartelesBadgeHTML()}
-    ${isLegendary ? '<div class="special-fail" style="color:var(--gold);border-color:var(--gold);background:#fffbe8;">👑 ¡PIRATA LEGENDARIO (5⭐)!<br>Inmune al reclutamiento salvaje. ¡Únicamente puedes combatirlo!</div>' : nuzBlock ? '<div class="special-fail">Regla Nuzlocke: ya reclutaste en esta isla (solo puedes combatir).</div>' : ''}
+    ${cannotRecruit ? `<div class="special-fail" style="color:var(--gold);border-color:var(--gold);background:#fffbe8;">${c.rareza === 5 ? '👑 PIRATA LEGENDARIO (5⭐)' : '⭐ PIRATA DE 4 ESTRELLAS'}<br>Solo puede conseguirse en Crossguild o en la tirada de carteles. ¡Aquí únicamente puedes combatirlo!</div>` : nuzBlock ? '<div class="special-fail">Regla Nuzlocke: ya reclutaste en esta isla (solo puedes combatir).</div>' : ''}
     <div class="actions" style="flex-direction:column;align-items:stretch;">
       <button class="btn red" id="we-fight">⚔️ COMBATIR — gana XP para la banda</button>
-      ${!isLegendary ? `
+      ${!cannotRecruit ? `
         <button class="btn green" id="we-pay" ${nuzBlock || run.berries < price ? 'disabled' : ''}>💋 SEDUCIR — ${berriesHTML(price)}</button>
         <button class="btn gold" id="we-chains" ${nuzBlock ? 'disabled' : ''}>⛓️ TENTAR A LA SUERTE — las 3 cadenas</button>
       ` : ''}
@@ -5261,10 +5387,10 @@ function wildEncounter(wild) {
     scheduleAutoStep(() => {
       if (!document.body.contains(ov)) return;
       if(autoSettings.wildAction==='manual'){pauseAutoForChoice('Elige qué hacer con este pirata.');return;}
-      if (!isLegendary && autoSettings.wildAction === 'recruit') {
+      if (!cannotRecruit && autoSettings.wildAction === 'recruit') {
         const payBtn = ov.querySelector('#we-pay');
         if (payBtn && !payBtn.disabled && autoCanSpend(price)) { payBtn.click(); return; }
-      } else if (!isLegendary && autoSettings.wildAction === 'chains') {
+      } else if (!cannotRecruit && autoSettings.wildAction === 'chains') {
         const chainBtn = ov.querySelector('#we-chains');
         if (chainBtn && !chainBtn.disabled) { chainBtn.click(); return; }
       }
@@ -5273,15 +5399,16 @@ function wildEncounter(wild) {
     }, 700);
   }
   const recruit = () => {
-    if (isLegendary) return;
+    if (cannotRecruit) return;
     const recLvl = recruitLevelForCurrentSaga();
     const f = applyUpgrades(makeChar(wild.id, recLvl));
+    const dexStatus = recruitDexStatusHTML(f.id);
     addToTeam(f, ok => {
       if (ok) {
         if (run.mode === 'nuzlocke') run.nuzCaught[run.islandIdx] = true;
         registerRecruit(f.id);
         saveRun();
-        modalInfo('🎉 ¡Nuevo nakama!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(f.id, 44)}</span><br><b>${charName(f)}</b> Nv${f.lvl} se une a tu banda.</div>`, screenMap);
+        modalInfo('🎉 ¡Nuevo nakama!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(f.id, 44)}</span><br><b>${charName(f)}</b> Nv${f.lvl} se une a tu banda.<br>${dexStatus}</div>`, screenMap);
       } else {
         modalInfo('🌊 Se marcha', '<div class="reward-list">Dejas marchar al pirata con un saludo.</div>', screenMap);
       }
@@ -5900,7 +6027,7 @@ function specialBlockedReason() {
   return null;
 }
 
-function specialJoin(id, lvl) {
+function specialJoin(id, lvl, dexStatus = recruitDexStatusHTML(id)) {
   const recLvl = recruitLevelForCurrentSaga();
   const f = applyUpgrades(makeChar(id, recLvl));
   addToTeam(f, ok => {
@@ -5908,7 +6035,7 @@ function specialJoin(id, lvl) {
       if (run.mode === 'nuzlocke') run.nuzCaught[run.islandIdx] = true;
       registerRecruit(id);
       saveRun();
-      modalInfo('🎉 ¡Nuevo nakama!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(id, 44)}</span><br><b>${CHARS[id].name}</b> Nv${recLvl} se une a tu banda.</div>`, screenMap);
+      modalInfo('🎉 ¡Nuevo nakama!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(id, 44)}</span><br><b>${CHARS[id].name}</b> Nv${recLvl} se une a tu banda.<br>${dexStatus}</div>`, screenMap);
     } else {
       modalInfo('🌊 Trato deshecho', '<div class="reward-list">Dejas marchar al recluta. Lo pagado no se devuelve: negocios son negocios.</div>', screenMap);
     }
@@ -5922,10 +6049,10 @@ function specialPiratePoolHTML() {
     <p class="special-pool-heading">${esc(SAGAS[run.saga].name)} · ${pool.length} piratas posibles</p>
     <div class="special-pool" role="list" aria-label="Piratas disponibles en este evento">
       ${pool.map(id => {
-        const c = CHARS[id], seen = meta.dex.includes(id);
+        const c = CHARS[id], seen = dexEntrySeen(id);
         return `<div class="special-pool-card ${seen ? 'seen' : 'unseen'}" role="listitem" aria-label="${seen ? esc(c.name) : 'Pirata sin avistar'}, ${c.rareza} estrellas">
           <div class="special-pool-portrait" aria-hidden="true">${charIcon(id, 54)}</div>
-          <b>${seen ? esc(c.name) : '???'}</b><span class="special-pool-stars">${'⭐'.repeat(c.rareza)}</span>
+          <b>${seen ? esc(c.name) : '???'}</b><span class="special-pool-stars">${'⭐'.repeat(c.rareza)}</span>${recruitDexStatusHTML(id)}
         </div>`;
       }).join('')}
     </div>`;
@@ -5996,7 +6123,7 @@ function renderSpecialCatalog(lvl) {
     const can = run.berries >= price;
     return `<div class="pick-row" style="cursor:default;">
           <span class="emoji">${charIcon(id, 22)}</span>
-          <div class="info"><b>${c.name}</b> ${'⭐'.repeat(c.rareza)}<br><small>${c.types.join(' / ')}</small></div>
+          <div class="info"><b>${c.name}</b> ${'⭐'.repeat(c.rareza)}<br><small>${c.types.join(' / ')}</small><br>${recruitDexStatusHTML(id)}</div>
           <button class="btn small ${can ? 'green' : 'gray'}" data-hire="${id}" ${can ? '' : 'disabled'}>${berriesHTML(price)}</button>
         </div>`;
   }).join('')}
@@ -6021,18 +6148,18 @@ function renderSpecialCatalog(lvl) {
   });
 }
 
-function revealSpecialRecruit(ov, prizeId, lvl, reward = CHARS[prizeId].rareza) {
+function revealSpecialRecruit(ov, prizeId, lvl, reward = CHARS[prizeId].rareza, dexStatus = recruitDexStatusHTML(prizeId)) {
   let completed = false;
   const complete = () => {
     if (completed || !ov.isConnected) return;
     completed = true;
     ov.remove();
-    specialJoin(prizeId, lvl);
+    specialJoin(prizeId, lvl, dexStatus);
   };
   try {
     if (typeof MarketReveal !== 'undefined') {
       MarketReveal.show({host:ov, name:CHARS[prizeId].name, rarity:CHARS[prizeId].rareza,
-        rewardText:`+${reward} Log Pose${reward === 1 ? '' : 's'}`,
+        rewardText:`+${reward} Log Pose${reward === 1 ? '' : 's'} · ${dexStatus.includes('Ya en tu Dex') ? 'Ya en tu Dex' : 'Nuevo en tu Dex'}`,
         portraitHTML:charIcon(prizeId, 140), onComplete:complete});
       if(autoMode){
         const advance=()=>{if(!ov.isConnected)return;const button=ov.querySelector('.mr-continue');if(button)button.click();if(ov.isConnected)scheduleAutoStep(advance,700);};
@@ -6097,15 +6224,16 @@ function renderSpecialGacha(lvl) {
     if (i === stopIdx) {
       resolved = true;
       const c = CHARS[prizeId];
+      const dexStatus = recruitDexStatusHTML(prizeId);
       const reward = duplicatePosterReward(prizeId) || c.rareza;
       trackJourneyRewards(0, reward);
       meta.logPoses = (meta.logPoses || 0) + reward;
       saveMeta();
-      face.innerHTML = `${charIcon(prizeId, 28)}<br><span>${c.name}</span>`;
+      face.innerHTML = `${charIcon(prizeId, 28)}<br><span>${c.name}</span><br>${dexStatus}`;
       el.classList.add('hit'); el.classList.remove('next');
       registerDex(prizeId);
       ov.querySelectorAll('.poster').forEach(p => { p.onclick = null; p.disabled = true; });
-      revealSpecialRecruit(ov, prizeId, lvl, reward);
+      revealSpecialRecruit(ov, prizeId, lvl, reward, dexStatus);
     } else {
       face.innerHTML = `💨<br><span>VACÍO</span>`;
       el.classList.add('empty');
@@ -6704,12 +6832,15 @@ function useUltimate(f) {
   if (!isEnemy && !b.opts?.local && !b.opts?.duos) b.pendingUltimateAction = f;
   const ultMv = getUltimateMove(f);
   log(`💥 <b>¡DEFINITIVA DE ${charName(f).toUpperCase()}!</b> Desata <b>${ultMv.name}</b> 💥`);
+  const enemyHPBefore = enemy.hp;
   attackWith(f, enemy, ultMv, isEnemy ? 'player' : 'enemy');
+  if (!isEnemy && enemy.hp < enemyHPBefore) b.lastPlayerUltimateRound = b.round;
   refreshHPCards();
 }
 
 function startBattle(enemies, opts) {
   playMusic('combat');
+  battleBackpackExpanded = false;
   const team = opts.challenge ? opts.team : opts.tower ? tower.team : run.team;
   if (!team.some(f => f.hp > 0)) return opts.challenge ? endChallengeBattle(false) : opts.tower ? towerGameOver() : gameOver();
   autoSpeed = preferredCombatSpeed();
@@ -6934,6 +7065,8 @@ function battleTeamPassivesHTML(team) {
   return entries.length ? `<ul class="team-passive-list">${entries.join('')}</ul>` : '<p class="team-passive-empty">Sin pasivas</p>';
 }
 
+let battleBackpackExpanded = false;
+
 function battleLayoutHTML(logLines, labels = {}) {
   const b = battle;
   const eHead = b.opts.wild ? '🌊' : b.opts.boss ? '💀' : '⚓';
@@ -6957,7 +7090,7 @@ function battleLayoutHTML(logLines, labels = {}) {
           </div>
         </div>
         <div class="battle-reserves" id="battle-reserves"></div>
-        <section id="battle-backpack" aria-label="Mochila de combate"></section>
+        <details id="battle-backpack" aria-label="Mochila de combate" ${battleBackpackExpanded || !globalThis.matchMedia?.('(max-width: 700px)').matches ? 'open' : ''}><summary>🎒 Mochila de combate</summary><div class="battle-backpack-content"></div></details>
         <div class="battle-team-passives" aria-label="Pasivas de los equipos">
           <section><h3>✨ ${labels.p || 'TU BANDA'}</h3><div id="passives-p" class="team-passive-strip" tabindex="0" role="region" aria-label="Pasivas aliadas, desplaza para ver todas">${battleTeamPassivesHTML(b.pTeam)}</div></section>
           <section><h3>✨ ${labels.e || 'ENEMIGOS'}</h3><div id="passives-e" class="team-passive-strip" tabindex="0" role="region" aria-label="Pasivas enemigas, desplaza para ver todas">${battleTeamPassivesHTML(b.eTeam)}</div></section>
@@ -7009,6 +7142,7 @@ function renderBattle(logLines) {
     });
   });
   refreshBattleBackpack();
+  $('#battle-backpack')?.addEventListener?.('toggle', event => { battleBackpackExpanded = event.currentTarget.open; });
   keepActiveFightersVisible();
 }
 
@@ -7409,13 +7543,26 @@ function runRound() {
     if (battle.waiting) { battle.pendingStep = step; return; }
     b.pendingStep = null;
     if (i < order.length) {
+      // An enemy hit by our ultimate finishes its recoil before the round advances.
+      // Its action for this round is lost; a charged ultimate remains ready for the next one.
+      if (order[i][2] === 'player' && b.playerUltimateVisualPromise) {
+        const scene = b.playerUltimateVisualPromise;
+        b.pendingStep = step;
+        scene.then(() => {
+          if (b.playerUltimateVisualPromise === scene) b.playerUltimateVisualPromise = null;
+          if (battle === b && !b.over) step();
+        });
+        return;
+      }
       const side = order[i++][2];
       // Preserve this round's turn order; a manual relay changes its actors, not its number of attacks.
       const att = side === 'enemy' ? b.curP : b.curE;
       const dfd = side === 'enemy' ? b.curE : b.curP;
       const ultimateConsumedTurn = side === 'enemy' && b.pendingUltimateAction === att;
       if (ultimateConsumedTurn) b.pendingUltimateAction = null;
-      if (att.hp > 0 && dfd.hp > 0 && !ultimateConsumedTurn) {
+      const stunnedByUltimate = side === 'player' && b.lastPlayerUltimateRound === b.round;
+      if (stunnedByUltimate && att.hp > 0) log(`💥 ${charName(att)} se recupera del impacto y pierde este turno.`);
+      if (att.hp > 0 && dfd.hp > 0 && !ultimateConsumedTurn && !stunnedByUltimate) {
         if (side === 'player' && enemyUltimatesEnabled(b) && att.lvl >= 20 && (att.ultCharge || 0) >= 100) useUltimate(att);
         else attackWith(att, dfd, chooseMove(att, dfd), side);
       }
@@ -8914,13 +9061,18 @@ function challengeSeriesStatusHTML(t) {
   return `<div class="challenge-series-status" role="status"><span>🤖 Torneo <strong>${current}/${series.total}</strong></span><span>🏆 ${series.wins} · ❌ ${series.losses}</span></div>`;
 }
 function challengeOwnedBases() { return [...new Set([...SAGAS[0].starters,...meta.roster].filter(id=>CHARS[id]).map(baseFormOf))]; }
+function legendsUnlocked(progress=meta) {
+  const wanoIndex=SAGAS.findIndex(s=>s.id==='wano');
+  return wanoIndex>=0&&sagaUnlocked(wanoIndex,progress);
+}
+function legendChallengeCharacter(t) { return t?.kind==='legends'&&t.legendCharacter||null; }
 function challengeLevel(kind) {
   if (kind==='tournament') return 65;
   const wano=SAGAS.find(s=>s.id==='wano');
   return Math.max(...wano.islands[Math.floor(wano.islands.length/2)].bossLvl);
 }
 function challengePool(kind) {
-  return challengeOwnedBases().map(id=>evolutionFormAt(id,startLvlOf(id))).filter(id=>kind!=='legends'||CHARS[id].rareza===5);
+  return challengeOwnedBases().map(id=>evolutionFormAt(id,startLvlOf(id)));
 }
 function challengeSagaLimit(progress = meta) {
   let highest = 0;
@@ -8936,8 +9088,7 @@ function challengeOpponentPool(kind, picked = []) {
     return index >= 0 && index <= limit;
   };
   return Object.keys(CHARS).filter(id => !BASE_OF[id] && !excluded.has(id) && available(id)).map(id => {
-    if (kind !== 'legends') return id;
-    return characterForms(id).map(f => f.id).filter(form => CHARS[form].rareza === 5 && available(form)).at(-1);
+    return id;
   }).filter(Boolean);
 }
 function shuffleChallenge(list) {
@@ -8956,8 +9107,8 @@ function challengeCanStart(continuingSeries=false) {
     (continuingSeries||!challengeSeriesIncomplete(meta.challenge))));
 }
 function startChallenge(kind,picked,series=null) {
-  if (!['tournament','legends'].includes(kind)||!challengeCanStart(!!series)) return false;
-  const count=kind==='legends'?2:1, allowed=challengePool(kind);
+  if (!['tournament','legends'].includes(kind)||!challengeCanStart(!!series)||kind==='legends'&&!legendsUnlocked()) return false;
+  const count=1, allowed=challengePool(kind);
   // Existing selections may still name a base that now has historical phases.
   // Resolve owned base IDs to their unlocked form; explicit locked forms still fail.
   if (Array.isArray(picked)) picked=picked.map(id=>CHARS[id]&&baseFormOf(id)===id
@@ -8968,7 +9119,7 @@ function startChallenge(kind,picked,series=null) {
       !Array.isArray(series.members)||series.members.length!==count||new Set(series.members).size!==count||
       series.members.some((id,index)=>typeof id!=='string'||!CHARS[id]||baseFormOf(id)!==id||id!==baseFormOf(picked[index]))))return false;
   const level=challengeLevel(kind), candidates=challengeOpponentPool(kind,picked);
-  const size = candidates.length >= 16-count ? 16 : 8;
+  const size = kind==='legends'?8:candidates.length >= 16-count ? 16 : 8;
   const opponents=shuffleChallenge(candidates).slice(0,size-count);
   if(opponents.length!==size-count){toast('Necesitas avanzar de saga para reunir suficientes rivales.');return false;}
   const entrants=[{members:[...picked]}];
@@ -8976,6 +9127,7 @@ function startChallenge(kind,picked,series=null) {
   const seeds=shuffleChallenge(entrants.map((_,i)=>i));
   const matches=[];for(let i=0;i<seeds.length;i+=2)matches.push(challengeMatch(seeds[i],seeds[i+1]));
   meta.challenge={version:size===16?2:1,kind,level,entrants,stage:0,rounds:[{name:challengeRoundName(matches.length),matches}],finished:false,placement:null,reward:0,pendingRelics:[],
+    ...(kind==='legends'?{legendCharacter:baseFormOf(picked[0])}:{}),
     ...(series?{series:{...series,members:[...series.members]}}:{})};
   recordCharacterUsage(picked);
   saveMeta();screenChallengeBracket();return true;
@@ -9005,7 +9157,7 @@ function showChallengeAutoSetup(t=meta.challenge) {
     <h2 id="challenge-auto-title">🤖 Serie de Desafíos</h2><p><strong>${t.kind==='legends'?'Batalla de Leyendas':'Torneo'}</strong> · ${t.entrants[0].members.map(id=>esc(CHARS[id].name)).join(' · ')}</p>
     <label for="challenge-auto-count">Número de torneos<input id="challenge-auto-count" type="number" inputmode="numeric" min="1" max="1000" step="1" value="10" required></label>
     <p>El torneo actual cuenta como el primero. Cada combate automático consume 1 Paso 👢 y la serie se pausa si te quedas sin pasos, sales o recargas.</p>
-    ${t.kind==='legends'?'<p>Al ganar, se elegirá automáticamente la primera reliquia ofrecida, priorizando las afinidades de tu pareja.</p>':''}
+    ${t.kind==='legends'?'<p>Al ganar, recibirás automáticamente la reliquia del personaje con el que luchas.</p>':''}
     <p id="challenge-auto-error" role="alert"></p><div class="actions"><button class="btn gray" id="challenge-auto-cancel">Volver</button><button class="btn green" id="challenge-auto-start">Jugar 10 torneos</button></div>
   </section>`;
   document.body.appendChild(ov);
@@ -9041,7 +9193,9 @@ function finishChallenge(placement) {
   t.finished=true;t.placement=placement;
   t.reward=t.kind==='tournament'?(CHALLENGE_PRIZES[placement]||0):0;
   meta.logPoses=(meta.logPoses||0)+t.reward;
-  if(t.kind==='legends'&&placement===1)t.pendingRelics=challengeRelicChoices(t);
+  if(t.kind==='legends'&&placement===1)t.pendingRelics=legendChallengeCharacter(t)
+    ? [`relic_${t.legendCharacter}`] : challengeRelicChoices(t);
+  if(legendChallengeCharacter(t)&&t.pendingRelics.length)grantChallengeRelic(t,t.pendingRelics[0]);
   if(t.series){
     t.series.completed++;
     if(placement===1)t.series.wins++;else t.series.losses++;
@@ -9103,22 +9257,25 @@ function challengePlayerTeam(t) {
 }
 function playChallengeMatch(automatic = false) {
   const t=meta.challenge,m=challengeCurrentMatch(t);
-  if(battle||!m||accountLevel()<35)return false;
+  if(battle||!m||accountLevel()<35||t.kind==='legends'&&legendChallengeCharacter(t)&&!legendsUnlocked())return false;
   const enemyIndex=m.a===0?m.b:m.a;
   const enemyLevel=challengeEnemyLevel(t);
   const allies=challengePlayerTeam(t);
-  if(t.kind==='legends'&&allies.some(f=>CHARS[f.id].rareza!==5)){toast('Tu pareja debe conservar dos personajes de rareza 5★. Revisa sus niveles base o inicia un nuevo torneo.');return false;}
+  if(t.kind==='legends'&&(legendChallengeCharacter(t)
+    ? allies.length!==1||baseFormOf(allies[0].id)!==t.legendCharacter
+    : allies.some(f=>CHARS[f.id].rareza!==5))){toast('El desafío de Leyendas debe completarse con el personaje elegido.');return false;}
   if(automatic&&!spendDailyStep('iniciar un combate automático de Desafíos')) {
     stopChallengeAuto();screenChallengeBracket();return false;
   }
   t.entrants[0].members=allies.map(f=>f.id);
   saveMeta();
   const enemies=t.entrants[enemyIndex].members.map(id=>makeEnemy(id,enemyLevel));
-  startBattle(enemies,{challenge:true,duos:t.kind==='legends',team:allies,items:{},intro:`🏆 ${t.bronze?'Tercer puesto':t.rounds[t.stage].name} · ${t.kind==='legends'?'Batalla de Leyendas · 2 contra 2':`Torneo de ${t.entrants.length}`} · Nv. rival ${enemyLevel}`});
+  startBattle(enemies,{challenge:true,duos:t.kind==='legends'&&allies.length===2,team:allies,items:{},intro:`🏆 ${t.bronze?'Tercer puesto':t.rounds[t.stage].name} · ${t.kind==='legends'?`Batalla de Leyendas · ${allies.length} contra ${enemies.length}`:`Torneo de ${t.entrants.length}`} · Nv. rival ${enemyLevel}`});
   return true;
 }
 function grantChallengeRelic(t,id) {
-  if(!t?.finished||t.kind!=='legends'||t.placement!==1||!t.pendingRelics.includes(id)||!RELICS[id])return false;
+  if(!t?.finished||t.kind!=='legends'||t.placement!==1||!t.pendingRelics.includes(id)||!RELICS[id]||
+    legendChallengeCharacter(t)&&id!==`relic_${t.legendCharacter}`)return false;
   meta.relics.push(id);
   meta.relics=[...new Set(meta.relics)];
   meta.relicCopies ||= {};meta.relicCopies[id]=(meta.relicCopies[id]||0)+1;
@@ -9133,12 +9290,12 @@ function screenChallenges() {
   stopChallengeAuto();
   playMusic('menu');if(accountLevel()<35){toast('🔒 Desafíos requiere nivel de cuenta 35.');return screenHome();}
   const active = meta.challenge && (!meta.challenge.finished || meta.challenge.pendingRelics?.length || challengeSeriesIncomplete(meta.challenge)) ? meta.challenge : null;
-  const eventButton = (kind,label) => `<button class="btn ${kind==='legends'?'gold':'blue'}" data-challenge="${kind}" ${active&&active.kind!==kind?'disabled':''}>${active?.kind===kind ? (active.finished&&challengeSeriesIncomplete(active)?'Continuar serie':active.finished?'Entrar':'Continuar') : label}</button>`;
+  const eventButton = (kind,label) => `<button class="btn ${kind==='legends'?'gold':'blue'}" data-challenge="${kind}" ${active&&active.kind!==kind||kind==='legends'&&!legendsUnlocked()&&active?.kind!==kind?'disabled':''}>${active?.kind===kind ? (active.finished&&challengeSeriesIncomplete(active)?'Continuar serie':active.finished?'Entrar':'Continuar') : kind==='legends'&&!legendsUnlocked()?'🔒 Llega a Wano':label}</button>`;
   render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← PUERTO</button>
     <section class="panel challenge-panel challenge-hub"><h2 id="challenge-title" tabindex="-1">🏆 Desafíos</h2>
     <div class="challenge-events"><article class="challenge-event"><span class="challenge-emblem" aria-hidden="true">🏆</span><h3>Torneo</h3>
     <span class="challenge-format">1 vs 1 · 16 participantes</span>${eventButton('tournament','Elegir nakama')}</article>
-    <article class="challenge-event legends"><span class="challenge-emblem" aria-hidden="true">👑</span><h3>Batalla de Leyendas</h3><span class="challenge-format">2 vs 2 · Solo 5★</span>${eventButton('legends','Formar pareja')}</article></div></section>`);
+    <article class="challenge-event legends"><span class="challenge-emblem" aria-hidden="true">👑</span><h3>Batalla de Leyendas</h3><span class="challenge-format">1 vs 1 · Tu personaje · Desde Wano</span>${eventButton('legends','Elegir personaje')}</article></div></section>`);
   $('#btn-back').onclick=screenHome;
   document.querySelectorAll('[data-challenge]').forEach(el=>el.onclick=()=>active?.kind===el.dataset.challenge?screenChallengeBracket():screenChallengeSelection(el.dataset.challenge));
   $('#challenge-title').focus();
@@ -9146,6 +9303,7 @@ function screenChallenges() {
 
 function screenChallengeSelection(kind) {
   if(!challengeCanStart()||!['tournament','legends'].includes(kind))return screenChallenges();
+  if(kind==='legends')return screenLegendSelection();
   const pool=challengePool(kind), count=kind==='legends'?2:1, picked=Array(count).fill(null);
   const pickerState={q:'',saga:'',type:'',rarity:0,sort:'name',scope:'all',page:0};
   render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button>
@@ -9192,6 +9350,24 @@ function screenChallengeSelection(kind) {
   $('#challenge-start').onclick=()=>startChallenge(kind,picked.filter(Boolean).map(id=>evolutionFormAt(id,startLvlOf(id))));
   draw();$('#challenge-title').focus();
 }
+function screenLegendSelection() {
+  if(!challengeCanStart()||!legendsUnlocked())return screenChallenges();
+  const bases=challengeOwnedBases().sort((a,b)=>CHARS[a].name.localeCompare(CHARS[b].name,'es'));
+  render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button>
+    <section class="panel challenge-panel challenge-selection"><h2 id="challenge-title" tabindex="-1">👑 Batalla de Leyendas</h2>
+    <p>Elige un personaje. Supera tres combates en solitario con él para ganar su reliquia. Los rivales van del nivel de Wano medio al final de la saga.</p>
+    <div class="legend-challenge-grid">${bases.map(id=>{
+      const form=evolutionFormAt(id,startLvlOf(id)),relic=RELICS[`relic_${id}`];
+      const owned=meta.relics.some(relicId=>RELICS[relicId]?.character===id);
+      return `<article class="legend-challenge-card"><div class="legend-challenge-portrait">${charIcon(form,72)}</div>
+        <div><h3>${esc(CHARS[id].name)}</h3><p>Nv. ${startLvlOf(id)} · ${'⭐'.repeat(CHARS[form].rareza)}</p>
+        <p>🏺 ${esc(relic.name)}${owned?' · Conseguida':''}</p></div>
+        <button class="btn gold" data-legend-challenge="${id}" aria-label="Iniciar desafío de ${esc(CHARS[id].name)}">${owned?'Repetir desafío':'Conseguir reliquia'}</button></article>`;
+    }).join('')}</div></section>`);
+  $('#btn-back').onclick=screenChallenges;
+  document.querySelectorAll('[data-legend-challenge]').forEach(button=>button.onclick=()=>startChallenge('legends',[button.dataset.legendChallenge]));
+  $('#challenge-title').focus();
+}
 let challengeBracketObserver = null;
 function bindChallengeBracket() {
   const viewport = $('.tournament-viewport'), canvas = $('.tournament-canvas'), frame = $('.tournament-frame');
@@ -9219,7 +9395,7 @@ function bindChallengeBracket() {
 }
 function challengeBracketHTML(t) {
   const firstCount=t.entrants.length/2,totalRounds=Math.log2(t.entrants.length);
-  const slot=t.kind==='legends'?168:120,cardHeight=slot-24;
+  const slot=t.kind==='legends'&&t.entrants[0].members.length===2?168:120,cardHeight=slot-24;
   const player=challengePlayerTeam(t),next=challengeCurrentMatch(t);
   const entry=(index,placeholder,winner,level)=>{
     if(index===null)return `<div class="bracket-entry pending">${placeholder}</div>`;
@@ -9261,7 +9437,7 @@ function screenChallengeBracket() {
     :(seriesIncomplete&&!t.pendingRelics.length?'<button class="btn green" id="challenge-series-next">Continuar serie</button><button class="btn gray" id="challenge-series-cancel">Cancelar serie</button>':(!t.pendingRelics.length?'<button class="btn blue" id="challenge-again">Jugar de nuevo</button>':''));
   render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button>
     <section class="panel challenge-panel challenge-arena ${t.kind==='legends'?'legends-arena':''}">
-      <header class="challenge-arena-header"><div><span class="challenge-eyebrow">${t.kind==='legends'?'2 CONTRA 2':'1 CONTRA 1'} · ${t.entrants.length} ${t.kind==='legends'?'PAREJAS':'PARTICIPANTES'}</span><h2 id="challenge-title" tabindex="-1">${name}</h2></div><span class="challenge-round-badge">${t.finished?'Finalizado':round}</span></header>
+      <header class="challenge-arena-header"><div><span class="challenge-eyebrow">${t.kind==='legends'&&t.entrants[0].members.length===2?'2 CONTRA 2':'1 CONTRA 1'} · ${t.entrants.length} ${t.kind==='legends'&&t.entrants[0].members.length===2?'PAREJAS':'PARTICIPANTES'}</span><h2 id="challenge-title" tabindex="-1">${name}${legendChallengeCharacter(t)?' · '+esc(CHARS[t.legendCharacter].name):''}</h2></div><span class="challenge-round-badge">${t.finished?'Finalizado':round}</span></header>
       ${challengeSeriesStatusHTML(t)}
       <ol class="challenge-progress" aria-label="Progreso del torneo">${Array.from({length:totalRounds},(_,i)=>`<li ${!t.bronze&&i===t.stage?'aria-current="step"':''} class="${i<t.stage?'complete':''}"><span>${i<t.stage?'✓':i+1}</span>${challengeRoundName(t.entrants.length/2**(i+1)).replace(' de final','')}</li>`).join('')}</ol>
       <nav class="challenge-view-tabs" aria-label="Vista del torneo"><button class="btn" id="challenge-tab-fight" aria-pressed="true" aria-controls="challenge-fight-view">${t.finished?'Resultado':'Próximo combate'}</button><button class="btn" id="challenge-tab-draw" aria-pressed="false" aria-controls="challenge-draw-view">Cuadro completo</button></nav>

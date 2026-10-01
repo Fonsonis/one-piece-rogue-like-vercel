@@ -157,3 +157,21 @@ html[data-theme="dark"] .challenge-panel :is(.challenge-event,.relic-card,.chall
   overscroll-behavior:contain;
   -webkit-overflow-scrolling:touch;
 }
+
+@media(max-width:700px) {
+  :is(#app,#local-arena) .battle-layout .battle-main { flex-direction:column; }
+  .battle-layout .battle-reserve-list:has(> :only-child) { display:block; }
+  .battle-layout .battle-reserve-list:has(> :only-child) .battle-reserve {
+    display:grid;
+    grid-template-columns:44px minmax(0,1fr);
+    grid-template-rows:auto auto auto;
+    width:100%;
+    min-height:56px;
+    gap:0 8px;
+    text-align:left;
+  }
+  .battle-layout .battle-reserve-list:has(> :only-child) .battle-reserve .dex-sprite { grid-row:1 / 4; --sprite-size:44px!important; }
+  .battle-layout .battle-reserve-list:has(> :only-child) .battle-reserve .hp-bar { margin:2px 0; }
+  .battle-layout .battle-lower-panels { order:3; min-height:130px!important; }
+  .battle-layout .battle-team-passives { order:4; }
+}

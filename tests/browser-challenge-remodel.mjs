@@ -11,10 +11,10 @@ try {
  await page.evaluate(()=>{meta.accXp=xpForAccLevel(35);meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.roster=['luffy','shanks','mihawk'];meta.charUpgrades={shanks:42,mihawk:45};screenChallenges();});
  for(const kind of ['tournament','legends'])for(const width of [320,390,1440]) {
   await page.setViewportSize({width,height:844});
-  await page.evaluate(kind=>{meta.challenge=null;startChallenge(kind,kind==='legends'?['shanks','mihawk']:['shanks']);},kind);
+  await page.evaluate(kind=>{meta.challenge=null;startChallenge(kind,['shanks']);},kind);
   assert.ok(await page.locator('#challenge-fight-view').isVisible());
   assert.ok(await page.locator('#challenge-draw-view').isHidden());
-  assert.equal(await page.locator('.challenge-contender figure').count(),kind==='legends'?4:2);
+  assert.equal(await page.locator('.challenge-contender figure').count(),2);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
   if(width===390) {
    assert.ok(await page.locator('#challenge-fight').evaluate(el=>el.getBoundingClientRect().bottom<=innerHeight),'fight button is visible on first mobile screen');
@@ -32,8 +32,9 @@ try {
  await page.evaluate(()=>{for(let i=0;i<10&&!meta.challenge.finished;i++)endChallengeBattle(true);screenChallenges();});
  assert.equal(await page.locator('#challenge-resume,#challenge-relics').count(),0);
  await page.locator('[data-challenge="legends"]').click();
- assert.equal(await page.locator('[data-claim-relic]').count(),3);
- await page.locator('[data-claim-relic]').first().click();await page.locator('#btn-back').click();
+ assert.ok(await page.locator('[data-legend-challenge="shanks"]').count());
+ assert.equal(await page.evaluate(()=>meta.relics.includes('relic_shanks')),true);
+ await page.locator('#btn-back').click();
  assert.ok(await page.locator('[data-challenge="tournament"]').isEnabled());
  assert.doesNotMatch(await page.locator('.challenge-hub').innerText(),/VER RESULTADO|RELIQUIAS/);
  await page.setViewportSize({width:390,height:844});

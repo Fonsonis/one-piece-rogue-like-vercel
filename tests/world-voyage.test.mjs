@@ -67,14 +67,11 @@ test('reduced motion arrives immediately and long journeys finish in five second
  const h=mounted();h.nav.travelTo('b');h.tick(0);h.tick(5001);assert.equal(h.nav.sailing,false);assert.deepEqual(h.arrivals,['b']);
 });
 
-test('ocean scrolls pixel for pixel with the islands, including return scrolling',()=>{
- const h=mounted();assert.equal(h.seaValues['--sea-offset'],'0px');
- for(const y of [375,480,660,700,19375,210,0]){
-  h.chart.scrollTop=y;h.listeners.scroll();
-  assert.equal(h.seaValues['--sea-offset'],`${-y}px`);
-  assert.equal(h.seaValues['--sea-base-shift'],`${-y%480}px`);
-  assert.equal(h.seaValues['--sea-foam-shift'],`${-y%660}px`);
- }
+test('ocean stays fixed while the island chart scrolls',()=>{
+ const h=mounted();
+ assert.equal(h.listeners.scroll,undefined);
+ h.chart.scrollTop=19375;
+ assert.deepEqual(h.seaValues,{});
 });
 
 test('every canonical destination and sailing direction has a bundled static image',()=>{

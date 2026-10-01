@@ -502,6 +502,7 @@ button { font-family: inherit; cursor: pointer; }
 .poster .poster-stars { font-size: 7px; margin-bottom: 4px; }
 .poster-face { font-size: 22px; line-height: 1.2; }
 .poster-face span:not(.event-sprite) { font-size: 6px; display: block; margin-top: 3px; }
+.poster-face .recruit-dex-status { font:700 8px/1.3 system-ui,sans-serif!important; padding:3px!important; white-space:normal; }
 .poster.next { opacity: 1; cursor: pointer; border-color: var(--gold); animation: posterPulse .8s infinite alternate; }
 @keyframes posterPulse { from { transform: scale(1); } to { transform: scale(1.07); } }
 .poster.empty { opacity: .35; filter: grayscale(1); }
@@ -539,8 +540,17 @@ button { font-family: inherit; cursor: pointer; }
 .logpose-market-cost > span { display:grid; gap:1px; font-weight:700; }
 .logpose-market-cost small { color:#7c7568; font-size:8px; font-weight:400; }
 .logpose-market-cost strong { flex:none; color:#9b6417; font:800 14px/1.2 system-ui,sans-serif; }
-.logpose-market-actions { display:grid!important; grid-template-columns:minmax(0,1.6fr) minmax(0,1fr); gap:7px!important; margin:0!important; padding:0!important; }
-.logpose-market-actions .btn { min-width:0; min-height:42px; margin:0; }
+.logpose-auto-setup { display:flex; align-items:center; flex-wrap:wrap; gap:6px; margin:0 0 8px; font:700 11px/1.4 system-ui,sans-serif; }
+.logpose-auto-setup input { width:70px; min-height:44px; padding:6px; border:1px solid #778d8a; border-radius:6px; background:#fff; color:#273d40; font:700 15px system-ui,sans-serif; text-align:center; }
+.logpose-auto-setup span { margin-left:auto; color:#825615; }
+.logpose-market-actions { display:grid!important; grid-template-columns:repeat(2,minmax(0,1fr)); gap:7px!important; margin:0!important; padding:0!important; }
+.logpose-market-actions .btn { min-width:0; min-height:44px; margin:0; }
+.logpose-market-actions #lp-close-modal { grid-column:1/-1; }
+.logpose-auto-results p { font:13px/1.5 system-ui,sans-serif; text-align:center; }
+.logpose-auto-list { display:grid; gap:6px; max-height:50vh; overflow:auto; margin:12px 0; }
+.logpose-auto-list > div { display:flex; align-items:center; gap:8px; padding:8px; border:1px solid #b4c4b9; border-radius:6px; font:12px/1.4 system-ui,sans-serif; }
+.logpose-auto-list small { display:block; margin-top:2px; color:#53665f; }
+.logpose-auto-results > .btn { width:100%; min-height:44px; }
 
 @media(max-width:420px) {
   .logpose-market-modal { width:calc(100vw - 16px)!important; padding:12px!important; }

@@ -19,15 +19,15 @@ test('usage counts actual starts, groups forms, composes with filters and surviv
   assert.equal(h.exec(`characterUsageCount('luffy')`),0);
 });
 
-test('challenge rejection and resume do not inflate usage; each new tournament counts once',()=>{
+test('individual legend challenge counts only the chosen character and only on start',()=>{
   const h=combatHarness();
   h.exec(`accountLevel=()=>35;screenChallengeBracket=()=>{};meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.roster=['luffy','shanks','roger'];`);
   assert.equal(h.exec(`startChallenge('legends',['luffy','shanks'])`),false);
   assert.equal(h.exec(`characterUsageCount('shanks')`),0);
-  assert.equal(h.exec(`startChallenge('legends',['shanks','roger'])`),true);
-  h.exec(`screenChallengeBracket();startChallenge('legends',['shanks','roger']);`);
+  assert.equal(h.exec(`startChallenge('legends',['shanks'])`),true);
+  h.exec(`screenChallengeBracket();startChallenge('legends',['shanks']);`);
   assert.equal(h.exec(`characterUsageCount('shanks')`),1);
-  assert.equal(h.exec(`characterUsageCount('roger')`),1);
+  assert.equal(h.exec(`characterUsageCount('roger')`),0);
 });
 
 test('saved teams preserve order while excluding duplicates, locked identities and excess slots',()=>{

@@ -16,25 +16,24 @@ test('sixteen entrants, a real bronze match and exactly one placement payout',()
   assert.equal(h.exec('meta.challenge.rounds.at(-1).matches[0].winner!==null'),true);
  }
 });
-test('eligibility uses unlocked forms and rarity, never fusion or borrowed teams',()=>{
+test('eligibility uses owned characters and unlocked forms, never fusion or borrowed teams',()=>{
  const h=harness();h.exec(`accountLevel=()=>34;`);assert.equal(h.exec(`startChallenge('tournament',['zoro'])`),false);
  h.exec('accountLevel=()=>35;meta.charUpgrades={};');
- for(const ids of [['luffy','zoro'],['luffy5','shanks'],['shanks','shanks'],['shanks','kaido']])assert.equal(h.exec(`startChallenge('legends',${JSON.stringify(ids)})`),false);
+ for(const ids of [['luffy','zoro'],['luffy5','shanks'],['shanks','shanks'],['kaido']])assert.equal(h.exec(`startChallenge('legends',${JSON.stringify(ids)})`),false);
+ assert.equal(h.exec(`startChallenge('legends',['luffy5'])`),false);
  h.exec('meta.charUpgrades={luffy:95};');assert.equal(h.exec(`challengePool('legends').includes('luffy5')`),true);
- assert.equal(h.exec(`startChallenge('legends',['luffy5','shanks'])`),true);
+ assert.equal(h.exec(`startChallenge('legends',['luffy5'])`),true);
  assert.equal(h.exec(`startChallenge('tournament',['zoro'])`),false);
  assert.equal(h.exec('meta.challenge.entrants.length'),8);
- assert.equal(h.exec('meta.challenge.entrants.every(e=>e.members.length===2&&e.members.every(id=>CHARS[id].rareza===5))'),true);
- assert.equal(h.exec('new Set(meta.challenge.entrants.flatMap(e=>e.members.map(baseFormOf))).size'),16);
+ assert.equal(h.exec('meta.challenge.entrants.every(e=>e.members.length===1)'),true);
+ assert.equal(h.exec('new Set(meta.challenge.entrants.flatMap(e=>e.members.map(baseFormOf))).size'),8);
 });
-test('legendary winner gets a persisted choice, affinity priority and a single relic claim',()=>{
- const h=harness();h.exec(`startChallenge('legends',['shanks','roger']);`);finish(h,[true,true,true]);
- assert.equal(h.exec('meta.challenge.pendingRelics.length'),3);
- assert.equal(h.exec(`meta.challenge.pendingRelics.includes('relic_shanks')&&meta.challenge.pendingRelics.includes('relic_roger')`),true);
- assert.equal(h.exec(`startChallenge('tournament',['zoro'])`),false);
+test('legendary winner automatically gets only their own relic',()=>{
+ const h=harness();h.exec(`startChallenge('legends',['shanks']);`);finish(h,[true,true,true]);
+ assert.equal(h.exec('meta.challenge.pendingRelics.length'),0);
+ assert.equal(h.exec('meta.challenge.relicReward'),'relic_shanks');
  h.exec(`loadedSave=JSON.parse(JSON.stringify(GameSaveStorage.payload(meta,null)));loadMeta();`);
  assert.equal(h.exec(`claimChallengeRelic('relic_zoro')`),false);
- assert.equal(h.exec(`claimChallengeRelic('relic_shanks')`),true);
  assert.equal(h.exec(`claimChallengeRelic('relic_shanks')`),false);
  assert.equal(h.exec('meta.relics.length'),1);assert.equal(h.exec('meta.logPoses'),0);
  assert.equal(h.exec(`startChallenge('tournament',['zoro'])`),true);
@@ -72,7 +71,7 @@ test('automatic challenge series repeat the selected tournament and stop at the 
  h.ctx.document.querySelector=()=>({focus(){}});h.ctx.document.querySelectorAll=()=>[];h.exec(`let seriesHub='';render=html=>seriesHub=html;screenChallenges();`);
  assert.match(h.exec('seriesHub'),/Continuar serie/);
  assert.equal(h.exec('challengeCanStart()'),false);
- assert.equal(h.exec("startChallenge('legends',['shanks','roger'])"),false);
+ assert.equal(h.exec("startChallenge('legends',['shanks'])"),false);
  const steps=h.exec('meta.dailySteps.remaining');assert.equal(h.exec('startNextChallengeTournament()'),true);
  assert.equal(h.exec('meta.dailySteps.remaining'),steps);
  assert.deepEqual(Array.from(h.exec('meta.challenge.series.members')),['zoro']);
@@ -85,8 +84,8 @@ test('automatic challenge series repeat the selected tournament and stop at the 
  assert.equal(h.exec('startNextChallengeTournament()'),false);
  assert.doesNotThrow(()=>h.exec('GameSaveStorage.validate(GameSaveStorage.payload(meta,null))'));
 });
-test('automatic legendary series claim the first offered relic and persist paused progress',()=>{
- const h=harness();h.exec(`saveMeta=()=>true;startChallenge('legends',['shanks','roger']);startChallengeSeries(2);`);
+test('automatic legendary series grant the chosen relic and persist paused progress',()=>{
+ const h=harness();h.exec(`saveMeta=()=>true;startChallenge('legends',['shanks']);startChallengeSeries(2);`);
  finish(h,[true,true,true]);
  assert.equal(h.exec('meta.challenge.pendingRelics.length'),0);
  assert.equal(h.exec('typeof meta.challenge.relicReward'),'string');
@@ -96,7 +95,7 @@ test('automatic legendary series claim the first offered relic and persist pause
  assert.equal(fresh.exec('meta.challenge.series.completed'),1);
  assert.equal(fresh.exec('challengeAutoMode'),false);
  assert.equal(fresh.exec('startNextChallengeTournament()'),true);
- assert.deepEqual(Array.from(fresh.exec('meta.challenge.series.members')),['shanks','roger']);
+ assert.deepEqual(Array.from(fresh.exec('meta.challenge.series.members')),['shanks']);
 });
 test('challenge series reject invalid totals and malformed saved counters',()=>{
  const h=harness();h.exec(`startChallenge('tournament',['zoro']);`);
@@ -119,7 +118,7 @@ test('challenge series reject invalid totals and malformed saved counters',()=>{
 test('challenge victory, defeat and simultaneous KO never mutate a nuzlocke journey or tower',()=>{
  for(const outcome of ['win','loss','draw']){
   const h=harness();h.exec(`run={mode:'nuzlocke',saga:9,diff:5,team:[makeChar('zoro',20)],items:{carne:9}};tower={floor:12,team:[makeChar('luffy',15)],items:{}};const before=JSON.stringify([run,tower]);
-   startChallenge('legends',['shanks','roger']);playChallengeMatch();
+   startChallenge('legends',['shanks']);playChallengeMatch();
    endBattle=originalEndBattle;
    ${outcome!=='loss'?'battle.eTeam.forEach(f=>f.hp=0);':''}
    ${outcome!=='win'?'battle.pTeam.forEach(f=>f.hp=0);':''}
@@ -130,15 +129,15 @@ test('challenge victory, defeat and simultaneous KO never mutate a nuzlocke jour
   assert.equal(h.exec('meta.logPoses'),0);
  }
 });
-test('both members on both sides act once in a duo round; KO actors cannot attack',()=>{
+test('both fighters act once in a solo legend round; a KO fighter cannot attack',()=>{
  for(const kill of [false,true]){
-  const h=harness();h.exec(`startChallenge('legends',['shanks','roger']);playChallengeMatch();clearTimeout(battle.timer);let turns=[];
+  const h=harness();h.exec(`startChallenge('legends',['shanks']);playChallengeMatch();clearTimeout(battle.timer);let turns=[];
    const ordered=[...battle.pTeam,...battle.eTeam].sort((a,b)=>effectiveSpeed(b)-effectiveSpeed(a));
    attackWith=(a,d)=>{turns.push(a.id);${kill?'if(turns.length===1)ordered.at(-1).hp=0;':''}};
    afterRound=()=>{battle.over=true;};runRound();`);
   for(let n=0;n<10&&h.tick();n++){}
-  assert.equal(h.exec('turns.length'),kill?3:4);
-  assert.equal(h.exec('new Set(turns).size'),kill?3:4);
+  assert.equal(h.exec('turns.length'),kill?1:2);
+  assert.equal(h.exec('new Set(turns).size'),kill?1:2);
  }
 });
 test('every identity has an executable signature relic, including legacy relics and evolved forms',()=>{
@@ -177,7 +176,7 @@ test('affinity effects alter real damage, criticals, evasion, pierce, speed, sta
  h.exec(`f.id='saturn';f.battleRelic='relic_saturn';f.hp=100;f.st={};e.st={};battle.opts.challenge=true;afterRound();`);assert.ok(h.exec('f.hp')>100);
 });
 test('saved tournaments and equipment survive validation; malformed and unknown content is rejected',()=>{
- const h=harness();h.exec(`startChallenge('legends',['shanks','roger']);const saved=JSON.stringify(GameSaveStorage.payload(meta,null));`);
+ const h=harness();h.exec(`startChallenge('legends',['shanks']);const saved=JSON.stringify(GameSaveStorage.payload(meta,null));`);
  assert.doesNotThrow(()=>h.exec('validateGameSave(GameSaveStorage.parse(saved));'));
  for(const mutation of [`d.meta.challenge.entrants[0].members=['zoro','shanks']`, `d.meta.challenge.entrants[0].members=['unknown','shanks']`, `d.meta.challenge.rounds[0].matches[0].a=999`, `d.meta.challenge.pendingRelics=['missing']`, `d.meta.relicEquipment={zoro:'relic_zoro'}`]){
   assert.throws(()=>h.exec(`{const d=JSON.parse(saved);${mutation};validateGameSave(GameSaveStorage.validate(d));}`));
@@ -191,8 +190,8 @@ test('both challenges use each player permanent level, including after resuming 
  for(const kind of ['tournament','legends']){
   const h=harness();h.exec(`meta.charUpgrades={zoro:7,shanks:42,roger:61};meta.upgrades={shanks:{atk:4}};
    run={mode:'nuzlocke',saga:9,diff:5,team:[makeChar('luffy',99)],items:{}};const before=JSON.stringify(run);
-   startChallenge('${kind}',${kind==='legends'?"['shanks','roger']":"['zoro']"});playChallengeMatch();`);
-  assert.deepEqual(Array.from(h.exec('battle.pTeam.map(f=>f.lvl)')),kind==='legends'?[47,66]:[12]);
+   startChallenge('${kind}',${kind==='legends'?"['shanks']":"['zoro']"});playChallengeMatch();`);
+  assert.deepEqual(Array.from(h.exec('battle.pTeam.map(f=>f.lvl)')),kind==='legends'?[47]:[12]);
   assert.equal(h.exec('battle.pTeam.every(f=>f.lvl===startLvlOf(f.id)&&f.hp===f.maxhp)'),true);
   if(kind==='legends')assert.equal(h.exec('battle.pTeam[0].atk===statAt(CHARS.shanks.base[1],47)+8'),true);
   assert.equal(h.exec('JSON.stringify(run)===before'),true);
@@ -212,11 +211,11 @@ test('forms follow permanent levels even when the event level is below or above 
 test('every challenge rival has its own affinity, without granting relics to the player',()=>{
  for(const kind of ['tournament','legends']){
   const h=harness();h.exec(`meta.relics=['relic_roger'];meta.relicEquipment={roger:'relic_roger'};const inventory=JSON.stringify([meta.relics,meta.relicEquipment]);
-   startChallenge('${kind}',${kind==='legends'?"['shanks','roger']":"['zoro']"});playChallengeMatch();`);
+   startChallenge('${kind}',${kind==='legends'?"['shanks']":"['zoro']"});playChallengeMatch();`);
   assert.equal(h.exec('battle.eTeam.every(f=>equippedRelic(f)?.character===baseFormOf(f.id)&&relicStatMult(f)===1.10&&Object.keys(relicRule(f)).length>0)'),true);
   assert.equal(h.exec('JSON.stringify([meta.relics,meta.relicEquipment])===inventory'),true);
   assert.equal(h.exec('battle.pTeam[0].battleRelic'),null);
-  if(kind==='legends')assert.equal(h.exec('battle.pTeam[1].battleRelic'),'relic_roger');
+  assert.equal(h.exec('battle.pTeam.length'),1);
   h.exec('battle=null;endChallengeBattle(true);playChallengeMatch();');
   assert.equal(h.exec('battle.eTeam.every(f=>equippedRelic(f)?.character===baseFormOf(f.id))'),true);
  }
@@ -232,7 +231,7 @@ test('affine enemy relic hooks apply to evolved rivals and reset outside challen
  assert.equal(h.exec('enemies.every(f=>f.battleRelic===null)'),true);
 });
 test('rivals level up each round while allies retain permanent levels; bronze is below semifinal difficulty',()=>{
- for(const [kind,levels,ids] of [['tournament',[65,80,95,110],['zoro']],['legends',[266,278,290],['shanks','roger']]]){
+ for(const [kind,levels,ids] of [['tournament',[65,80,95,110],['zoro']],['legends',[266,278,290],['shanks']]]){
   const h=harness();h.exec(`meta.charUpgrades={zoro:7,shanks:42,roger:61};startChallenge('${kind}',${JSON.stringify(ids)});`);
   for(const level of levels){
    h.exec('playChallengeMatch();');
@@ -248,15 +247,15 @@ test('rivals level up each round while allies retain permanent levels; bronze is
  assert.ok(h.exec('challengeEnemyLevel(meta.challenge)<challengeRoundLevel(meta.challenge,2)'));
 });
 
-test('old eight-character brackets remain valid, retain their draw, and finish without duplicate payouts',()=>{
- for(const kind of ['tournament','legends']){
-  const h=harness();h.exec(`startChallenge('${kind}',${kind==='legends'?"['shanks','roger']":"['zoro']"});
+test('old eight-character tournament brackets remain valid and finish without duplicate payouts',()=>{
+ for(const kind of ['tournament']){
+  const h=harness();h.exec(`startChallenge('${kind}',${kind==='legends'?"['shanks']":"['zoro']"});
    const t=meta.challenge;t.version=1;t.entrants=t.entrants.slice(0,${kind==='legends'?4:8});
    t.rounds=[{name:challengeRoundName(t.entrants.length/2),matches:Array.from({length:t.entrants.length/2},(_,i)=>challengeMatch(i*2,i*2+1))}];
    const legacy=JSON.stringify(GameSaveStorage.payload(meta,null));validateGameSave(GameSaveStorage.parse(legacy));
    loadedSave=GameSaveStorage.parse(legacy);loadMeta();`);
-  assert.equal(h.exec('meta.challenge.entrants.length'),kind==='legends'?4:8);
-  finish(h,Array(kind==='legends'?2:3).fill(true));
+  assert.equal(h.exec('meta.challenge.entrants.length'),8);
+  finish(h,Array(3).fill(true));
   const reward=h.exec('meta.logPoses');h.exec('finishChallenge(1);');assert.equal(h.exec('meta.logPoses'),reward);
   assert.doesNotThrow(()=>h.exec('validateGameSave(GameSaveStorage.parse(JSON.stringify(GameSaveStorage.payload(meta,null))));'));
  }
@@ -264,7 +263,7 @@ test('old eight-character brackets remain valid, retain their draw, and finish w
 
 test('all new tournament outcomes validate and render complete future rounds with correct placements',()=>{
  for(const kind of ['tournament','legends'])for(const outcome of [[false],[true,false],[true,true,false],[true,true,true,false]]){
-  const h=harness();h.exec(`startChallenge('${kind}',${kind==='legends'?"['shanks','roger']":"['zoro']"});`);
+  const h=harness();h.exec(`startChallenge('${kind}',${kind==='legends'?"['shanks']":"['zoro']"});`);
   const initial=h.exec('challengeBracketHTML(meta.challenge)');
   assert.equal((initial.match(/class="tournament-round"/g)||[]).length,kind==='legends'?3:4);
   assert.match(initial,/Ganador cruce/);assert.match(initial,/tournament-link/);

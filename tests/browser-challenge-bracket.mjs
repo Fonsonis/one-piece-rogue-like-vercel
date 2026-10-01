@@ -52,9 +52,9 @@ try {
  assert.match(await page.locator('.challenge-contender:not(.own-contender)').innerText(),/Nv. 85/);
  assert.equal(await page.locator('.tournament-bronze .current-match').count(),1);
  await page.evaluate(()=>endChallengeBattle(true));assert.equal(await page.evaluate(()=>meta.logPoses),7500);
- await page.evaluate(()=>{startChallenge('legends',['shanks','roger']);});
+ await page.evaluate(()=>{startChallenge('legends',['shanks']);});
  assert.equal(await page.locator('.tournament-round').count(),3);
- assert.equal(await page.evaluate(()=>meta.challenge.entrants.flatMap(e=>e.members).length),16);
+ assert.equal(await page.evaluate(()=>meta.challenge.entrants.flatMap(e=>e.members).length),8);
  await page.locator('#challenge-tab-draw').click();await page.locator('.tournament-viewport').scrollIntoViewIfNeeded();
  await page.screenshot({path:'outputs/challenges/bracket-legends-mobile.png'});
  // UI sorting must match the values shown in character sheets, not catalog constants.
