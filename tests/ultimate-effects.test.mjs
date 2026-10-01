@@ -67,6 +67,28 @@ test('blocked ultimates do not animate, and misses never display a successful im
  assert.equal(h.exec('effects.length'),0);
  h.exec('battle.over=false;useUltimate(f);');assert.equal(h.exec('effects.length'),1);assert.equal(h.exec('effects[0].hit'),false);
 });
+test('an ultimate consumes the player attack in auto and manual combat',()=>{
+ for(const automatic of [true,false]){
+  const h=combatHarness();
+  h.exec(`run={mode:'story',saga:0,team:[makeChar('luffy5',100)],items:{}};
+    startBattle([makeChar('kaido',100,true)],{wild:true});
+    battle.curP.spd=10000;battle.curE.spd=1;battle.curE.hp=battle.curE.maxhp=100000;
+    battle.curP.ultCharge=100;autoMode=${automatic};
+    let playerMoves=[];const realAttack=attackWith;
+    attackWith=function(att,dfd,mv,side){if(att===battle.curP)playerMoves.push(mv.name);return realAttack.apply(this,arguments);};
+    ${automatic?'':'useUltimate(battle.curP);'}
+    runRound();`);
+  assert.equal(h.exec('playerMoves.length'),1,automatic?'auto ultimate added a normal attack':'manual ultimate added a normal attack');
+  assert.equal(h.exec('battle.pendingUltimateAction'),null);
+ }
+});
+test('a finishing ultimate does not consume an attack in a later round',()=>{
+ const h=combatHarness();
+ h.exec(`run={mode:'story',saga:0,team:[makeChar('luffy5',100)],items:{}};
+   startBattle([makeChar('kaido',100,true)],{wild:true});
+   battle.curE.hp=1;battle.curP.ultCharge=100;autoMode=true;runRound();`);
+ assert.equal(h.exec('battle.pendingUltimateAction'),null);
+});
 function lifecycle(reduced=false,brokenCanvas=false) {
  let nodes=[],rafs=new Map(),timeouts=new Map(),id=0;
  const recording=canvasRecorder(),ctx=recording.ctx;
@@ -84,10 +106,45 @@ test('effects respect viewport bounds, cap concurrency and release timers and ca
  const h=lifecycle(),s={profile:h.profile,source:h.source,target:h.target};
  const handle=h.play(s);await h.ready();h.step(0);assert.equal(h.nodes()[0].style.width,'390px');assert.equal(h.nodes()[0].style.height,'252px');
  h.play(s);assert.equal(h.nodes().length,1,'replace previous effect on the same stage');handle.cancel();assert.equal(h.nodes().length,1);
- const two=h.play({...s,owner:{}});h.play({...s,owner:{}});assert.equal(h.nodes().length,2);two.cancel();
+ const otherSource={...h.source,querySelector:()=>null};
+ const two=h.play({...s,source:otherSource,owner:{}});
+ h.play({...s,owner:{}});
+ assert.equal(h.nodes().length,2,'different fighters can animate concurrently');two.cancel();
  await h.ready();h.step(0);h.step(2000);assert.deepEqual(h.counts(),[0,0,0]);
  h.play(s);h.source.isConnected=false;h.step(0);assert.deepEqual(h.counts(),[0,0,0]);
  h.source.isConnected=true;h.play(s);h.doc.hidden=true;h.step(0);assert.deepEqual(h.counts(),[0,0,0]);
+});
+test('attack and ultimate scenes for one fighter never overlap',async()=>{
+ const h=lifecycle(),owner={};
+ const spec={profile:h.profile,source:h.source,target:h.target};
+ h.play({...spec,owner:h.sprite,basic:true});await h.ready();
+ assert.equal(h.nodes().length,1);
+ h.play({...spec,owner});await h.ready();
+ assert.equal(h.nodes().length,1,'ultimate replaces an active attack scene');
+ assert.equal(h.play({...spec,owner:h.sprite,basic:true}),null,'attack cannot replace the active ultimate');
+ assert.equal(h.nodes().length,1);
+});
+test('reviewed ultimates load new art while Gear 5 has a new normal attack',async()=>{
+ const h=lifecycle();
+ h.play({profile:h.profile,source:h.source,target:h.target,basic:true});
+ await h.ready();
+ assert.equal(h.images[0].url,'/art/characters/zoro.png');
+ const zoroUltimate=h.play({profile:h.profile,source:h.source,target:h.target});
+ await h.ready();
+ assert.equal(h.images[1].url,'/art/characters/ultimates/zoro.png');
+ zoroUltimate.cancel();
+ const unlisted={...h.profile,id:'unlisted-test'};
+ const unlistedUltimate=h.play({profile:unlisted,source:h.source,target:h.target});
+ await h.ready();
+ assert.equal(h.images[2].url,'/art/characters/unlisted-test.png');
+ unlistedUltimate.cancel();
+ const gear={...h.profile,id:'luffy5'};
+ h.play({profile:gear,source:h.source,target:h.target,basic:true});
+ await h.ready();
+ assert.equal(h.images[3].url,'/art/characters/attacks/luffy5.png');
+ h.play({profile:gear,source:h.source,target:h.target});
+ await h.ready();
+ assert.equal(h.images[4].url,'/art/characters/luffy5.png');
 });
 test('reduced-motion mode is static and cleans up; interrupted screens cancel safely',async()=>{
  const h=lifecycle(true),s={profile:h.profile,source:h.source,target:h.target};
@@ -130,6 +187,9 @@ test('Gear 5 grows, raises its foot, stomps and returns to its original size',()
  assert.equal(landed.lift,0);assert.equal(landed.pose,2);assert.equal(landed.scale,raised.scale);
  assert.equal(home.scale,1);assert.equal(home.travel,0);
  assert.equal(choreo(p,.48,true).scale,1);
+ const normal=choreo({...p,normalAttack:true},.48);
+ assert.equal(normal.scale,1,'normal attack does not grow into the ultimate stomp');
+ assert.ok(normal.travel>0&&normal.lift>0,'normal attack lunges and strikes');
 });
 
 

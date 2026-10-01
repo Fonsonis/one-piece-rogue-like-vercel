@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "node scripts/prepare-offline.mjs && node scripts/serve-static.mjs",
+    "dev": "node scripts/update-ultimate-manifest.mjs && node scripts/prepare-offline.mjs && node scripts/serve-static.mjs",
     "build": "node scripts/build-static.mjs",
     "android:sync": "npm run build && node --require ./scripts/node-user-info-shim.cjs ./node_modules/@capacitor/cli/bin/capacitor sync android",
     "android:apk": "npm run android:sync && node scripts/build-android-apk.mjs",

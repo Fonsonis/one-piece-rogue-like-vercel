@@ -825,6 +825,11 @@ function validateGameSave(data) {
 // Nivel de cuenta: sube de forma exponencial con los PX de cuenta (se ganan a la par que la Fama)
 const SAGA_LEVEL_CAPS = {eastblue:7,alabasta:15,skypiea:20,water7:25,thriller:30,sabaody:30,marineford:35,gyojin:40,punkhazard:40,dressrosa:45,zou:45,wholecake:50,wano:55,egghead:100,elbaph:100};
 
+// Los reclutas empiezan en el tope base de la saga que se está jugando.
+function recruitLevelForCurrentSaga() {
+  return SAGA_LEVEL_CAPS[SAGAS[run.saga].id] ?? 100;
+}
+
 function getMaxAccountLevelCap() {
   if (typeof SAGAS === 'undefined' || !SAGAS.length) return 7;
   let highest = 0;
@@ -5178,7 +5183,7 @@ function doMystery(island) {
         modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">Un pirata quería unirse, pero la regla Nuzlocke lo impide.<br>Te deja 200 Berries de regalo.</div>`, screenMap);
       } else {
         const id = pickWildEnemy(island.pool);
-        const recLvl = Math.max(1, Math.floor(island.lvl[0] * 0.85));
+        const recLvl = recruitLevelForCurrentSaga();
         const f = applyUpgrades(makeChar(id, recLvl));
         addToTeam(f, ok => {
           if (ok) {
@@ -5269,7 +5274,7 @@ function wildEncounter(wild) {
   }
   const recruit = () => {
     if (isLegendary) return;
-    const recLvl = Math.max(1, Math.floor(wild.lvl * 0.85));
+    const recLvl = recruitLevelForCurrentSaga();
     const f = applyUpgrades(makeChar(wild.id, recLvl));
     addToTeam(f, ok => {
       if (ok) {
@@ -5896,7 +5901,7 @@ function specialBlockedReason() {
 }
 
 function specialJoin(id, lvl) {
-  const recLvl = Math.max(1, Math.floor(lvl * 0.85));
+  const recLvl = recruitLevelForCurrentSaga();
   const f = applyUpgrades(makeChar(id, recLvl));
   addToTeam(f, ok => {
     if (ok) {
@@ -5928,7 +5933,7 @@ function specialPiratePoolHTML() {
 
 function doSpecialPirate(island) {
   meta.starPity = meta.starPity || 0;
-  const lvl = island.lvl[1] + 2;
+  const lvl = recruitLevelForCurrentSaga();
   const gachaPrice = specialGachaPrice();
   const blocked = specialBlockedReason();
   const ov = document.createElement('div');
@@ -6694,6 +6699,9 @@ function useUltimate(f) {
   if ((f.ultCharge || 0) < 100) return toast(`⚡ Ultimate de ${charName(f)} al ${Math.floor(f.ultCharge || 0)}% (golpea para cargar).`);
 
   f.ultCharge = 0;
+  // La definitiva sustituye el siguiente ataque normal de este luchador.
+  // También cubre el uso manual entre pasos de una ronda automática.
+  if (!isEnemy && !b.opts?.local && !b.opts?.duos) b.pendingUltimateAction = f;
   const ultMv = getUltimateMove(f);
   log(`💥 <b>¡DEFINITIVA DE ${charName(f).toUpperCase()}!</b> Desata <b>${ultMv.name}</b> 💥`);
   attackWith(f, enemy, ultMv, isEnemy ? 'player' : 'enemy');
@@ -7381,7 +7389,10 @@ function runRound() {
   if (b.opts?.duos) return runChallengeDuoRound();
   if (!b.opts?.challenge) runAutoItems();
   const p = b.curP, e = b.curE;
-  if (!p || !e || p.hp <= 0 || e.hp <= 0) return afterRound();
+  if (!p || !e || p.hp <= 0 || e.hp <= 0) {
+    b.pendingUltimateAction = null;
+    return afterRound();
+  }
 
   // Modo auto: tira la Ultimate automáticamente si está cargada
   if ((b.opts?.challenge || autoMode && autoSettings.useUltimates !== false) && p.lvl >= 20 && (p.ultCharge || 0) >= 100) {
@@ -7402,7 +7413,9 @@ function runRound() {
       // Preserve this round's turn order; a manual relay changes its actors, not its number of attacks.
       const att = side === 'enemy' ? b.curP : b.curE;
       const dfd = side === 'enemy' ? b.curE : b.curP;
-      if (att.hp > 0 && dfd.hp > 0) {
+      const ultimateConsumedTurn = side === 'enemy' && b.pendingUltimateAction === att;
+      if (ultimateConsumedTurn) b.pendingUltimateAction = null;
+      if (att.hp > 0 && dfd.hp > 0 && !ultimateConsumedTurn) {
         if (side === 'player' && enemyUltimatesEnabled(b) && att.lvl >= 20 && (att.ultCharge || 0) >= 100) useUltimate(att);
         else attackWith(att, dfd, chooseMove(att, dfd), side);
       }

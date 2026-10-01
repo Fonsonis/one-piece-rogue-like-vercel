@@ -119,6 +119,12 @@ async function installedRelease() {
   };
 }
 
+export async function pendingAndroidUpdate() {
+  if (!isAndroidApp()) return null;
+  const [installed, release] = await Promise.all([installedRelease(), latestAndroidRelease()]);
+  return release.versionCode > installed.versionCode ? release : null;
+}
+
 export async function downloadAndroidApk({ toast } = {}) {
   if (!isAndroidApp()) {
     globalThis.location.assign(RELEASE_URL);

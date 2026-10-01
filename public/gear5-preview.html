@@ -30,7 +30,7 @@ const form=document.querySelector('#form');
 const ids=['luffy','luffy2','luffy3','luffy4-boundman','luffy4','luffy4-tankman','luffy5'];
 const requested=new URLSearchParams(location.search).get('form');
 if(ids.includes(requested))form.value=requested;
-const textures=await Promise.all(ids.map(id=>UltimateFX.loadSprite(id)));
+const textures=await Promise.all(ids.map(id=>UltimateFX.loadSprite(id,'ultimate')));
 const sprites=Object.fromEntries(ids.map((id,i)=>[id,textures[i]]));
 let sprite=sprites[form.value];
 const enemy=await UltimateFX.loadSprite('kaido');

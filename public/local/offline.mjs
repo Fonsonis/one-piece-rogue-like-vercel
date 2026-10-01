@@ -14,7 +14,7 @@ export async function prepareOffline() {
       channel.port1.onmessage = event => {
         const data = event.data;
         if (data.error) { status.textContent = data.error; button.disabled = false; channel.port1.close(); }
-        else if (data.complete) { status.textContent = 'Copia lista. Puedes abrir esta misma dirección sin internet. Conserva también una exportación de tu guardado.'; button.disabled = false; channel.port1.close(); }
+        else if (data.complete) { status.textContent = 'Copia lista. Puedes abrir esta misma dirección sin internet. Conserva también una exportación de tu guardado.'; button.disabled = false; channel.port1.close(); window.dispatchEvent(new Event('game-offline-updated')); }
         else { progress.hidden = false; progress.max = data.total; progress.value = data.done; status.textContent = `${data.done} de ${data.total} archivos. Mantén esta pestaña abierta.`; }
       };
       const worker = registration.active || (await navigator.serviceWorker.ready).active;

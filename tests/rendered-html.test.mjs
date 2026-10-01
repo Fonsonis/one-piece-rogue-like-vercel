@@ -4,11 +4,15 @@ import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 
 test('static deployment contains the exact game and every asset, with both entry URLs', () => {
-  assert.equal(readFileSync('dist/index.html','utf8'), readFileSync('public/play.html','utf8'));
+  const sourceHtml=readFileSync('public/play.html','utf8');
+  const version=JSON.parse(readFileSync('dist/offline-manifest.json','utf8')).version;
+  const publishedHtml=sourceHtml.replace('content="development"', `content="${version}"`);
+  assert.equal(readFileSync('dist/index.html','utf8'), publishedHtml);
   function compare(dir = '') {
     for (const entry of readdirSync(join('public',dir), {withFileTypes:true})) {
       const path = join(dir,entry.name);
       if (entry.isDirectory()) compare(path);
+      else if (path === 'play.html') assert.equal(readFileSync(join('dist',path),'utf8'), publishedHtml);
       else assert.deepEqual(readFileSync(join('dist',path)), readFileSync(join('public',path)), path);
     }
   }

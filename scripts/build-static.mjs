@@ -1,7 +1,8 @@
-import { cpSync, copyFileSync, existsSync, readdirSync, rmSync } from 'node:fs';
+import { cpSync, copyFileSync, existsSync, readdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
+import './update-ultimate-manifest.mjs';
 import './prepare-offline.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
@@ -22,4 +23,9 @@ checkScripts(source);
 rmSync(output, { recursive: true, force: true });
 cpSync(source, output, { recursive: true });
 copyFileSync(join(source, 'play.html'), resolve(output, 'index.html'));
+const buildVersion = JSON.parse(readFileSync(join(source, 'offline-manifest.json'), 'utf8')).version;
+for (const name of ['play.html', 'index.html']) {
+  const path = join(output, name);
+  writeFileSync(path, readFileSync(path, 'utf8').replace('content="development"', `content="${buildVersion}"`));
+}
 console.log('Cliente del juego listo en dist/ (la señalización multijugador se despliega desde api/).');
