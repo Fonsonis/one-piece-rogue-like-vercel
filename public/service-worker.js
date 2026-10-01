@@ -16,11 +16,13 @@ self.addEventListener('message', event => {
     try {
       const response = await fetch('/offline-manifest.json', { cache: 'no-store' });
       if (!response.ok) throw Error('No se pudo obtener la lista de archivos.');
+      const manifestResponse = response.clone();
       const manifest = await response.json();
       if (!Array.isArray(manifest.files) || manifest.files.length > 5000 || !/^[a-f0-9]{20}$/.test(manifest.version) ||
           manifest.files.some(url => typeof url !== 'string' || !url.startsWith('/') || url.startsWith('//') || url.includes('..'))) throw Error('Lista de archivos inválida.');
       cacheName = PREFIX + manifest.version + '-' + Date.now();
       const cache = await caches.open(cacheName);
+      await cache.put('/offline-manifest.json', manifestResponse);
       let cursor = 0, done = 0;
       // Esperamos también las descargas pendientes antes de limpiar un intento fallido.
       const results = await Promise.allSettled(Array.from({ length: 4 }, async () => {
@@ -45,6 +47,20 @@ self.addEventListener('message', event => {
 self.addEventListener('fetch', event => {
   if (event.request.method !== 'GET') return;
   event.respondWith((async () => {
+    // The version probe must reach the server even while the game itself uses
+    // the offline snapshot. Keep the last manifest available without a network.
+    const requestUrl = new URL(event.request.url);
+    if (requestUrl.origin === self.location.origin && requestUrl.pathname === '/offline-manifest.json') {
+      try { return await fetch(event.request, { cache: 'no-store' }); }
+      catch {
+        const active = await activeCache();
+        if (active) {
+          const cached = await (await caches.open(active)).match('/offline-manifest.json');
+          if (cached) return cached;
+        }
+        throw Error('Sin conexión');
+      }
+    }
     const active = await activeCache();
     if (active) {
       const url = new URL(event.request.url);
