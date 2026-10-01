@@ -28,11 +28,11 @@ test('boss kills accumulate once and defeat includes consolation before clearing
  h.exec(source.slice(source.indexOf('function gameOver() {'),source.indexOf('// ============ TORRE MARINE')));
  h.exec(`startBattle([makeChar('buggy',5),makeChar('arlong',5)],{boss:true});pauseBattle();
  battle.eTeam[0].hp=0;afterRound();pauseBattle();afterRound();pauseBattle();`);
- assert.equal(h.exec('run.rewards.fame'),40);
+ assert.equal(h.exec('run.rewards.fame'),10);
  assert.equal(h.exec('run.rewards.logPoses'),7);
  h.exec('run.badges=[0];gameOver();');
  assert.equal(h.exec('run'),null);
- assert.match(h.exec('html'),/Fama: <strong>50<\/strong>/);
+ assert.match(h.exec('html'),/Fama: <strong>12<\/strong>/);
  assert.match(h.exec('html'),/Log Poses: <strong>7<\/strong>/);
 });
 
@@ -42,7 +42,7 @@ test('saga victory includes its first or repeated reward in the displayed total'
   h.exec(`trackJourneyRewards(40,21);run.islandComplete=true;
   meta.sagaDiffWins={eastblue:${repeated?'{1:true}':'{}'}};sagaComplete();`);
   assert.equal(h.exec('run'),null);
-  assert.match(h.exec('html'),new RegExp(`Fama: <strong>${repeated?140:540}</strong>`));
+  assert.match(h.exec('html'),new RegExp(`Fama: <strong>${repeated?60:140}</strong>`));
   assert.match(h.exec('html'),/Log Poses: <strong>21<\/strong>/);
  }
 });

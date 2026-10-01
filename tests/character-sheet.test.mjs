@@ -7,14 +7,18 @@ function modalHarness() {
  h.ctx.queueMicrotask=fn=>fn();
  h.ctx.document.body={appendChild:ov=>overlays.push(ov)};
  h.ctx.document.createElement=()=>{
-  const ov={nodes:new Map(),html:'',remove(){this.removed=true;},querySelector(selector){
+  const ov={nodes:new Map(),crewButtons:[],html:'',remove(){this.removed=true;},querySelectorAll(selector){
+   return selector==='[data-crew-choice]'?this.crewButtons:[];
+  },querySelector(selector){
    if(selector==='#sheet-upg-btn:not(:disabled)')return this.nodes.get('#sheet-upg-btn')?.disabled?null:this.nodes.get('#sheet-upg-btn');
+   if(selector.startsWith('[data-crew-choice='))return this.crewButtons.find(button=>selector.includes(`"${button.dataset.crewChoice}"`))||null;
    return this.nodes.get(selector)||null;
   }};
   Object.defineProperty(ov,'innerHTML',{get(){return this.html;},set(html){
    this.html=html;this.nodes=new Map([['.modal',{scrollTop:0}]]);
    for(const match of html.matchAll(/<button\b[^>]*id="([^"]+)"[^>]*>/g))
     this.nodes.set('#'+match[1],{disabled:/\sdisabled(?:\s|>)/.test(match[0]),focus(){}});
+   this.crewButtons=[...html.matchAll(/<button\b[^>]*data-crew-choice="([^"]+)"[^>]*>/g)].map(match=>({dataset:{crewChoice:match[1]},focus(){}}));
   }});
   return ov;
  };
@@ -69,4 +73,50 @@ test('faction in the sheet follows the purchased crew version and matches its sy
  assert.ok(h.exec("(()=>{const team=[makeChar('robin',20),makeChar('gem',20)];return crewTier(team,'baroque')===1&&crewTier(team,'straw')===0;})()"));
  h.exec("showCharModal(priorRobin,sheet);");
  assert.match(ov.html,/<b>Facción:<\/b>[^<]*Sombrero de Paja/);
+});
+
+test('crew version can be previewed without paying and requires a confirmed second tap',()=>{
+ const {h,overlays}=modalHarness();
+ h.exec("meta.roster=['robin'];meta.logPoses=100000;saveMeta=()=>true;showCharModal('robin');");
+ const ov=overlays[0];
+ ov.crewButtons.find(button=>button.dataset.crewChoice==='baroque').onclick();
+ assert.equal(h.exec('meta.logPoses'),100000);
+ assert.equal(h.exec("preferredCrew('robin')"),'straw');
+ assert.match(ov.html,/crew-preview-locked/);
+ assert.match(ov.html,/<b>Facción:<\/b>[^<]*Baroque Works — vista previa/);
+ ov.crewButtons.find(button=>button.dataset.crewChoice==='baroque').onclick();
+ assert.equal(overlays.length,2);
+ assert.equal(h.exec('meta.logPoses'),100000);
+ overlays[1].querySelector('#mc-no').onclick();
+ assert.equal(h.exec('meta.logPoses'),100000);
+ assert.equal(h.exec("crewVersionUnlocked('robin','baroque')"),false);
+ ov.crewButtons.find(button=>button.dataset.crewChoice==='baroque').onclick();
+ overlays[2].querySelector('#mc-yes').onclick();
+ assert.equal(h.exec('meta.logPoses'),0);
+ assert.equal(h.exec("crewVersionUnlocked('robin','baroque')"),true);
+ assert.equal(h.exec("preferredCrew('robin')"),'baroque');
+ assert.doesNotMatch(ov.html,/crew-preview-locked/);
+ ov.crewButtons.find(button=>button.dataset.crewChoice==='straw').onclick();
+ assert.equal(h.exec("preferredCrew('robin')"),'baroque');
+ ov.crewButtons.find(button=>button.dataset.crewChoice==='straw').onclick();
+ assert.equal(h.exec("preferredCrew('robin')"),'straw');
+ ov.crewButtons.find(button=>button.dataset.crewChoice==='baroque').onclick();
+ assert.equal(h.exec("preferredCrew('robin')"),'straw');
+ ov.crewButtons.find(button=>button.dataset.crewChoice==='baroque').onclick();
+ assert.equal(h.exec("preferredCrew('robin')"),'baroque');
+ assert.equal(h.exec('meta.logPoses'),0);
+});
+
+test('locked crew version remains previewable without enough Log Poses',()=>{
+ const {h,overlays}=modalHarness();
+ h.exec("meta.roster=['robin'];meta.logPoses=0;saveMeta=()=>true;showCharModal('robin');");
+ const ov=overlays[0];
+ ov.crewButtons.find(button=>button.dataset.crewChoice==='baroque').onclick();
+ assert.match(ov.html,/crew-preview-locked/);
+ assert.equal(h.exec('meta.logPoses'),0);
+ ov.crewButtons.find(button=>button.dataset.crewChoice==='baroque').onclick();
+ assert.equal(overlays.length,2);
+ overlays[1].querySelector('#mc-yes').onclick();
+ assert.equal(h.exec("crewVersionUnlocked('robin','baroque')"),false);
+ assert.equal(h.exec("preferredCrew('robin')"),'straw');
 });

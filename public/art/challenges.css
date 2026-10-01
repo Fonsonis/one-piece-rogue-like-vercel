@@ -211,6 +211,10 @@ html[data-theme="dark"] .challenge-slot-pick:not(:disabled):hover { background:#
 #app .legend-challenge-card h3 { margin:0 0 5px; font-size:15px; }
 .legend-challenge-card p { margin:3px 0; font-size:12px; overflow-wrap:anywhere; }
 .legend-challenge-card .btn { grid-column:1 / -1; width:100%; min-height:48px; }
+.legend-challenge-search { display:grid; gap:6px; max-width:420px; margin-top:18px; }
+#app .legend-challenge-search input { width:100%; min-width:0; padding:10px 12px; }
+#app .challenge-panel .legend-challenge-count { margin:8px 0 0; color:var(--sea); font-size:13px; }
+.legend-challenge-card[hidden],.legend-challenge-empty[hidden] { display:none!important; }
 @media(max-width:540px) {
  .challenge-event { align-items:stretch; padding:14px 10px; }
  .challenge-event .challenge-emblem { align-self:center; width:46px; height:46px; font-size:24px; }

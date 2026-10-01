@@ -14,8 +14,8 @@ function setup(mode='classic', diff=1) {
   return h;
 }
 
-test('each boss pays difficulty-scaled Fama and account XP once, including repeated character IDs',()=>{
-  for(const mode of ['classic','nuzlocke']) for(const [i,reward] of [40,52,66,86,110].entries()) {
+test('each boss pays reduced difficulty-scaled Fama and account XP once, including repeated character IDs',()=>{
+  for(const mode of ['classic','nuzlocke']) for(const [i,reward] of [10,13,17,22,28].entries()) {
     for(const finalBoss of [false,true]) {
       const h=setup(mode,i+1);
       if(finalBoss) h.exec('run.islandIdx=SAGAS[0].islands.length-1');
@@ -39,12 +39,12 @@ test('two simultaneous boss kills pay immediately and remain saved after losing 
     const h=setup(mode);
     h.exec(`let savedFame=0;saveMeta=()=>{savedFame=meta.fame;};
       battle.eTeam[0].hp=0;battle.eTeam[1].hp=0;battle.pTeam[0].hp=0;afterRound();`);
-    assert.equal(h.exec('meta.fame'),80);
-    assert.equal(h.exec('meta.accXp'),80);
-    assert.equal(h.exec('savedFame'),80);
+    assert.equal(h.exec('meta.fame'),20);
+    assert.equal(h.exec('meta.accXp'),20);
+    assert.equal(h.exec('savedFame'),20);
     for(let i=0;i<10&&!h.exec('auditResult');i++) h.tick();
     assert.equal(h.exec('auditResult'),'loss');
-    assert.equal(h.exec('meta.fame'),80);
+    assert.equal(h.exec('meta.fame'),20);
   }
 });
 
@@ -58,6 +58,6 @@ test('ordinary encounters, tower kills and losses with no boss kills do not pay 
     assert.equal(h.exec('meta.accXp'),0);
   }
   const h=combatHarness();
-  assert.equal(h.exec('bossFameReward()'),40);
-  assert.equal(h.exec('bossFameReward(999)'),40);
+  assert.equal(h.exec('bossFameReward()'),10);
+  assert.equal(h.exec('bossFameReward(999)'),10);
 });

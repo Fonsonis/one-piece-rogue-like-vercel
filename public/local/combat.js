@@ -80,10 +80,12 @@ globalThis.LocalCombat = (() => {
       const enemy = () => activeFor(b, b.opts.coop ? 'yonko' : b.participants[1]);
       if (!b.turns.length && !b.endRound) {
         const active = allies(); b.roundOwners = active.map(f => f.owner);
-        for (const p of active) {
+        if (b.opts.coop) {
+          // Una acción conjunta de los jugadores y una sola respuesta del yonkou.
+          b.turns.push(['alliance', 'yonko'], ['yonko', 'alliance']);
+        } else for (const p of active) {
           const e = enemy(); b.curP = p; b.curE = e;
           if (!e) break;
-          // Mismo orden y ritmo que runRound; las referencias de propietario permiten el relevo.
           const pair = [[p.owner, e.owner], [e.owner, p.owner]];
           b.turns.push(...(effectiveSpeed(p) >= effectiveSpeed(e) ? pair : pair.reverse()));
         }
@@ -91,17 +93,34 @@ globalThis.LocalCombat = (() => {
       }
       if (b.turns.length) {
         const [source, target] = b.turns.shift();
-        const attacker = b.activeByOwner[source], defender = b.activeByOwner[target];
-        if (attacker?.hp > 0 && defender?.hp > 0) {
-          b.curP = b.pTeam.includes(attacker) ? attacker : defender;
-          b.curE = b.eTeam.includes(attacker) ? attacker : defender;
-          const ultimate = b.commands[source] === 'ultimate' && attacker.ultCharge >= 100;
-          const move = ultimate ? getUltimateMove(attacker) : chooseMove(attacker, defender);
-          const all = [...b.pTeam, ...b.eTeam], before = all.map(f => f.hp);
-          if (ultimate) { delete b.commands[source]; useUltimate(attacker); }
-          else attackWith(attacker, defender, move, b.pTeam.includes(attacker) ? 'enemy' : 'player');
-          b.event = { kind: ultimate ? 'ultimate' : 'attack', source: all.indexOf(attacker), target: all.indexOf(defender),
-            move: { name: move.name, type: move.type }, before };
+        const all = [...b.pTeam, ...b.eTeam];
+        if (b.opts.coop && source === 'alliance') {
+          const before = all.map(f => f.hp), actions = [];
+          for (const owner of b.roundOwners) {
+            const attacker = activeFor(b, owner), defender = enemy();
+            if (!attacker || !defender || defender.hp <= 0) break;
+            b.curP = attacker; b.curE = defender;
+            const ultimate = b.commands[owner] === 'ultimate' && attacker.ultCharge >= 100;
+            const move = ultimate ? getUltimateMove(attacker) : chooseMove(attacker, defender);
+            if (ultimate) { delete b.commands[owner]; useUltimate(attacker); }
+            else attackWith(attacker, defender, move, 'enemy');
+            actions.push({ kind: ultimate ? 'ultimate' : 'attack', source: all.indexOf(attacker), target: all.indexOf(defender), move: { name: move.name, type: move.type } });
+          }
+          if (actions.length) b.event = { kind: 'group', actions, before };
+        } else {
+          const attacker = b.activeByOwner[source];
+          const defender = b.opts.coop ? b.roundOwners.map(owner => activeFor(b, owner)).filter(Boolean)[(b.round - 1) % b.roundOwners.length] : b.activeByOwner[target];
+          if (attacker?.hp > 0 && defender?.hp > 0) {
+            b.curP = b.pTeam.includes(attacker) ? attacker : defender;
+            b.curE = b.eTeam.includes(attacker) ? attacker : defender;
+            const ultimate = b.commands[source] === 'ultimate' && attacker.ultCharge >= 100;
+            const move = ultimate ? getUltimateMove(attacker) : chooseMove(attacker, defender);
+            const before = all.map(f => f.hp);
+            if (ultimate) { delete b.commands[source]; useUltimate(attacker); }
+            else attackWith(attacker, defender, move, b.pTeam.includes(attacker) ? 'enemy' : 'player');
+            b.event = { kind: ultimate ? 'ultimate' : 'attack', source: all.indexOf(attacker), target: all.indexOf(defender),
+              move: { name: move.name, type: move.type }, before };
+          }
         }
         b.delay = 900;
       } else {

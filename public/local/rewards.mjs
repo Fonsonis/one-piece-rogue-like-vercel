@@ -1,4 +1,13 @@
-export const YONKO_REWARD = Object.freeze({ logPoses: 100000, fame: 10000, dailyLimit: 4 });
+export const YONKO_REWARD = Object.freeze({
+  byTeamSize: Object.freeze({
+    1: Object.freeze({ logPoses: 500000, fame: 25000 }),
+    3: Object.freeze({ logPoses: 100000, fame: 10000 }),
+    6: Object.freeze({ logPoses: 10000, fame: 1000 }),
+  }),
+  dailyLimit: 4,
+});
+
+export const yonkoRewardForSize = size => YONKO_REWARD.byTeamSize[size] || null;
 
 const dayKey = date => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 const validId = id => typeof id === 'string' && /^[a-f0-9]{32}:match-\d+$/.test(id);
@@ -12,19 +21,27 @@ export function yonkoRewardState(value, now = new Date()) {
 
 export function claimYonkoReward(meta, view, persist, now = new Date()) {
   if (view?.mode !== 'coop' || view.phase !== 'finished' || view.champion !== 'alliance') return { kind: 'not-earned' };
+  const reward = yonkoRewardForSize(view.size);
+  if (!reward) return { kind: 'not-earned' };
   const match = view.matches?.find(m => m.status === 'done' && m.winner === 'alliance' && validId(m.rewardId));
   if (!match) return { kind: 'not-earned' };
+  const participants = match.players;
+  const battle = match.battle;
+  if (!Array.isArray(participants) || participants.length < 2 || participants.length > 8 ||
+      !battle?.over || battle.winner !== 'p' || !Array.isArray(battle.pTeam) || !Array.isArray(battle.eTeam) ||
+      battle.eTeam.length !== 1 || battle.eTeam[0]?.owner !== 'yonko' || battle.pTeam.length !== participants.length * view.size ||
+      participants.some(id => battle.pTeam.filter(f => f.owner === id).length !== view.size)) return { kind: 'not-earned' };
   const state = yonkoRewardState(meta.localYonkoReward, now);
   if (state.claims.includes(match.rewardId) || state.recentIds.includes(match.rewardId)) return { kind: 'already', count: state.claims.length };
   if (state.claims.length >= YONKO_REWARD.dailyLimit) return { kind: 'limit', count: state.claims.length };
 
   const previous = { fame: meta.fame, accXp: meta.accXp, logPoses: meta.logPoses, localYonkoReward: meta.localYonkoReward };
-  meta.fame = (Number(meta.fame) || 0) + YONKO_REWARD.fame;
-  meta.accXp = (Number(meta.accXp) || 0) + YONKO_REWARD.fame;
-  meta.logPoses = (Number(meta.logPoses) || 0) + YONKO_REWARD.logPoses;
+  meta.fame = (Number(meta.fame) || 0) + reward.fame;
+  meta.accXp = (Number(meta.accXp) || 0) + reward.fame;
+  meta.logPoses = (Number(meta.logPoses) || 0) + reward.logPoses;
   meta.localYonkoReward = { date: state.date, claims: [...state.claims, match.rewardId], recentIds: [...state.recentIds, match.rewardId].slice(-32) };
   try {
-    if (persist() === true) return { kind: 'granted', count: meta.localYonkoReward.claims.length };
+    if (persist() === true) return { kind: 'granted', count: meta.localYonkoReward.claims.length, reward };
   } catch { /* A failed write must not leave a reward in memory. */ }
   Object.assign(meta, previous);
   return { kind: 'save-failed', count: state.claims.length };

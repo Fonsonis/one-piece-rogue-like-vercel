@@ -20,6 +20,13 @@ try{
  await page.locator('[data-challenge="legends"]').click();
  await page.setViewportSize({width:390,height:844});
  await page.evaluate(()=>{meta.settings.theme='dark';applyDisplayPreferences();});
+ await page.locator('#legend-challenge-query').fill('shAnKs');
+ assert.equal(await page.locator('.legend-challenge-card:visible').count(),1);
+ assert.ok(await page.locator('[data-legend-challenge="shanks"]').isVisible());
+ await page.locator('#legend-challenge-query').fill('personaje inexistente');
+ assert.equal(await page.locator('.legend-challenge-card:visible').count(),0);
+ assert.ok(await page.locator('#legend-challenge-empty').isVisible());
+ await page.locator('#legend-challenge-query').fill('');
  await page.screenshot({path:'outputs/challenges/legend-selection-mobile-dark.png',fullPage:true});
  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
  await page.evaluate(()=>{meta.settings.theme='light';applyDisplayPreferences();});

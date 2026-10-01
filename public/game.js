@@ -584,6 +584,7 @@ function loadMeta() {
     meta.roster.push('luffy');
   }
   meta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 2 }, meta.settings || {});
+  if (typeof meta.settings.battleBackpackOpen !== 'boolean') delete meta.settings.battleBackpackOpen;
   autoSettings = normalizeAutoSettings(meta.settings.autoConfig);
   // Preserve saved healing choices from the previous automatic-mode panel.
   if (!meta.settings.autoBackpack && meta.settings.autoConfig) {
@@ -1415,6 +1416,7 @@ function showSettingsModal() {
           <div class="settings-section-heading"><span aria-hidden="true">🧭</span><div><h3 id="settings-game-title">Durante la partida</h3><p>Decide cuánta ayuda quieres al jugar.</p></div></div>
           <label class="settings-toggle-row settings-toggle-label" for="chk-event-confirm"><span><strong>Confirmar eventos del mapa</strong><span class="settings-hint">Muestra qué hay en un nodo antes de entrar.</span></span><input type="checkbox" id="chk-event-confirm" ${showConfirm ? 'checked' : ''}></label>
           <label class="settings-toggle-row settings-toggle-label" for="setting-bag-quick-use"><span><strong>Usar objetos al tocarlos</strong><span class="settings-hint">En combate, consume una unidad sin abrir su ficha.</span></span><input type="checkbox" id="setting-bag-quick-use" ${meta.settings.quickBattleItems === true ? 'checked' : ''}></label>
+          <label class="settings-toggle-row settings-toggle-label" for="setting-bag-open"><span><strong>Mochila abierta en combate</strong><span class="settings-hint">Mantiene la mochila visible entre combates hasta que la cierres.</span></span><input type="checkbox" id="setting-bag-open" ${(meta.settings.battleBackpackOpen ?? !globalThis.matchMedia?.('(max-width: 700px)').matches) ? 'checked' : ''}></label>
         </section>
         <details class="settings-section settings-advanced" ${bagAuto.enabled ? 'open' : ''}>
           <summary><span aria-hidden="true">🤖</span><span><strong>Automatización</strong><small>Ruta, encuentros y objetos de la mochila</small></span><span class="settings-chevron" aria-hidden="true">⌄</span></summary>
@@ -1437,6 +1439,13 @@ function showSettingsModal() {
   ov.querySelector('#setting-bag-auto').onchange = e => setAutoBackpackSettings({enabled:e.target.checked});
   ov.querySelector('#setting-bag-quick-use').onchange = e => {
     meta.settings.quickBattleItems = e.target.checked;
+    saveMeta();
+  };
+  ov.querySelector('#setting-bag-open').onchange = e => {
+    battleBackpackExpanded = e.target.checked;
+    meta.settings.battleBackpackOpen = battleBackpackExpanded;
+    const details = document.querySelector('#battle-backpack');
+    if (details) details.open = battleBackpackExpanded;
     saveMeta();
   };
   ov.querySelector('#setting-bag-where').onchange = e => setAutoBackpackSettings({where:e.target.value});
@@ -2292,23 +2301,8 @@ function showLogPoseGachaModal() {
       if (!Number.isInteger(count) || count < 1 || count > 100 || meta.logPoses < cost * count) return;
       logPoseAutoCount = count;
       const activeSagas = unlockedSagas.filter(s => !logPoseBlockedSagaIds.includes(s.id));
-      meta.logPoses -= cost * count;
-      const results = [];
-      for (let i = 0; i < count; i++) {
-        const prize = rollLogPosePrize(activeSagas);
-        if (!prize) {
-          meta.logPoses += 1000;
-          meta.starPity = 0;
-          results.push({compensation:true});
-          continue;
-        }
-        const wasInDex = dexEntrySeen(prize.prizeId);
-        const duplicateReward = awardLogPosePrize(prize.prizeId);
-        results.push({id:prize.prizeId,wasInDex,duplicateReward});
-      }
-      saveMeta();
       ov.remove();
-      showLogPoseAutoResults(results, cost * count);
+      startLogPoseAutoGacha(activeSagas, count, cost);
     };
 
     const closeBtn = ov.querySelector('#lp-close-modal');
@@ -2375,14 +2369,112 @@ function awardLogPosePrize(prizeId) {
   return duplicateReward;
 }
 
-function showLogPoseAutoResults(results,totalCost) {
+function performLogPoseAutoPull(activeSagas,cost) {
+  if (meta.logPoses < cost) return null;
+  meta.logPoses -= cost;
+  const prize = rollLogPosePrize(activeSagas);
+  if (!prize) {
+    meta.logPoses += 1000;
+    meta.starPity = 0;
+    saveMeta();
+    return {compensation:true,stopIdx:4};
+  }
+  const wasInDex = dexEntrySeen(prize.prizeId);
+  const duplicateReward = awardLogPosePrize(prize.prizeId);
+  saveMeta();
+  return {id:prize.prizeId,stopIdx:prize.stopIdx,wasInDex,duplicateReward};
+}
+
+function startLogPoseAutoGacha(activeSagas,count,cost) {
+  const ov = document.createElement('div');
+  ov.className = 'overlay';
+  ov.innerHTML = `<div class="modal logpose-auto-session" role="dialog" aria-modal="true" aria-labelledby="lp-session-title">
+    <h2 id="lp-session-title">🎰 Carteles automáticos</h2>
+    <p id="lp-session-progress" role="status"></p>
+    <div class="poster-row" aria-label="Carteles de la tirada">${[0,1,2,3,4].map(i=>`<div class="poster" data-p="${i}"><div class="poster-stars">${'⭐'.repeat(i+1)}</div><div class="poster-face" id="pf-${i}">📜<br><span>SE BUSCA</span></div></div>`).join('')}</div>
+    <p id="lp-session-reward" aria-live="polite">Destapando carteles…</p>
+    <div class="actions"><button class="btn blue" id="lp-skip-pull">SALTAR ESTA ANIMACIÓN</button><button class="btn gray" id="lp-stop-auto">DETENER TIRADAS</button></div>
+  </div>`;
+  document.body.appendChild(ov);
+  const results = [];
+  let current = null, nextPoster = 0, timer = null, closed = false;
+  const clear = () => { if (timer !== null) clearTimeout(timer); timer = null; };
+  const finish = () => {
+    if (closed) return;
+    closed = true;
+    clear();
+    ov.remove();
+    showLogPoseAutoResults(results, results.length * cost, count);
+  };
+  const reveal = i => {
+    const el = ov.querySelector(`[data-p="${i}"]`);
+    const face = ov.querySelector(`#pf-${i}`);
+    el.classList.remove('next');
+    el.classList.add('revealed');
+    if (i !== current.stopIdx) {
+      el.classList.add('empty');
+      face.innerHTML = '💨<br><span>VACÍO</span>';
+      return;
+    }
+    el.classList.add('hit');
+    if (current.compensation) {
+      face.innerHTML = '🧭<br><span>+1000</span>';
+      ov.querySelector('#lp-session-reward').textContent = 'Garantía completada · +1000 Log Poses';
+    } else {
+      face.innerHTML = `${charIcon(current.id,28)}<br><span>${CHARS[current.id].name}</span><br>${current.wasInDex ? '📖 Ya en Dex' : '✨ Nuevo en Dex'}`;
+      ov.querySelector('#lp-session-reward').textContent = `${CHARS[current.id].name} · ${current.wasInDex ? 'Ya en Dex' : 'Nuevo en Dex'}${current.duplicateReward ? ` · +${current.duplicateReward} 🧭` : ''}`;
+    }
+  };
+  const advance = () => {
+    if (closed || !current) return;
+    if (nextPoster <= current.stopIdx) {
+      reveal(nextPoster++);
+      if (nextPoster <= current.stopIdx) ov.querySelector(`[data-p="${nextPoster}"]`).classList.add('next');
+      timer = setTimeout(advance, nextPoster > current.stopIdx ? 650 : 330);
+    } else {
+      startPull();
+    }
+  };
+  const startPull = () => {
+    if (closed) return;
+    if (results.length >= count || meta.logPoses < cost) return finish();
+    current = performLogPoseAutoPull(activeSagas,cost);
+    if (!current) return finish();
+    results.push(current);
+    nextPoster = 0;
+    ov.querySelector('#lp-session-progress').textContent = `Tirada ${results.length} de ${count} · 🧭 ${meta.logPoses} disponibles`;
+    ov.querySelector('#lp-session-reward').textContent = 'Destapando carteles…';
+    ov.querySelectorAll('.poster').forEach((el,i) => {
+      el.classList.remove('empty','hit','next','revealed');
+      ov.querySelector(`#pf-${i}`).innerHTML = '📜<br><span>SE BUSCA</span>';
+    });
+    ov.querySelector('[data-p="0"]').classList.add('next');
+    timer = setTimeout(advance, 280);
+  };
+  ov.querySelector('#lp-skip-pull').onclick = () => {
+    if (closed || !current) return;
+    clear();
+    while (nextPoster <= current.stopIdx) reveal(nextPoster++);
+    timer = setTimeout(startPull, 250);
+  };
+  ov.querySelector('#lp-stop-auto').onclick = () => {
+    if (closed) return;
+    clear();
+    if (current) while (nextPoster <= current.stopIdx) reveal(nextPoster++);
+    finish();
+  };
+  ov.onclick = e => { if (e.target === ov) ov.querySelector('#lp-stop-auto').click(); };
+  startPull();
+}
+
+function showLogPoseAutoResults(results,totalCost,requested=results.length) {
   const acquired = results.filter(result => result.id);
   const newCount = acquired.filter(result => !result.wasInDex).length;
   const recovered = results.reduce((sum,result) => sum + (result.duplicateReward || (result.compensation ? 1000 : 0)),0);
   const ov = document.createElement('div');
   ov.className = 'overlay';
   ov.innerHTML = `<div class="modal logpose-auto-results" role="dialog" aria-modal="true" aria-labelledby="lp-auto-title">
-    <h2 id="lp-auto-title">⚡ ${results.length} tiradas completadas</h2>
+    <h2 id="lp-auto-title">⚡ ${results.length} de ${requested} tiradas completadas</h2>
     <p>${newCount} nuevos en la Dex · 🧭 ${totalCost} gastados · 🧭 ${recovered} recuperados</p>
     <div class="logpose-auto-list">${results.map(result => result.compensation
       ? '<div>🧭 Garantía completada · +1000 Log Poses</div>'
@@ -2468,7 +2560,7 @@ function screenHome() {
   const accLvl = accountLevel();
   const runnerUnlocked = accLvl >= 1;
   const towerUnlocked = accLvl >= 20;
-  const challengeUnlocked = accLvl >= 35;
+  const challengeUnlocked = accLvl >= 35 || legendsUnlocked();
   const { totalCompleted: completedAch, totalAchievements: totalAchCount, hasUnclaimedAch } = getAchievementsInfo();
   render(`
     ${topbar(false)}
@@ -3389,19 +3481,19 @@ function showInventoryModal(opts = {}) {
     const cards=ids.slice(page*pageSize,(page+1)*pageSize).map(id=>{
       const displayId=evolutionFormAt(id,startLvlOf(id)),c=CHARS[displayId],level=startLvlOf(id);
       const cost=logPoseUpgradeCost(level),maxed=level>=cap,canAfford=(meta.logPoses||0)>=cost;
-      const relic=meta.relics.includes(meta.relicEquipment?.[id])?RELICS[meta.relicEquipment[id]]:null;
+      const ownsRelic=meta.relics.some(relicId=>RELICS[relicId]?.character===id);
+      const relicStatus=ownsRelic?'Reliquia conseguida':'Reliquia bloqueada';
       return `<article class="inventory-card ${currentTeam.includes(id)?'in-team':''}" data-id="${id}">
-        <div class="inventory-card-top"><span>${currentTeam.includes(id)?'En tu equipo':'Nakama'}</span><span class="inventory-rarity" aria-label="Rareza ${c.rareza} de 5 estrellas"><span aria-hidden="true">★</span> ${c.rareza}/5</span></div>
+        <div class="inventory-card-top"><span>${currentTeam.includes(id)?'En tu equipo':'Reclutado'}</span><span class="inventory-card-marks"><span class="inventory-relic-mark ${ownsRelic?'owned':'locked'}" role="img" aria-label="${relicStatus}" title="${relicStatus}">${ownsRelic?'🏺':'🔒'}</span><span class="inventory-rarity" aria-label="Rareza ${c.rareza} de 5 estrellas"><span aria-hidden="true">★</span> ${c.rareza}/5</span></span></div>
         <button class="inventory-profile btn-info-inv" data-id="${id}" aria-label="Ver ficha de ${collectionText(c.name)}"><span class="inventory-portrait" aria-hidden="true">${charIcon(displayId,80)}</span><strong>${c.name}</strong><span class="inventory-profile-link">Ver ficha ↗</span></button>
         ${characterSortStatHTML(displayId,invViewState.sort)}<div class="inventory-level">Nivel base <strong>${level}</strong></div><div class="type-badges">${typeBadges(c.types)}</div>
-        <p class="inventory-relic">${relic?`🏺 ${esc(relic.name)}<br><span>${relic.character===id?'Afinidad activa':'Boost común activo'}</span>`:'Sin reliquia equipada'}</p>
         <div class="inventory-upgrade">${maxed?`<span class="inventory-limit">Límite de saga: Nv. ${cap}</span><button class="btn btn-upg-inv" data-id="${id}" disabled aria-label="Nivel máximo de saga alcanzado"><span class="inventory-upgrade-label">Nivel máximo</span><span class="inventory-upgrade-short" aria-hidden="true">Máx.</span></button>`:`<span class="inventory-cost" title="${number(cost)} Log Poses">Coste: <strong>${compact(cost)} 🧭</strong></span><button class="btn gold btn-upg-inv" data-id="${id}" ${canAfford?'':'disabled'} aria-label="Mejorar a ${collectionText(c.name)} al nivel base ${level+1} por ${number(cost)} Log Poses"><span class="inventory-upgrade-label">Subir a Nv. ${level+1}</span><span class="inventory-upgrade-short" aria-hidden="true">↑ Lv. ${level+1}</span></button>${canAfford?'':`<span class="inventory-shortfall">Faltan ${compact(cost-(meta.logPoses||0))} 🧭</span>`}`}${level>5?`<button class="btn gray small btn-sell-base-inv" data-id="${id}" aria-label="Vender niveles base de ${collectionText(c.name)} y recuperar ${number(Math.floor(charBaseLevelSpent(id)/2))} Log Poses">Vender niveles · +${compact(Math.floor(charBaseLevelSpent(id)/2))} 🧭</button>`:''}</div>
       </article>`;
     }).join('');
     const filtered=invViewState.type||+invViewState.rarity||invViewState.saga;
     return `<button class="btn gray collection-close" id="inv-close-x" aria-label="Cerrar inventario">Cerrar <span aria-hidden="true">×</span></button><div class="inventory-scroll"><header class="collection-header"><div><span class="collection-eyebrow">Tu tripulación</span><h2 id="inv-title" tabindex="-1">${collectionText(opts.title || 'Inventario')}</h2></div></header>
       <button class="btn gray inventory-relics-link" id="inv-relics">🏺 Reliquias (${meta.relics.filter(id=>RELICS[id]).length}) · Ver colección →</button>
-      <div class="collection-summary"><div><strong>${allUnlocked.length}</strong><span>Nakamas disponibles</span></div><button class="collection-summary-action" id="inv-logpose-info" aria-label="${number(meta.logPoses||0)} Log Poses disponibles. Ver cómo conseguirlos"><strong>${compact(meta.logPoses||0)} 🧭</strong><span>Log Poses · ¿Cómo conseguirlos?</span></button></div>
+      <div class="collection-summary"><div><strong>${allUnlocked.length}</strong><span>Reclutados disponibles</span></div><button class="collection-summary-action" id="inv-logpose-info" aria-label="${number(meta.logPoses||0)} Log Poses disponibles. Ver cómo conseguirlos"><strong>${compact(meta.logPoses||0)} 🧭</strong><span>Log Poses · ¿Cómo conseguirlos?</span></button></div>
       <label for="inv-q" class="inventory-search-label">Buscar nakama<input id="inv-q" type="search" placeholder="Nombre del personaje o su forma" value="${collectionText(invViewState.q)}"></label>
       <details class="collection-extra" ${filtersOpen?'open':''}><summary>Filtros y vista${filtered?' · activos':''}</summary><div class="collection-filter-grid inventory-filters">
         <label for="inv-saga">Saga<select id="inv-saga"><option value="">Todas las sagas</option>${groupUpgradeRoster(allUnlocked).map(g=>`<option value="${g.id}" ${invViewState.saga===g.id?'selected':''}>${g.name}</option>`).join('')}</select></label>
@@ -3489,7 +3581,7 @@ const starterView = { q: '', saga: '', type: '', rarity: 0, sort: 'default', pag
 function selCardHTML(id, veteran, picked, unlocked) {
   const c = CHARS[id];
   return `<div class="dex-card sel-card ${picked ? 'picked' : ''} ${unlocked ? '' : 'locked'}" data-id="${id}">
-    ${!unlocked ? '<div class="veteran-tag" style="background:#666;">🔒 BLOQUEADO</div>' : veteran ? '<div class="veteran-tag">🏅 VETERANO</div>' : (c.nakama ? '<div class="veteran-tag" style="background:var(--sea);">🏴‍☠️ NAKAMA</div>' : '')}
+    ${!unlocked ? '<div class="veteran-tag" style="background:#666;">🔒 BLOQUEADO</div>' : veteran ? '<div class="veteran-tag">🏅 RECLUTADO</div>' : (c.nakama ? '<div class="veteran-tag" style="background:var(--sea);">👁 AVISTADO</div>' : '')}
     <div class="emoji">${charIcon(id, 36)}</div>
     <div style="font-size:9px;margin:3px 0;">${c.name}</div>
     <div class="char-lvl">${unlocked ? `Nv. ${startLvlOf(id)}${startLvlOf(id) > 5 ? ' 🔥' : ''} · ` : ''}${'⭐'.repeat(c.rareza)}</div>
@@ -3751,7 +3843,11 @@ function screenStarter(sagaIdx, islandIdx = 0) {
   const renderSlotsGrid = () => {
     let slotsHTML = '';
     const cap = maxStartLvlCap();
-    for (let i = 0; i < maxSlots; i++) {
+    for (let i = 0; i < 6; i++) {
+      if (i >= maxSlots) {
+        slotsHTML += `<div class="starter-slot-card locked-slot" aria-label="Hueco ${i + 1} bloqueado"><div class="starter-slot-badge">HUECO ${i + 1}</div><span aria-hidden="true">🔒</span><b>Bloqueado</b><small>Desbloquea más huecos en la tienda</small></div>`;
+        continue;
+      }
       const id = picked[i];
       if (id && CHARS[id]) {
         const displayId = evolutionFormAt(id, startLvlOf(id));
@@ -3795,12 +3891,13 @@ function screenStarter(sagaIdx, islandIdx = 0) {
         `;
       }
     }
-    return `<div class="starter-team-grid">${slotsHTML}</div>${maxSlots < 6 ? `<p class="starter-locked-summary">🔒 ${6 - maxSlots} huecos más disponibles en la tienda</p>` : ''}`;
+    return `<div class="starter-team-grid">${slotsHTML}</div>`;
   };
 
   const renderPresetsBar = () => {
     return `
-      <details class="preset-bar"><summary>💾 Equipos guardados</summary>
+      <div class="preset-bar" style="display:flex;flex-direction:column;gap:6px;align-items:center;margin:12px 0;background:rgba(0,0,0,0.25);padding:10px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.15);">
+        <span style="font-size:9px;font-weight:bold;color:var(--gold);">💾 EQUIPOS PREDEFINIDOS</span>
         <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;width:100%;">
           ${[1, 2, 3].map(slot => {
       const p = meta.teamPresets[slot] || [];
@@ -3816,7 +3913,7 @@ function screenStarter(sagaIdx, islandIdx = 0) {
               </div>`;
     }).join('')}
         </div>
-      </details>`;
+      </div>`;
   };
 
   render(`
@@ -3987,11 +4084,7 @@ function screenStarter(sagaIdx, islandIdx = 0) {
     $('#starter-synergies').innerHTML = activeSynergiesHTML(previewTeam);
     $('#starter-synergy-info').onclick = () => showSynergyModal(previewTeam);
     const presetBarCont = document.querySelector('.preset-bar');
-    if (presetBarCont) {
-      const wasOpen = presetBarCont.open;
-      presetBarCont.outerHTML = renderPresetsBar();
-      document.querySelector('.preset-bar').open = wasOpen;
-    }
+    if (presetBarCont) presetBarCont.outerHTML = renderPresetsBar();
     const lpCont = $('#starter-logpose-info');
     if (lpCont) lpCont.innerHTML = `🧭 Log Poses: ${meta.logPoses || 0} ℹ️`;
     bindEvents();
@@ -4387,13 +4480,13 @@ function backpackHTML(owner, combat = false, category = null) {
   const cells = stacks.map(({id,key,count,size}) => {
     const item = ITEMS[id], pos = layout[key], {w,h} = backpackShape(size,pos.vertical);
     const footprint = backpackCells(size,pos.cell,pos.vertical);footprint.forEach(c=>occupied.add(c));
-    return `<button type="button" class="bag-piece bag-filled" style="grid-column:${pos.cell%3+1}/span ${w};grid-row:${Math.floor(pos.cell/3)+1}/span ${h};--bag-piece-columns:${w}" data-bag-item="${id}" data-bag-count="${count}" data-bag-stack="${key}" title="${item.name} ×${count} · ${w}×${h}" aria-label="${item.name} ×${count}, ocupa ${w} por ${h} casillas">
+    return `<button type="button" class="bag-piece bag-filled" style="grid-column:${pos.cell%3+1}/span ${w};grid-row:${Math.floor(pos.cell/3)+1}/span ${h};--bag-piece-columns:${w}" data-bag-item="${id}" data-bag-count="${count}" data-bag-stack="${key}" data-bag-cell="${pos.cell}" ${combat ? '' : 'draggable="true"'} title="${item.name} ×${count} · ${w}×${h}" aria-label="${item.name} ×${count}, ocupa ${w} por ${h} casillas. Toca para mover o arrastra a una casilla libre">
       <span class="bag-piece-cells">${footprint.map(c=>`<span class="bag-cell bag-occupied"><span class="bag-slot-number">${c+1}</span></span>`).join('')}</span>
       <span class="bag-icon">${item.emoji}</span><span class="bag-quantity">×${count}</span>
       <span class="bag-item-name">${item.name}${size > 1 ? ` · ${w}×${h}` : ''}</span>
     </button>`;
   }).join('');
-  const empty = Array.from({length:capacity},(_,i)=>i).filter(i=>!occupied.has(i)).map(i=>`<div class="bag-cell bag-empty" style="grid-column:${i%3+1};grid-row:${Math.floor(i/3)+1}" aria-label="Casilla ${i+1} libre"><span class="bag-slot-number">${i+1}</span><span>＋</span></div>`).join('');
+  const empty = Array.from({length:capacity},(_,i)=>i).filter(i=>!occupied.has(i)).map(i=>`<div class="bag-cell bag-empty" data-bag-cell="${i}" style="grid-column:${i%3+1};grid-row:${Math.floor(i/3)+1}" aria-label="Casilla ${i+1} libre"><span class="bag-slot-number">${i+1}</span><span>＋</span></div>`).join('');
   const pending = Object.entries(owner.pendingLoot || {}).filter(([id,n])=>ITEMS[id] && n>0 && (isBattleItem(id) === battleBag)).map(([id,n])=>`
     <div class="bag-pending-item"><span>${ITEMS[id].emoji} ${ITEMS[id].name} ×${n}</span>
       <button type="button" data-bag-collect="${id}">COLOCAR</button>
@@ -4403,18 +4496,18 @@ function backpackHTML(owner, combat = false, category = null) {
     <div class="bag-grid">${cells}${empty}</div>
     ${combat ? '' : `<button type="button" class="btn small" data-bag-organize="${battleBag}">ORGANIZAR MOCHILA</button>`}
     ${pending ? `<div class="bag-pending"><b>Pendiente de guardar</b><p>Elige una posición, reorganiza la mochila o deja los objetos para continuar.</p>${pending}</div>` : ''}
-    ${combat ? '' : `<p class="bag-help">${battleBag ? 'Curas, resurrecciones y bebidas de combate.' : 'Carteles, frutas y mejoras para la isla.'} Hasta ${backpackStackLimit()} unidades del mismo objeto por pila. Las dos mochilas tienen su propio espacio y se amplían juntas.</p>`}
+    ${combat ? '' : `<p class="bag-help">Toca un objeto para mover su pila o arrástralo a una casilla libre. ${battleBag ? 'Curas, resurrecciones y bebidas de combate.' : 'Carteles, frutas y mejoras para la isla.'} Hasta ${backpackStackLimit()} unidades del mismo objeto por pila.</p>`}
   </div>`;
 }
 function saveBackpack(owner) { if (owner === run) saveRun(); }
-function showBackpackOrganizer(owner, battleBag, refresh, initialId = null) {
+function showBackpackOrganizer(owner, battleBag, refresh, initialId = null, initialStack = null) {
   prepareBackpack(owner);
   if (autoMode) pauseAutoForChoice();
   const activeBattle = battle && (battle.tower ? tower : run) === owner ? battle : null;
   const wasWaiting = activeBattle?.waiting;
   if (activeBattle && !activeBattle.over) pauseBattle();
   const ov = document.createElement('div');ov.className='overlay';
-  let selection=initialId ? `pending:${initialId}` : '', cell=null, vertical=false, closed=false;
+  let selection=initialId ? `pending:${initialId}` : initialStack || '', cell=null, vertical=false, closed=false;
   const close=()=>{
     if (closed) return;
     closed=true;ov.remove();refresh();
@@ -4448,7 +4541,12 @@ function showBackpackOrganizer(owner, battleBag, refresh, initialId = null) {
       <div class="actions"><button class="btn green" data-layout-place ${valid?'':'disabled'}>${merging?'APILAR 1':incoming?'GUARDAR 1':'MOVER PILA'}</button><button class="btn gray" data-layout-close>VOLVER</button></div></div>`;
     ov.querySelector('[data-layout-select]').onchange=e=>{selection=e.target.value;cell=null;vertical=false;renderOrganizer();};
     ov.querySelector('[data-layout-rotate]').onclick=()=>{vertical=!vertical;renderOrganizer();};
-    ov.querySelectorAll('[data-layout-cell]').forEach(btn=>{btn.onclick=()=>{cell=Number(btn.dataset.layoutCell);renderOrganizer();};});
+    ov.querySelectorAll('[data-layout-cell]').forEach(btn=>{btn.onclick=()=>{
+      const occupiedStack=occupied.get(Number(btn.dataset.layoutCell));
+      if (occupiedStack && occupiedStack.key !== selection) { selection=occupiedStack.key; cell=null; vertical=false; }
+      else cell=Number(btn.dataset.layoutCell);
+      renderOrganizer();
+    };});
     ov.querySelector('[data-layout-place]').onclick=()=>{
       if(closed || !valid) return;
       const done=incoming ? placePendingBackpackItem(owner,id,cell,vertical) : moveBackpackStack(owner,key,cell,vertical);
@@ -4467,7 +4565,66 @@ function bindBackpack(root, owner, combat, refresh) {
     button.onclick = () => showBackpackOrganizer(owner,button.dataset.bagOrganize==='true',refresh);
   });
   root.querySelectorAll('[data-bag-item]').forEach(button => {
-    button.onclick = () => showBackpackItem(owner, button.dataset.bagItem, Number(button.dataset.bagCount), combat, refresh);
+    button.onclick = () => {
+      if (button.dataset.bagDragged === 'true') { delete button.dataset.bagDragged; return; }
+      showBackpackItem(owner, button.dataset.bagItem, Number(button.dataset.bagCount), combat, refresh, button.dataset.bagStack);
+    };
+    if (combat) return;
+    const moveTo = target => {
+      const targetCell = Number(target?.closest?.('[data-bag-cell]')?.dataset.bagCell);
+      if (!Number.isInteger(targetCell) || !target?.closest?.('[data-bag-cell]')) return;
+      const key = button.dataset.bagStack;
+      const vertical = owner.bagLayout?.[key]?.vertical || false;
+      if (!moveBackpackStack(owner,key,targetCell,vertical)) {
+        toast('🎒 La pila no cabe ahí. Prueba otra casilla o gírala al tocarla.');
+        return;
+      }
+      saveBackpack(owner);
+      refresh();
+    };
+    button.ondragstart = event => {
+      event.dataTransfer?.setData('text/plain',button.dataset.bagStack);
+      if (event.dataTransfer) event.dataTransfer.effectAllowed='move';
+    };
+    let pointerStart=null;
+    button.onpointerdown = event => {
+      if (event.pointerType === 'mouse') return;
+      pointerStart={x:event.clientX,y:event.clientY,dragged:false};
+      button.setPointerCapture?.(event.pointerId);
+    };
+    button.onpointermove = event => {
+      if (!pointerStart) return;
+      if (Math.hypot(event.clientX-pointerStart.x,event.clientY-pointerStart.y)>12) {
+        pointerStart.dragged=true;button.classList.add('bag-dragging');
+      }
+    };
+    button.onpointerup = event => {
+      if (!pointerStart) return;
+      const dragged=pointerStart.dragged;
+      pointerStart=null;button.classList.remove('bag-dragging');
+      if (dragged) {
+        button.dataset.bagDragged='true';
+        setTimeout(()=>{delete button.dataset.bagDragged;},350);
+        moveTo(document.elementFromPoint?.(event.clientX,event.clientY));
+      }
+    };
+    button.onpointercancel = () => {pointerStart=null;button.classList.remove('bag-dragging');};
+  });
+  if (!combat) root.querySelectorAll('.backpack .bag-grid').forEach(grid => {
+    grid.ondragover = event => {
+      if (event.target.closest?.('[data-bag-cell]')) event.preventDefault();
+    };
+    grid.ondrop = event => {
+      event.preventDefault();
+      const key=event.dataTransfer?.getData('text/plain');
+      const target=event.target.closest?.('[data-bag-cell]');
+      const cell=Number(target?.dataset.bagCell);
+      if (!target || !Number.isInteger(cell) || !backpackStacks(owner).some(s=>s.key===key && isBattleItem(s.id)===(grid.closest('.backpack')?.querySelector('[data-bag-organize]')?.dataset.bagOrganize==='true'))) return;
+      if (!moveBackpackStack(owner,key,cell,owner.bagLayout?.[key]?.vertical || false)) {
+        toast('🎒 La pila no cabe ahí. Prueba otra casilla o gírala al tocarla.');return;
+      }
+      saveBackpack(owner);refresh();
+    };
   });
   root.querySelectorAll('[data-bag-collect]').forEach(button => {
     button.onclick = () => {
@@ -4485,7 +4642,7 @@ function bindBackpack(root, owner, combat, refresh) {
     };
   });
 }
-function showBackpackItem(owner, id, count, combat, refresh) {
+function showBackpackItem(owner, id, count, combat, refresh, stackKey = null) {
   if (!(owner.items[id] > 0) || (combat && !isBattleItem(id))) return;
   const b = combat ? battle : null;
   if (combat && (!b || b.over || b.waiting)) return;
@@ -4498,6 +4655,7 @@ function showBackpackItem(owner, id, count, combat, refresh) {
     <p>${item.slotSize} casilla${item.slotSize > 1 ? 's' : ''} · Hasta ${backpackStackLimit()} por pila</p>
     ${!usable ? `<p>${item.kind === 'ball' ? 'Se usa en el evento de las cadenas.' : item.kind === 'battleBoost' ? 'Se usa durante el combate.' : 'Se usa fuera del combate.'}</p>` : ''}
     <div class="actions"><button class="btn green" data-bag-use ${usable ? '' : 'disabled'}>USAR</button>
+      ${!combat && stackKey ? '<button class="btn blue" data-bag-move>MOVER PILA</button>' : ''}
       <button class="btn red" data-bag-discard>DESCARTAR ${count > 1 ? `PILA ×${count}` : '1'}</button>
       <button class="btn gray" data-bag-close>VOLVER</button></div></div>`;
   document.body.appendChild(ov);
@@ -4508,6 +4666,8 @@ function showBackpackItem(owner, id, count, combat, refresh) {
     if (b && battle === b && !b.over) resumeBattle();
   };
   ov.querySelector('[data-bag-close]').onclick = close;
+  const moveButton = ov.querySelector('[data-bag-move]');
+  if (moveButton) moveButton.onclick = () => {close();showBackpackOrganizer(owner,isBattleItem(id),refresh,null,stackKey);};
   ov.querySelector('[data-bag-use]').onclick = () => {
     if (!usable || closed) return;
     close();
@@ -4708,17 +4868,10 @@ function screenMap(activePageIdx = 0) {
           </div>
         </div>
 
-        <!-- PÁGINA 3: MOCHILA Y EMBLEMAS (ANCHO COMPLETO) -->
+        <!-- PÁGINA 3: MOCHILA (ANCHO COMPLETO) -->
         <div class="carousel-page" id="page-bag">
           <div class="panel">
             <div id="map-backpack">${backpackHTML(run)}</div>
-            <h3 style="margin-top:14px;">🏅 EMBLEMAS DE LA SAGA</h3>
-            <div class="badge-grid">
-              ${saga.islands.map((isl, i) =>
-                `<div class="badge-slot ${run.badges.includes(i) ? '' : 'empty'}" title="${isl.name}">${run.badges.includes(i) ? '🏅' : '·'}</div>`
-              ).join('')}
-            </div>
-
           </div>
         </div>
       </div>
@@ -5660,8 +5813,15 @@ function addToTeam(f, done) {
 
 // ============ FICHA DE PERSONAJE ============
 // Muestra las características reales del personaje en la saga (nivel, fusiones y barco).
-function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navigation = null) {
+function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navigation = null, selectedCrew = null) {
   const isLive = typeof fOrId === 'object';
+  const sheetBase = baseFormOf(isLive ? fOrId.id : fOrId);
+  const selectableCrews = !isLive ? crewOptions(sheetBase) : [];
+  const savedCrew = !isLive ? preferredCrew(sheetBase) : null;
+  const crewPreview = selectableCrews.includes(selectedCrew) ? selectedCrew
+    : existingOverlay?.sheetCrewBase === sheetBase && existingOverlay?.sheetCrewPreference === savedCrew && selectableCrews.includes(existingOverlay.sheetCrewPreview)
+      ? existingOverlay.sheetCrewPreview : savedCrew;
+  const crewPreviewLocked = !isLive && crewPreview && !crewVersionUnlocked(sheetBase, crewPreview);
   const forms=characterForms(isLive?fOrId.id:fOrId);
   const previewId=forms.some(form=>form.id===selectedForm)?selectedForm:forms[0].id;
   const phaseIndex=forms.findIndex(form=>form.id===previewId);
@@ -5675,6 +5835,7 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
     phaseSagaLocked ? `llegar a ${phaseSagaName}` : '',
   ].filter(Boolean);
   const f = isLive ? migrateFighter(fOrId, !!battle?.eTeam.includes(fOrId)) : applyUpgrades(makeChar(previewId, startLvlOf(fOrId), false, true));
+  if (!isLive && crewPreview) f.crewId = crewPreview;
   const c = CHARS[f.id];
   const lore = (typeof LORE !== 'undefined' && LORE) ? (LORE[f.id] || LORE[baseFormOf(f.id)] || {}) : {};
   const pInfo = passiveInfo(f);
@@ -5707,16 +5868,17 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
   const upgCost = logPoseUpgradeCost(f.lvl);
   const canAffordUpg = (meta.logPoses || 0) >= upgCost;
   const isMaxLvl = f.lvl >= cap;
-  const selectableCrews = !isLive ? crewOptions(fOrId) : [];
-  const crewPreference = isLive ? fighterCrew(f) : preferredCrew(fOrId);
-  const sheetFaction = crewPreference ? CREW_BY_ID[crewPreference] : null;
+  const crewPreference = isLive ? fighterCrew(f) : savedCrew;
+  const sheetFaction = crewPreview ? CREW_BY_ID[crewPreview] : crewPreference ? CREW_BY_ID[crewPreference] : null;
   const crewChoiceHTML = selectableCrews.length > 1 ? `<section class="sheet-section sheet-gear4 sheet-crew-choice" aria-labelledby="sheet-crew-title">
     <b id="sheet-crew-title">🏴‍☠️ Versiones de tripulación</b>
     <div class="sheet-gear4-options">${selectableCrews.map(id=>{
       const crew=CREW_BY_ID[id], unlocked=crewVersionUnlocked(fOrId,id);
-      const canBuy=ownsCharacter && (meta.logPoses || 0)>=CREW_VERSION_PRICE;
-      return `<button type="button" class="btn small gear4-choice${crewPreference===id?' selected':''}" data-crew-choice="${id}" aria-pressed="${crewPreference===id}" ${unlocked?'':canBuy?'':`disabled title="${ownsCharacter?'Faltan Log Poses':'Recluta al personaje primero'}"`}><span>${crew.emoji} ${esc(crew.name)}</span><small>${crewPreference===id?'Elegida':unlocked?'Elegir versión':`Comprar · ${CREW_VERSION_PRICE.toLocaleString('es')} 🧭`}</small></button>`;
-    }).join('')}</div><p>La versión habitual está incluida. Cada alternativa cuesta 100.000 Log Poses una sola vez; después podrás cambiar gratis. La versión elegida determina la sinergia y apariencia de nuevas aventuras.</p>
+      const previewing=crewPreview===id;
+      const status=unlocked ? crewPreference===id?'Elegida':previewing?'Toca de nuevo para elegir':'Vista previa'
+        : previewing?`🔒 Toca de nuevo para comprar · ${CREW_VERSION_PRICE.toLocaleString('es')} 🧭`:'🔒 Vista previa';
+      return `<button type="button" class="btn small gear4-choice${previewing?' selected':''}${unlocked?'':' crew-choice-locked'}" data-crew-choice="${id}" aria-pressed="${previewing}" title="${unlocked?'Versión desbloqueada':`Versión bloqueada · ${CREW_VERSION_PRICE.toLocaleString('es')} Log Poses`}"><span>${crew.emoji} ${esc(crew.name)}</span><small>${status}</small></button>`;
+    }).join('')}</div><p>Toca una versión para verla. Si está bloqueada, tócala de nuevo para confirmar su compra por 100.000 Log Poses. Las versiones compradas se pueden elegir gratis para nuevas aventuras.</p>
   </section>` : '';
   const showGear4Choice = !isLive && baseFormOf(fOrId) === 'luffy';
   const gear4Preference = preferredLuffyGear4(meta);
@@ -5737,9 +5899,12 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
   const previousFocus=document.activeElement;
   const closeSheet = existingOverlay?.querySelector('#sheet-close')?.onclick || (() => {ov.remove();if(previousFocus?.isConnected)previousFocus.focus({preventScroll:true});});
   ov.sheetNavigation = navigation || ov.sheetNavigation || null;
+  ov.sheetCrewBase = sheetBase;
+  ov.sheetCrewPreview = crewPreview;
+  ov.sheetCrewPreference = savedCrew;
   ov.className = 'overlay';
-  ov.innerHTML = `<div class="modal char-sheet ${phaseLocked?'phase-locked':''}" role="dialog" aria-modal="true" aria-label="Ficha de ${collectionText(c.name)}">
-    <h2><span style="font-size:26px;vertical-align:middle;">${phaseLocked?'🔒':charIcon(f.id, 34, f.crewId)}</span> ${c.name}${phaseLocked?'':rarityTag+fusionTag} <small>${phaseLocked?'Bloqueada':'Nv.'+f.lvl}</small></h2>
+  ov.innerHTML = `<div class="modal char-sheet ${phaseLocked?'phase-locked':''} ${crewPreviewLocked?'crew-preview-locked':''}" role="dialog" aria-modal="true" aria-label="Ficha de ${collectionText(c.name)}">
+    <h2><span class="sheet-crew-title-icon" style="font-size:26px;vertical-align:middle;">${phaseLocked?'🔒':charIcon(f.id, 34, f.crewId)}</span> ${c.name}${phaseLocked?'':rarityTag+fusionTag} <small>${phaseLocked?'Bloqueada':'Nv.'+f.lvl}</small></h2>
     <div class="char-sheet-hero" data-phase-locked="${phaseLocked}" style="text-align:center;padding:12px;margin:8px 0 12px;background:radial-gradient(ellipse at center, rgba(232, 200, 50, 0.22) 0%, rgba(0,0,0,0.35) 75%);border:2px solid var(--gold);border-radius:8px;position:relative;">
       <div class="char-sheet-sprite" data-character="${f.id}" style="display:inline-block;filter:drop-shadow(3px 5px 8px rgba(0,0,0,0.6));">
         ${charIcon(f.id, 90, f.crewId)}
@@ -5748,6 +5913,7 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
       <div class="platform" style="width:120px;height:24px;margin:-10px auto 0;background:radial-gradient(ellipse at center, #7ec850 0%, #4aa557 70%, transparent 72%);border-radius:50%;box-shadow:inset 0 0 0 2px rgba(217, 131, 46, 0.35);"></div>
       <div style="margin-top:6px;font-size:9px;color:var(--gold);"><b>Rareza:</b> ${'⭐'.repeat(c.rareza || 1)} (${c.rareza || 1} Estrellas)</div>
       ${!isLive&&forms.length>1?`<p class="sheet-phase-caption" role="status">Fase ${phaseIndex+1} de ${forms.length} · ${phaseIndex===0?'Forma base':esc(c.name)}<br>${phaseLocked?`🔒 Bloqueada · Falta ${esc(phaseMissing.join(' y '))}`:phaseIndex?`Desbloqueada · Nv. ${phase.level} en partida · ${esc(phaseSagaName)}`:''}</p>`:''}
+      ${crewPreviewLocked?`<p class="sheet-crew-preview-caption" role="status">🔒 Vista previa de ${esc(CREW_BY_ID[crewPreview].name)} · Toca de nuevo su versión para comprarla</p>`:''}
     </div>
     ${crewChoiceHTML}
     ${gear4ChoiceHTML}
@@ -5785,7 +5951,7 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
       ${isFru ? '<b>🍈 Tag FRUTA</b> — recibe la mitad de daño de atacantes sin HAKI. ' : ''}
       ${isHak ? '<b>👁️ Tag HAKI</b> — sus ataques anulan la defensa pasiva de los usuarios FRUTA.' : ''}
     </div>` : ''}
-    ${(sheetFaction || lore.faccion) ? `<div class="sheet-line" style="color:var(--sea);"><b>Facción:</b> ${sheetFaction ? `${sheetFaction.emoji} ${esc(sheetFaction.name)} — cuenta para esta sinergia de tripulación` : esc(lore.faccion)}</div>` : ''}
+    ${(sheetFaction || lore.faccion) ? `<div class="sheet-line" style="color:var(--sea);"><b>Facción:</b> ${sheetFaction ? `${sheetFaction.emoji} ${esc(sheetFaction.name)} — ${crewPreview!==crewPreference?'vista previa; elige esta versión para activar su sinergia':'cuenta para esta sinergia de tripulación'}` : esc(lore.faccion)}</div>` : ''}
     ${lore.clase ? `<div class="sheet-line"><b>Clase:</b> ${lore.clase}</div>` : ''}
     <div class="sheet-stats">
       ${stats.map(([label, val, max, bonus]) => `
@@ -5810,7 +5976,7 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
     ${pInfo ? `<div class="sheet-section sheet-passive"><b>✨ Pasiva — ${pInfo.label}</b><p>${pInfo.desc}</p></div>` : ''}
     ${ultMv ? `<div class="sheet-section sheet-ultimate"><b>💥 Habilidad Definitiva — ${ultMv.name}</b><p>${ultMv.type ? `<span class="type-badge" style="background:${TYPES[ultMv.type]?.color || '#888'}">${ultMv.type.toUpperCase()}</span> ` : ''}${ultMv.power ? ultMv.power + ' PWR · ' + Math.round((ultMv.acc || 0.9) * 100) + '% precisión' : 'MOVIMIENTO DEFINITIVO'}</p></div>` : ''}
     ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>${CHARS[c.evo.to].name} requiere nivel base ${c.evo.lvl}, nivel ${c.evo.lvl} en partida y llegar a ${esc(nextSagaName)}. Tu nivel base: ${startLvlOf(f.id)} · Saga: ${nextSagaReached?'alcanzada':'pendiente'}. ${nextBaseReached&&nextSagaReached?'La forma se activará al alcanzar el nivel necesario en partida.':'Aún faltan requisitos permanentes para desbloquearla.'}</p></div>` : ''}
-    <p class="sheet-desc">${c.desc}</p>
+    <p class="sheet-desc"><strong>Biografía:</strong> ${esc(CHARS[baseFormOf(f.id)]?.bio || c.bio)}</p>
     `}
     <div class="actions" style="flex-direction:column;gap:6px;">
       ${isLive && (!battle || battle.over) && run && run.team && run.team.includes(f) ? `<button class="btn red small" id="sheet-dismiss-btn" style="width:100%;">🗑️ EXPULSAR DE LA BANDA</button>` : ''}
@@ -5847,17 +6013,26 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
   (ov.querySelectorAll?.('[data-crew-choice]') || []).forEach(button => button.onclick = () => {
     const crewId=button.dataset.crewChoice,base=baseFormOf(fOrId);
     if (!crewOptions(base).includes(crewId)) return;
-    if (!crewVersionUnlocked(base,crewId) && !buyCrewVersion(base,crewId)) {
-      toast('⚠️ No se pudo comprar la versión. Comprueba tus Log Poses y el guardado.');
-      return;
-    }
-    const previousPreferences=meta.formPreferences;
-    meta.formPreferences={...previousPreferences,crews:{...previousPreferences?.crews,[base]:crewId}};
-    if (!saveMeta()) { meta.formPreferences=previousPreferences; toast('⚠️ No se pudo guardar la versión elegida.'); return; }
     const scrollTop=ov.querySelector('.modal').scrollTop;
-    showCharModal(fOrId,ov,previewId);
-    queueMicrotask(()=>{if(ov.isConnected){ov.querySelector('.modal').scrollTop=scrollTop;ov.querySelector(`[data-crew-choice="${crewId}"]`)?.focus({preventScroll:true});}});
-    toast(`${CREW_BY_ID[crewId].emoji} ${CHARS[base].name}: ${CREW_BY_ID[crewId].name} para nuevas aventuras.`);
+    const showCrew=()=>{
+      showCharModal(fOrId,ov,previewId,null,crewId);
+      queueMicrotask(()=>{if(ov.isConnected){ov.querySelector('.modal').scrollTop=scrollTop;ov.querySelector(`[data-crew-choice="${crewId}"]`)?.focus({preventScroll:true});}});
+    };
+    if (crewPreview!==crewId) { showCrew(); return; }
+    if (crewId===crewPreference) return;
+    const chooseCrew=()=>{
+      const previousPreferences=meta.formPreferences;
+      meta.formPreferences={...previousPreferences,crews:{...previousPreferences?.crews,[base]:crewId}};
+      if (!saveMeta()) { meta.formPreferences=previousPreferences; toast('⚠️ No se pudo guardar la versión elegida.'); return; }
+      showCrew();
+      toast(`${CREW_BY_ID[crewId].emoji} ${CHARS[base].name}: ${CREW_BY_ID[crewId].name} para nuevas aventuras.`);
+    };
+    if (crewVersionUnlocked(base,crewId)) { chooseCrew(); return; }
+    if (!ownsCharacter) { toast('⚠️ Recluta al personaje antes de comprar esta versión.'); return; }
+    modalConfirm('🧭 ¿Comprar esta versión?', `¿Comprar <strong>${esc(CREW_BY_ID[crewId].name)}</strong> de ${esc(CHARS[base].name)} por <strong>${CREW_VERSION_PRICE.toLocaleString('es')} Log Poses</strong>?<br>Saldo actual: ${Number(meta.logPoses || 0).toLocaleString('es')} 🧭.`, () => {
+      if (!buyCrewVersion(base,crewId)) { toast('⚠️ No se pudo comprar la versión. Comprueba tus Log Poses y el guardado.'); return; }
+      chooseCrew();
+    });
   });
   const relicSelect=ov.querySelector('#sheet-relic-select');
   if(relicSelect)relicSelect.onchange=()=>{
@@ -6520,7 +6695,8 @@ const PASSIVES = {
   im: { name:'Sombra del Trono', desc:'+25% de daño de Oscuridad y Haki. Interpretación para el juego.', types:{Oscuridad:1.25,Haki:1.25} },
   xebec: { name:'Furia Salvaje', desc:'+25% de ataque.', attack:1.25 },
 };
-const passiveRule = f => PASSIVES[f.id] || PASSIVES[baseFormOf(f.id)] || {};
+const passiveRule = f => (CHARS[f.id]?.rareza || 0) >= 4 ? PASSIVES[f.id] || PASSIVES[baseFormOf(f.id)] || {} : {};
+const hasPassive = (f,id) => isP(f,id) && !!passiveRule(f).name;
 function passiveInfo(f) {
   const rule = passiveRule(f);
   if (!rule.name) return null;
@@ -6840,7 +7016,9 @@ function useUltimate(f) {
 
 function startBattle(enemies, opts) {
   playMusic('combat');
-  battleBackpackExpanded = false;
+  battleBackpackExpanded = typeof meta.settings?.battleBackpackOpen === 'boolean'
+    ? meta.settings.battleBackpackOpen
+    : !globalThis.matchMedia?.('(max-width: 700px)').matches;
   const team = opts.challenge ? opts.team : opts.tower ? tower.team : run.team;
   if (!team.some(f => f.hp > 0)) return opts.challenge ? endChallengeBattle(false) : opts.tower ? towerGameOver() : gameOver();
   autoSpeed = preferredCombatSpeed();
@@ -7090,7 +7268,7 @@ function battleLayoutHTML(logLines, labels = {}) {
           </div>
         </div>
         <div class="battle-reserves" id="battle-reserves"></div>
-        <details id="battle-backpack" aria-label="Mochila de combate" ${battleBackpackExpanded || !globalThis.matchMedia?.('(max-width: 700px)').matches ? 'open' : ''}><summary>🎒 Mochila de combate</summary><div class="battle-backpack-content"></div></details>
+        <details id="battle-backpack" aria-label="Mochila de combate" ${battleBackpackExpanded ? 'open' : ''}><summary>🎒 Mochila de combate</summary><div class="battle-backpack-content"></div></details>
         <div class="battle-team-passives" aria-label="Pasivas de los equipos">
           <section><h3>✨ ${labels.p || 'TU BANDA'}</h3><div id="passives-p" class="team-passive-strip" tabindex="0" role="region" aria-label="Pasivas aliadas, desplaza para ver todas">${battleTeamPassivesHTML(b.pTeam)}</div></section>
           <section><h3>✨ ${labels.e || 'ENEMIGOS'}</h3><div id="passives-e" class="team-passive-strip" tabindex="0" role="region" aria-label="Pasivas enemigas, desplaza para ver todas">${battleTeamPassivesHTML(b.eTeam)}</div></section>
@@ -7142,7 +7320,14 @@ function renderBattle(logLines) {
     });
   });
   refreshBattleBackpack();
-  $('#battle-backpack')?.addEventListener?.('toggle', event => { battleBackpackExpanded = event.currentTarget.open; });
+  $('#battle-backpack')?.addEventListener?.('toggle', event => {
+    const open = event.currentTarget.open;
+    if (battleBackpackExpanded === open) return;
+    battleBackpackExpanded = open;
+    meta.settings ||= {};
+    meta.settings.battleBackpackOpen = open;
+    saveMeta();
+  });
   keepActiveFightersVisible();
 }
 
@@ -7248,9 +7433,9 @@ function chooseMove(att, dfd) {
 function critChanceFor(att) {
   let c = BASE_CRIT + (passiveRule(att).critical || 0);
   // Pasiva Zoro: crítico creciente con el PS faltante
-  if (isP(att, 'zoro')) c += 0.25 * (1 - att.hp / Math.max(1, att.maxhp));
-  if (isP(att, 'mihawk')) c += 0.15;
-  if (isP(att, 'oden')) c += 0.10;
+  if (hasPassive(att, 'zoro')) c += 0.25 * (1 - att.hp / Math.max(1, att.maxhp));
+  if (hasPassive(att, 'mihawk')) c += 0.15;
+  if (hasPassive(att, 'oden')) c += 0.10;
   const team = teamOf(att);
   c += synergyBonus(team, 'Corte', 0, .10);
   const tD = synergyTier(team, 'Disparo');
@@ -7262,7 +7447,7 @@ function critChanceFor(att) {
 }
 function critDmgFor(att) {
   let m = BASE_CRIT_DMG + (relicRule(att).critDamage || 0);
-  if (isP(att, 'oden')) m += 0.20;
+  if (hasPassive(att, 'oden')) m += 0.20;
   const tC = synergyTier(teamOf(att), 'Corte');
   if (tC) m += synergyBonus(teamOf(att), 'Corte', .15, .35);
   return m;
@@ -7270,9 +7455,9 @@ function critDmgFor(att) {
 function evaChanceFor(dfd) {
   let e = BASE_EVA + (passiveRule(dfd).evasion || 0) + (relicRule(dfd).evasion || 0) + relicTeamBonus(dfd,'teamEvasion');
   // Pasiva Nami: +10% de evasión de equipo
-  if (teamOf(dfd).some(x => x.hp > 0 && isP(x, 'nami'))) e += 0.10;
-  if (teamOf(dfd).some(x => x.hp > 0 && isP(x, 'dragon'))) e += 0.15;
-  if (isP(dfd, 'smoker')) e += 0.20;
+  if (teamOf(dfd).some(x => x.hp > 0 && hasPassive(x, 'nami'))) e += 0.10;
+  if (teamOf(dfd).some(x => x.hp > 0 && hasPassive(x, 'dragon'))) e += 0.15;
+  if (hasPassive(dfd, 'smoker')) e += 0.20;
   const tV = synergyTier(teamOf(dfd), 'Viento');
   if (tV) e += synergyBonus(teamOf(dfd), 'Viento', .08, .18);
   e += crewBonus(teamOf(dfd),'eva');
@@ -7283,8 +7468,8 @@ function calcDamage(att, dfd, mv, crit, variance) {
   const phys = isPhysType(mv.type);
   let eff = typeMult(mv.type, fighterTypes(dfd));
   // Pasiva Buggy: inmune al daño de espadas
-  if (isP(dfd, 'buggy') && mv.type === 'Corte') eff = 0;
-  if (isP(dfd, 'luffy') && mv.type === 'Rayo') eff = 0;
+  if (hasPassive(dfd, 'buggy') && mv.type === 'Corte') eff = 0;
+  if (hasPassive(dfd, 'luffy') && mv.type === 'Rayo') eff = 0;
   const atkTeam = teamOf(att), defTeam = teamOf(dfd);
   // Categoría: físico usa ATQ vs DEF; especial usa ESP_ATQ vs ESP_DEF
   let atkStat = (phys ? att.atk : att.spatk) * nakamaStatMult(atkTeam) * crewStatMult(atkTeam,phys?'atk':'spatk') * battleItemMult(att,'atk');
@@ -7301,11 +7486,11 @@ function calcDamage(att, dfd, mv, crit, variance) {
   if (att.st?.atkup) atkStat *= 1.20;
   if (dfd.st?.defup) defStat *= 1.20;
   // Pasiva Luffy: +15% ATQ por debajo del 50% de PS
-  if (isP(att, 'luffy') && att.hp < att.maxhp * 0.5) atkStat *= 1.15;
-  if (isP(att, 'newgate') && att.hp < att.maxhp * 0.5) atkStat *= 1.25;
-  if (isP(att, 'garp') && phys) defStat *= 0.70;
-  if (isP(dfd, 'kaido')) defStat *= 1.20;
-  if (teamOf(dfd).some(x => x.hp > 0 && isP(x, 'shanks'))) atkStat *= 0.85;
+  if (hasPassive(att, 'luffy') && att.hp < att.maxhp * 0.5) atkStat *= 1.15;
+  if (hasPassive(att, 'newgate') && att.hp < att.maxhp * 0.5) atkStat *= 1.25;
+  if (hasPassive(att, 'garp') && phys) defStat *= 0.70;
+  if (hasPassive(dfd, 'kaido')) defStat *= 1.20;
+  if (teamOf(dfd).some(x => x.hp > 0 && hasPassive(x, 'shanks'))) atkStat *= 0.85;
   // Veneno: daño neutral que ignora el 20% de la defensa
   if (mv.type === 'Veneno') defStat *= 0.8;
   // Golpe Ⅱ: los ataques físicos rompen un 15% de la DEF rival
@@ -7346,12 +7531,12 @@ function calcDamage(att, dfd, mv, crit, variance) {
   const tHaki = synergyTier(atkTeam, 'Haki');
   if (tHaki) dmg *= 1 + synergyBonus(atkTeam, 'Haki', .08, .18);
   // Pasivas de daño de 5 estrellas
-  if (teamOf(att).some(x => x.hp > 0 && isP(x, 'roger'))) dmg *= 1.20;
-  if (isP(dfd, 'kaido')) dmg *= 0.85;
-  if (isP(att, 'teach') && hasFruta(dfd)) dmg *= 1.25;
-  if (isP(att, 'akainu') && mv.type === 'Fuego') dmg *= 1.20;
+  if (teamOf(att).some(x => x.hp > 0 && hasPassive(x, 'roger'))) dmg *= 1.20;
+  if (hasPassive(dfd, 'kaido')) dmg *= 0.85;
+  if (hasPassive(att, 'teach') && hasFruta(dfd)) dmg *= 1.25;
+  if (hasPassive(att, 'akainu') && mv.type === 'Fuego') dmg *= 1.20;
   // Pasiva Sanji: reduce el daño recibido un 15%
-  if (isP(dfd, 'sanji')) dmg *= 0.85;
+  if (hasPassive(dfd, 'sanji')) dmg *= 0.85;
   // Regla núcleo de tags: sin HAKI contra un usuario FRUTA, -50% de daño
   let frutaGuard = false;
   if (hasFruta(dfd) && !hasHaki(att)) { dmg *= FRUTA_NOHAKI_MULT; frutaGuard = true; }
@@ -7430,7 +7615,7 @@ function attackWith(att, dfd, mv, targetSide) {
   let crit = Math.random() < critChanceFor(att);
   if (synergyTier(teamOf(att), 'Rayo') === 2 && b.firstHit[sideKey]) crit = true; // Rayo Ⅱ
   b.firstHit[sideKey] = false;
-  if (isP(dfd, 'franky')) crit = false; // Armadura Frontal
+  if (hasPassive(dfd, 'franky')) crit = false; // Armadura Frontal
   if (crit && synergyTier(teamOf(dfd), 'Tierra') === 2) { crit = false; log(`⛰️ ¡Baluarte! El crítico rebota en la defensa de ${charName(dfd)}.`); }
   // Esquiva (EVA)
   let eva = evaChanceFor(dfd);
@@ -7603,8 +7788,8 @@ function afterRound() {
     const team = teamOf(act), foe = targets[i];
     const drain = foe?.hp > 0 ? Math.min(foe.hp, Math.floor(foe.maxhp * (passiveRule(act).drain || 0))) : 0;
     let heal = (passiveRule(act).regen || 0) + (relicRule(act).regen || 0) + relicTeamBonus(act,'teamRegen');
-    if (team.some(x => x.hp > 0 && isP(x,'marco'))) heal += .06;
-    if (team.some(x => x.hp > 0 && isP(x,'ryokugyu'))) heal += .05;
+    if (team.some(x => x.hp > 0 && hasPassive(x,'marco'))) heal += .06;
+    if (team.some(x => x.hp > 0 && hasPassive(x,'ryokugyu'))) heal += .05;
     const water = synergyTier(team,'Agua');
     if (water) heal += synergyBonus(team, 'Agua', .04, .08);
     const opposingTeam = b.pTeam.includes(act) ? b.eTeam : b.pTeam;
@@ -7626,7 +7811,7 @@ function afterRound() {
     if (!f || f.hp > 0) return;
     const isPlayer = b.pTeam.includes(f) || (run && run.team && run.team.includes(f));
     if (!b.opts?.local && !b.opts?.challenge && isPlayer && run && run.mode === 'nuzlocke' && !b.tower) return; // En Nuzlocke los aliados no sobreviven ni reviven
-    if (isP(f, 'brook') && !f.reviveUsed) {
+    if (hasPassive(f, 'brook') && !f.reviveUsed) {
       f.reviveUsed = true;
       f.hp = Math.max(1, Math.floor(f.maxhp * 0.2));
       log(`✨ ¡Segunda Vida! ${charName(f)} se niega a morir. ¡Yohohoho!`);
@@ -7892,7 +8077,7 @@ function encounterBerries(opts, sagaIdx, islandIdx) {
 
 function bossFameReward(diff = 1) {
   const difficulty = DIFFICULTIES.find(d => d.id === diff) || DIFFICULTIES[0];
-  return Math.round(40 * difficulty.mult);
+  return Math.round(10 * difficulty.mult);
 }
 
 function endBattle(victory, fled, recruited) {
@@ -8066,7 +8251,8 @@ function sagaComplete() {
     if (!Object.hasOwn(meta.pirateKingRewards, saga.id)) meta.pirateKingRewards[saga.id] = 'pending';
   }
 
-  const baseFame = 500;
+  // La historia aporta progreso, pero la Torre Marine es la fuente principal de Fama.
+  const baseFame = 100;
   let fameWon = 0;
   let rewardMessage = '';
 
@@ -8118,7 +8304,7 @@ function gameOver() {
   battle = null;
   const retry = islandRetrySpec(run);
   const wasNuz = run && run.mode === 'nuzlocke';
-  const consuelo = run ? run.badges.length * 10 : 0;
+  const consuelo = run ? run.badges.length * 2 : 0;
   trackJourneyRewards(consuelo);
   if (consuelo) gainFame(consuelo);
   if(finishIslandRepeat('loss',continueRepeat))return;
@@ -8162,13 +8348,19 @@ function screenTowerIntro() {
     <div class="panel tower-selection">
       <h2>🗼 Torre Marine ${start50 ? '<span style="color:var(--gold);font-size:12px;">(Piso 50)</span>' : ''}</h2>
       <p>Combates automáticos infinitos contra oleadas cada vez más fuertes.
-      Elige a <b>3 nakamas desbloqueados</b> (salen a Nv.${startLvl}, con sus mejoras del Barco)
+      Elige entre <b>1 y 3 nakamas desbloqueados</b> (salen a Nv.${startLvl}, con sus mejoras del Barco)
       y recibe 3 Platos de Sanji. ${start50 ? '<b>¡Inicias tu ascenso directamente en el Piso 50!</b>' : '¿Hasta qué piso llegarás?'}</p>
       <p style="margin-top:10px;">Récord actual: <b>${meta.towerRecord}</b> pisos</p>
       <div class="tower-selection-bar"><div id="tower-picked" aria-live="polite"></div><div id="tower-synergies"></div></div>
       <div id="tower-presets"></div>
-      <label class="tower-search" for="tower-search">Buscar nakama<input type="search" id="tower-search" placeholder="Nombre o tipo"></label>
+      <div class="tower-filters">
+        <label class="tower-search" for="tower-search">Buscar nakama<input type="search" id="tower-search" placeholder="Nombre del personaje" autocomplete="off"></label>
+        <label for="tower-saga">Saga<select id="tower-saga"><option value="">Todas las sagas</option>${SAGAS.filter(s => pool.some(id => CHARS[previews[id].id].saga === s.id)).map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select></label>
+        <label for="tower-type">Tipo<select id="tower-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t => `<option value="${t}">${TYPES[t].emoji} ${t}</option>`).join('')}</select></label>
+        <label for="tower-rarity">Rareza<select id="tower-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r => `<option value="${r}">${r} ${r===1?'estrella':'estrellas'}</option>`).join('')}</select></label>
+      </div>
       <button class="btn gray usage-filter" id="tower-used" aria-pressed="false">Más usados</button>
+      <button class="btn gray usage-filter" id="tower-clear">Limpiar filtros</button>
       <p id="tower-results" role="status">${pool.length} nakamas disponibles</p>
       <div class="tower-roster">
         ${pool.map(id => {
@@ -8183,7 +8375,7 @@ function screenTowerIntro() {
   }).join('')}
       </div>
       <div class="actions tower-launch" style="text-align:center;margin-top:14px;">
-        <button class="btn blue" id="btn-start" disabled>ELIGE 3 NAKAMAS (0/3)</button>
+        <button class="btn blue" id="btn-start" disabled>ELIGE AL MENOS 1 NAKAMA</button>
       </div>
     </div>
   `);
@@ -8200,24 +8392,35 @@ function screenTowerIntro() {
     $('#tower-picked').innerHTML = `<b>Tu equipo · ${picked.length}/3</b><div class="tower-picked-slots">${[0,1,2].map(i => picked[i] ? `<button class="btn gray" data-tower-remove="${picked[i]}">${charIcon(previews[picked[i]].id,32)} ${CHARS[previews[picked[i]].id].name} ×</button>` : `<span class="tower-empty-slot">${i+1}. Elige un nakama</span>`).join('')}</div>`;
     $('#tower-picked').querySelectorAll('[data-tower-remove]').forEach(button => button.onclick = () => {picked.splice(picked.indexOf(button.dataset.towerRemove),1);updateSelection();});
     $('#tower-synergies').innerHTML = activeSynergiesHTML(picked.map(id => previews[id]));
-    startBtn.disabled = picked.length !== 3;
-    startBtn.textContent = picked.length === 3 ? '¡SUBIR A LA TORRE!' : `ELIGE 3 NAKAMAS (${picked.length}/3)`;
+    startBtn.disabled = picked.length === 0;
+    startBtn.textContent = picked.length ? `¡SUBIR A LA TORRE CON ${picked.length}!` : 'ELIGE AL MENOS 1 NAKAMA';
   };
-  $('#tower-search').oninput = e => {
-    const query = e.target.value.trim().toLocaleLowerCase('es');
+  let sortByUsage = false;
+  const filterTowerRoster = () => {
+    const state = { q:$('#tower-search').value, saga:$('#tower-saga').value, type:$('#tower-type').value, rarity:+$('#tower-rarity').value, sort:sortByUsage ? 'usageDesc' : 'name' };
+    const visibleIds = filterSortChars(pool, state, id => previews[id].id);
+    const visibleSet = new Set(visibleIds);
+    const roster = $('.tower-roster');
+    const ordered = sortByUsage ? visibleIds : filterSortChars(pool, {sort:'name'}, id => previews[id].id);
+    ordered.forEach(id => roster.appendChild($(`[data-tower="${id}"]`)));
     let visible = 0;
-    document.querySelectorAll('[data-tower]').forEach(card => {
-      const f = previews[card.dataset.tower];
-      card.hidden = !`${CHARS[f.id].name} ${fighterTypes(f).join(' ')}`.toLocaleLowerCase('es').includes(query);
-      if (!card.hidden) visible++;
-    });
+    document.querySelectorAll('[data-tower]').forEach(card => { card.hidden = !visibleSet.has(card.dataset.tower); if (!card.hidden) visible++; });
     $('#tower-results').textContent = visible ? `${visible} nakamas disponibles` : 'No hay nakamas con esta búsqueda.';
   };
+  $('#tower-search').oninput = filterTowerRoster;
+  for (const id of ['tower-saga','tower-type','tower-rarity']) $(`#${id}`).onchange = filterTowerRoster;
   $('#tower-used').onclick = () => {
-    const button = $('#tower-used'), active = button.getAttribute('aria-pressed') !== 'true';
-    button.setAttribute('aria-pressed', String(active));
-    const ids = active ? filterSortChars(pool, {sort:'usageDesc'}) : pool;
-    ids.forEach(id => $('.tower-roster').appendChild($(`[data-tower="${id}"]`)));
+    sortByUsage = !sortByUsage;
+    $('#tower-used').setAttribute('aria-pressed', String(sortByUsage));
+    filterTowerRoster();
+  };
+  $('#tower-clear').onclick = () => {
+    $('#tower-search').value = '';
+    for (const id of ['tower-saga','tower-type']) $(`#${id}`).value = '';
+    $('#tower-rarity').value = '0';
+    sortByUsage = false;
+    $('#tower-used').setAttribute('aria-pressed', 'false');
+    filterTowerRoster();
   };
   document.querySelectorAll('[data-tower]').forEach(el => {
     el.onclick = () => {
@@ -8229,8 +8432,9 @@ function screenTowerIntro() {
     };
   });
   updateSelection();
+  filterTowerRoster();
   startBtn.onclick = () => {
-    if (picked.length !== 3) return;
+    if (picked.length < 1 || picked.length > 3) return;
     recordCharacterUsage(picked);
     saveMeta();
     tower = { floor: startFloor, team: picked.map(id => applyUpgrades(makeChar(id, startLvl))), items: { bocadillo: 3, sake: 1 } };
@@ -8250,14 +8454,22 @@ function towerNextBattle() {
   const bossIds = Object.keys(CHARS).filter(id => !BASE_OF[id] && CHARS[id].boss && availableSagas.has(CHARS[id].saga));
   const id = isBossFloor ? pick(bossIds) : pick(pool);
   const enemy = makeEnemy(id, lvl + (isBossFloor ? 2 : 0));
+  // La recompensa usa las estrellas de la forma que aparece en combate.
+  tower.floorEnemyRarity = CHARS[enemy.id].rareza;
   startBattle([enemy], {
     wild: false, tower: true,
     intro: `🗼 Piso ${tower.floor} — ¡${charName(enemy)} te desafía!`,
   });
 }
 
+function towerFloorFame(floor, rarity) {
+  const block = Math.floor((Math.max(1, floor) - 1) / 25);
+  return 10 * (5 * block + Math.min(5, Math.max(1, rarity || 1)));
+}
+
 function endTowerBattle(victory) {
   if (!victory) return towerGameOver();
+  tower.fameWon = (tower.fameWon || 0) + towerFloorFame(tower.floor, tower.floorEnemyRarity);
   tower.team.forEach(f => {
     if (f.hp > 0) {
       gainXP(f, xpForLevel(f.lvl)); // +1 nivel por piso conservando EXP
@@ -8275,7 +8487,7 @@ function towerGameOver() {
   battle = null;
   const floors = tower ? tower.floor - 1 : 0;
   if (floors > meta.towerRecord) meta.towerRecord = floors;
-  const fameWon = floors * 5;
+  const fameWon = tower?.fameWon || 0;
   gainFame(fameWon);
   render(`
     ${topbar(false)}
@@ -8826,7 +9038,7 @@ function dexCardHTML(id) {
 
 function dexCollectionStatus(id) {
   const base = baseFormOf(id);
-  if (isNakamaUnlocked(base)) return { key:'veteran', icon:'🏅', label:'Veterano' };
+  if (isNakamaUnlocked(base)) return { key:'veteran', icon:'🏅', label:'Reclutado' };
   if (dexBaseIds(meta.recruited).includes(base)) return { key:'recruited', icon:'⚓', label:'Reclutado en viaje' };
   if (dexEntrySeen(base)) return { key:'seen', icon:'👁', label:'Avistado' };
   return { key:'unknown', icon:'❔', label:'Sin avistar' };
@@ -8841,10 +9053,10 @@ function screenDex() {
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
     <div class="panel pirate-dex collection-page">
       <header class="collection-header dex-header"><div><span class="collection-eyebrow">Tu colección</span><h2>📖 Dex Pirata</h2></div></header>
-      <div class="collection-summary dex-progress" aria-label="Progreso de la colección"><span><strong>${dexBaseIds(meta.dex).length} <small>/ ${all.length}</small></strong><span>Avistados</span></span><span><strong>${dexBaseIds(meta.recruited).length}</strong><span>Reclutados en viaje</span></span><span><strong>${dexBaseIds(meta.roster).length}</strong><span>Veteranos permanentes</span></span></div>
+      <div class="collection-summary dex-progress" aria-label="Progreso de la colección"><span><strong>${dexBaseIds(meta.dex).length} <small>/ ${all.length}</small></strong><span>Avistados</span></span><span><strong>${dexBaseIds(meta.recruited).length}</strong><span>Reclutados en viaje</span></span><span><strong>${dexBaseIds(meta.roster).length}</strong><span>Reclutados permanentes</span></span></div>
       <div class="dex-filter-panel"><span class="collection-eyebrow">Buscar y ordenar</span>${charControlsHTML(dexView, { sagas: sagaOpts })}</div>
       <div id="char-grid" class="collection-list"></div>
-      <p class="dex-help"><strong>Veterano</strong> significa que ya forma parte de tu cuenta; <strong>Reclutado en viaje</strong>, que se unió temporalmente a una aventura. Toca un personaje avistado para abrir su ficha y ver todas sus fases.</p>
+      <p class="dex-help"><strong>Reclutado</strong> significa que ya forma parte de tu cuenta; <strong>Reclutado en viaje</strong>, que se unió temporalmente a una aventura. Toca un personaje avistado para abrir su ficha y ver todas sus fases.</p>
     </div>
   `);
   $('#btn-back').onclick = screenHome;
@@ -9063,7 +9275,7 @@ function challengeSeriesStatusHTML(t) {
 function challengeOwnedBases() { return [...new Set([...SAGAS[0].starters,...meta.roster].filter(id=>CHARS[id]).map(baseFormOf))]; }
 function legendsUnlocked(progress=meta) {
   const wanoIndex=SAGAS.findIndex(s=>s.id==='wano');
-  return wanoIndex>=0&&sagaUnlocked(wanoIndex,progress);
+  return wanoIndex>=0&&sagaReached(wanoIndex,progress);
 }
 function legendChallengeCharacter(t) { return t?.kind==='legends'&&t.legendCharacter||null; }
 function challengeLevel(kind) {
@@ -9102,12 +9314,12 @@ function challengeCurrentMatch(t=meta.challenge) {
   if (t.bronze) return t.bronze.winner===null?t.bronze:null;
   return t.rounds[t.stage].matches.find(m=>m.winner===null&&(m.a===0||m.b===0)) || null;
 }
-function challengeCanStart(continuingSeries=false) {
-  return !battle&&accountLevel()>=35&&(!meta.challenge||(meta.challenge.finished&&!meta.challenge.pendingRelics?.length&&
+function challengeCanStart(continuingSeries=false, kind='tournament') {
+  return !battle&&(accountLevel()>=35||kind==='legends'&&legendsUnlocked())&&(!meta.challenge||(meta.challenge.finished&&!meta.challenge.pendingRelics?.length&&
     (continuingSeries||!challengeSeriesIncomplete(meta.challenge))));
 }
 function startChallenge(kind,picked,series=null) {
-  if (!['tournament','legends'].includes(kind)||!challengeCanStart(!!series)||kind==='legends'&&!legendsUnlocked()) return false;
+  if (!['tournament','legends'].includes(kind)||!challengeCanStart(!!series,kind)||kind==='legends'&&!legendsUnlocked()) return false;
   const count=1, allowed=challengePool(kind);
   // Existing selections may still name a base that now has historical phases.
   // Resolve owned base IDs to their unlocked form; explicit locked forms still fail.
@@ -9257,7 +9469,7 @@ function challengePlayerTeam(t) {
 }
 function playChallengeMatch(automatic = false) {
   const t=meta.challenge,m=challengeCurrentMatch(t);
-  if(battle||!m||accountLevel()<35||t.kind==='legends'&&legendChallengeCharacter(t)&&!legendsUnlocked())return false;
+  if(battle||!m||(accountLevel()<35&&!(t.kind==='legends'&&legendsUnlocked()))||t.kind==='legends'&&legendChallengeCharacter(t)&&!legendsUnlocked())return false;
   const enemyIndex=m.a===0?m.b:m.a;
   const enemyLevel=challengeEnemyLevel(t);
   const allies=challengePlayerTeam(t);
@@ -9288,9 +9500,9 @@ function claimChallengeRelic(id) {
 }
 function screenChallenges() {
   stopChallengeAuto();
-  playMusic('menu');if(accountLevel()<35){toast('🔒 Desafíos requiere nivel de cuenta 35.');return screenHome();}
+  playMusic('menu');if(accountLevel()<35&&!legendsUnlocked()){toast('🔒 Desafíos requiere nivel de cuenta 35.');return screenHome();}
   const active = meta.challenge && (!meta.challenge.finished || meta.challenge.pendingRelics?.length || challengeSeriesIncomplete(meta.challenge)) ? meta.challenge : null;
-  const eventButton = (kind,label) => `<button class="btn ${kind==='legends'?'gold':'blue'}" data-challenge="${kind}" ${active&&active.kind!==kind||kind==='legends'&&!legendsUnlocked()&&active?.kind!==kind?'disabled':''}>${active?.kind===kind ? (active.finished&&challengeSeriesIncomplete(active)?'Continuar serie':active.finished?'Entrar':'Continuar') : kind==='legends'&&!legendsUnlocked()?'🔒 Llega a Wano':label}</button>`;
+  const eventButton = (kind,label) => `<button class="btn ${kind==='legends'?'gold':'blue'}" data-challenge="${kind}" ${active&&active.kind!==kind||kind==='legends'&&!legendsUnlocked()&&active?.kind!==kind||kind==='tournament'&&accountLevel()<35&&active?.kind!==kind?'disabled':''}>${active?.kind===kind ? (active.finished&&challengeSeriesIncomplete(active)?'Continuar serie':active.finished?'Entrar':'Continuar') : kind==='legends'&&!legendsUnlocked()?'🔒 Llega a Wano':kind==='tournament'&&accountLevel()<35?'🔒 Nv. cuenta 35':label}</button>`;
   render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← PUERTO</button>
     <section class="panel challenge-panel challenge-hub"><h2 id="challenge-title" tabindex="-1">🏆 Desafíos</h2>
     <div class="challenge-events"><article class="challenge-event"><span class="challenge-emblem" aria-hidden="true">🏆</span><h3>Torneo</h3>
@@ -9302,7 +9514,7 @@ function screenChallenges() {
 }
 
 function screenChallengeSelection(kind) {
-  if(!challengeCanStart()||!['tournament','legends'].includes(kind))return screenChallenges();
+  if(!challengeCanStart(false,kind)||!['tournament','legends'].includes(kind))return screenChallenges();
   if(kind==='legends')return screenLegendSelection();
   const pool=challengePool(kind), count=kind==='legends'?2:1, picked=Array(count).fill(null);
   const pickerState={q:'',saga:'',type:'',rarity:0,sort:'name',scope:'all',page:0};
@@ -9351,20 +9563,34 @@ function screenChallengeSelection(kind) {
   draw();$('#challenge-title').focus();
 }
 function screenLegendSelection() {
-  if(!challengeCanStart()||!legendsUnlocked())return screenChallenges();
+  if(!challengeCanStart(false,'legends')||!legendsUnlocked())return screenChallenges();
   const bases=challengeOwnedBases().sort((a,b)=>CHARS[a].name.localeCompare(CHARS[b].name,'es'));
   render(`${topbar(false)}<button class="btn gray small back-btn" id="btn-back">← DESAFÍOS</button>
     <section class="panel challenge-panel challenge-selection"><h2 id="challenge-title" tabindex="-1">👑 Batalla de Leyendas</h2>
     <p>Elige un personaje. Supera tres combates en solitario con él para ganar su reliquia. Los rivales van del nivel de Wano medio al final de la saga.</p>
-    <div class="legend-challenge-grid">${bases.map(id=>{
+    <label class="legend-challenge-search" for="legend-challenge-query">Buscar personaje
+      <input id="legend-challenge-query" type="search" autocomplete="off" placeholder="Nombre del personaje" aria-controls="legend-challenge-results"></label>
+    <p class="legend-challenge-count" id="legend-challenge-count" role="status"></p>
+    <div class="legend-challenge-grid" id="legend-challenge-results">${bases.map(id=>{
       const form=evolutionFormAt(id,startLvlOf(id)),relic=RELICS[`relic_${id}`];
       const owned=meta.relics.some(relicId=>RELICS[relicId]?.character===id);
-      return `<article class="legend-challenge-card"><div class="legend-challenge-portrait">${charIcon(form,72)}</div>
+      return `<article class="legend-challenge-card" data-legend-name="${esc(CHARS[id].name)}"><div class="legend-challenge-portrait">${charIcon(form,72)}</div>
         <div><h3>${esc(CHARS[id].name)}</h3><p>Nv. ${startLvlOf(id)} · ${'⭐'.repeat(CHARS[form].rareza)}</p>
         <p>🏺 ${esc(relic.name)}${owned?' · Conseguida':''}</p></div>
         <button class="btn gold" data-legend-challenge="${id}" aria-label="Iniciar desafío de ${esc(CHARS[id].name)}">${owned?'Repetir desafío':'Conseguir reliquia'}</button></article>`;
-    }).join('')}</div></section>`);
+    }).join('')}</div>
+    <p class="challenge-notice legend-challenge-empty" id="legend-challenge-empty" hidden>No hay personajes con ese nombre. Prueba otra búsqueda.</p></section>`);
   $('#btn-back').onclick=screenChallenges;
+  const query=$('#legend-challenge-query'),cards=[...document.querySelectorAll('.legend-challenge-card')];
+  const normalizeName=value=>value.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLocaleLowerCase('es').trim();
+  const filter=()=>{
+    const needle=normalizeName(query.value);
+    let shown=0;
+    cards.forEach(card=>{const matches=normalizeName(card.dataset.legendName).includes(needle);card.hidden=!matches;if(matches)shown++;});
+    $('#legend-challenge-count').textContent=`${shown} de ${cards.length} personajes`;
+    $('#legend-challenge-empty').hidden=shown!==0;
+  };
+  query.addEventListener('input',filter);filter();
   document.querySelectorAll('[data-legend-challenge]').forEach(button=>button.onclick=()=>startChallenge('legends',[button.dataset.legendChallenge]));
   $('#challenge-title').focus();
 }

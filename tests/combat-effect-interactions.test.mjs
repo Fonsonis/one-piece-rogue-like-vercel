@@ -70,7 +70,7 @@ test('round healing survives an enemy KO without draining the dead or the reserv
       const reserveHP=reserve.hp;afterRound();
       return {hp:p.hp,reserveUnchanged:reserve.hp===reserveHP};
     })()`);
-    const expected={passive:130,relic:210,teamRelic:140,water:140,drain:100,climax:100,darkness:100,dead:0};
+    const expected={passive:100,relic:210,teamRelic:140,water:140,drain:100,climax:100,darkness:100,dead:0};
     // Moria's own relic is not equipped, so a dead target provides no drain or healing.
     assert.equal(result.hp,expected[kind],kind);
     assert.equal(result.reserveUnchanged,true,kind+' reserve');

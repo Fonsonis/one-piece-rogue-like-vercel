@@ -50,7 +50,7 @@ try {
   assert.match(await page.locator('.sheet-relic-status').innerText(),/Pasiva de afinidad inactiva/);
   assert.equal(await page.locator('#sheet-relic-select').evaluate(el=>el===document.activeElement),true);
   await page.keyboard.press('Escape');
-  assert.match(await page.locator('.inventory-relic').innerText(),/Sombrero de la Promesa/);
+  assert.equal(await page.locator('.inventory-relic-mark').getAttribute('aria-label'),'Reliquia conseguida');
   assert.equal(await page.locator('.btn-info-inv[data-id="shanks"]').evaluate(el=>el===document.activeElement),true);
   await page.keyboard.press('Escape');
   await page.evaluate(()=>showCharModal('luffy5'));

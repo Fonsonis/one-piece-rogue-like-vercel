@@ -1809,3 +1809,87 @@ const SAGAS = SAGA_DEFS.map((d, i) => {
     }),
   };
 });
+
+// Biografías breves de la ficha. Los personajes principales tienen texto propio;
+// el resto conserva su identidad, afiliación y saga sin mezclarlo con requisitos de juego.
+const CHARACTER_BIOGRAPHIES = {
+  luffy:'Luffy salió de East Blue para encontrar el One Piece. Como capitán de los Sombrero de Paja, reúne amigos y desafía a quienes les arrebatan la libertad.',
+  zoro:'Zoro juró convertirse en el mejor espadachín del mundo. Lucha junto a Luffy con tres espadas y una lealtad que nunca vacila.',
+  nami:'Nami creció bajo el dominio de Arlong y aprendió a leer el clima. Navega con los Sombrero de Paja mientras persigue su sueño de cartografiar el mundo.',
+  usopp:'Usopp dejó Villa Syrup para vivir aventuras reales. Entre historias imposibles y disparos certeros, intenta convertirse en un valiente guerrero del mar.',
+  sanji:'Sanji aprendió a cocinar y luchar en el Baratie. Busca el All Blue y alimenta a sus compañeros incluso cuando el mar se vuelve hostil.',
+  chopper:'Chopper fue rechazado por ser distinto y encontró una familia con Hiriluk y Kureha. Ahora es el médico de los Sombrero de Paja.',
+  robin:'Robin sobrevivió a la destrucción de Ohara. Busca los poneglyphs y una historia prohibida mientras descubre un hogar entre los Sombrero de Paja.',
+  franky:'Franky construyó barcos en Water Seven y transformó su propio cuerpo en un cíborg. Su sueño es ver al Thousand Sunny recorrer el mundo.',
+  brook:'Brook pasó décadas solo en el Florian Triangle tras perder a su tripulación. Su música y su promesa a Laboon lo guiaron hasta los Sombrero de Paja.',
+  jinbe:'Jinbe fue capitán de los Piratas del Sol y defendió la convivencia entre humanos y gyojin. Su experiencia al timón fortalece a los Sombrero de Paja.',
+  coby:'Coby escapó de los piratas de Alvida para unirse a la Marina. Entrena sin descanso con el sueño de llegar a almirante.',
+  buggy:'Buggy navegó con los Piratas de Roger antes de formar su propia banda. Su suerte y su ambición lo llevaron mucho más lejos de lo previsto.',
+  arlong:'Arlong impuso su dominio sobre las Islas Conomi y obligó a Nami a trabajar para él. Su caída liberó a la aldea de Cocoyasi.',
+  mihawk:'Mihawk ostenta el título de mejor espadachín del mundo. Su encuentro con Zoro en el Baratie marcó el camino del joven pirata.',
+  smoker:'Smoker persigue a los piratas desde Loguetown. Su sentido de la justicia lo lleva a cuestionar órdenes y alianzas cuando la verdad lo exige.',
+  vivi:'Vivi se infiltró en Baroque Works para salvar Alabasta. Su amistad con los Sombrero de Paja perduró incluso después de quedarse con su pueblo.',
+  crocodile:'Crocodile dirigió Baroque Works desde las sombras y buscó apoderarse de Alabasta. Su poder de arena ocultaba una ambición aún mayor.',
+  enel:'Enel gobernó Skypiea convencido de ser un dios. Su dominio del rayo convirtió el cielo en un lugar de miedo hasta que Luffy lo desafió.',
+  lucci:'Lucci fue el agente más temido del CP9. Se infiltró en Water Seven y persiguió a Robin en nombre del Gobierno Mundial.',
+  moria:'Moria creó una tripulación de zombis en Thriller Bark usando sombras robadas. Quería recuperar el poder que perdió frente a Kaido.',
+  kuma:'Kuma fue rey, revolucionario y Shichibukai. Su sacrificio protegió a Bonney y a los Sombrero de Paja a un precio devastador.',
+  hancock:'Hancock gobierna Amazon Lily y lidera a las Piratas Kuja. Su historia con los Dragones Celestiales explica su desconfianza hacia el mundo exterior.',
+  ace:'Ace buscó su propio lugar pese a la sombra de Roger. Como comandante de Barbablanca, encontró una familia y protegió a Luffy hasta el final.',
+  newgate:'Barbablanca reunió una inmensa familia pirata bajo su bandera. Su fuerza sacudió Marineford cuando intentó rescatar a Ace.',
+  roger:'Roger llegó al final de Grand Line y se convirtió en el Rey de los Piratas. Sus últimas palabras impulsaron la Gran Era de la Piratería.',
+  shanks:'Shanks inspiró a Luffy a hacerse pirata y le confió su sombrero de paja. Desde entonces gobierna los mares como uno de los emperadores.',
+  teach:'Teach abandonó la tripulación de Barbablanca para perseguir el poder. Robó una fruta prohibida y levantó su propia banda rumbo al trono pirata.',
+  sengoku:'Sengoku dirigió la Marina durante la guerra de Marineford. Cargó con decisiones difíciles mientras intentaba mantener el orden en una era turbulenta.',
+  garp:'Garp es un héroe de la Marina y el abuelo de Luffy. Rechazó ascensos para conservar su independencia frente a los Dragones Celestiales.',
+  akainu:'Akainu encarna la justicia absoluta de la Marina. Su determinación en Marineford cambió para siempre la vida de Luffy.',
+  aokiji:'Aokiji fue almirante de la Marina y conoció a Robin tras la tragedia de Ohara. Su idea de justicia lo separó de Akainu.',
+  kizaru:'Kizaru sirvió durante años como almirante. Su velocidad de luz lo convirtió en una amenaza decisiva en Sabaody y Egghead.',
+  law:'Law sobrevivió a Flevance y formó los Piratas Heart. Su alianza con Luffy buscó derribar a Doflamingo y, después, a Kaido.',
+  kid:'Kid lidera a su propia banda de la Peor Generación. Su ambición y su magnetismo lo llevaron a desafiar a los emperadores.',
+  doflamingo:'Doflamingo convirtió Dressrosa en su reino y movió el mercado criminal desde las sombras. Su pasado como Dragón Celestial alimentó su crueldad.',
+  sabo:'Sabo creció junto a Luffy y Ace antes de unirse al Ejército Revolucionario. Recuperó sus recuerdos y heredó la voluntad de Ace.',
+  dragon:'Dragon fundó el Ejército Revolucionario para desafiar al Gobierno Mundial. Aunque es el padre de Luffy, sus caminos casi nunca se cruzan.',
+  katakuri:'Katakuri protege a la familia Charlotte con una fortaleza casi impenetrable. Su duelo con Luffy en Whole Cake puso a prueba ambos ideales.',
+  bigmom:'Big Mom construyó Totto Land como un reino para todas las razas. Su deseo de familia convive con un poder capaz de aterrorizarla.',
+  kaido:'Kaido convirtió Wano en el centro de su imperio de armas. Su búsqueda de una guerra definitiva lo enfrentó a Luffy y sus aliados.',
+  oden:'Oden abandonó Wano para navegar con Barbablanca y Roger. Al regresar, luchó por abrir su país al mundo.',
+  yamato:'Yamato creció bajo el dominio de Kaido y admiró la libertad de Oden. Luchó por liberar Wano y proteger a sus habitantes.',
+  king:'King es un lunaria superviviente y la mano derecha de Kaido. Su confianza en él nació cuando ambos escaparon del Gobierno Mundial.',
+  queen:'Queen combinó ciencia y brutalidad al servicio de Kaido. Sus inventos y plagas convirtieron Onigashima en un campo de pruebas.',
+  marco:'Marco acompañó a Barbablanca durante años como comandante y médico. Tras la guerra, siguió protegiendo a quienes formaban parte de aquella familia.',
+  bonney:'Bonney capitanea su propia banda y busca respuestas sobre el destino de Kuma. Su viaje la conduce hasta los secretos de Egghead.',
+  vegapunk:'Vegapunk dedicó su vida a la investigación científica. En Egghead dividió sus facetas en satélites y quedó atrapado entre su curiosidad y el Gobierno Mundial.',
+  ryuma:'Ryuma fue un espadachín legendario de Wano. Siglos después, su cuerpo revivido en Thriller Bark se cruzó con Zoro.',
+  perona:'Perona sirvió a Moria en Thriller Bark con sus fantasmas. Tras la derrota de su capitán, encontró refugio junto a Mihawk.',
+  zeff:'Zeff dejó la piratería y fundó el Baratie. Enseñó a Sanji a cocinar, a luchar y a no permitir que nadie pase hambre.',
+  kuina:'Kuina entrenó junto a Zoro en la infancia y compartió su sueño de ser la mejor espadachina. Su promesa sigue impulsándolo.',
+  chouchou:'Chouchou cuidó la tienda de su dueño incluso después de perderlo. Su lealtad conmovió a Luffy durante el conflicto con Buggy.',
+  gaimon:'Gaimon quedó atrapado en un cofre tras buscar un tesoro. Con el tiempo eligió proteger a los animales de su isla.',
+  shirahoshi:'Shirahoshi es la princesa de la Isla Gyojin y heredera del poder de Poseidón. Luffy la ayudó a conocer el mundo fuera de su torre.',
+  fishertiger:'Fisher Tiger liberó esclavos de Mary Geoise y fundó los Piratas del Sol. Su historia marcó a Jinbe y al pueblo gyojin.',
+  hody:'Hody Jones lideró una revuelta en la Isla Gyojin alimentada por odio heredado. Su violencia amenazó el sueño de Otohime.',
+  rebecca:'Rebecca sobrevivió al golpe de Doflamingo y luchó en el Coliseo Corrida. Buscaba proteger a su padre y recuperar Dressrosa.',
+  kyros:'Kyros fue un gladiador invicto y padre de Rebecca. Convertido en juguete, combatió durante años para devolver la libertad a Dressrosa.',
+  pudding:'Pudding creció temiendo el rechazo a su tercer ojo. Su encuentro con Sanji alteró los planes de Big Mom en Whole Cake.',
+  carrot:'Carrot dejó Zou para descubrir el mar junto a los Sombrero de Paja. En Whole Cake reveló el poder de su forma Sulong.',
+  momonosuke:'Momonosuke viajó al futuro para salvar Wano del dominio de Kaido. Aprendió a gobernar mientras cargaba con el legado de Oden.',
+};
+const BIO_GENERIC = new Set([
+  'Un temible adversario que bloquea tu camino.',
+  'Nakama de la tripulación del Sombrero de Paja.',
+  'Un rostro conocido de este mar, dispuesto a unirse a una buena banda.',
+]);
+for (const [id,character] of Object.entries(CHARS)) {
+  const saga = SAGAS.find(entry=>entry.id===character.saga)?.name || 'Grand Line';
+  const crew = CREW_GROUPS.find(group=>group.members.includes(id));
+  const displayName = character.name.split(' · ')[0];
+  const ownDescription = !BIO_GENERIC.has(character.desc) && !/Requiere nivel base|Carta coleccionable|Adaptación de progreso/.test(character.desc);
+  character.bio = CHARACTER_BIOGRAPHIES[id] || (ownDescription
+    ? `${displayName}: ${character.desc}`
+    : crew ? `${displayName} pertenece a ${crew.name}. Su historia se cruza con los acontecimientos de ${saga}.`
+      : character.boss ? `${displayName} se enfrenta a los protagonistas durante ${saga}. Su presencia marca uno de los conflictos de esa travesía.`
+        : `${displayName} aparece durante ${saga} y forma parte de las vidas que los piratas encuentran en su viaje.`);
+  const words = character.bio.trim().split(/\s+/);
+  if (words.length > 30) character.bio = words.slice(0,30).join(' ').replace(/[,:;]$/, '') + '.';
+}
