@@ -8,7 +8,7 @@ test('new draws never use later sagas, even with later characters in the owned r
  const firstChallengeSaga=h.exec(`SAGAS.findIndex(s=>s.id==='marineford')`);
  const lastChallengeSaga=h.exec(`SAGAS.findIndex(s=>s.id==='egghead')`);
  for(let saga=firstChallengeSaga;saga<=lastChallengeSaga;saga++)for(const kind of ['tournament','legends'])for(let attempt=0;attempt<12;attempt++) {
-  h.exec(`meta.challenge=null;meta.sagaDiffWins=Object.fromEntries(SAGAS.slice(0,${saga}).map(s=>[s.id,{3:true}]));`);
+  h.exec(`meta.challenge=null;meta.reachedSagas=['eastblue'];meta.sagaDiffWins=Object.fromEntries(SAGAS.slice(0,${saga}).map(s=>[s.id,{3:true}]));if(${saga}>=SAGAS.findIndex(s=>s.id==='wano'))markSagaReached(${saga});`);
   assert.equal(h.exec(`challengeSagaLimit()`),saga);
   assert.equal(h.exec(`startChallenge('${kind}',['shanks'])`),kind==='tournament'||saga>=h.exec(`SAGAS.findIndex(s=>s.id==='wano')`));
   if(kind==='legends'&&saga<h.exec(`SAGAS.findIndex(s=>s.id==='wano')`))continue;
@@ -21,7 +21,7 @@ test('new draws never use later sagas, even with later characters in the owned r
 
 test('an individual legendary draw completes and preserves its earned relic on reload',()=>{
  const h=combatHarness();
- h.exec(`screenChallengeBracket=()=>{};meta.accXp=xpForAccLevel(35);meta.roster=['shanks','mihawk'];meta.sagaDiffWins=Object.fromEntries(SAGAS.slice(0,SAGAS.findIndex(s=>s.id==='wano')).map(s=>[s.id,{3:true}]));startChallenge('legends',['shanks']);`);
+ h.exec(`screenChallengeBracket=()=>{};meta.accXp=xpForAccLevel(35);meta.roster=['shanks','mihawk'];meta.sagaDiffWins=Object.fromEntries(SAGAS.slice(0,SAGAS.findIndex(s=>s.id==='wano')).map(s=>[s.id,{3:true}]));markSagaReached(SAGAS.findIndex(s=>s.id==='wano'));startChallenge('legends',['shanks']);`);
  assert.equal(h.exec('meta.challenge.entrants.length'),8);
  h.exec(`endChallengeBattle(true);endChallengeBattle(true);endChallengeBattle(true);loadedSave=GameSaveStorage.parse(JSON.stringify(GameSaveStorage.payload(meta,null)));loadMeta();`);
  assert.equal(h.exec('meta.challenge.placement'),1);

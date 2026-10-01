@@ -63,27 +63,39 @@ test('menu duplicates award 50, 500 and 1000 Log Poses exactly once',()=>{
  }
 });
 
-test('automatic poster pulls use the chosen quantity and charge the full displayed cost',()=>{
+test('automatic poster pulls charge one at a time and stop without charging remaining pulls',()=>{
  const h=combatHarness();
  h.exec(`
-  const controls={};
-  const market={
+  const control={};
+  const posters=Array.from({length:5},()=>({classList:{add(){},remove(){}}}));
+  const faces=Array.from({length:5},()=>({innerHTML:''}));
+  const scene={
     set innerHTML(value){this.markup=value;},
-    querySelectorAll(){return [];},
-    querySelector(selector){return controls[selector] ||= {value:'3',textContent:'',disabled:false};},
+    querySelectorAll(){return posters;},
+    querySelector(selector){
+      if(selector.startsWith('[data-p='))return posters[Number(selector.match(/\\d+/)[0])];
+      if(selector.startsWith('#pf-'))return faces[Number(selector.match(/\\d+/)[0])];
+      return control[selector] ||= {textContent:'',click(){this.onclick?.();}};
+    },
     remove(){}
   };
+  const summary={set innerHTML(value){this.markup=value;},querySelector(){return {};}};
+  let created=0;
   document.body={appendChild(){}};
-  document.querySelector=()=>null;
-  document.createElement=()=>market;
-  sagaUnlocked=()=>true;
+  document.createElement=()=>++created===1?scene:summary;
   Math.random=()=>0;
   meta.logPoses=5000;
   meta.starPity=0;
-  showLogPoseGachaModal();
-  market.querySelector('#lp-auto-gacha').onclick();
+  startLogPoseAutoGacha(SAGAS,3,1000);
  `);
- assert.equal(h.exec('meta.logPoses'),2000);
- assert.equal(h.exec('meta.starPity'),3);
+ assert.equal(h.exec('meta.logPoses'),4000);
+ h.exec(`scene.querySelector('#lp-skip-pull').onclick();`);
+ h.tick();
+ assert.equal(h.exec('meta.logPoses'),3000);
+ h.exec(`scene.querySelector('#lp-stop-auto').onclick();`);
+ assert.match(h.exec('summary.markup'),/2 de 3 tiradas completadas/);
+ while(h.tick()){}
+ assert.equal(h.exec('meta.logPoses'),3000);
+ assert.equal(h.exec('meta.starPity'),2);
  assert.ok(h.exec('meta.roster.length')>0);
 });

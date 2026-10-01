@@ -118,6 +118,11 @@ html[data-theme="dark"] .char-sheet .char-sheet-hero { background:linear-gradien
 .char-sheet.phase-locked .char-sheet-sprite .dex-sprite { animation:none!important; }
 .char-sheet.phase-locked .platform, .char-sheet.phase-locked .char-sheet-hero > div:last-of-type { visibility:hidden; }
 .char-sheet.phase-locked .sheet-phase-caption { color:#e0e8ee; }
+.char-sheet.crew-preview-locked .char-sheet-sprite { filter:brightness(0)!important; opacity:.65; }
+.char-sheet.crew-preview-locked .sheet-crew-title-icon { filter:brightness(0); opacity:.65; }
+.char-sheet.crew-preview-locked .char-sheet-sprite .dex-sprite { animation:none!important; }
+.char-sheet .sheet-crew-preview-caption { margin:10px 0 4px; color:#e0e8ee; font:650 12px/1.5 system-ui,sans-serif; }
+.char-sheet .gear4-choice.crew-choice-locked { border-style:dashed; }
 .sheet-locked-notice { margin:18px 0; padding:18px; border:1px solid var(--sheet-line); border-radius:10px; background:var(--sheet-card); text-align:center; }
 .sheet-locked-notice h3 { margin:0 0 8px; font:750 18px/1.4 system-ui,sans-serif; }
 

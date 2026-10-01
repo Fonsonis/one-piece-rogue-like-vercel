@@ -14,12 +14,25 @@ test('legend challenges unlock with Wano and accept one owned character of any r
   assert.equal(h.exec('legendsUnlocked()'),false);
   assert.equal(h.exec(`startChallenge('legends',['zoro'])`),false);
   h.exec(`meta.sagaDiffWins.wholecake={3:true};`);
+  assert.equal(h.exec('legendsUnlocked()'),false);
+  h.exec(`markSagaReached(SAGAS.findIndex(s=>s.id==='wano'));`);
   assert.equal(h.exec('legendsUnlocked()'),true);
   assert.equal(h.exec(`startChallenge('legends',['zoro'])`),true);
   assert.equal(h.exec('meta.challenge.legendCharacter'),'zoro');
   assert.equal(h.exec('meta.challenge.entrants.length'),8);
   assert.equal(h.exec('meta.challenge.entrants.every(e=>e.members.length===1)'),true);
   assert.doesNotThrow(()=>h.exec('validateGameSave(GameSaveStorage.payload(meta,null))'));
+});
+
+test('arrival at Wano opens character challenges before account level 35 without opening tournaments',()=>{
+  const h=harness();
+  h.exec(`accountLevel=()=>12;meta.sagaDiffWins={};markSagaReached(SAGAS.findIndex(s=>s.id==='wano'));`);
+  assert.equal(h.exec('sagaUnlocked(SAGAS.findIndex(s=>s.id===\'wano\'))'),false);
+  assert.equal(h.exec('legendsUnlocked()'),true);
+  assert.equal(h.exec('challengeCanStart(false,\'legends\')'),true);
+  assert.equal(h.exec('challengeCanStart(false,\'tournament\')'),false);
+  assert.equal(h.exec(`startChallenge('tournament',['zoro'])`),false);
+  assert.equal(h.exec(`startChallenge('legends',['zoro'])`),true);
 });
 
 test('three Wano-level wins grant only the selected character relic and persist it',()=>{

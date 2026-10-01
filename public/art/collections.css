@@ -173,6 +173,10 @@ html .collection-modal #inv-cards-grid { display:grid; grid-template-columns:rep
 .inventory-card { display:flex; flex-direction:column; min-width:0; border:1px solid var(--collection-line); border-radius:12px; padding:12px; background:var(--collection-surface); }
 .inventory-card.in-team { border-color:#508b78; box-shadow:inset 0 3px #508b78; }
 .inventory-card-top { display:flex; justify-content:space-between; align-items:center; gap:6px; color:var(--collection-muted); font-size:11px; }
+.inventory-card-marks { display:inline-flex; align-items:center; gap:4px; flex-shrink:0; }
+.inventory-relic-mark { display:inline-grid; place-items:center; width:22px; height:22px; border:1px solid var(--collection-line); border-radius:50%; background:var(--collection-soft); font:12px/1 system-ui,sans-serif; }
+.inventory-relic-mark.locked { opacity:.55; filter:grayscale(1); }
+.inventory-relic-mark.owned { border-color:var(--collection-ready); background:#e5f2e8; }
 .inventory-rarity { flex-shrink:0; color:#745210; background:#fff0c6; border-radius:5px; padding:2px 5px; font-weight:750; }
 .inventory-profile { display:flex; flex-direction:column; align-items:center; justify-content:start; gap:6px; width:100%; flex:1; padding:6px 0; border:0; border-radius:7px; background:none; color:var(--collection-ink); text-align:center; }
 .inventory-profile:hover { background:var(--collection-soft); }
@@ -432,6 +436,17 @@ html[data-theme="dark"] .inventory-shortfall { color:#ffbd9e; }
 
 /* On narrow screens show the first nakama before secondary collection controls. */
 @media(max-width:600px) {
+  .inventory-modal .inventory-card { padding:7px; }
+  .inventory-modal .inventory-card-top { flex-wrap:nowrap; font-size:10px; }
+  .inventory-modal .inventory-card-marks { gap:2px; }
+  .inventory-modal .inventory-relic-mark { width:19px; height:19px; font-size:10px; }
+  .inventory-modal .inventory-profile { padding:2px 0; gap:2px; }
+  .inventory-modal .inventory-profile-link { display:none; }
+  .inventory-modal .inventory-portrait { height:52px; }
+  html .inventory-modal #inv-cards-grid .dex-sprite { --sprite-size:52px!important; }
+  .inventory-modal .inventory-level { margin:3px 0; padding:3px; }
+  .inventory-modal .inventory-card .type-badges { margin:2px 0; }
+  .inventory-modal .inventory-upgrade { gap:4px; padding-top:4px; margin-top:4px; }
   .inventory-modal .inventory-scroll { padding-bottom:26px; }
   .inventory-modal:has(.collection-pagination) .inventory-scroll { padding-bottom:92px; }
   .inventory-modal .inventory-relics-link { min-height:40px; padding:6px 10px; font:600 12px/1.3 system-ui,sans-serif; }
