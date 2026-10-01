@@ -20,6 +20,7 @@ test('tower opponents and bosses never exceed the furthest unlocked saga',()=>{
   assert.deepEqual(offered,expected);
   assert.equal(h.exec('encounter.opts.tower'),true);
   assert.equal(h.exec('encounter.enemy.lvl'),13+floor*2+(floor%5===0?2:0));
+  assert.equal(h.exec('tower.floorEnemyRarity'),h.exec('CHARS[encounter.enemy.id].rareza'));
  }
 });
 

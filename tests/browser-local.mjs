@@ -51,9 +51,11 @@ try {
   await host.locator('#local-size').selectOption('1');
   const guest = await page('Nakama', true);
   await connect(host, guest);
-  assert.equal(await guest.locator('[data-pick="0"] option').count(), 6);
-  assert.equal(await guest.locator('[data-pick="0"] option[value="kaido"]').count(), 0);
-  await guest.locator('[data-pick="0"]').selectOption('zoro');
+  await guest.locator('[data-pick="0"]').click();
+  assert.equal(await guest.locator('.local-picker-choice').count(), 6);
+  assert.equal(await guest.locator('.local-picker-choice[data-character="kaido"]').count(), 0);
+  await guest.locator('#local-picker-search').fill('zoro');
+  await guest.locator('.local-picker-choice[data-character="zoro"]').click();
   checks.push('Room code signaling connected a direct WebRTC data channel without ICE services');
   console.log(checks.at(-1));
   await host.screenshot({ path: 'outputs/local-lobby-mobile.png', fullPage: true });

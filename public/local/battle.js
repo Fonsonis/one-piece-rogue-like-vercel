@@ -17,7 +17,8 @@ globalThis.LocalBattleView = (() => {
     b.curE = b.eTeam.find(f => f.active) || b.eTeam.at(-1);
     const event = data.event;
     if (coop && event) {
-      const actor = [all[event.source], all[event.target]].find(f => p.includes(f));
+      const first = event.kind === 'group' ? event.actions[0] : event;
+      const actor = [all[first.source], all[first.target]].find(f => p.includes(f));
       if (actor) b.curP = actor;
     }
     const old = state.get(root), fresh = !old || old.match !== match.id;
@@ -58,28 +59,31 @@ globalThis.LocalBattleView = (() => {
         });
       } else reserves.replaceChildren();
       const controls = root.querySelector('#battle-controls');
-      controls.innerHTML = `<p class="local-turn">Turno ${data.round}${event ? ` · ${esc(charName(all[event.source]))}` : ''}</p>${own.length ? `<button class="btn gold" data-ultimate="${match.id}" ${b.over || b.waiting || !active || active.hp <= 0 || active.ultCharge < 100 ? 'disabled' : ''}>⚡ Lanzar definitiva</button>` : '<p>Espectador</p>'}`;
+      controls.innerHTML = `<p class="local-turn">Turno ${data.round}${event ? event.kind === 'group' ? ' · Ataque de la alianza' : ` · ${esc(charName(all[event.source]))}` : ''}</p>${own.length ? `<button class="btn gold" data-ultimate="${match.id}" ${b.over || b.waiting || !active || active.hp <= 0 || active.ultCharge < 100 ? 'disabled' : ''}>⚡ Lanzar definitiva</button>` : '<p>Espectador</p>'}`;
       controls.querySelector('[data-ultimate]')?.addEventListener('click', event => {
         session.ultimate(match.id); event.currentTarget.disabled = true;
       });
       if (event && (!old || old.revision !== data.revision)) {
-        const source = all[event.source], target = all[event.target];
         const before = new Map(all.map((f, i) => [f, event.before[i]]));
-        BattlePresentation.attack(source, target, event.move, before, event.kind === 'ultimate');
+        const actions = event.kind === 'group' ? event.actions : [event];
+        for (const action of actions) BattlePresentation.attack(all[action.source], all[action.target], action.move, before, action.kind === 'ultimate');
         for (const f of all) {
           const delta = f.hp - before.get(f);
           if (!delta) continue;
           const side = b.pTeam.includes(f) ? 'p' : 'e', team = side === 'p' ? b.pTeam : b.eTeam;
           popDamageCard(root.querySelector(`#fc-${side}-${team.indexOf(f)}`), delta > 0 ? `+${delta}` : String(delta), delta > 0 ? '#78efb4' : null);
         }
-        if (event.kind === 'ultimate' && globalThis.UltimateFX && globalThis.UltimateArtProfiles) {
+        if (globalThis.UltimateFX && globalThis.UltimateArtProfiles) {
           const stage = f => {
             const side = b.pTeam.includes(f) ? 'p' : 'e', team = side === 'p' ? b.pTeam : b.eTeam;
             return root.querySelector(`#fc-${side}-${team.indexOf(f)} .fcard-sprite`);
           };
-          UltimateFX.play({ profile: UltimateArtProfiles.resolve(source.id, CHARS[source.id], event.move, baseFormOf(source.id)),
-            source: stage(source), target: stage(target), owner: root, speed: 1, hit: target.hp < before.get(target),
-            valid: () => root.isConnected && state.get(root)?.match === match.id });
+          for (const action of actions.filter(action => action.kind === 'ultimate')) {
+            const source = all[action.source], target = all[action.target];
+            UltimateFX.play({ profile: UltimateArtProfiles.resolve(source.id, CHARS[source.id], action.move, baseFormOf(source.id)),
+              source: stage(source), target: stage(target), owner: root, speed: 1, hit: target.hp < before.get(target),
+              valid: () => root.isConnected && state.get(root)?.match === match.id });
+          }
         }
       }
     });

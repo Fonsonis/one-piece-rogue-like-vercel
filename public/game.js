@@ -584,6 +584,7 @@ function loadMeta() {
     meta.roster.push('luffy');
   }
   meta.settings = Object.assign({ showEventConfirm: true, customSounds: false, theme: 'light', mobileColumns: 2 }, meta.settings || {});
+  if (typeof meta.settings.battleBackpackOpen !== 'boolean') delete meta.settings.battleBackpackOpen;
   autoSettings = normalizeAutoSettings(meta.settings.autoConfig);
   // Preserve saved healing choices from the previous automatic-mode panel.
   if (!meta.settings.autoBackpack && meta.settings.autoConfig) {
@@ -1415,6 +1416,7 @@ function showSettingsModal() {
           <div class="settings-section-heading"><span aria-hidden="true">🧭</span><div><h3 id="settings-game-title">Durante la partida</h3><p>Decide cuánta ayuda quieres al jugar.</p></div></div>
           <label class="settings-toggle-row settings-toggle-label" for="chk-event-confirm"><span><strong>Confirmar eventos del mapa</strong><span class="settings-hint">Muestra qué hay en un nodo antes de entrar.</span></span><input type="checkbox" id="chk-event-confirm" ${showConfirm ? 'checked' : ''}></label>
           <label class="settings-toggle-row settings-toggle-label" for="setting-bag-quick-use"><span><strong>Usar objetos al tocarlos</strong><span class="settings-hint">En combate, consume una unidad sin abrir su ficha.</span></span><input type="checkbox" id="setting-bag-quick-use" ${meta.settings.quickBattleItems === true ? 'checked' : ''}></label>
+          <label class="settings-toggle-row settings-toggle-label" for="setting-bag-open"><span><strong>Mochila abierta en combate</strong><span class="settings-hint">Mantiene la mochila visible entre combates hasta que la cierres.</span></span><input type="checkbox" id="setting-bag-open" ${(meta.settings.battleBackpackOpen ?? !globalThis.matchMedia?.('(max-width: 700px)').matches) ? 'checked' : ''}></label>
         </section>
         <details class="settings-section settings-advanced" ${bagAuto.enabled ? 'open' : ''}>
           <summary><span aria-hidden="true">🤖</span><span><strong>Automatización</strong><small>Ruta, encuentros y objetos de la mochila</small></span><span class="settings-chevron" aria-hidden="true">⌄</span></summary>
@@ -1437,6 +1439,13 @@ function showSettingsModal() {
   ov.querySelector('#setting-bag-auto').onchange = e => setAutoBackpackSettings({enabled:e.target.checked});
   ov.querySelector('#setting-bag-quick-use').onchange = e => {
     meta.settings.quickBattleItems = e.target.checked;
+    saveMeta();
+  };
+  ov.querySelector('#setting-bag-open').onchange = e => {
+    battleBackpackExpanded = e.target.checked;
+    meta.settings.battleBackpackOpen = battleBackpackExpanded;
+    const details = document.querySelector('#battle-backpack');
+    if (details) details.open = battleBackpackExpanded;
     saveMeta();
   };
   ov.querySelector('#setting-bag-where').onchange = e => setAutoBackpackSettings({where:e.target.value});
@@ -4471,13 +4480,13 @@ function backpackHTML(owner, combat = false, category = null) {
   const cells = stacks.map(({id,key,count,size}) => {
     const item = ITEMS[id], pos = layout[key], {w,h} = backpackShape(size,pos.vertical);
     const footprint = backpackCells(size,pos.cell,pos.vertical);footprint.forEach(c=>occupied.add(c));
-    return `<button type="button" class="bag-piece bag-filled" style="grid-column:${pos.cell%3+1}/span ${w};grid-row:${Math.floor(pos.cell/3)+1}/span ${h};--bag-piece-columns:${w}" data-bag-item="${id}" data-bag-count="${count}" data-bag-stack="${key}" title="${item.name} ×${count} · ${w}×${h}" aria-label="${item.name} ×${count}, ocupa ${w} por ${h} casillas">
+    return `<button type="button" class="bag-piece bag-filled" style="grid-column:${pos.cell%3+1}/span ${w};grid-row:${Math.floor(pos.cell/3)+1}/span ${h};--bag-piece-columns:${w}" data-bag-item="${id}" data-bag-count="${count}" data-bag-stack="${key}" data-bag-cell="${pos.cell}" ${combat ? '' : 'draggable="true"'} title="${item.name} ×${count} · ${w}×${h}" aria-label="${item.name} ×${count}, ocupa ${w} por ${h} casillas. Toca para mover o arrastra a una casilla libre">
       <span class="bag-piece-cells">${footprint.map(c=>`<span class="bag-cell bag-occupied"><span class="bag-slot-number">${c+1}</span></span>`).join('')}</span>
       <span class="bag-icon">${item.emoji}</span><span class="bag-quantity">×${count}</span>
       <span class="bag-item-name">${item.name}${size > 1 ? ` · ${w}×${h}` : ''}</span>
     </button>`;
   }).join('');
-  const empty = Array.from({length:capacity},(_,i)=>i).filter(i=>!occupied.has(i)).map(i=>`<div class="bag-cell bag-empty" style="grid-column:${i%3+1};grid-row:${Math.floor(i/3)+1}" aria-label="Casilla ${i+1} libre"><span class="bag-slot-number">${i+1}</span><span>＋</span></div>`).join('');
+  const empty = Array.from({length:capacity},(_,i)=>i).filter(i=>!occupied.has(i)).map(i=>`<div class="bag-cell bag-empty" data-bag-cell="${i}" style="grid-column:${i%3+1};grid-row:${Math.floor(i/3)+1}" aria-label="Casilla ${i+1} libre"><span class="bag-slot-number">${i+1}</span><span>＋</span></div>`).join('');
   const pending = Object.entries(owner.pendingLoot || {}).filter(([id,n])=>ITEMS[id] && n>0 && (isBattleItem(id) === battleBag)).map(([id,n])=>`
     <div class="bag-pending-item"><span>${ITEMS[id].emoji} ${ITEMS[id].name} ×${n}</span>
       <button type="button" data-bag-collect="${id}">COLOCAR</button>
@@ -4487,18 +4496,18 @@ function backpackHTML(owner, combat = false, category = null) {
     <div class="bag-grid">${cells}${empty}</div>
     ${combat ? '' : `<button type="button" class="btn small" data-bag-organize="${battleBag}">ORGANIZAR MOCHILA</button>`}
     ${pending ? `<div class="bag-pending"><b>Pendiente de guardar</b><p>Elige una posición, reorganiza la mochila o deja los objetos para continuar.</p>${pending}</div>` : ''}
-    ${combat ? '' : `<p class="bag-help">${battleBag ? 'Curas, resurrecciones y bebidas de combate.' : 'Carteles, frutas y mejoras para la isla.'} Hasta ${backpackStackLimit()} unidades del mismo objeto por pila. Las dos mochilas tienen su propio espacio y se amplían juntas.</p>`}
+    ${combat ? '' : `<p class="bag-help">Toca un objeto para mover su pila o arrástralo a una casilla libre. ${battleBag ? 'Curas, resurrecciones y bebidas de combate.' : 'Carteles, frutas y mejoras para la isla.'} Hasta ${backpackStackLimit()} unidades del mismo objeto por pila.</p>`}
   </div>`;
 }
 function saveBackpack(owner) { if (owner === run) saveRun(); }
-function showBackpackOrganizer(owner, battleBag, refresh, initialId = null) {
+function showBackpackOrganizer(owner, battleBag, refresh, initialId = null, initialStack = null) {
   prepareBackpack(owner);
   if (autoMode) pauseAutoForChoice();
   const activeBattle = battle && (battle.tower ? tower : run) === owner ? battle : null;
   const wasWaiting = activeBattle?.waiting;
   if (activeBattle && !activeBattle.over) pauseBattle();
   const ov = document.createElement('div');ov.className='overlay';
-  let selection=initialId ? `pending:${initialId}` : '', cell=null, vertical=false, closed=false;
+  let selection=initialId ? `pending:${initialId}` : initialStack || '', cell=null, vertical=false, closed=false;
   const close=()=>{
     if (closed) return;
     closed=true;ov.remove();refresh();
@@ -4532,7 +4541,12 @@ function showBackpackOrganizer(owner, battleBag, refresh, initialId = null) {
       <div class="actions"><button class="btn green" data-layout-place ${valid?'':'disabled'}>${merging?'APILAR 1':incoming?'GUARDAR 1':'MOVER PILA'}</button><button class="btn gray" data-layout-close>VOLVER</button></div></div>`;
     ov.querySelector('[data-layout-select]').onchange=e=>{selection=e.target.value;cell=null;vertical=false;renderOrganizer();};
     ov.querySelector('[data-layout-rotate]').onclick=()=>{vertical=!vertical;renderOrganizer();};
-    ov.querySelectorAll('[data-layout-cell]').forEach(btn=>{btn.onclick=()=>{cell=Number(btn.dataset.layoutCell);renderOrganizer();};});
+    ov.querySelectorAll('[data-layout-cell]').forEach(btn=>{btn.onclick=()=>{
+      const occupiedStack=occupied.get(Number(btn.dataset.layoutCell));
+      if (occupiedStack && occupiedStack.key !== selection) { selection=occupiedStack.key; cell=null; vertical=false; }
+      else cell=Number(btn.dataset.layoutCell);
+      renderOrganizer();
+    };});
     ov.querySelector('[data-layout-place]').onclick=()=>{
       if(closed || !valid) return;
       const done=incoming ? placePendingBackpackItem(owner,id,cell,vertical) : moveBackpackStack(owner,key,cell,vertical);
@@ -4551,7 +4565,66 @@ function bindBackpack(root, owner, combat, refresh) {
     button.onclick = () => showBackpackOrganizer(owner,button.dataset.bagOrganize==='true',refresh);
   });
   root.querySelectorAll('[data-bag-item]').forEach(button => {
-    button.onclick = () => showBackpackItem(owner, button.dataset.bagItem, Number(button.dataset.bagCount), combat, refresh);
+    button.onclick = () => {
+      if (button.dataset.bagDragged === 'true') { delete button.dataset.bagDragged; return; }
+      showBackpackItem(owner, button.dataset.bagItem, Number(button.dataset.bagCount), combat, refresh, button.dataset.bagStack);
+    };
+    if (combat) return;
+    const moveTo = target => {
+      const targetCell = Number(target?.closest?.('[data-bag-cell]')?.dataset.bagCell);
+      if (!Number.isInteger(targetCell) || !target?.closest?.('[data-bag-cell]')) return;
+      const key = button.dataset.bagStack;
+      const vertical = owner.bagLayout?.[key]?.vertical || false;
+      if (!moveBackpackStack(owner,key,targetCell,vertical)) {
+        toast('🎒 La pila no cabe ahí. Prueba otra casilla o gírala al tocarla.');
+        return;
+      }
+      saveBackpack(owner);
+      refresh();
+    };
+    button.ondragstart = event => {
+      event.dataTransfer?.setData('text/plain',button.dataset.bagStack);
+      if (event.dataTransfer) event.dataTransfer.effectAllowed='move';
+    };
+    let pointerStart=null;
+    button.onpointerdown = event => {
+      if (event.pointerType === 'mouse') return;
+      pointerStart={x:event.clientX,y:event.clientY,dragged:false};
+      button.setPointerCapture?.(event.pointerId);
+    };
+    button.onpointermove = event => {
+      if (!pointerStart) return;
+      if (Math.hypot(event.clientX-pointerStart.x,event.clientY-pointerStart.y)>12) {
+        pointerStart.dragged=true;button.classList.add('bag-dragging');
+      }
+    };
+    button.onpointerup = event => {
+      if (!pointerStart) return;
+      const dragged=pointerStart.dragged;
+      pointerStart=null;button.classList.remove('bag-dragging');
+      if (dragged) {
+        button.dataset.bagDragged='true';
+        setTimeout(()=>{delete button.dataset.bagDragged;},350);
+        moveTo(document.elementFromPoint?.(event.clientX,event.clientY));
+      }
+    };
+    button.onpointercancel = () => {pointerStart=null;button.classList.remove('bag-dragging');};
+  });
+  if (!combat) root.querySelectorAll('.backpack .bag-grid').forEach(grid => {
+    grid.ondragover = event => {
+      if (event.target.closest?.('[data-bag-cell]')) event.preventDefault();
+    };
+    grid.ondrop = event => {
+      event.preventDefault();
+      const key=event.dataTransfer?.getData('text/plain');
+      const target=event.target.closest?.('[data-bag-cell]');
+      const cell=Number(target?.dataset.bagCell);
+      if (!target || !Number.isInteger(cell) || !backpackStacks(owner).some(s=>s.key===key && isBattleItem(s.id)===(grid.closest('.backpack')?.querySelector('[data-bag-organize]')?.dataset.bagOrganize==='true'))) return;
+      if (!moveBackpackStack(owner,key,cell,owner.bagLayout?.[key]?.vertical || false)) {
+        toast('🎒 La pila no cabe ahí. Prueba otra casilla o gírala al tocarla.');return;
+      }
+      saveBackpack(owner);refresh();
+    };
   });
   root.querySelectorAll('[data-bag-collect]').forEach(button => {
     button.onclick = () => {
@@ -4569,7 +4642,7 @@ function bindBackpack(root, owner, combat, refresh) {
     };
   });
 }
-function showBackpackItem(owner, id, count, combat, refresh) {
+function showBackpackItem(owner, id, count, combat, refresh, stackKey = null) {
   if (!(owner.items[id] > 0) || (combat && !isBattleItem(id))) return;
   const b = combat ? battle : null;
   if (combat && (!b || b.over || b.waiting)) return;
@@ -4582,6 +4655,7 @@ function showBackpackItem(owner, id, count, combat, refresh) {
     <p>${item.slotSize} casilla${item.slotSize > 1 ? 's' : ''} · Hasta ${backpackStackLimit()} por pila</p>
     ${!usable ? `<p>${item.kind === 'ball' ? 'Se usa en el evento de las cadenas.' : item.kind === 'battleBoost' ? 'Se usa durante el combate.' : 'Se usa fuera del combate.'}</p>` : ''}
     <div class="actions"><button class="btn green" data-bag-use ${usable ? '' : 'disabled'}>USAR</button>
+      ${!combat && stackKey ? '<button class="btn blue" data-bag-move>MOVER PILA</button>' : ''}
       <button class="btn red" data-bag-discard>DESCARTAR ${count > 1 ? `PILA ×${count}` : '1'}</button>
       <button class="btn gray" data-bag-close>VOLVER</button></div></div>`;
   document.body.appendChild(ov);
@@ -4592,6 +4666,8 @@ function showBackpackItem(owner, id, count, combat, refresh) {
     if (b && battle === b && !b.over) resumeBattle();
   };
   ov.querySelector('[data-bag-close]').onclick = close;
+  const moveButton = ov.querySelector('[data-bag-move]');
+  if (moveButton) moveButton.onclick = () => {close();showBackpackOrganizer(owner,isBattleItem(id),refresh,null,stackKey);};
   ov.querySelector('[data-bag-use]').onclick = () => {
     if (!usable || closed) return;
     close();
@@ -4792,17 +4868,10 @@ function screenMap(activePageIdx = 0) {
           </div>
         </div>
 
-        <!-- PÁGINA 3: MOCHILA Y EMBLEMAS (ANCHO COMPLETO) -->
+        <!-- PÁGINA 3: MOCHILA (ANCHO COMPLETO) -->
         <div class="carousel-page" id="page-bag">
           <div class="panel">
             <div id="map-backpack">${backpackHTML(run)}</div>
-            <h3 style="margin-top:14px;">🏅 EMBLEMAS DE LA SAGA</h3>
-            <div class="badge-grid">
-              ${saga.islands.map((isl, i) =>
-                `<div class="badge-slot ${run.badges.includes(i) ? '' : 'empty'}" title="${isl.name}">${run.badges.includes(i) ? '🏅' : '·'}</div>`
-              ).join('')}
-            </div>
-
           </div>
         </div>
       </div>
@@ -5907,7 +5976,7 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
     ${pInfo ? `<div class="sheet-section sheet-passive"><b>✨ Pasiva — ${pInfo.label}</b><p>${pInfo.desc}</p></div>` : ''}
     ${ultMv ? `<div class="sheet-section sheet-ultimate"><b>💥 Habilidad Definitiva — ${ultMv.name}</b><p>${ultMv.type ? `<span class="type-badge" style="background:${TYPES[ultMv.type]?.color || '#888'}">${ultMv.type.toUpperCase()}</span> ` : ''}${ultMv.power ? ultMv.power + ' PWR · ' + Math.round((ultMv.acc || 0.9) * 100) + '% precisión' : 'MOVIMIENTO DEFINITIVO'}</p></div>` : ''}
     ${c.evo ? `<div class="sheet-section"><b>🔄 Transformación</b><p>${CHARS[c.evo.to].name} requiere nivel base ${c.evo.lvl}, nivel ${c.evo.lvl} en partida y llegar a ${esc(nextSagaName)}. Tu nivel base: ${startLvlOf(f.id)} · Saga: ${nextSagaReached?'alcanzada':'pendiente'}. ${nextBaseReached&&nextSagaReached?'La forma se activará al alcanzar el nivel necesario en partida.':'Aún faltan requisitos permanentes para desbloquearla.'}</p></div>` : ''}
-    <p class="sheet-desc">${c.desc}</p>
+    <p class="sheet-desc"><strong>Biografía:</strong> ${esc(CHARS[baseFormOf(f.id)]?.bio || c.bio)}</p>
     `}
     <div class="actions" style="flex-direction:column;gap:6px;">
       ${isLive && (!battle || battle.over) && run && run.team && run.team.includes(f) ? `<button class="btn red small" id="sheet-dismiss-btn" style="width:100%;">🗑️ EXPULSAR DE LA BANDA</button>` : ''}
@@ -6626,7 +6695,8 @@ const PASSIVES = {
   im: { name:'Sombra del Trono', desc:'+25% de daño de Oscuridad y Haki. Interpretación para el juego.', types:{Oscuridad:1.25,Haki:1.25} },
   xebec: { name:'Furia Salvaje', desc:'+25% de ataque.', attack:1.25 },
 };
-const passiveRule = f => PASSIVES[f.id] || PASSIVES[baseFormOf(f.id)] || {};
+const passiveRule = f => (CHARS[f.id]?.rareza || 0) >= 4 ? PASSIVES[f.id] || PASSIVES[baseFormOf(f.id)] || {} : {};
+const hasPassive = (f,id) => isP(f,id) && !!passiveRule(f).name;
 function passiveInfo(f) {
   const rule = passiveRule(f);
   if (!rule.name) return null;
@@ -6946,7 +7016,9 @@ function useUltimate(f) {
 
 function startBattle(enemies, opts) {
   playMusic('combat');
-  battleBackpackExpanded = false;
+  battleBackpackExpanded = typeof meta.settings?.battleBackpackOpen === 'boolean'
+    ? meta.settings.battleBackpackOpen
+    : !globalThis.matchMedia?.('(max-width: 700px)').matches;
   const team = opts.challenge ? opts.team : opts.tower ? tower.team : run.team;
   if (!team.some(f => f.hp > 0)) return opts.challenge ? endChallengeBattle(false) : opts.tower ? towerGameOver() : gameOver();
   autoSpeed = preferredCombatSpeed();
@@ -7196,7 +7268,7 @@ function battleLayoutHTML(logLines, labels = {}) {
           </div>
         </div>
         <div class="battle-reserves" id="battle-reserves"></div>
-        <details id="battle-backpack" aria-label="Mochila de combate" ${battleBackpackExpanded || !globalThis.matchMedia?.('(max-width: 700px)').matches ? 'open' : ''}><summary>🎒 Mochila de combate</summary><div class="battle-backpack-content"></div></details>
+        <details id="battle-backpack" aria-label="Mochila de combate" ${battleBackpackExpanded ? 'open' : ''}><summary>🎒 Mochila de combate</summary><div class="battle-backpack-content"></div></details>
         <div class="battle-team-passives" aria-label="Pasivas de los equipos">
           <section><h3>✨ ${labels.p || 'TU BANDA'}</h3><div id="passives-p" class="team-passive-strip" tabindex="0" role="region" aria-label="Pasivas aliadas, desplaza para ver todas">${battleTeamPassivesHTML(b.pTeam)}</div></section>
           <section><h3>✨ ${labels.e || 'ENEMIGOS'}</h3><div id="passives-e" class="team-passive-strip" tabindex="0" role="region" aria-label="Pasivas enemigas, desplaza para ver todas">${battleTeamPassivesHTML(b.eTeam)}</div></section>
@@ -7248,7 +7320,14 @@ function renderBattle(logLines) {
     });
   });
   refreshBattleBackpack();
-  $('#battle-backpack')?.addEventListener?.('toggle', event => { battleBackpackExpanded = event.currentTarget.open; });
+  $('#battle-backpack')?.addEventListener?.('toggle', event => {
+    const open = event.currentTarget.open;
+    if (battleBackpackExpanded === open) return;
+    battleBackpackExpanded = open;
+    meta.settings ||= {};
+    meta.settings.battleBackpackOpen = open;
+    saveMeta();
+  });
   keepActiveFightersVisible();
 }
 
@@ -7354,9 +7433,9 @@ function chooseMove(att, dfd) {
 function critChanceFor(att) {
   let c = BASE_CRIT + (passiveRule(att).critical || 0);
   // Pasiva Zoro: crítico creciente con el PS faltante
-  if (isP(att, 'zoro')) c += 0.25 * (1 - att.hp / Math.max(1, att.maxhp));
-  if (isP(att, 'mihawk')) c += 0.15;
-  if (isP(att, 'oden')) c += 0.10;
+  if (hasPassive(att, 'zoro')) c += 0.25 * (1 - att.hp / Math.max(1, att.maxhp));
+  if (hasPassive(att, 'mihawk')) c += 0.15;
+  if (hasPassive(att, 'oden')) c += 0.10;
   const team = teamOf(att);
   c += synergyBonus(team, 'Corte', 0, .10);
   const tD = synergyTier(team, 'Disparo');
@@ -7368,7 +7447,7 @@ function critChanceFor(att) {
 }
 function critDmgFor(att) {
   let m = BASE_CRIT_DMG + (relicRule(att).critDamage || 0);
-  if (isP(att, 'oden')) m += 0.20;
+  if (hasPassive(att, 'oden')) m += 0.20;
   const tC = synergyTier(teamOf(att), 'Corte');
   if (tC) m += synergyBonus(teamOf(att), 'Corte', .15, .35);
   return m;
@@ -7376,9 +7455,9 @@ function critDmgFor(att) {
 function evaChanceFor(dfd) {
   let e = BASE_EVA + (passiveRule(dfd).evasion || 0) + (relicRule(dfd).evasion || 0) + relicTeamBonus(dfd,'teamEvasion');
   // Pasiva Nami: +10% de evasión de equipo
-  if (teamOf(dfd).some(x => x.hp > 0 && isP(x, 'nami'))) e += 0.10;
-  if (teamOf(dfd).some(x => x.hp > 0 && isP(x, 'dragon'))) e += 0.15;
-  if (isP(dfd, 'smoker')) e += 0.20;
+  if (teamOf(dfd).some(x => x.hp > 0 && hasPassive(x, 'nami'))) e += 0.10;
+  if (teamOf(dfd).some(x => x.hp > 0 && hasPassive(x, 'dragon'))) e += 0.15;
+  if (hasPassive(dfd, 'smoker')) e += 0.20;
   const tV = synergyTier(teamOf(dfd), 'Viento');
   if (tV) e += synergyBonus(teamOf(dfd), 'Viento', .08, .18);
   e += crewBonus(teamOf(dfd),'eva');
@@ -7389,8 +7468,8 @@ function calcDamage(att, dfd, mv, crit, variance) {
   const phys = isPhysType(mv.type);
   let eff = typeMult(mv.type, fighterTypes(dfd));
   // Pasiva Buggy: inmune al daño de espadas
-  if (isP(dfd, 'buggy') && mv.type === 'Corte') eff = 0;
-  if (isP(dfd, 'luffy') && mv.type === 'Rayo') eff = 0;
+  if (hasPassive(dfd, 'buggy') && mv.type === 'Corte') eff = 0;
+  if (hasPassive(dfd, 'luffy') && mv.type === 'Rayo') eff = 0;
   const atkTeam = teamOf(att), defTeam = teamOf(dfd);
   // Categoría: físico usa ATQ vs DEF; especial usa ESP_ATQ vs ESP_DEF
   let atkStat = (phys ? att.atk : att.spatk) * nakamaStatMult(atkTeam) * crewStatMult(atkTeam,phys?'atk':'spatk') * battleItemMult(att,'atk');
@@ -7407,11 +7486,11 @@ function calcDamage(att, dfd, mv, crit, variance) {
   if (att.st?.atkup) atkStat *= 1.20;
   if (dfd.st?.defup) defStat *= 1.20;
   // Pasiva Luffy: +15% ATQ por debajo del 50% de PS
-  if (isP(att, 'luffy') && att.hp < att.maxhp * 0.5) atkStat *= 1.15;
-  if (isP(att, 'newgate') && att.hp < att.maxhp * 0.5) atkStat *= 1.25;
-  if (isP(att, 'garp') && phys) defStat *= 0.70;
-  if (isP(dfd, 'kaido')) defStat *= 1.20;
-  if (teamOf(dfd).some(x => x.hp > 0 && isP(x, 'shanks'))) atkStat *= 0.85;
+  if (hasPassive(att, 'luffy') && att.hp < att.maxhp * 0.5) atkStat *= 1.15;
+  if (hasPassive(att, 'newgate') && att.hp < att.maxhp * 0.5) atkStat *= 1.25;
+  if (hasPassive(att, 'garp') && phys) defStat *= 0.70;
+  if (hasPassive(dfd, 'kaido')) defStat *= 1.20;
+  if (teamOf(dfd).some(x => x.hp > 0 && hasPassive(x, 'shanks'))) atkStat *= 0.85;
   // Veneno: daño neutral que ignora el 20% de la defensa
   if (mv.type === 'Veneno') defStat *= 0.8;
   // Golpe Ⅱ: los ataques físicos rompen un 15% de la DEF rival
@@ -7452,12 +7531,12 @@ function calcDamage(att, dfd, mv, crit, variance) {
   const tHaki = synergyTier(atkTeam, 'Haki');
   if (tHaki) dmg *= 1 + synergyBonus(atkTeam, 'Haki', .08, .18);
   // Pasivas de daño de 5 estrellas
-  if (teamOf(att).some(x => x.hp > 0 && isP(x, 'roger'))) dmg *= 1.20;
-  if (isP(dfd, 'kaido')) dmg *= 0.85;
-  if (isP(att, 'teach') && hasFruta(dfd)) dmg *= 1.25;
-  if (isP(att, 'akainu') && mv.type === 'Fuego') dmg *= 1.20;
+  if (teamOf(att).some(x => x.hp > 0 && hasPassive(x, 'roger'))) dmg *= 1.20;
+  if (hasPassive(dfd, 'kaido')) dmg *= 0.85;
+  if (hasPassive(att, 'teach') && hasFruta(dfd)) dmg *= 1.25;
+  if (hasPassive(att, 'akainu') && mv.type === 'Fuego') dmg *= 1.20;
   // Pasiva Sanji: reduce el daño recibido un 15%
-  if (isP(dfd, 'sanji')) dmg *= 0.85;
+  if (hasPassive(dfd, 'sanji')) dmg *= 0.85;
   // Regla núcleo de tags: sin HAKI contra un usuario FRUTA, -50% de daño
   let frutaGuard = false;
   if (hasFruta(dfd) && !hasHaki(att)) { dmg *= FRUTA_NOHAKI_MULT; frutaGuard = true; }
@@ -7536,7 +7615,7 @@ function attackWith(att, dfd, mv, targetSide) {
   let crit = Math.random() < critChanceFor(att);
   if (synergyTier(teamOf(att), 'Rayo') === 2 && b.firstHit[sideKey]) crit = true; // Rayo Ⅱ
   b.firstHit[sideKey] = false;
-  if (isP(dfd, 'franky')) crit = false; // Armadura Frontal
+  if (hasPassive(dfd, 'franky')) crit = false; // Armadura Frontal
   if (crit && synergyTier(teamOf(dfd), 'Tierra') === 2) { crit = false; log(`⛰️ ¡Baluarte! El crítico rebota en la defensa de ${charName(dfd)}.`); }
   // Esquiva (EVA)
   let eva = evaChanceFor(dfd);
@@ -7709,8 +7788,8 @@ function afterRound() {
     const team = teamOf(act), foe = targets[i];
     const drain = foe?.hp > 0 ? Math.min(foe.hp, Math.floor(foe.maxhp * (passiveRule(act).drain || 0))) : 0;
     let heal = (passiveRule(act).regen || 0) + (relicRule(act).regen || 0) + relicTeamBonus(act,'teamRegen');
-    if (team.some(x => x.hp > 0 && isP(x,'marco'))) heal += .06;
-    if (team.some(x => x.hp > 0 && isP(x,'ryokugyu'))) heal += .05;
+    if (team.some(x => x.hp > 0 && hasPassive(x,'marco'))) heal += .06;
+    if (team.some(x => x.hp > 0 && hasPassive(x,'ryokugyu'))) heal += .05;
     const water = synergyTier(team,'Agua');
     if (water) heal += synergyBonus(team, 'Agua', .04, .08);
     const opposingTeam = b.pTeam.includes(act) ? b.eTeam : b.pTeam;
@@ -7732,7 +7811,7 @@ function afterRound() {
     if (!f || f.hp > 0) return;
     const isPlayer = b.pTeam.includes(f) || (run && run.team && run.team.includes(f));
     if (!b.opts?.local && !b.opts?.challenge && isPlayer && run && run.mode === 'nuzlocke' && !b.tower) return; // En Nuzlocke los aliados no sobreviven ni reviven
-    if (isP(f, 'brook') && !f.reviveUsed) {
+    if (hasPassive(f, 'brook') && !f.reviveUsed) {
       f.reviveUsed = true;
       f.hp = Math.max(1, Math.floor(f.maxhp * 0.2));
       log(`✨ ¡Segunda Vida! ${charName(f)} se niega a morir. ¡Yohohoho!`);
@@ -7998,7 +8077,7 @@ function encounterBerries(opts, sagaIdx, islandIdx) {
 
 function bossFameReward(diff = 1) {
   const difficulty = DIFFICULTIES.find(d => d.id === diff) || DIFFICULTIES[0];
-  return Math.round(40 * difficulty.mult);
+  return Math.round(10 * difficulty.mult);
 }
 
 function endBattle(victory, fled, recruited) {
@@ -8172,7 +8251,8 @@ function sagaComplete() {
     if (!Object.hasOwn(meta.pirateKingRewards, saga.id)) meta.pirateKingRewards[saga.id] = 'pending';
   }
 
-  const baseFame = 500;
+  // La historia aporta progreso, pero la Torre Marine es la fuente principal de Fama.
+  const baseFame = 100;
   let fameWon = 0;
   let rewardMessage = '';
 
@@ -8224,7 +8304,7 @@ function gameOver() {
   battle = null;
   const retry = islandRetrySpec(run);
   const wasNuz = run && run.mode === 'nuzlocke';
-  const consuelo = run ? run.badges.length * 10 : 0;
+  const consuelo = run ? run.badges.length * 2 : 0;
   trackJourneyRewards(consuelo);
   if (consuelo) gainFame(consuelo);
   if(finishIslandRepeat('loss',continueRepeat))return;
@@ -8268,13 +8348,19 @@ function screenTowerIntro() {
     <div class="panel tower-selection">
       <h2>🗼 Torre Marine ${start50 ? '<span style="color:var(--gold);font-size:12px;">(Piso 50)</span>' : ''}</h2>
       <p>Combates automáticos infinitos contra oleadas cada vez más fuertes.
-      Elige a <b>3 nakamas desbloqueados</b> (salen a Nv.${startLvl}, con sus mejoras del Barco)
+      Elige entre <b>1 y 3 nakamas desbloqueados</b> (salen a Nv.${startLvl}, con sus mejoras del Barco)
       y recibe 3 Platos de Sanji. ${start50 ? '<b>¡Inicias tu ascenso directamente en el Piso 50!</b>' : '¿Hasta qué piso llegarás?'}</p>
       <p style="margin-top:10px;">Récord actual: <b>${meta.towerRecord}</b> pisos</p>
       <div class="tower-selection-bar"><div id="tower-picked" aria-live="polite"></div><div id="tower-synergies"></div></div>
       <div id="tower-presets"></div>
-      <label class="tower-search" for="tower-search">Buscar nakama<input type="search" id="tower-search" placeholder="Nombre o tipo"></label>
+      <div class="tower-filters">
+        <label class="tower-search" for="tower-search">Buscar nakama<input type="search" id="tower-search" placeholder="Nombre del personaje" autocomplete="off"></label>
+        <label for="tower-saga">Saga<select id="tower-saga"><option value="">Todas las sagas</option>${SAGAS.filter(s => pool.some(id => CHARS[previews[id].id].saga === s.id)).map(s => `<option value="${s.id}">${s.name}</option>`).join('')}</select></label>
+        <label for="tower-type">Tipo<select id="tower-type"><option value="">Todos los tipos</option>${Object.keys(TYPES).map(t => `<option value="${t}">${TYPES[t].emoji} ${t}</option>`).join('')}</select></label>
+        <label for="tower-rarity">Rareza<select id="tower-rarity"><option value="0">Todas las rarezas</option>${[1,2,3,4,5].map(r => `<option value="${r}">${r} ${r===1?'estrella':'estrellas'}</option>`).join('')}</select></label>
+      </div>
       <button class="btn gray usage-filter" id="tower-used" aria-pressed="false">Más usados</button>
+      <button class="btn gray usage-filter" id="tower-clear">Limpiar filtros</button>
       <p id="tower-results" role="status">${pool.length} nakamas disponibles</p>
       <div class="tower-roster">
         ${pool.map(id => {
@@ -8289,7 +8375,7 @@ function screenTowerIntro() {
   }).join('')}
       </div>
       <div class="actions tower-launch" style="text-align:center;margin-top:14px;">
-        <button class="btn blue" id="btn-start" disabled>ELIGE 3 NAKAMAS (0/3)</button>
+        <button class="btn blue" id="btn-start" disabled>ELIGE AL MENOS 1 NAKAMA</button>
       </div>
     </div>
   `);
@@ -8306,24 +8392,35 @@ function screenTowerIntro() {
     $('#tower-picked').innerHTML = `<b>Tu equipo · ${picked.length}/3</b><div class="tower-picked-slots">${[0,1,2].map(i => picked[i] ? `<button class="btn gray" data-tower-remove="${picked[i]}">${charIcon(previews[picked[i]].id,32)} ${CHARS[previews[picked[i]].id].name} ×</button>` : `<span class="tower-empty-slot">${i+1}. Elige un nakama</span>`).join('')}</div>`;
     $('#tower-picked').querySelectorAll('[data-tower-remove]').forEach(button => button.onclick = () => {picked.splice(picked.indexOf(button.dataset.towerRemove),1);updateSelection();});
     $('#tower-synergies').innerHTML = activeSynergiesHTML(picked.map(id => previews[id]));
-    startBtn.disabled = picked.length !== 3;
-    startBtn.textContent = picked.length === 3 ? '¡SUBIR A LA TORRE!' : `ELIGE 3 NAKAMAS (${picked.length}/3)`;
+    startBtn.disabled = picked.length === 0;
+    startBtn.textContent = picked.length ? `¡SUBIR A LA TORRE CON ${picked.length}!` : 'ELIGE AL MENOS 1 NAKAMA';
   };
-  $('#tower-search').oninput = e => {
-    const query = e.target.value.trim().toLocaleLowerCase('es');
+  let sortByUsage = false;
+  const filterTowerRoster = () => {
+    const state = { q:$('#tower-search').value, saga:$('#tower-saga').value, type:$('#tower-type').value, rarity:+$('#tower-rarity').value, sort:sortByUsage ? 'usageDesc' : 'name' };
+    const visibleIds = filterSortChars(pool, state, id => previews[id].id);
+    const visibleSet = new Set(visibleIds);
+    const roster = $('.tower-roster');
+    const ordered = sortByUsage ? visibleIds : filterSortChars(pool, {sort:'name'}, id => previews[id].id);
+    ordered.forEach(id => roster.appendChild($(`[data-tower="${id}"]`)));
     let visible = 0;
-    document.querySelectorAll('[data-tower]').forEach(card => {
-      const f = previews[card.dataset.tower];
-      card.hidden = !`${CHARS[f.id].name} ${fighterTypes(f).join(' ')}`.toLocaleLowerCase('es').includes(query);
-      if (!card.hidden) visible++;
-    });
+    document.querySelectorAll('[data-tower]').forEach(card => { card.hidden = !visibleSet.has(card.dataset.tower); if (!card.hidden) visible++; });
     $('#tower-results').textContent = visible ? `${visible} nakamas disponibles` : 'No hay nakamas con esta búsqueda.';
   };
+  $('#tower-search').oninput = filterTowerRoster;
+  for (const id of ['tower-saga','tower-type','tower-rarity']) $(`#${id}`).onchange = filterTowerRoster;
   $('#tower-used').onclick = () => {
-    const button = $('#tower-used'), active = button.getAttribute('aria-pressed') !== 'true';
-    button.setAttribute('aria-pressed', String(active));
-    const ids = active ? filterSortChars(pool, {sort:'usageDesc'}) : pool;
-    ids.forEach(id => $('.tower-roster').appendChild($(`[data-tower="${id}"]`)));
+    sortByUsage = !sortByUsage;
+    $('#tower-used').setAttribute('aria-pressed', String(sortByUsage));
+    filterTowerRoster();
+  };
+  $('#tower-clear').onclick = () => {
+    $('#tower-search').value = '';
+    for (const id of ['tower-saga','tower-type']) $(`#${id}`).value = '';
+    $('#tower-rarity').value = '0';
+    sortByUsage = false;
+    $('#tower-used').setAttribute('aria-pressed', 'false');
+    filterTowerRoster();
   };
   document.querySelectorAll('[data-tower]').forEach(el => {
     el.onclick = () => {
@@ -8335,8 +8432,9 @@ function screenTowerIntro() {
     };
   });
   updateSelection();
+  filterTowerRoster();
   startBtn.onclick = () => {
-    if (picked.length !== 3) return;
+    if (picked.length < 1 || picked.length > 3) return;
     recordCharacterUsage(picked);
     saveMeta();
     tower = { floor: startFloor, team: picked.map(id => applyUpgrades(makeChar(id, startLvl))), items: { bocadillo: 3, sake: 1 } };
@@ -8356,14 +8454,22 @@ function towerNextBattle() {
   const bossIds = Object.keys(CHARS).filter(id => !BASE_OF[id] && CHARS[id].boss && availableSagas.has(CHARS[id].saga));
   const id = isBossFloor ? pick(bossIds) : pick(pool);
   const enemy = makeEnemy(id, lvl + (isBossFloor ? 2 : 0));
+  // La recompensa usa las estrellas de la forma que aparece en combate.
+  tower.floorEnemyRarity = CHARS[enemy.id].rareza;
   startBattle([enemy], {
     wild: false, tower: true,
     intro: `🗼 Piso ${tower.floor} — ¡${charName(enemy)} te desafía!`,
   });
 }
 
+function towerFloorFame(floor, rarity) {
+  const block = Math.floor((Math.max(1, floor) - 1) / 25);
+  return 10 * (5 * block + Math.min(5, Math.max(1, rarity || 1)));
+}
+
 function endTowerBattle(victory) {
   if (!victory) return towerGameOver();
+  tower.fameWon = (tower.fameWon || 0) + towerFloorFame(tower.floor, tower.floorEnemyRarity);
   tower.team.forEach(f => {
     if (f.hp > 0) {
       gainXP(f, xpForLevel(f.lvl)); // +1 nivel por piso conservando EXP
@@ -8381,7 +8487,7 @@ function towerGameOver() {
   battle = null;
   const floors = tower ? tower.floor - 1 : 0;
   if (floors > meta.towerRecord) meta.towerRecord = floors;
-  const fameWon = floors * 5;
+  const fameWon = tower?.fameWon || 0;
   gainFame(fameWon);
   render(`
     ${topbar(false)}

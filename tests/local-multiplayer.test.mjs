@@ -113,6 +113,22 @@ test('co-op scales the yonko with players and crew sizes, and every active playe
   for (let i = 0; !two.over && i < 500; i++) api.tick(two);
   assert.ok(two.over);
 });
+test('co-op allies attack in one shared phase and the yonkou answers once', () => {
+  const { api } = engine();
+  const b = api.create([player('host'), player(guestId(1))], { mode: 'coop', boss: 'kaido' });
+  b.eTeam[0].maxhp = b.eTeam[0].hp = 1_000_000;
+  b.pTeam.forEach(f => { f.maxhp = f.hp = 100_000; });
+  api.tick(b);
+  assert.equal(b.event.kind, 'group');
+  assert.deepEqual(Array.from(b.event.actions, action => b.pTeam[action.source].owner), ['host', guestId(1)]);
+  assert.equal(b.round, 1);
+  api.tick(b);
+  assert.equal(b.event.source, b.pTeam.length);
+  assert.equal(b.event.kind, 'attack');
+  api.tick(b);
+  assert.equal(b.event, null);
+  assert.equal(b.round, 2);
+});
 test('brackets cover every player once and handle byes for 3–8 entrants', () => {
   for (let n = 3; n <= 8; n++) {
     const ids = Array.from({ length: n }, (_, i) => String(i));
@@ -165,6 +181,9 @@ test('yonko match IDs are unique across rematches and travel in the validated ho
   s.start();
   const first = s.view.matches[0].rewardId;
   assert.equal(first, `${'f'.repeat(32)}:match-1`);
+  assert.equal(validView(JSON.parse(JSON.stringify(s.view)), api), true);
+  advance(); heartbeat(); s.pulse();
+  assert.equal(s.view.matches[0].battle.event.kind, 'group');
   assert.equal(validView(JSON.parse(JSON.stringify(s.view)), api), true);
   const bad = JSON.parse(JSON.stringify(s.view)); bad.matches[0].rewardId = 'invalid';
   assert.equal(validView(bad, api), false);

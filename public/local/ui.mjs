@@ -1,9 +1,11 @@
 import { LocalLink, decodeSignal } from './connection.mjs';
 import { LocalSession, BOSSES, RULES } from './session.mjs';
 import { formatRoomCode, normalizeRoomCode, roomSignal } from './signaling.mjs';
+import { yonkoRewardForSize } from './rewards.mjs';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const MODE = { duel: 'Duelo PvP', tournament: 'Torneo', coop: 'Alianza contra un yonko' };
+const searchKey = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
 export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' }), denDenAvailable = () => 4, consumeDenDen = () => true } = {}) {
   if (document.getElementById('local-multiplayer')) return;
   const engine = globalThis.LocalCombat;
@@ -15,7 +17,7 @@ export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' })
   const previousOverflow = document.body.style.overflow; document.body.style.overflow = 'hidden';
   const main = root.querySelector('#local-content'), notice = root.querySelector('#local-notice');
   let session, guestLink, viewKey = '', timer, signalTimer, signalBusy = false, signalFailures = 0, closed = false, displayName = 'Pirata', rewardStatus;
-  let roomCode = '', hostSecret = '', guestTicket = null;
+  let roomCode = '', hostSecret = '', guestTicket = null, picker = null;
   const links = new Map(); const room = crypto.randomUUID().replaceAll('-', '');
   const pendingJoins = new Map();
   const say = message => { notice.textContent = message; };
@@ -25,6 +27,7 @@ export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' })
   document.addEventListener('visibilitychange', onVisibility); window.addEventListener('beforeunload', onUnload);
   const leave = () => {
     const closingCode = roomCode, closingHost = hostSecret, closingGuest = guestTicket;
+    picker?.remove(); picker = null;
     session?.close(); for (const link of links.values()) link.close(); links.clear(); pendingJoins.clear(); guestLink?.close();
     clearInterval(timer); clearInterval(signalTimer); timer = signalTimer = null; session = null; viewKey = ''; guestLink = null; rewardStatus = null;
     roomCode = ''; hostSecret = ''; guestTicket = null; signalBusy = false; signalFailures = 0;
@@ -76,6 +79,7 @@ export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' })
     }
     const key = JSON.stringify(v) + session.self + rewardStatus?.kind + roomCode + (v.phase==='lobby'?denDenAvailable():'');
     if (key === viewKey) return; viewKey = key;
+    if (v.phase !== 'lobby' && picker) { picker.remove(); picker = null; }
     const me = v.players.find(p => p.id === session.self);
     if (!me) { main.innerHTML = `<section class="local-intro"><h2>Conectando con ${esc(formatRoomCode(roomCode))}</h2><p>El anfitrión está preparando la conexión. Mantén el juego abierto.</p><button class="btn gray" id="local-back">Cancelar</button></section>`; main.querySelector('#local-back').onclick = () => { leave(); startScreen(); }; return; }
     const connected = v.players.filter(p => p.connected).length;
@@ -96,18 +100,16 @@ export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' })
   }
   const playerName = id => id === 'alliance' ? 'La alianza' : id === 'yonko' ? 'El yonko' : id === 'draw' ? 'Empate' : session.view.players.find(p => p.id === id)?.name || 'Pirata';
   function lobbyHTML(v, me) {
-    const options = engine.roster.filter(c => session.roster.includes(c.id)).map(c => `<option value="${esc(c.id)}">${esc(c.name)}</option>`).join('');
+    const reward = yonkoRewardForSize(v.size);
+    const rewardText = v.mode === 'coop' ? `<p class="local-reward-preview">Victoria por jugador con ${v.size} nakama${v.size === 1 ? '' : 's'}: <strong>🧭 ${reward.logPoses.toLocaleString('es')} Log Poses · ⭐ ${reward.fame.toLocaleString('es')} Fama</strong></p>` : '';
     return `<section class="local-panel"><div class="local-config"><label class="local-field">Modo<select id="local-mode" ${session.host ? '' : 'disabled'}>${Object.entries(MODE).map(([id, name]) => `<option value="${id}" ${id === v.mode ? 'selected' : ''}>${name}</option>`).join('')}</select></label><div class="local-den-den" role="status" aria-label="Den den mushis disponibles"><span aria-hidden="true">🐌</span><strong>${denDenAvailable()} / 4</strong><small>Den den mushis · uno por desafío yonkou · se renuevan cada día</small></div><label class="local-field">Nakamas por jugador<select id="local-size" ${session.host ? '' : 'disabled'}>${[1, 3, 6].map(n => `<option ${n === v.size ? 'selected' : ''}>${n}</option>`).join('')}</select></label>${v.mode === 'coop' ? `<label class="local-field">Yonko<select id="local-boss" ${session.host ? '' : 'disabled'}>${BOSSES.map(id => `<option value="${id}" ${id === v.boss ? 'selected' : ''}>${esc(engine.name(id))}</option>`).join('')}</select></label>` : ''}</div>
-      <p class="local-fine">${v.mode === 'tournament' ? 'Eliminación directa · sorteo de cruces · pases de ronda para completar el cuadro · los empates se repiten.' : v.mode === 'coop' ? 'Cada jugador ataca con su nakama activo. El yonko responde a cada uno; sus PS escalan con jugadores y tamaño de equipos.' : 'Los ataques son automáticos. Tú decides cuándo lanzar la definitiva del nakama activo.'}</p>
+      <p class="local-fine">${v.mode === 'tournament' ? 'Eliminación directa · sorteo de cruces · pases de ronda para completar el cuadro · los empates se repiten.' : v.mode === 'coop' ? 'Los nakamas activos de la alianza atacan juntos. El yonkou responde una vez por turno; sus PS escalan con jugadores y tamaño de equipos.' : 'Los ataques son automáticos. Tú decides cuándo lanzar la definitiva del nakama activo.'}</p>${rewardText}
       <div class="local-player-list">${v.players.map(p => `<div class="local-player"><span>${p.id === 'host' ? '👑' : '🏴‍☠️'} <b>${esc(p.name)}</b>${p.id === me.id ? ' (tú)' : ''}</span><span>${!p.connected ? 'Desconectado' : !p.visible ? 'En segundo plano' : v.mode==='coop' && p.denDen<1 ? 'Sin den den mushis' : p.ready ? '✓ Listo' : 'Eligiendo equipo'}</span>${session.host && p.id !== 'host' ? `<button class="btn gray small" data-remove="${p.id}" aria-label="Retirar a ${esc(p.name)}">Retirar</button>` : ''}</div>`).join('')}</div>
       ${session.host ? `<div class="local-room-code"><span>Código de sala</span><strong>${esc(formatRoomCode(roomCode))}</strong><button class="btn blue small" id="local-copy-code">Copiar código</button><small>Los invitados pueden entrar mientras permanezcas en esta sala.</small></div>` : `<p class="local-fine">Sala ${esc(formatRoomCode(roomCode))} · El anfitrión elige el modo y el tamaño de las tripulaciones.</p>`}</section>
-      <section class="local-panel"><h3>Tu equipo · nivel 30</h3><p class="local-fine">Elige entre los personajes de tu cuenta y sus evoluciones desbloqueadas. El orden determina quién entra en combate.</p>${me.team.length < v.size ? `<p class="local-warning">Tienes ${session.roster.length} personajes disponibles. Necesitas ${v.size} para este equipo; el anfitrión puede reducir el tamaño.</p>` : ''}<div class="local-team-picker">${me.team.map((id, i) => `<label class="local-pick"><span>${engine.icon(id, 40)}</span><span>Nakama ${i + 1}<select aria-label="Nakama ${i + 1}" data-pick="${i}">${options}</select></span></label>`).join('')}</div><div class="local-actions"><button class="btn ${me.ready ? 'gray' : 'green'}" id="local-ready" ${me.team.length !== v.size || (v.mode==='coop' && denDenAvailable()<1) ? 'disabled' : ''}>${me.ready ? 'Dejar de estar listo' : 'Estoy listo'}</button>${session.host ? `<button class="btn gold" id="local-start" ${v.players.length < (v.mode === 'tournament' ? 3 : 2) || v.players.some(p => !p.ready || !p.connected || !p.visible || (v.mode==='coop' && p.denDen<1)) ? 'disabled' : ''}>Comenzar ${v.mode === 'tournament' ? 'torneo' : 'partida'}</button>` : ''}</div></section>`;
+      <section class="local-panel"><h3>Tu equipo · nivel 30</h3><p class="local-fine">Elige entre los personajes de tu cuenta y sus evoluciones desbloqueadas. El orden determina quién entra en combate.</p>${me.team.length < v.size ? `<p class="local-warning">Tienes ${session.roster.length} personajes disponibles. Necesitas ${v.size} para este equipo; el anfitrión puede reducir el tamaño.</p>` : ''}<div class="local-team-picker">${me.team.map((id, i) => `<button type="button" class="local-pick" data-pick="${i}" aria-label="Cambiar nakama ${i + 1}: ${esc(engine.name(id))}"><span>${engine.icon(id, 46)}</span><span><small>Nakama ${i + 1}</small><strong>${esc(engine.name(id))}</strong></span><span aria-hidden="true">Cambiar ↗</span></button>`).join('')}</div><div class="local-actions"><button class="btn ${me.ready ? 'gray' : 'green'}" id="local-ready" ${me.team.length !== v.size || (v.mode==='coop' && denDenAvailable()<1) ? 'disabled' : ''}>${me.ready ? 'Dejar de estar listo' : 'Estoy listo'}</button>${session.host ? `<button class="btn gold" id="local-start" ${v.players.length < (v.mode === 'tournament' ? 3 : 2) || v.players.some(p => !p.ready || !p.connected || !p.visible || (v.mode==='coop' && p.denDen<1)) ? 'disabled' : ''}>Comenzar ${v.mode === 'tournament' ? 'torneo' : 'partida'}</button>` : ''}</div></section>`;
   }
   function bindLobby(v, me) {
-    main.querySelectorAll('[data-pick]').forEach(select => {
-      const i = Number(select.dataset.pick); select.value = me.team[i];
-      select.onchange = handle(() => { const team = [...me.team]; team[i] = select.value; try { session.select(team); } catch (error) { select.value = me.team[i]; throw error; } });
-    });
+    main.querySelectorAll('[data-pick]').forEach(button => { button.onclick = () => openPicker(Number(button.dataset.pick)); });
     for (const key of ['mode', 'size', 'boss']) main.querySelector(`#local-${key}`)?.addEventListener('change', handle(event => {
       try { session.configure({ [key]: key === 'size' ? Number(event.target.value) : event.target.value }); }
       catch (error) { event.target.value = v[key]; throw error; }
@@ -120,6 +122,29 @@ export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' })
     }));
     main.querySelectorAll('[data-remove]').forEach(button => { button.onclick = () => { const id = button.dataset.remove; session.remove(id); links.get(id)?.close(); links.delete(id); }; });
   }
+  function openPicker(slot) {
+    picker?.remove();
+    const me = session.view.players.find(p => p.id === session.self);
+    if (!me || !Number.isInteger(slot) || slot < 0 || slot >= me.team.length) return;
+    const roster = engine.roster.filter(c => session.roster.includes(c.id));
+    picker = document.createElement('div'); picker.className = 'local-picker-backdrop';
+    picker.innerHTML = `<section class="local-picker" role="dialog" aria-modal="true" aria-labelledby="local-picker-title"><header><div><small>TRIPULACIÓN · HUECO ${slot + 1}</small><h2 id="local-picker-title">Elegir personaje</h2></div><button class="btn gray small" type="button" id="local-picker-close" aria-label="Cerrar selector">Cerrar</button></header><label class="local-field">Buscar por nombre<input type="search" id="local-picker-search" autocomplete="off" placeholder="Escribe el nombre del personaje"></label><p id="local-picker-count" class="local-fine" role="status"></p><div id="local-picker-results" class="local-picker-results"></div></section>`;
+    root.append(picker);
+    const close = () => { picker?.remove(); picker = null; main.querySelector(`[data-pick="${slot}"]`)?.focus(); };
+    picker.onclick = event => { if (event.target === picker) close(); };
+    picker.querySelector('#local-picker-close').onclick = close;
+    picker.onkeydown = event => { if (event.key === 'Escape') close(); };
+    const search = picker.querySelector('#local-picker-search'), results = picker.querySelector('#local-picker-results'), count = picker.querySelector('#local-picker-count');
+    const draw = () => {
+      const matches = roster.filter(c => searchKey(c.name).includes(searchKey(search.value)));
+      count.textContent = `${matches.length} personaje${matches.length === 1 ? '' : 's'}${matches.length > 48 ? ' · escribe para acotar' : ''}`;
+      results.innerHTML = matches.slice(0, 48).map(c => `<button type="button" class="local-picker-choice" data-character="${esc(c.id)}" ${me.team.includes(c.id) && me.team[slot] !== c.id ? 'disabled' : ''} ${me.team[slot] === c.id ? 'aria-current="true"' : ''}><span>${engine.icon(c.id, 52)}</span><strong>${esc(c.name)}</strong>${me.team[slot] === c.id ? '<small>Elegido</small>' : ''}</button>`).join('') || '<p class="local-fine">Sin resultados. Prueba con otro nombre.</p>';
+      results.querySelectorAll('[data-character]').forEach(button => { button.onclick = handle(() => {
+        const team = [...me.team]; team[slot] = button.dataset.character; session.select(team); close();
+      }); });
+    };
+    search.oninput = draw; draw(); search.focus();
+  }
   function focusedMatch(v, me) {
     const relevant = v.matches.filter(m => m.round === v.round && m.status !== 'replay' && m.battle);
     return relevant.find(m => m.players.includes(me.id)) || relevant[0];
@@ -128,7 +153,8 @@ export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' })
     const relevant = v.matches.filter(m => m.round === v.round && m.status !== 'replay');
     const own = relevant.find(m => m.players.includes(me.id) && m.battle);
     const focus = own || relevant.find(m => m.battle);
-    const reward = v.mode === 'coop' && v.champion === 'alliance' ? rewardStatus?.kind === 'granted' || rewardStatus?.kind === 'already' ? '<p>🧭 +100.000 Log Poses · ⭐ +10.000 Fama para tu cuenta.</p>' : rewardStatus?.kind === 'limit' ? '<p>Límite diario alcanzado: 4 victorias recompensadas.</p>' : rewardStatus?.kind === 'save-failed' ? '<p>No se pudo guardar la recompensa.</p>' : '' : '';
+    const rewardAmount = yonkoRewardForSize(v.size);
+    const reward = v.mode === 'coop' && v.champion === 'alliance' ? rewardStatus?.kind === 'granted' || rewardStatus?.kind === 'already' ? `<p>🧭 +${rewardAmount.logPoses.toLocaleString('es')} Log Poses · ⭐ +${rewardAmount.fame.toLocaleString('es')} Fama para tu cuenta.</p>` : rewardStatus?.kind === 'limit' ? '<p>Límite diario alcanzado: 4 victorias recompensadas.</p>' : rewardStatus?.kind === 'save-failed' ? '<p>No se pudo guardar la recompensa.</p>' : '' : '';
     const result = v.phase === 'finished' ? `<div class="local-result" role="status"><span>🏆</span><h2>${v.champion === 'draw' ? '¡Empate!' : `¡${esc(playerName(v.champion))} gana!`}</h2><p>Partida amistosa completada.</p>${reward}</div>` : '';
     const bracket = v.mode === 'tournament' ? `<section class="local-panel"><h3>Cuadro del torneo · ronda ${v.round}</h3><div class="local-bracket">${v.matches.map(m => `<div class="local-match ${m.status === 'playing' ? 'is-playing' : ''}"><small>Ronda ${m.round}${m.attempt > 1 ? ` · Repetición ${m.attempt}` : ''}</small><b>${m.players.map(id => esc(playerName(id))).join(' vs ')}</b><span>${m.status === 'bye' ? 'Pasa de ronda' : m.status === 'replay' ? 'Empate · se repite' : m.status === 'playing' ? 'En combate' : `Gana ${esc(playerName(m.winner))}`}</span></div>`).join('')}</div></section>` : '';
     const battleHTML = focus ? '<div id="local-arena"></div>' : '<section class="local-panel"><p>Has pasado de ronda. Espera a que terminen los otros combates.</p></section>';

@@ -99,6 +99,10 @@ html[data-theme="dark"] .bag-continuation { background:repeating-linear-gradient
 .backpack .bag-slot-number { opacity:.8; font-weight:700; }
 .backpack .bag-quantity { padding:2px 4px; border-radius:4px; background:#fff8dc; color:#30424a; }
 .backpack .bag-item-name { line-height:1.3; }
+.backpack:not(.backpack-combat) .bag-piece { cursor:grab; touch-action:none; }
+.backpack:not(.backpack-combat) .bag-piece.bag-dragging { opacity:.62; cursor:grabbing; z-index:4; }
+.backpack:not(.backpack-combat) .bag-empty { transition:box-shadow .15s ease; }
+.backpack:not(.backpack-combat) .bag-grid:has(.bag-dragging) .bag-empty { box-shadow:inset 0 0 0 2px #55c993; }
 .backpack:not(.backpack-combat) > [data-bag-organize] { display:block; width:100%; max-width:420px; min-height:44px; margin:12px auto 0; padding:8px; border:2px solid #39768a; border-radius:7px; background:#2d7087; color:#fff; font:800 12px/1.3 system-ui,sans-serif; }
 .backpack:not(.backpack-combat) > [data-bag-organize]:hover { background:#245a70; }
 .backpack .bag-help { max-width:55ch; margin:12px auto 0; color:var(--ink); font:13px/1.55 system-ui,sans-serif; }

@@ -17,6 +17,9 @@
     for (const key of ['wins', 'nuzWins', 'upgrades', 'global', 'stats', 'settings', 'sagaClears', 'sagaDiffWins', 'teamPresets', 'characterUsage', 'charUpgrades', 'charUpgradeSpent', 'crewVersions', 'formPreferences', 'islandProgress', 'sagaStats', 'pirateKingRewards', 'relicEquipment', 'relicCopies']) {
       if (data.meta[key] !== undefined && !record(data.meta[key])) throw new Error('Progreso inválido.');
     }
+    if (data.meta.settings?.battleBackpackOpen !== undefined && typeof data.meta.settings.battleBackpackOpen !== 'boolean') {
+      throw new Error('Preferencia de mochila inválida.');
+    }
     if (Object.values(data.meta.characterUsage || {}).some(n => !Number.isSafeInteger(n) || n < 0)) throw new Error('Contadores de uso inválidos.');
     for (const islands of Object.values(data.meta.islandProgress || {})) {
       if (!Array.isArray(islands) || islands.some(i=>!Number.isInteger(i) || i<0)) throw new Error('Progreso de islas inválido.');

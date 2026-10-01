@@ -46,7 +46,8 @@ try {
   assert.equal(await page.locator('#btn-king-rewards').count(),0);
   assert.equal(await page.evaluate(()=>meta.pirateKingRewards.eastblue),'mihawk');
   await page.locator('#btn-local').click();await page.locator('#local-create').click();
-  const options=await page.locator('[data-pick="0"] option').evaluateAll(nodes=>nodes.map(n=>n.value));
+  await page.locator('[data-pick="0"]').click();
+  const options=await page.locator('.local-picker-choice[data-character]').evaluateAll(nodes=>nodes.map(n=>n.dataset.character));
   assert.equal(options.includes('mihawk'),true);assert.equal(options.includes('naruto'),false);
   assert.deepEqual(errors,[]);
   console.log('Legacy roster migration, retroactive saga choices, final-boss reward, postponement/reload, permanent unlocks and local multiplayer roster verified in browser.');

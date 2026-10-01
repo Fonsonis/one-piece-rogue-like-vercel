@@ -69,3 +69,23 @@ body:has(#local-arena)>.ultimate-scene{z-index:2201}
  .local-config .local-den-den{padding:8px;}
 }
 @media(max-width:360px){.local-config{grid-template-columns:1fr;}}
+
+.local-reward-preview{padding:12px 14px;border:1px solid #d6b568;border-radius:10px;background:#fff3d4;color:#65470d;font-size:13px}
+.local-reward-preview strong{display:block;margin-top:3px;font-size:15px}
+.local-team-picker .local-pick{width:100%;min-height:78px;text-align:left;cursor:pointer}
+.local-team-picker .local-pick:hover{border-color:#287a84;background:#e9f6f0}
+.local-team-picker .local-pick>span:nth-child(2){flex:1;min-width:0}
+.local-team-picker .local-pick strong,.local-team-picker .local-pick small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.local-team-picker .local-pick strong{font-size:15px}
+.local-team-picker .local-pick>span:last-child{flex:0 0 auto;font-size:11px;color:#287a84;white-space:nowrap}
+.local-picker-backdrop{position:fixed;inset:0;z-index:2120;display:flex;align-items:center;justify-content:center;padding:12px;background:#082e44c9}
+.local-picker{display:flex;flex-direction:column;width:min(100%,680px);max-height:min(90dvh,760px);padding:18px;border-radius:16px;background:#fffdf7;box-shadow:0 24px 80px #0007}
+.local-picker header{display:flex;align-items:start;justify-content:space-between;gap:12px}
+.local-picker header small{font-size:10px;font-weight:800;letter-spacing:.12em;color:#287a84}
+.local-picker h2{margin:2px 0 12px}
+.local-picker-results{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:8px;overflow-y:auto;min-height:0;padding:3px}
+.local-picker-choice{display:flex;flex-direction:column;align-items:center;gap:3px;min-height:100px;padding:9px;border:1px solid #c9d9d5;border-radius:9px;background:#f5faf7;color:#203846;font:700 12px/1.3 system-ui,sans-serif;cursor:pointer;text-align:center}
+.local-picker-choice>span{min-height:54px}.local-picker-choice strong{overflow-wrap:anywhere}.local-picker-choice small{font-size:10px;color:#287a84}
+.local-picker-choice:hover:not(:disabled),.local-picker-choice[aria-current="true"]{border-color:#287a84;background:#e5f4ee}
+.local-picker-choice:disabled{opacity:.38;cursor:not-allowed}
+@media(max-width:600px){.local-picker{max-height:94dvh;padding:14px}.local-picker-results{grid-template-columns:repeat(2,minmax(0,1fr))}}

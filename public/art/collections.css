@@ -56,6 +56,10 @@ html[data-theme="dark"] .probabilities-modal .chart-table :is(small,span[style*=
 .tower-empty-slot { border:1px dashed var(--collection-line); border-radius:8px; color:var(--collection-muted); }
 .tower-search { display:flex; flex-direction:column; gap:6px; font-weight:650; }
 .tower-search input { width:100%; min-height:44px; padding:10px 12px; font:15px/1.4 system-ui,sans-serif; color:var(--collection-ink); background:var(--collection-surface); border:1px solid var(--collection-line); border-radius:8px; }
+.tower-filters { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.tower-filters label { display:flex; flex-direction:column; gap:6px; min-width:0; font:650 13px/1.4 system-ui,sans-serif; }
+.tower-filters select { width:100%; min-height:44px; padding:8px 10px; font:14px/1.4 system-ui,sans-serif; color:var(--collection-ink); background:var(--collection-surface); border:1px solid var(--collection-line); border-radius:8px; }
+.tower-selection #tower-clear { margin-left:8px; }
 .tower-roster { display:grid; grid-template-columns:repeat(auto-fill,minmax(165px,1fr)); gap:12px; margin-top:12px; }
 .tower-card { display:flex; flex-direction:column; align-items:center; gap:8px; min-width:0; padding:14px 10px; border:1px solid var(--collection-line); border-radius:12px; background:var(--collection-surface); color:var(--collection-ink); cursor:pointer; font:14px/1.4 system-ui,sans-serif; text-align:center; }
 .tower-card[hidden] { display:none; }
@@ -83,6 +87,8 @@ html[data-theme="dark"] :is(.team-synergy-summary,.tower-selection) { --collecti
   .probabilities-modal .tabs { grid-template-columns:repeat(3,minmax(0,1fr)); }
   .panel.tower-selection { padding:14px; }
   .tower-roster { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
+  .tower-filters { grid-template-columns:1fr 1fr; }
+  .tower-filters .tower-search { grid-column:1 / -1; }
   .tower-picked-slots { grid-template-columns:1fr; }
   .tower-picked-slots .btn,.tower-empty-slot { min-height:44px; }
   .world-saga-options { grid-template-columns:1fr; }
@@ -473,8 +479,9 @@ html[data-theme="dark"] .inventory-shortfall { color:#ffbd9e; }
 .achievements-modal .achieve-list-container { overflow:visible; min-height:0; max-height:none; padding:0; scrollbar-gutter:auto; }
 .achievements-modal .achievements-more { display:block; width:100%; margin:16px 0 0; }
 @media(max-width:600px) {
-  .modal.collection-modal.achievements-modal { height:calc(100dvh - 16px); }
-  .achievements-modal .achievements-scroll { padding:14px 14px 30px; }
-  .achievements-modal #ach-close { top:10px; right:12px; }
+  .collection-overlay:has(.achievements-modal) { align-items:flex-start; padding-top:max(28px,calc(env(safe-area-inset-top) + 14px)); padding-bottom:max(8px,env(safe-area-inset-bottom)); }
+  .modal.collection-modal.achievements-modal { height:calc(100dvh - max(28px,calc(env(safe-area-inset-top) + 14px)) - max(8px,env(safe-area-inset-bottom))); max-height:100%; }
+  .achievements-modal .achievements-scroll { padding:18px 14px 30px; }
+  .achievements-modal #ach-close { top:14px; right:12px; }
   .achievements-modal .collection-header { padding-right:100px; }
 }

@@ -241,10 +241,15 @@ export function validView(v, engine) {
     if (!b.relays || Object.keys(b.relays).some(id => !ids.has(id) || b.relays[id] !== true)) return false;
     if (b.event) {
       const event = b.event, count = b.pTeam.length + b.eTeam.length;
-      if (!['attack','ultimate'].includes(event.kind) || !Number.isInteger(event.source) || event.source < 0 || event.source >= count ||
-          !Number.isInteger(event.target) || event.target < 0 || event.target >= count || !event.move ||
-          typeof event.move.name !== 'string' || event.move.name.length > 150 || typeof event.move.type !== 'string' || event.move.type.length > 40 ||
-          !Array.isArray(event.before) || event.before.length !== count || event.before.some(hp => !Number.isFinite(hp) || hp < 0 || hp > 100000000)) return false;
+      const validAction = action => action && ['attack','ultimate'].includes(action.kind) && Number.isInteger(action.source) && action.source >= 0 && action.source < count &&
+        Number.isInteger(action.target) && action.target >= 0 && action.target < count && action.move &&
+        typeof action.move.name === 'string' && action.move.name.length <= 150 && typeof action.move.type === 'string' && action.move.type.length <= 40;
+      if (!Array.isArray(event.before) || event.before.length !== count || event.before.some(hp => !Number.isFinite(hp) || hp < 0 || hp > 100000000)) return false;
+      if (event.kind === 'group') {
+        if (v.mode !== 'coop' || !Array.isArray(event.actions) || event.actions.length < 1 || event.actions.length > m.players.length ||
+            new Set(event.actions.map(action => action?.source)).size !== event.actions.length ||
+            event.actions.some(action => !validAction(action) || !b.pTeam[action.source] || !m.players.includes(b.pTeam[action.source].owner) || action.target !== b.pTeam.length)) return false;
+      } else if (!validAction(event)) return false;
     }
   }
   return v.champion === null || ids.has(v.champion) || ['draw', 'alliance', 'yonko'].includes(v.champion);
