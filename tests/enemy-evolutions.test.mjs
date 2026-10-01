@@ -49,11 +49,11 @@ test('saved tournament and legends combat resolve every opponent from the round 
   const h=combatHarness();
   h.exec(`accountLevel=()=>35;screenChallengeBracket=()=>{};maxStartLvlCap=()=>100;
    meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.roster=['luffy','shanks','roger'];meta.charUpgrades={};
-   startChallenge('${kind}',${kind==='legends'?"['shanks','roger']":"['luffy']"});
+   startChallenge('${kind}',${kind==='legends'?"['shanks']":"['luffy']"});
    meta.challenge.level=65;
    const match=challengeCurrentMatch(meta.challenge),index=match.a===0?match.b:match.a;
    const members=meta.challenge.entrants[index].members;
-   ${kind==='legends'?"['lucci','kaido']":"['lucci']"}.forEach((id,slot)=>{
+   ['lucci'].forEach((id,slot)=>{
     for(const entrant of meta.challenge.entrants){
      const old=entrant.members.findIndex(member=>baseFormOf(member)===id);
      if(old>=0){entrant.members[old]=members[slot];break;}
@@ -66,8 +66,8 @@ test('saved tournament and legends combat resolve every opponent from the round 
   assert.equal(h.exec('battle.eTeam[0].id'),'lucci-awakened');
   assert.equal(h.exec('battle.eTeam[0].lvl'),65);
   assert.equal(h.exec('JSON.stringify(meta.challenge)===checkpoint'),true);
-  if(kind==='legends')assert.equal(h.exec('battle.eTeam[1].id'),'kaido-hybrid');
-  else assert.equal(h.exec('battle.pTeam[0].id'),'luffy');
+  assert.equal(h.exec('battle.eTeam.length'),1);
+  assert.equal(h.exec('battle.pTeam[0].id'),kind==='legends'?'shanks':'luffy');
  }
 });
 

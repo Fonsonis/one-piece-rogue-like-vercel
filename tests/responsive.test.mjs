@@ -39,12 +39,14 @@ test('island app uses the stable layout viewport instead of transient visual vie
 test('battle content scrolls inside the viewport while controls remain in the layout',()=>{
  const crew=fs.readFileSync('public/art/crew-layout.css','utf8');
  const layout=[...crew.matchAll(/:is\(#app,#local-arena\) \.battle-layout \{([^}]*)\}/g)].at(-1)?.[1] || '';
- const main=[...crew.matchAll(/:is\(#app,#local-arena\) \.battle-layout \.battle-main \{([^}]*)\}/g)].at(-1)?.[1] || '';
+ const mainRules=[...crew.matchAll(/:is\(#app,#local-arena\) \.battle-layout \.battle-main \{([^}]*)\}/g)].map(match=>match[1]);
+ const main=mainRules.find(rule=>/overflow-y:\s*auto/.test(rule)) || '';
  assert.match(layout,/overflow:\s*hidden/);
  assert.match(main,/flex:\s*1 1 auto/);
  assert.match(main,/height:\s*0/);
  assert.match(main,/min-height:\s*0/);
  assert.match(main,/overflow-y:\s*auto/);
+ assert.ok(mainRules.some(rule=>/flex-direction:\s*column/.test(rule)), 'mobile combat stacks the crew, bag and log');
 });
 
 async function viewHarness(){

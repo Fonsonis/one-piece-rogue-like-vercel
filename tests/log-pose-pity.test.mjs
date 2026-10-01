@@ -62,3 +62,28 @@ test('menu duplicates award 50, 500 and 1000 Log Poses exactly once',()=>{
   assert.equal(h.exec('meta.logPoses'),12+reward);
  }
 });
+
+test('automatic poster pulls use the chosen quantity and charge the full displayed cost',()=>{
+ const h=combatHarness();
+ h.exec(`
+  const controls={};
+  const market={
+    set innerHTML(value){this.markup=value;},
+    querySelectorAll(){return [];},
+    querySelector(selector){return controls[selector] ||= {value:'3',textContent:'',disabled:false};},
+    remove(){}
+  };
+  document.body={appendChild(){}};
+  document.querySelector=()=>null;
+  document.createElement=()=>market;
+  sagaUnlocked=()=>true;
+  Math.random=()=>0;
+  meta.logPoses=5000;
+  meta.starPity=0;
+  showLogPoseGachaModal();
+  market.querySelector('#lp-auto-gacha').onclick();
+ `);
+ assert.equal(h.exec('meta.logPoses'),2000);
+ assert.equal(h.exec('meta.starPity'),3);
+ assert.ok(h.exec('meta.roster.length')>0);
+});

@@ -817,9 +817,11 @@
     const sourceSprite=source.matches?.('.dex-sprite')?source:source.querySelector?.('.dex-sprite');
     const targetSprite=target!==source?target.querySelector?.('.dex-sprite'):null;
     let sprite=null,enemyImage=null,ready=false,frame=0,timer=0,start=null,last=-100,closed=false;
+    let finish;
+    const finished = new Promise(resolve => { finish = resolve; });
     let restore=()=>{},restoreEnemy=()=>{};
-    const cancel=()=>{if(closed)return;closed=true;cancelAnimationFrame(frame);clearTimeout(timer);restore();restoreEnemy();el.remove();if(active.get(owner)===handle)active.delete(owner);};
-    const handle={cancel,source,basic};active.set(owner,handle);
+    const cancel=()=>{if(closed)return;closed=true;cancelAnimationFrame(frame);clearTimeout(timer);restore();restoreEnemy();el.remove();if(active.get(owner)===handle)active.delete(owner);finish();};
+    const handle={cancel,source,basic,finished};active.set(owner,handle);
     // Hide the in-place sprite only after its replacement has loaded successfully.
     Promise.all([loadSprite(profile.id,basic?'attack':'ultimate'),targetSprite?.dataset.character?loadSprite(targetSprite.dataset.character):null]).then(([own,enemy])=>{
       if(closed)return;if(!own){cancel();return;}sprite=own;enemyImage=enemy;ready=true;

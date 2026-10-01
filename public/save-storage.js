@@ -34,7 +34,7 @@
         !Number.isSafeInteger(denDen.remaining) || denDen.remaining<0 || denDen.remaining>4)) throw new Error('Den den mushis inválidos.');
     const t=data.meta.challenge;
     if(t!==undefined&&t!==null){
-      const teamSize=t.kind==='legends'?2:1;
+      const teamSize=t.kind==='legends'&&!t.legendCharacter?2:1;
       const size=(t.version===2?16:8)/teamSize;
       const validMatch=m=>record(m)&&[m.a,m.b].every(i=>Number.isInteger(i)&&i>=0&&i<size)&&m.a!==m.b&&[null,m.a,m.b].includes(m.winner);
       const series=t.series;
@@ -44,6 +44,7 @@
         series.members.length===teamSize&&new Set(series.members).size===teamSize&&series.members.every(id=>typeof id==='string')&&
         (!t.finished?series.completed<series.total:series.completed>0&&(t.placement===1?series.wins>0:series.losses>0)));
       if(!record(t)||![1,2].includes(t.version)||!['tournament','legends'].includes(t.kind)||
+        (t.legendCharacter!==undefined&&(t.kind!=='legends'||typeof t.legendCharacter!=='string'))||
         !Number.isInteger(t.level)||t.level<1||t.level>1000||typeof t.finished!=='boolean'||
         !Array.isArray(t.entrants)||t.entrants.length!==size||t.entrants.some(e=>!record(e)||!Array.isArray(e.members)||e.members.length!==teamSize||e.members.some(id=>typeof id!=='string'))||
         !Array.isArray(t.rounds)||!t.rounds.length||t.rounds.length>Math.log2(size)||t.rounds.some((r,i)=>!record(r)||typeof r.name!=='string'||!Array.isArray(r.matches)||r.matches.length!==size/2**(i+1)||!r.matches.every(validMatch))||
