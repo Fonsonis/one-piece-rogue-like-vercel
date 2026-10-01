@@ -6,7 +6,7 @@ import { yonkoRewardForSize } from './rewards.mjs';
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const MODE = { duel: 'Duelo PvP', tournament: 'Torneo', coop: 'Alianza contra un yonko' };
 const searchKey = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' }), denDenAvailable = () => 4, consumeDenDen = () => true } = {}) {
+export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' }), denDenAvailable = () => 4, consumeDenDen = () => true, refreshHome = () => {} } = {}) {
   if (document.getElementById('local-multiplayer')) return;
   const engine = globalThis.LocalCombat;
   const root = document.createElement('div');
@@ -37,7 +37,7 @@ export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' })
   root.querySelector('#local-exit').onclick = () => {
     if (session && !confirm(session.host ? '¿Cerrar la sala? Los demás jugadores perderán al anfitrión.' : '¿Salir de la partida local?')) return;
     closed = true; leave(); document.removeEventListener('visibilitychange', onVisibility); window.removeEventListener('beforeunload', onUnload);
-    original.inert = false; document.body.style.overflow = previousOverflow; root.remove(); document.getElementById('btn-local')?.focus();
+    original.inert = false; document.body.style.overflow = previousOverflow; root.remove(); refreshHome(); document.getElementById('btn-local')?.focus();
   };
   function startScreen() {
     main.innerHTML = `<section class="local-intro"><div class="local-emblem" aria-hidden="true">🏴‍☠️ ⚔️ 🏴‍☠️</div><h2>Reúne a tu tripulación</h2><p>Duelo de 1, 3 o 6 nakamas, torneo de 3 a 8 jugadores o alianza de 2 a 8 contra un yonko.</p><div class="local-steps"><p><b>1.</b> Ambos dispositivos necesitan conexión: Wi-Fi, cable o un punto de acceso con datos.</p><p><b>2.</b> Un jugador crea la sala y comparte su código de 8 caracteres.</p><p><b>3.</b> Los demás introducen el código, eligen equipo y se marcan como listos.</p></div><label class="local-field">Tu nombre<input id="local-name" maxlength="24" autocomplete="nickname" value="${esc(displayName)}"></label><div class="local-actions"><button class="btn green" id="local-create">Crear sala</button></div><div class="local-join-box"><label class="local-field">Código de sala<input id="local-code" maxlength="9" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH"></label><button class="btn blue" id="local-join">Unirse a la sala</button></div><p class="local-fine">Sin cuentas. El servicio solo intercambia los datos necesarios para conectar los dispositivos; la partida viaja directamente entre ellos. El anfitrión debe mantener el juego abierto.</p><details><summary>Si no conecta</summary><p>Comprueba que ambos dispositivos tienen Internet y pueden comunicarse por la misma Wi-Fi o punto de acceso. Evita redes de invitados, aislamiento de dispositivos y VPN.</p><p>El multijugador requiere conexión aunque hayas preparado una copia del juego para usarla sin Internet.</p></details></section>`;
@@ -75,6 +75,7 @@ export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' })
     const v = session.view;
     if (v.mode === 'coop' && v.phase === 'finished' && v.champion === 'alliance' && (rewardStatus?.match !== v.matches[0]?.rewardId || rewardStatus?.kind === 'save-failed')) {
       rewardStatus = { ...awardYonkoWin(v), match: v.matches[0]?.rewardId };
+      if (rewardStatus.kind === 'granted') refreshHome();
       if (rewardStatus.kind === 'save-failed') say('No se pudo guardar la recompensa. Revisa el almacenamiento del dispositivo antes de salir.');
     }
     const key = JSON.stringify(v) + session.self + rewardStatus?.kind + roomCode + (v.phase==='lobby'?denDenAvailable():'');
@@ -95,7 +96,9 @@ export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' })
       const focus = focusedMatch(v, me);
       if (focus) globalThis.LocalBattleView.update(main.querySelector('#local-arena'), focus, session, playerName);
       main.querySelector('#local-next')?.addEventListener('click', handle(() => session.nextRound()));
-      main.querySelector('#local-rematch')?.addEventListener('click', () => session.reset());
+      main.querySelector('#local-return-lobby')?.addEventListener('click', () => {
+        if (session.returnToLobby() && !session.host) say('Volviendo a la selección de modo…');
+      });
     }
   }
   const playerName = id => id === 'alliance' ? 'La alianza' : id === 'yonko' ? 'El yonko' : id === 'draw' ? 'Empate' : session.view.players.find(p => p.id === id)?.name || 'Pirata';
@@ -154,11 +157,12 @@ export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' })
     const own = relevant.find(m => m.players.includes(me.id) && m.battle);
     const focus = own || relevant.find(m => m.battle);
     const rewardAmount = yonkoRewardForSize(v.size);
-    const reward = v.mode === 'coop' && v.champion === 'alliance' ? rewardStatus?.kind === 'granted' || rewardStatus?.kind === 'already' ? `<p>🧭 +${rewardAmount.logPoses.toLocaleString('es')} Log Poses · ⭐ +${rewardAmount.fame.toLocaleString('es')} Fama para tu cuenta.</p>` : rewardStatus?.kind === 'limit' ? '<p>Límite diario alcanzado: 4 victorias recompensadas.</p>' : rewardStatus?.kind === 'save-failed' ? '<p>No se pudo guardar la recompensa.</p>' : '' : '';
-    const result = v.phase === 'finished' ? `<div class="local-result" role="status"><span>🏆</span><h2>${v.champion === 'draw' ? '¡Empate!' : `¡${esc(playerName(v.champion))} gana!`}</h2><p>Partida amistosa completada.</p>${reward}</div>` : '';
+    const balance = rewardStatus?.balance ? `<p>Saldo actual: 🧭 ${Number(rewardStatus.balance.logPoses).toLocaleString('es')} Log Poses · ⭐ ${Number(rewardStatus.balance.fame).toLocaleString('es')} Fama</p>` : '';
+    const reward = v.mode === 'coop' && v.champion === 'alliance' ? rewardStatus?.kind === 'granted' || rewardStatus?.kind === 'already' ? `<p>🧭 +${rewardAmount.logPoses.toLocaleString('es')} Log Poses · ⭐ +${rewardAmount.fame.toLocaleString('es')} Fama para tu cuenta.</p>${balance}` : rewardStatus?.kind === 'limit' ? '<p>Límite diario alcanzado: 4 victorias recompensadas.</p>' : rewardStatus?.kind === 'save-failed' ? '<p>No se pudo guardar la recompensa.</p>' : '' : '';
+    const result = v.phase === 'finished' ? `<div class="local-result" role="status"><span>🏆</span><h2>${v.champion === 'draw' ? '¡Empate!' : `¡${esc(playerName(v.champion))} gana!`}</h2><p>Partida amistosa completada.</p>${reward}<button class="btn green" id="local-return-lobby">Volver a elegir modo</button></div>` : '';
     const bracket = v.mode === 'tournament' ? `<section class="local-panel"><h3>Cuadro del torneo · ronda ${v.round}</h3><div class="local-bracket">${v.matches.map(m => `<div class="local-match ${m.status === 'playing' ? 'is-playing' : ''}"><small>Ronda ${m.round}${m.attempt > 1 ? ` · Repetición ${m.attempt}` : ''}</small><b>${m.players.map(id => esc(playerName(id))).join(' vs ')}</b><span>${m.status === 'bye' ? 'Pasa de ronda' : m.status === 'replay' ? 'Empate · se repite' : m.status === 'playing' ? 'En combate' : `Gana ${esc(playerName(m.winner))}`}</span></div>`).join('')}</div></section>` : '';
     const battleHTML = focus ? '<div id="local-arena"></div>' : '<section class="local-panel"><p>Has pasado de ronda. Espera a que terminen los otros combates.</p></section>';
-    return `${result}${bracket}${battleHTML}${session.host && v.phase === 'round-end' ? '<button class="btn green" id="local-next">Comenzar siguiente ronda</button>' : ''}${session.host && v.phase === 'finished' ? '<button class="btn green" id="local-rematch">Volver a la sala · otra partida</button>' : ''}`;
+    return `${result}${bracket}${battleHTML}${session.host && v.phase === 'round-end' ? '<button class="btn green" id="local-next">Comenzar siguiente ronda</button>' : ''}`;
   }
   function startSignalLoop(task) {
     clearInterval(signalTimer); signalFailures = 0;

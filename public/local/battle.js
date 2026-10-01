@@ -25,13 +25,30 @@ globalThis.LocalBattleView = (() => {
     state.set(root, { key, match: match.id, revision: data.revision });
     const labels = { p: esc(coop ? 'ALIANZA' : playerName(b.pTeam[0].owner)), e: esc(playerName(b.eTeam[0].owner)) };
     LocalCombat.withBattle(b, () => {
-      if (fresh) root.innerHTML = battleLayoutHTML(data.lines.map(esc), labels);
+      if (fresh) {
+        root.innerHTML = battleLayoutHTML(data.lines.map(esc), labels);
+        if (coop) {
+          const side = root.querySelector('#side-p');
+          const slots = document.createElement('div');
+          slots.className = 'local-coop-slots';
+          side.querySelectorAll(':scope > .fcard').forEach(card => slots.append(card));
+          side.append(slots);
+        }
+      }
+      root.querySelector('.battle-layout')?.classList.toggle('local-coop', coop);
       for (const [side, team, active] of [['p', b.pTeam, b.curP], ['e', b.eTeam, b.curE]]) {
         team.forEach((f, i) => {
           const card = root.querySelector(`#fc-${side}-${i}`);
           const template = document.createElement('template'); template.innerHTML = fighterCardHTML(f, side, i, active);
           const next = template.content.firstElementChild;
           card.className = next.className;
+          if (coop && side === 'p') {
+            // Cada jugador conserva su propia carta y su propio escenario durante
+            // la acción conjunta; curP solo representa al primer atacante.
+            card.classList.toggle('active', f.active && f.hp > 0);
+            card.dataset.player = playerName(f.owner);
+            card.setAttribute('aria-label', `${playerName(f.owner)}: ${next.getAttribute('aria-label')}`);
+          }
           // Conserva el nodo del sprite para que una actualización no corte sus animaciones.
           for (const selector of ['.fcard-title','.fcard-hp','.fcard-meters','.fcard-stats-mini']) {
             const current = card.querySelector(selector), replacement = next.querySelector(selector);
@@ -81,7 +98,7 @@ globalThis.LocalBattleView = (() => {
           for (const action of actions.filter(action => action.kind === 'ultimate')) {
             const source = all[action.source], target = all[action.target];
             UltimateFX.play({ profile: UltimateArtProfiles.resolve(source.id, CHARS[source.id], action.move, baseFormOf(source.id)),
-              source: stage(source), target: stage(target), owner: root, speed: 1, hit: target.hp < before.get(target),
+              source: stage(source), target: stage(target), owner: stage(source), speed: 1, hit: target.hp < before.get(target),
               valid: () => root.isConnected && state.get(root)?.match === match.id });
           }
         }

@@ -546,6 +546,8 @@ const META_DEFAULTS = () => ({
   sagaDiffWins: {}, // sagaId -> { diffLevel: true }
   pirateKingRewards: {}, // sagaId -> 'pending' o ID del legendario elegido
   islandProgress: {}, // saga:mode:difficulty -> completed island indices
+  storyMapView: null, // Última vista de Historia, separada del progreso de islas.
+  characterIslandClears: [], // personajes que han terminado al menos una isla en la banda
   teamPresets: { 1: [], 2: [], 3: [] },
   characterUsage: {}, // Partidas iniciadas, compartidas entre formas y modos.
   stats: { kills: 0, items: 0 },
@@ -578,6 +580,7 @@ function loadMeta() {
   meta.charUpgradeSpent = meta.charUpgradeSpent || {};
   meta.crewVersions = meta.crewVersions || {};
   meta.formPreferences = Object.assign({}, meta.formPreferences || {});
+  meta.storyMapView = normalizeStoryMapView(meta.storyMapView);
   meta.dailySteps = normalizeDailySteps(meta.dailySteps);
   meta.roster = meta.roster || [];
   if (!meta.roster.includes('luffy')) {
@@ -766,6 +769,10 @@ function importSaveFile(file) {
 }
 function validateGameSave(data) {
   const progress=data.meta,t=progress.challenge;
+  if (progress.storyMapView && !normalizeStoryMapView(progress.storyMapView)) throw new Error('Vista de Historia incompatible.');
+  if (progress.storyMapView && progress.storyMapView.index >= SAGAS.find(saga=>saga.id===progress.storyMapView.sagaId).islands.length) {
+    throw new Error('Isla de Historia incompatible.');
+  }
   if (progress.formPreferences?.luffyGear4 !== undefined && !LUFFY_GEAR4_FORMS.includes(progress.formPreferences.luffyGear4)) {
     throw new Error('Preferencia de Gear 4 incompatible.');
   }
@@ -803,6 +810,9 @@ function validateGameSave(data) {
   if (Object.keys(data.meta.sagaStats || {}).some(id => !SAGAS.some(s => s.id === id))) throw new Error('Contadores de saga incompatibles.');
   for (const key of ['dex', 'recruited', 'roster', 'defeated']) {
     if (data.meta[key]?.some(id => !CHARS[id])) throw new Error('Personaje desconocido.');
+  }
+  if (data.meta.characterIslandClears?.some(id => !CHARS[id] || baseFormOf(id) !== id)) {
+    throw new Error('Victorias de personajes incompatibles.');
   }
   if (data.meta.reachedSagas?.some((id,index,ids) => !SAGAS.some(saga=>saga.id===id) || ids.indexOf(id)!==index)) {
     throw new Error('Progreso de sagas incompatible.');
@@ -1082,6 +1092,13 @@ function unlockRoster(allowBosses = true) {
   }
   if (added.length) saveMeta();
   return added;
+}
+function recordClearedIslandTeam() {
+  if (!run?.islandComplete) return;
+  const cleared = new Set(meta.characterIslandClears || []);
+  for (const fighter of run.team || []) if (CHARS[fighter.id]) cleared.add(baseFormOf(fighter.id));
+  meta.characterIslandClears = [...cleared];
+  saveMeta();
 }
 
 // ---------- Generación de mapa ----------
@@ -2642,8 +2659,12 @@ function screenHome() {
     const btn = $('#btn-local'); btn.disabled = true;
     try {
       const [{ openLocal }, { claimYonkoReward }, { denDenRemaining, spendDenDen }] = await Promise.all([import('./local/ui.mjs'), import('./local/rewards.mjs'), import('./local/den-den.mjs')]);
-      await openLocal({ awardYonkoWin: view => claimYonkoReward(meta, view, saveMeta),
-        denDenAvailable: () => denDenRemaining(meta), consumeDenDen: () => spendDenDen(meta,saveMeta) });
+      await openLocal({ awardYonkoWin: view => ({
+        ...claimYonkoReward(meta, view, saveMeta),
+        balance: { logPoses: meta.logPoses, fame: meta.fame },
+      }),
+        denDenAvailable: () => denDenRemaining(meta), consumeDenDen: () => spendDenDen(meta,saveMeta),
+        refreshHome: screenHome });
     }
     catch (e) { toast('No se pudo abrir el modo local. Recarga el juego e inténtalo de nuevo.'); }
     finally { btn.disabled = false; }
@@ -3107,9 +3128,34 @@ function showSagaInfoModal(sagaIdx = 0) {
 
 let storyMode = 'classic';
 
+function normalizeStoryMapView(view) {
+  if (!view || typeof view !== 'object' || Array.isArray(view)) return null;
+  const sagaIdx = SAGAS.findIndex(saga => saga.id === view.sagaId);
+  if (sagaIdx < 0 || !['classic','nuzlocke'].includes(view.mode) || !DIFFICULTIES.some(d => d.id === view.diff)) return null;
+  const index = Number.isInteger(view.index) && view.index >= 0 && view.index < SAGAS[sagaIdx].islands.length ? view.index : 0;
+  const scrollTop = Number.isFinite(view.scrollTop) && view.scrollTop >= 0 ? Math.min(view.scrollTop, 1000000) : 0;
+  return {sagaId:view.sagaId,index,mode:view.mode,diff:view.diff,scrollTop};
+}
+
+function rememberStoryMapView(chart = $('#world-map')) {
+  if (!chart) return;
+  const sagaIdx = Number($('#world-jump')?.dataset?.saga);
+  const safeSagaIdx = Number.isInteger(sagaIdx) && SAGAS[sagaIdx] ? sagaIdx : 0;
+  const previous = meta.storyMapView;
+  const index = worldSelection?.sagaIdx === safeSagaIdx ? worldSelection.index
+    : previous?.sagaId === SAGAS[safeSagaIdx].id ? previous.index : 0;
+  meta.storyMapView = normalizeStoryMapView({sagaId:SAGAS[safeSagaIdx].id,index,mode:storyMode,diff:selectedDiff,scrollTop:chart.scrollTop});
+}
+
 function screenSagas(focusSaga, previousScroll) {
   playMusic('menu');
-  if (!Number.isInteger(focusSaga) && meta.lastCompletedIsland && SAGAS[meta.lastCompletedIsland.saga]?.islands[meta.lastCompletedIsland.index]) {
+  const remembered = !Number.isInteger(focusSaga) ? normalizeStoryMapView(meta.storyMapView) : null;
+  if (remembered) {
+    focusSaga = SAGAS.findIndex(saga => saga.id === remembered.sagaId);
+    previousScroll = remembered.scrollTop;
+    storyMode = remembered.mode;
+    selectedDiff = remembered.diff;
+  } else if (!Number.isInteger(focusSaga) && meta.lastCompletedIsland && SAGAS[meta.lastCompletedIsland.saga]?.islands[meta.lastCompletedIsland.index]) {
     storyMode = meta.lastCompletedIsland.mode === 'nuzlocke' ? 'nuzlocke' : 'classic';
     selectedDiff = DIFFICULTIES.some(d => d.id === meta.lastCompletedIsland.diff) ? meta.lastCompletedIsland.diff : 1;
   }
@@ -3153,9 +3199,9 @@ function screenSagas(focusSaga, previousScroll) {
     </div>
   `);
 
-  $('#btn-back').onclick = () => { screenHome(); };
-  $('#tab-classic').onclick = () => { storyMode = 'classic'; screenSagas(Number($('#world-jump').dataset.saga), $('#world-map').scrollTop); };
-  $('#tab-nuz').onclick = () => { storyMode = 'nuzlocke'; screenSagas(Number($('#world-jump').dataset.saga), $('#world-map').scrollTop); };
+  $('#btn-back').onclick = () => { rememberStoryMapView(); saveMeta(); screenHome(); };
+  $('#tab-classic').onclick = () => { storyMode = 'classic'; rememberStoryMapView(); saveMeta(); screenSagas(Number($('#world-jump').dataset.saga), $('#world-map').scrollTop); };
+  $('#tab-nuz').onclick = () => { storyMode = 'nuzlocke'; rememberStoryMapView(); saveMeta(); screenSagas(Number($('#world-jump').dataset.saga), $('#world-map').scrollTop); };
 
   const diffTrigger = $('#btn-diff-trigger');
   const diffMenu = $('#diff-dropdown-menu');
@@ -3187,6 +3233,8 @@ function screenSagas(focusSaga, previousScroll) {
     item.onclick = e => {
       e.stopPropagation();
       selectedDiff = +item.dataset.diff;
+      rememberStoryMapView();
+      saveMeta();
       screenSagas(Number($('#world-jump').dataset.saga), $('#world-map').scrollTop);
     };
   });
@@ -3204,7 +3252,7 @@ function screenSagas(focusSaga, previousScroll) {
       showSagaProbabilitiesModal(+btn.dataset.saga);
     };
   });
-  bindWorldMapNavigation(focusSaga, previousScroll);
+  bindWorldMapNavigation(focusSaga, previousScroll, remembered);
 }
 
 // ============ LISTAS DE PERSONAJES: FILTRO, ORDEN Y CUADRÍCULA 3x3 ============
@@ -3486,7 +3534,7 @@ function showInventoryModal(opts = {}) {
       return `<article class="inventory-card ${currentTeam.includes(id)?'in-team':''}" data-id="${id}">
         <div class="inventory-card-top"><span>${currentTeam.includes(id)?'En tu equipo':'Reclutado'}</span><span class="inventory-card-marks"><span class="inventory-relic-mark ${ownsRelic?'owned':'locked'}" role="img" aria-label="${relicStatus}" title="${relicStatus}">${ownsRelic?'🏺':'🔒'}</span><span class="inventory-rarity" aria-label="Rareza ${c.rareza} de 5 estrellas"><span aria-hidden="true">★</span> ${c.rareza}/5</span></span></div>
         <button class="inventory-profile btn-info-inv" data-id="${id}" aria-label="Ver ficha de ${collectionText(c.name)}"><span class="inventory-portrait" aria-hidden="true">${charIcon(displayId,80)}</span><strong>${c.name}</strong><span class="inventory-profile-link">Ver ficha ↗</span></button>
-        ${characterSortStatHTML(displayId,invViewState.sort)}<div class="inventory-level">Nivel base <strong>${level}</strong></div><div class="type-badges">${typeBadges(c.types)}</div>
+        ${characterSortStatHTML(displayId,invViewState.sort)}<div class="inventory-level"><span>Nivel base</span><span class="inventory-level-details"><span class="inventory-type-dots">${c.types.filter(t=>TYPES[t]).map(t=>`<span class="inventory-type-dot" style="background:${TYPES[t].color}" role="img" aria-label="Tipo ${collectionText(t)}" title="${collectionText(t)}"></span>`).join('')}</span><strong>${level}</strong></span></div>
         <div class="inventory-upgrade">${maxed?`<span class="inventory-limit">Límite de saga: Nv. ${cap}</span><button class="btn btn-upg-inv" data-id="${id}" disabled aria-label="Nivel máximo de saga alcanzado"><span class="inventory-upgrade-label">Nivel máximo</span><span class="inventory-upgrade-short" aria-hidden="true">Máx.</span></button>`:`<span class="inventory-cost" title="${number(cost)} Log Poses">Coste: <strong>${compact(cost)} 🧭</strong></span><button class="btn gold btn-upg-inv" data-id="${id}" ${canAfford?'':'disabled'} aria-label="Mejorar a ${collectionText(c.name)} al nivel base ${level+1} por ${number(cost)} Log Poses"><span class="inventory-upgrade-label">Subir a Nv. ${level+1}</span><span class="inventory-upgrade-short" aria-hidden="true">↑ Lv. ${level+1}</span></button>${canAfford?'':`<span class="inventory-shortfall">Faltan ${compact(cost-(meta.logPoses||0))} 🧭</span>`}`}${level>5?`<button class="btn gray small btn-sell-base-inv" data-id="${id}" aria-label="Vender niveles base de ${collectionText(c.name)} y recuperar ${number(Math.floor(charBaseLevelSpent(id)/2))} Log Poses">Vender niveles · +${compact(Math.floor(charBaseLevelSpent(id)/2))} 🧭</button>`:''}</div>
       </article>`;
     }).join('');
@@ -3702,7 +3750,7 @@ function scrollWorldStart(chart) {
   chart.scrollTop = Math.min(chart.scrollHeight - chart.clientHeight, worldStopTop(chart,first) - 16);
 }
 
-function bindWorldMapNavigation(focusSaga, previousScroll) {
+function bindWorldMapNavigation(focusSaga, previousScroll, remembered) {
   const chart = $('#world-map');
   const recent = meta.lastCompletedIsland;
   updateWorldSagaPicker(Number.isInteger(focusSaga) ? focusSaga : recent && SAGAS[recent.saga]?.islands[recent.index] ? recent.saga : 0);
@@ -3718,7 +3766,7 @@ function bindWorldMapNavigation(focusSaga, previousScroll) {
     const target = $(`#world-island-${focusSaga}-${Math.max(0, index)}`);
     chart.scrollTop = worldStopTop(chart,target) - chart.clientHeight / 2 + target.offsetHeight / 2;
   } else scrollWorldStart(chart);
-  $('#world-to-start').onclick = () => scrollWorldStart(chart);
+  $('#world-to-start').onclick = () => { scrollWorldStart(chart); rememberStoryMapView(chart); saveMeta(); };
   document.querySelectorAll('[data-jump-saga]').forEach(button => button.onclick = () => {
     const index = Number(button.dataset.jumpSaga);
     const target = $(`#world-island-${index}-0`);
@@ -3726,12 +3774,14 @@ function bindWorldMapNavigation(focusSaga, previousScroll) {
     $('#world-saga-picker').open = false;
     const sailed = worldNavigator?.travelTo(`${SAGAS[index].id}-0`);
     if (!sailed) chart.scrollTop = worldStopTop(chart,target) - 16;
+    meta.storyMapView = normalizeStoryMapView({sagaId:SAGAS[index].id,index:0,mode:storyMode,diff:selectedDiff,scrollTop:chart.scrollTop});
+    saveMeta();
     $('#world-jump').focus();
   });
   worldNavigator = globalThis.WorldVoyage?.mount(chart, {
-    initialId:worldShipLocation || (run && !run.islandComplete ? `${SAGAS[run.saga]?.id}-${run.islandIdx}` : recent && SAGAS[recent.saga]?.islands[recent.index] ? `${SAGAS[recent.saga].id}-${recent.index}` : null),
+    initialId:remembered ? `${remembered.sagaId}-${remembered.index}` : worldShipLocation || (run && !run.islandComplete ? `${SAGAS[run.saga]?.id}-${run.islandIdx}` : recent && SAGAS[recent.saga]?.islands[recent.index] ? `${SAGAS[recent.saga].id}-${recent.index}` : null),
     onTravel:() => updateWorldArrival(true),
-    onArrival:id => { worldShipLocation=id; updateWorldArrival(false); }
+    onArrival:id => { worldShipLocation=id; updateWorldArrival(false); rememberStoryMapView(chart); saveMeta(); }
   });
   chart.parentElement && (chart.parentElement.onkeydown = e => {
     if(e.key === 'Escape' && worldSelection){e.preventDefault();closeWorldIsland();}
@@ -3773,6 +3823,7 @@ function selectWorldIsland(sagaIdx,index,trigger) {
   const panel=$('#world-island-panel');if(!panel)return;
   if(worldSelection?.trigger?.setAttribute)worldSelection.trigger.setAttribute('aria-expanded','false');
   worldSelection={sagaIdx,index,trigger};
+  updateWorldSagaPicker(sagaIdx);
   panel.innerHTML=worldIslandPanelHTML(sagaIdx,index);panel.hidden=false;
   trigger?.setAttribute?.('aria-expanded','true');
   document.querySelectorAll('.world-stop.is-selected').forEach(el=>el.classList.remove('is-selected'));
@@ -3782,6 +3833,8 @@ function selectWorldIsland(sagaIdx,index,trigger) {
   $('#world-enter').onclick=enterWorldIsland;
   const started=worldNavigator?.travelTo(`${SAGAS[sagaIdx].id}-${index}`);
   if(!started)updateWorldArrival(false);
+  rememberStoryMapView();
+  saveMeta();
   $('#world-close').focus?.({preventScroll:true});
 }
 function updateWorldArrival(sailing) {
@@ -8112,6 +8165,7 @@ function endBattle(victory, fled, recruited) {
     meta.islandProgress ||= {};
     meta.islandProgress[islandProgressKey(run.saga,run.mode,run.diff || 1)] = [...new Set([...completed,run.islandIdx])];
     meta.lastCompletedIsland = {saga:run.saga, index:run.islandIdx, mode:run.mode, diff:run.diff || 1};
+    recordClearedIslandTeam();
     meta.totalIslands = (meta.totalIslands || 0)+1;
     trackSagaStat('islands');
     const newVets = unlockRoster(true);
@@ -9038,8 +9092,7 @@ function dexCardHTML(id) {
 
 function dexCollectionStatus(id) {
   const base = baseFormOf(id);
-  if (isNakamaUnlocked(base)) return { key:'veteran', icon:'🏅', label:'Reclutado' };
-  if (dexBaseIds(meta.recruited).includes(base)) return { key:'recruited', icon:'⚓', label:'Reclutado en viaje' };
+  if (isNakamaUnlocked(base) && (meta.characterIslandClears || []).includes(base)) return { key:'veteran', icon:'🏅', label:'Reclutado' };
   if (dexEntrySeen(base)) return { key:'seen', icon:'👁', label:'Avistado' };
   return { key:'unknown', icon:'❔', label:'Sin avistar' };
 }
@@ -9053,10 +9106,10 @@ function screenDex() {
     <button class="btn gray small back-btn" id="btn-back">← VOLVER</button>
     <div class="panel pirate-dex collection-page">
       <header class="collection-header dex-header"><div><span class="collection-eyebrow">Tu colección</span><h2>📖 Dex Pirata</h2></div></header>
-      <div class="collection-summary dex-progress" aria-label="Progreso de la colección"><span><strong>${dexBaseIds(meta.dex).length} <small>/ ${all.length}</small></strong><span>Avistados</span></span><span><strong>${dexBaseIds(meta.recruited).length}</strong><span>Reclutados en viaje</span></span><span><strong>${dexBaseIds(meta.roster).length}</strong><span>Reclutados permanentes</span></span></div>
+      <div class="collection-summary dex-progress" style="grid-template-columns:repeat(2,minmax(0,1fr))" aria-label="Progreso de la colección"><span><strong>${dexBaseIds(meta.dex).length} <small>/ ${all.length}</small></strong><span>Avistados</span></span><span><strong>${all.filter(id => dexCollectionStatus(id).key === 'veteran').length}</strong><span>Reclutados</span></span></div>
       <div class="dex-filter-panel"><span class="collection-eyebrow">Buscar y ordenar</span>${charControlsHTML(dexView, { sagas: sagaOpts })}</div>
       <div id="char-grid" class="collection-list"></div>
-      <p class="dex-help"><strong>Reclutado</strong> significa que ya forma parte de tu cuenta; <strong>Reclutado en viaje</strong>, que se unió temporalmente a una aventura. Toca un personaje avistado para abrir su ficha y ver todas sus fases.</p>
+      <p class="dex-help"><strong>Reclutado</strong> significa que lo has conseguido y has superado una isla con él. Los personajes conocidos que aún no cumplen ambas condiciones aparecen como <strong>Avistado</strong>. Toca un personaje avistado para abrir su ficha y ver todas sus fases.</p>
     </div>
   `);
   $('#btn-back').onclick = screenHome;
