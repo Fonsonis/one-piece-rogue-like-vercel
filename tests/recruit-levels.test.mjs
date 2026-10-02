@@ -37,11 +37,13 @@ test('recruitment uses the highest base level available to the player', () => {
   assert.equal(h.exec("run.team.find(f=>f.id==='chopper').lvl"), h.exec('maxStartLvlCap()'));
 });
 
-test('the second starting nakama unlocks at account level 7 without shifting later slots', () => {
+test('the second and third starting nakamas unlock at account level 7', () => {
   const h = combatHarness();
   assert.equal(h.exec('nextStarterSlotItem().lvl'), 7);
   h.exec('meta.global.starterSlots=2');
-  assert.equal(h.exec('nextStarterSlotItem().lvl'), 8);
+  assert.equal(h.exec('nextStarterSlotItem().lvl'), 7);
+  h.exec('meta.global.starterSlots=3');
+  assert.equal(h.exec('nextStarterSlotItem().lvl'), 11);
 });
 
 test('new permanent recruits receive the available base level without refundable free upgrades', () => {

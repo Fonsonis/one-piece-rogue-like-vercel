@@ -8673,7 +8673,7 @@ function nextStarterSlotItem() {
   }
   const nextN = current + 1;
   const cost = 600 * Math.pow(2, nextN - 2);
-  const lvlReq = nextN === 2 ? 7 : 5 + (nextN - 2) * 3;
+  const lvlReq = nextN <= 3 ? 7 : 5 + (nextN - 2) * 3;
   const names = ['', '', 'Dúo inicial (2 casillas)', 'Trío inicial (3 casillas)', 'Cuarteto inicial (4 casillas)', 'Quinteto inicial (5 casillas)', 'Sexteto inicial (6 casillas)'];
   return {
     id: `starter_slot_${nextN}`,
