@@ -19,18 +19,18 @@ test('recruitment uses the highest base level available to the player', () => {
   h.exec(`screenMap=()=>{};modalInfo=()=>{};
     run={saga:0,islandIdx:0,mapIdx:0,mode:'classic',
       nuzCaught:{},berries:9999,items:{},team:[makeChar('luffy',5)]};`);
-  assert.equal(h.exec('recruitLevelForPlayer()'), 15);
+  assert.equal(h.exec('recruitLevelForPlayer()'), 20);
 
   h.exec("wildEncounter(makeChar('zoro',90,true))");
   nodes.get('#we-pay').onclick();
-  assert.equal(h.exec('run.team.find(f=>f.id===\'zoro\').lvl'), 15);
+  assert.equal(h.exec('run.team.find(f=>f.id===\'zoro\').lvl'), 20);
 
   h.exec(`MYSTERY_EVENTS.splice(0,MYSTERY_EVENTS.length,MYSTERY_EVENTS.find(e=>e.kind==='recruit'));
     doMystery({lvl:[90,100],pool:['nami']});`);
-  assert.equal(h.exec("run.team.find(f=>f.id==='nami').lvl"), 15);
+  assert.equal(h.exec("run.team.find(f=>f.id==='nami').lvl"), 20);
 
   h.exec("specialJoin('sanji',100)");
-  assert.equal(h.exec("run.team.find(f=>f.id==='sanji').lvl"), 15);
+  assert.equal(h.exec("run.team.find(f=>f.id==='sanji').lvl"), 20);
 
   h.exec("meta.sagaDiffWins={eastblue:{3:true},alabasta:{3:true}};specialJoin('chopper',100)");
   assert.ok(h.exec('maxStartLvlCap()') > 15);
@@ -49,7 +49,7 @@ test('the second and third starting nakamas unlock at account level 7', () => {
 test('new permanent recruits receive the available base level without refundable free upgrades', () => {
   const h = combatHarness();
   h.exec("run={islandComplete:true,team:[makeChar('zoro',15)]};unlockRoster()");
-  assert.equal(h.exec("startLvlOf('zoro')"), 15);
+  assert.equal(h.exec("startLvlOf('zoro')"), 20);
   assert.equal(h.exec('meta.charUpgradeSpent.zoro'), 0);
 
   h.exec("meta.sagaDiffWins={eastblue:{3:true},alabasta:{3:true}};awardLogPosePrize('nami')");

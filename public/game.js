@@ -4223,13 +4223,13 @@ function screenStarter(sagaIdx, islandIdx = 0) {
 }
 
 // Límite de nivel inicial según la máxima saga accesible:
-// East Blue permite Nv.15; las siguientes sagas nunca reducen ese límite.
+// East Blue permite Nv.20; las siguientes sagas nunca reducen ese límite.
 function maxStartLvlCap(progress = meta) {
   let highestSaga = 0;
   for (let i = 0; i < SAGAS.length; i++) {
     if (sagaUnlocked(i, progress)) highestSaga = i;
   }
-  return Math.max(15, SAGAS[highestSaga] ? SAGAS[highestSaga].islands[0].lvl[0] : 15);
+  return Math.max(20, SAGAS[highestSaga] ? SAGAS[highestSaga].islands[0].lvl[0] : 20);
 }
 
 function logPoseUpgradeCost(currentLvl) {

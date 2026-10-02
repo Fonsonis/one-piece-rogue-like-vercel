@@ -48,12 +48,12 @@ test('sheet upgrade spends the current cost, keeps the base phase and preserves 
 
 test('sheet respects insufficient funds and stops offering upgrades at the saga cap',()=>{
  const {h,overlays}=modalHarness();
- h.exec(`meta.sagaDiffWins={};meta.charUpgrades={luffy:9};meta.logPoses=0;showCharModal('luffy');`);
+ h.exec(`meta.sagaDiffWins={};meta.charUpgrades={luffy:14};meta.logPoses=0;showCharModal('luffy');`);
  const ov=overlays[0];assert.equal(ov.querySelector('#sheet-upg-btn').disabled,true);
- ov.querySelector('#sheet-upg-btn').onclick();assert.equal(h.exec("startLvlOf('luffy')"),14);
+ ov.querySelector('#sheet-upg-btn').onclick();assert.equal(h.exec("startLvlOf('luffy')"),19);
  h.exec('meta.logPoses=10000;');h.ctx.sheet=ov;h.exec("showCharModal('luffy',sheet);");
  ov.querySelector('#sheet-upg-btn').onclick();
- assert.equal(h.exec("startLvlOf('luffy')"),15);
+ assert.equal(h.exec("startLvlOf('luffy')"),20);
  assert.equal(ov.querySelector('#sheet-upg-btn'),null);
  assert.match(ov.html,/Nivel máximo alcanzado/);
 });
