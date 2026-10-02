@@ -68,6 +68,10 @@
     for (const key of ['fame', 'accXp', 'towerRecord', 'runnerBest', 'logPoses', 'starPity', 'soloWins', 'totalIslands']) {
       if (data.meta[key] !== undefined && (!Number.isFinite(data.meta[key]) || data.meta[key] < 0)) throw new Error('Progreso inválido.');
     }
+    if (data.meta.minigameBests !== undefined && (!record(data.meta.minigameBests) ||
+      Object.entries(data.meta.minigameBests).some(([id, score]) => !['zoro','nami','usopp','sanji','robin','chopper','brook','franky','jinbe'].includes(id) || !Number.isSafeInteger(score) || score < 0))) {
+      throw new Error('Récords de minijuegos inválidos.');
+    }
     if (data.run !== null && data.run !== undefined) {
       const r = data.run;
       if (r?.backpackVersion !== undefined && r.backpackVersion !== 1) throw new Error('Mochila incompatible.');
