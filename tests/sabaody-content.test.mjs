@@ -93,3 +93,13 @@ test('Punk Hazard is separate, owns its cast and keeps previous saga account cap
  assert.deepEqual(Array.from(h.exec("pirateKingLegendaryPool('punkhazard')")),['caesar']);
  assert.equal(h.exec("SAGA_LEVEL_CAPS.marineford"),35);assert.equal(h.exec("SAGA_LEVEL_CAPS.dressrosa"),45);assert.equal(h.exec("SAGA_LEVEL_CAPS.wano"),55);
 });
+
+test('East Blue caps account level at 8 until Alabasta unlocks',()=>{
+ const h=combatHarness();
+ h.exec('meta.accXp=xpForAccLevel(9)');
+ assert.equal(h.exec('getMaxAccountLevelCap()'),8);
+ assert.equal(h.exec('accountLevel()'),8);
+ h.exec('meta.sagaDiffWins={eastblue:{3:true}}');
+ assert.equal(h.exec('getMaxAccountLevelCap()'),15);
+ assert.equal(h.exec('accountLevel()'),9);
+});
