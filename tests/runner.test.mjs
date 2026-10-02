@@ -25,6 +25,18 @@ test('25 steps per completed 1000 real metres, exactly once per milestone in eac
  g.status='over';advance(g,2);assert.equal(rewards.length,2);
  g.start();g.spawnIn=999;g.distance=1000*14;g.update(1/120);assert.equal(rewards.length,3);assert.equal(rewards[2].steps,25);
 });
+test('fame accrues by half per metre and never repeats on pause, finish or restart',()=>{
+ const fame=[];const g=new RunnerEngine({onEvent:(name,data)=>{if(name==='fame')fame.push(data);}});
+ g.start();g.spawnIn=999;g.distance=14;g.update(1/120);
+ assert.deepEqual(fame.map(e=>e.fame),[.5]);
+ assert.equal(fame[0].totalFame,.5);
+ g.pause();advance(g,5);assert.equal(fame.length,1);
+ g.resume();g.distance=14*3;g.update(1/120);
+ assert.deepEqual(fame.map(e=>e.fame),[.5,1]);
+ g.status='over';advance(g,2);assert.equal(fame.length,2);
+ g.start();g.spawnIn=999;g.distance=14;g.update(1/120);
+ assert.deepEqual(fame.map(e=>e.fame),[.5,1,.5]);
+});
 test('rubber punch hits within visible reach, applies gravity and rotation, and enforces cooldown',()=>{
  const g=new RunnerEngine({random:()=>.5});g.start();g.spawnIn=999;
  const target=enemy(g,g.player.x+91);g.enemies.push(target);
@@ -41,8 +53,14 @@ test('flying enemies can knock out another enemy; ordinary collisions end the ru
 });
 test('progressive speed, paused clocks, reset and stable resize',()=>{
  const g=new RunnerEngine();g.start();g.spawnIn=999;advance(g,25);assert.ok(g.speed>RULES.startSpeed);
+ assert.ok(g.speed<RULES.startSpeed+25*4.5,'acceleration is slower than before');
  g.punch();g.pause();const time=g.time,cooldown=g.cooldown;advance(g,10);assert.equal(g.time,time);assert.equal(g.cooldown,cooldown);
  g.resume();advance(g,.2);assert.ok(g.cooldown<cooldown);
  const altitude=g.ground-g.player.y;g.resize(480,620);assert.equal(g.ground-g.player.y,altitude);
  g.start();assert.equal(g.enemies.length,0);assert.equal(g.cooldown,0);assert.equal(g.score,0);assert.equal(g.speed,RULES.startSpeed);
+});
+test('speed continues increasing beyond the old cap',()=>{
+ const g=new RunnerEngine();g.start();g.spawnIn=999;
+ advance(g,130);const speed=g.speed;assert.ok(speed>650);
+ advance(g,20);assert.ok(g.speed>speed);
 });

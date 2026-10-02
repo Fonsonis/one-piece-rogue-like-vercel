@@ -1,4 +1,4 @@
-export const RULES = Object.freeze({maxJumps:2,metersPerReward:1000,stepsPerReward:25,gravity:1850,jumpVelocity:-660,punchCooldown:2.4,punchDuration:0.32,startSpeed:285,maxSpeed:650});
+export const RULES = Object.freeze({maxJumps:2,metersPerReward:1000,stepsPerReward:25,famePerMeter:.5,gravity:1850,jumpVelocity:-660,punchCooldown:2.4,punchDuration:0.32,startSpeed:285,speedGainPerSecond:3});
 const overlaps=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
 export class RunnerEngine {
   constructor({width=900,height=540,random=Math.random,onEvent=()=>{}}={}) {
@@ -7,7 +7,7 @@ export class RunnerEngine {
   reset() {
     this.ground=this.height-82;
     this.player={x:Math.min(150,this.width*.21),y:this.ground-90,w:52,h:90,vy:0};
-    this.jumpsUsed=0;this.rewardedMilestones=0;
+    this.jumpsUsed=0;this.rewardedMilestones=0;this.rewardedMeters=0;
     this.status='ready';this.time=0;this.distance=0;this.scroll=0;this.score=0;this.kills=0;
     this.speed=RULES.startSpeed;this.spawnIn=1.55;this.cooldown=0;this.punchLeft=0;
     this.enemies=[];this.particles=[];this.nextId=1;this.shake=0;this.hitStop=0;
@@ -63,10 +63,16 @@ export class RunnerEngine {
     // Called at a fixed 120 Hz; the guard also prevents accidental giant catch-up steps.
     dt=Math.min(dt,1/30);
     if(this.hitStop>0){this.hitStop-=dt;return;}
-    this.time+=dt;this.speed=Math.min(RULES.maxSpeed,RULES.startSpeed+this.time*4.5);
+    this.time+=dt;this.speed=RULES.startSpeed+this.time*RULES.speedGainPerSecond;
     const travel=this.speed*Math.min(1,this.width/700)*dt;
     this.distance+=this.speed*dt;this.scroll+=travel;this.score=Math.floor(this.distance/14)+this.kills*30;
-    const milestones=Math.floor(this.meters/RULES.metersPerReward);
+    const meters=this.meters;
+    if(meters>this.rewardedMeters){
+      const fame=(meters-this.rewardedMeters)*RULES.famePerMeter;
+      this.rewardedMeters=meters;
+      this.onEvent('fame',{fame,totalFame:meters*RULES.famePerMeter,meters});
+    }
+    const milestones=Math.floor(meters/RULES.metersPerReward);
     if(milestones>this.rewardedMilestones){
       const steps=(milestones-this.rewardedMilestones)*RULES.stepsPerReward;
       this.rewardedMilestones=milestones;

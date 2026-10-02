@@ -61,6 +61,17 @@
 .team-synergy-summary h3 { margin:0 0 6px; color:var(--ux-ink); }
 .syn-none { color:var(--ux-muted); }
 .tower-selection-bar { background:#f0f5ee; border:1px solid var(--ux-line); padding:10px; }
+.recruit-dex-status { display:inline-block; margin:5px 0; padding:4px 8px; border:1px solid transparent; border-radius:6px; font:700 10px/1.4 system-ui,sans-serif; }
+.recruit-dex-status.seen { background:#e8f4eb; border-color:#9cc8aa; color:#214536; }
+.recruit-dex-status.unseen { background:#fff0c2; border-color:#d6ae55; color:#583b09; }
+.poster-face .recruit-dex-status { font-size:9px!important; line-height:1.35!important; }
+.carteles-bag-badge { margin:8px 0; padding:6px 10px; border:1px solid #b68b37; border-radius:6px; background:#fff2ca; color:#4b371b; font:700 10.5px/1.5 system-ui,sans-serif; text-align:center; }
+.special-fail-rare { border-color:#b68b37; background:#fff3d0; color:#654112; }
+.saga-info-island { margin-bottom:8px; padding:8px 12px; border:1px solid #b6c9c2; border-radius:6px; background:#fff; color:#243c4b; text-align:left; }
+.saga-info-heading { color:#80530d; font-size:10px; font-weight:700; }
+.saga-info-level { padding:2px 6px; border:1px solid #8ab4c4; border-radius:4px; background:#e0f7fa; color:#244655; font-size:8px; }
+.saga-info-bosses { display:flex; flex-wrap:wrap; align-items:center; gap:4px; margin-top:6px; color:#52676a; font-size:8px; }
+.saga-info-boss { display:inline-flex; align-items:center; gap:6px; margin:2px; padding:4px 8px; border:1px solid #cad7d5; border-radius:4px; background:#f2f5f2; }
 .map-nav-tabs .tab[aria-pressed=true] { border-color:#1c6d86; }
 .map-nav-tabs .tab { min-height:44px; }
 .map-node.reachable { outline:2px solid #0a536e; outline-offset:2px; }
@@ -113,6 +124,39 @@ html[data-theme="dark"] .tower-selection-bar,
 html[data-theme="dark"] .overlay :is(.display-settings,.bag-auto-settings) { background:#243d46; border-color:var(--ux-line); }
 html[data-theme="dark"] .btn-dismiss-slot { background:#493438; color:#ffc4b8; border-color:#a97470; }
 html[data-theme="dark"] .diff-dropdown-item[aria-pressed=true] { color:#fff; }
+/* Recruitment and poster notices stay readable over dark cards and dialogs. */
+html[data-theme="dark"] .recruit-dex-status.seen { background:#214c44; border-color:#6fb99c; color:#e7faec; }
+html[data-theme="dark"] .recruit-dex-status.unseen { background:#5a421e; border-color:#d5aa55; color:#fff2ca; }
+html[data-theme="dark"] .carteles-bag-badge { background:#493c24; border-color:#be9955; color:#fff0c8; }
+html[data-theme="dark"] .special-fail { background:#493033; border-color:#d08f89; color:#ffe2d8; }
+html[data-theme="dark"] .special-fail-rare { background:#4b3d24; border-color:#d5af66; color:#fff0cb; }
+html[data-theme="dark"] .wild-team-preview header span { color:#c6ddde; }
+html[data-theme="dark"] .special-card .char-name small { color:#c4d5d6; }
+html[data-theme="dark"] .logpose-market-header p,
+html[data-theme="dark"] .logpose-auto-list small { color:#c4d9da; }
+html[data-theme="dark"] :is(.logpose-market-rules,.logpose-saga-picker,.logpose-market-cost) { background:#253e49; border-color:#64818a; color:#e9f1ee; }
+html[data-theme="dark"] :is(.logpose-market-rules small,.logpose-saga-picker > header small,.logpose-block-note,.logpose-market-cost small) { color:#c4d9da; }
+html[data-theme="dark"] .logpose-saga-picker > header { color:#e9f1ee; }
+html[data-theme="dark"] .logpose-saga-picker > header > span { background:#315944; color:#e6f7e8; }
+html[data-theme="dark"] .logpose-market-status > div { background:#493e2b; border-color:#ad8950; color:#fff0ce; }
+html[data-theme="dark"] .logpose-market-status > div:last-child { background:#493a2f; }
+html[data-theme="dark"] .logpose-market-status > div.ready { background:#214737; border-color:#6bb88b; color:#e5f8e8; }
+html[data-theme="dark"] .logpose-market-status span { color:#dfd2b9; }
+html[data-theme="dark"] .saga-block-pill { background:#244638; border-color:#6fab83; color:#e5f6e9; }
+html[data-theme="dark"] .saga-block-state { color:#a7efbc; }
+html[data-theme="dark"] .saga-block-pill.blocked { background:#503638; border-color:#c58a85; color:#ffe7e3; }
+html[data-theme="dark"] .saga-block-pill.blocked .saga-block-state { color:#ffd0ca; }
+html[data-theme="dark"] .logpose-market-cost strong,
+html[data-theme="dark"] .logpose-auto-setup span { color:#f4d48e; }
+html[data-theme="dark"] .logpose-auto-list > div { background:#253e49; border-color:#587781; }
+html[data-theme="dark"] .poster.hit { background:#dff2df; color:#25422e; }
+html[data-theme="dark"] .market-cartels .poster { background:#ead8ae; border-color:#a07c4b; color:#3b2d1f; }
+html[data-theme="dark"] .market-cartels .poster.hit { background:#dff2df; color:#25422e; }
+html[data-theme="dark"] .saga-info-island { background:#253e49; border-color:#63808a; color:#e7f1ef; }
+html[data-theme="dark"] .saga-info-heading { color:#f3d28e; }
+html[data-theme="dark"] .saga-info-level { background:#244b58; border-color:#79a8b5; color:#e6f3f3; }
+html[data-theme="dark"] .saga-info-bosses { color:#c8dcdd; }
+html[data-theme="dark"] .saga-info-boss { background:#1b3440; border-color:#587581; }
 
 @media (prefers-reduced-motion:reduce) {
   :is(.btn,.tab,.mode-card,.map-node) { animation:none!important; transition:none!important; }

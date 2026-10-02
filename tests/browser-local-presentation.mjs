@@ -46,8 +46,54 @@ try {
     assert.equal(await page.evaluate(() => document.querySelector('.local-game').scrollWidth <= innerWidth), true);
     await page.evaluate(() => fixture.root.parentElement.remove());
     await page.waitForFunction(() => !document.querySelector('.ultimate-scene'));
+    await page.evaluate(() => {
+      const fight = LocalCombat.create([{ id: 'host', team: ['luffy'] }, { id: 'guest', team: ['zoro'] }], { mode: 'coop', boss: 'kaido' });
+      [...fight.pTeam, ...fight.eTeam].forEach(f => { f.maxhp = f.hp = 1000000; });
+      const container = document.createElement('div'); container.className = 'local-game'; container.innerHTML = '<div id="local-arena"></div>'; document.body.append(container);
+      const root = container.firstChild;
+      const session = { self: 'host', view: { mode: 'coop', paused: false }, ultimate: () => {}, relay: () => {} };
+      const match = { id: 'coop-match', battle: LocalCombat.snapshot(fight) };
+      const render = () => { match.battle = LocalCombat.snapshot(fight); LocalBattleView.update(root, match, session, id => id); };
+      render(); window.coopFixture = { fight, root, render };
+    });
+    assert.equal(await page.locator('.local-coop #side-p .fcard.active').count(), 2);
+    assert.equal(await page.evaluate(() => {
+      const side = document.querySelector('.local-coop #side-p').getBoundingClientRect();
+      const cards = [...document.querySelectorAll('.local-coop #side-p .fcard.active')].map(card => card.getBoundingClientRect());
+      return cards[0].right <= cards[1].left + 1 && cards.every(card => card.left >= side.left && card.right <= side.right);
+    }), true);
+    await page.evaluate(() => {
+      const { fight, render } = coopFixture;
+      fight.pTeam.forEach(f => { f.ultCharge = 100; });
+      LocalCombat.command(fight, 'host', 'ultimate'); LocalCombat.command(fight, 'guest', 'ultimate');
+      LocalCombat.tick(fight); render();
+    });
+    await page.waitForFunction(() => document.querySelectorAll('.ultimate-scene').length === 2);
+    assert.equal(await page.locator('.local-coop #side-p .fcard.active').count(), 2);
+    await page.evaluate(() => coopFixture.root.parentElement.remove());
+    await page.waitForFunction(() => !document.querySelector('.ultimate-scene'));
+    await page.evaluate(() => {
+      const fight = LocalCombat.create([
+        { id: 'host', team: ['luffy'] }, { id: 'guest', team: ['zoro'] }, { id: 'third', team: ['nami'] },
+      ], { mode: 'coop', boss: 'kaido' });
+      const container = document.createElement('div'); container.className = 'local-game'; container.innerHTML = '<div id="local-arena"></div>'; document.body.append(container);
+      const root = container.firstChild;
+      LocalBattleView.update(root, { id: 'coop-three', battle: LocalCombat.snapshot(fight) },
+        { self: 'host', view: { mode: 'coop', paused: false }, ultimate: () => {}, relay: () => {} }, id => id);
+      window.threePlayerRoot = root;
+    });
+    assert.equal(await page.locator('.local-coop #side-p .fcard.active').count(), 3);
+    assert.equal(await page.evaluate(() => {
+      const slots = threePlayerRoot.querySelector('.local-coop-slots');
+      const fits = slots.scrollWidth > slots.clientWidth && threePlayerRoot.parentElement.scrollWidth <= innerWidth;
+      slots.scrollLeft = slots.scrollWidth - slots.clientWidth;
+      const last = slots.querySelector('.fcard.active:last-child').getBoundingClientRect();
+      const bounds = slots.getBoundingClientRect();
+      return fits && last.left >= bounds.left && last.right <= bounds.right + 1;
+    }), true);
+    await page.evaluate(() => threePlayerRoot.parentElement.remove());
     await page.close();
   }
   assert.deepEqual(errors, []);
-  console.log('Shared battle layout, six reserves, ultimate effects, stable sprite nodes, relay and cleanup verified at 390 and 1440 px; rendering consumes no RNG.');
+  console.log('Shared battle layout, six reserves, two stable cooperative slots, scrollable larger alliance, simultaneous ultimates, relay and cleanup verified at 390 and 1440 px; rendering consumes no RNG.');
 } finally { await browser.close(); }

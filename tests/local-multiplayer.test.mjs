@@ -195,6 +195,28 @@ test('yonko match IDs are unique across rematches and travel in the validated ho
   s.start();
   assert.notEqual(s.view.matches[0].rewardId, first);
 });
+test('either yonko player can return to mode selection without closing the room', () => {
+  const { s } = room();
+  s.configure({ mode: 'coop' });
+  const originalPlayers = s.view.players.map(p => p.id);
+  s.view.phase = 'finished';
+  s.view.champion = 'alliance';
+  s.view.players.forEach(p => { p.ready = true; });
+  assert.equal(s.returnToLobby(), true);
+  assert.equal(s.view.phase, 'lobby');
+  assert.equal(s.view.mode, 'coop');
+  assert.deepEqual(s.view.players.map(p => p.id), originalPlayers);
+  assert.ok(s.view.players.every(p => !p.ready));
+  s.configure({ mode: 'duel' });
+  assert.equal(s.view.mode, 'duel');
+
+  s.view.phase = 'finished';
+  s.view.players.forEach(p => { p.ready = true; });
+  s.receive(guestId(1), { type: 'return-to-lobby' });
+  assert.equal(s.view.phase, 'lobby');
+  assert.ok(s.view.players.every(p => !p.ready));
+  assert.equal(s.view.players.length, 2);
+});
 test('yonko cannot start without one den den mushi per player and spends one on a real start', () => {
   const {s}=room(); let remaining=1, spent=0;
   s.denDenAvailable=()=>remaining;

@@ -27,15 +27,21 @@ test('legacy evolved sightings count once and reveal the base without rewriting 
  assert.equal(h.exec("STATIC_ACHIEVEMENTS.find(a=>a.id==='dex_full').goal===dexBaseIds(Object.keys(CHARS)).length"),true);
 });
 
-test('Dex labels permanent and temporary recruits, sightings, and unknown characters accurately',()=>{
+test('Dex marks obtained characters recruited only after clearing an island with them',()=>{
  const h=combatHarness();
  h.exec("meta.roster=[];meta.recruited=['zoro2'];meta.dex=['zoro2','nami'];");
- assert.equal(h.exec("dexCollectionStatus('luffy').label"),'Reclutado','Luffy is always available to the account');
- assert.equal(h.exec("dexCollectionStatus('zoro').label"),'Reclutado en viaje');
+ assert.equal(h.exec("dexCollectionStatus('luffy').label"),'Sin avistar');
+ assert.equal(h.exec("dexCollectionStatus('zoro').label"),'Avistado');
  assert.equal(h.exec("dexCollectionStatus('nami').label"),'Avistado');
  assert.equal(h.exec("dexCollectionStatus('buggy').label"),'Sin avistar');
  h.exec("meta.roster=['zoro'];");
+ assert.equal(h.exec("dexCollectionStatus('zoro2').label"),'Avistado','ownership alone is insufficient');
+ h.exec("run={islandComplete:false,team:[{id:'zoro2'},{id:'nami'}]};recordClearedIslandTeam();");
+ assert.equal(h.exec("meta.characterIslandClears.length"),0,'an unfinished island must not count');
+ h.exec("run.islandComplete=true;recordClearedIslandTeam();");
  assert.equal(h.exec("dexCollectionStatus('zoro2').label"),'Reclutado');
+ assert.equal(h.exec("dexCollectionStatus('nami').label"),'Avistado','clearing with a character does not imply ownership');
+ assert.equal(h.exec("meta.characterIslandClears.join(',')"),'zoro,nami','forms are stored under their base character');
  const card=h.exec("dexCardHTML('zoro2')");
  assert.match(card,/dex-status-veteran/);assert.match(card,/Sombrero de Paja/);assert.doesNotMatch(card,/\bNakama\b/);
 });

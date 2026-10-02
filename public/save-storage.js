@@ -20,6 +20,13 @@
     if (data.meta.settings?.battleBackpackOpen !== undefined && typeof data.meta.settings.battleBackpackOpen !== 'boolean') {
       throw new Error('Preferencia de mochila inválida.');
     }
+    const storyView=data.meta.storyMapView;
+    if(storyView!==undefined&&storyView!==null&&(!record(storyView)||
+      !SAGA_ORDER.includes(storyView.sagaId)||!Number.isInteger(storyView.index)||storyView.index<0||storyView.index>20||
+      !['classic','nuzlocke'].includes(storyView.mode)||![1,2,3,4,5].includes(storyView.diff)||
+      !Number.isFinite(storyView.scrollTop)||storyView.scrollTop<0||storyView.scrollTop>1000000)) {
+      throw new Error('Vista de Historia inválida.');
+    }
     if (Object.values(data.meta.characterUsage || {}).some(n => !Number.isSafeInteger(n) || n < 0)) throw new Error('Contadores de uso inválidos.');
     for (const islands of Object.values(data.meta.islandProgress || {})) {
       if (!Array.isArray(islands) || islands.some(i=>!Number.isInteger(i) || i<0)) throw new Error('Progreso de islas inválido.');

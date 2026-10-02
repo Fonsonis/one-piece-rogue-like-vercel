@@ -38,6 +38,18 @@ test('choosing a saga sends the ship to its first island',()=>{
  buttons[0].onclick();
  assert.equal(h.exec('sailedTo'),'skypiea-0');
  assert.equal(node('#world-jump').dataset.saga,'2');
+ assert.equal(h.exec('meta.storyMapView.sagaId'),'skypiea');
+ assert.equal(h.exec('meta.storyMapView.index'),0);
+});
+
+test('selecting another island remembers its saga and destination without changing completions',()=>{
+ const {h,node}=setup();
+ h.exec("screenHome=()=>{};screenSagas();selectWorldIsland(2,1);$('#world-map').scrollTop=7132;$('#btn-back').onclick();");
+ assert.deepEqual(JSON.parse(JSON.stringify(h.exec('meta.storyMapView'))),{sagaId:'skypiea',index:1,mode:'classic',diff:1,scrollTop:7132});
+ assert.deepEqual(JSON.parse(JSON.stringify(h.exec('meta.islandProgress'))),{});
+ h.exec('screenSagas()');
+ assert.equal(node('#world-jump').dataset.saga,'2');
+ assert.equal(node('#world-map').scrollTop,7132);
 });
 
 test('the vertical chart keeps a stable viewport, reaches East Blue and settles on complete island cards',()=>{
@@ -51,7 +63,7 @@ test('the vertical chart keeps a stable viewport, reaches East Blue and settles 
  assert.match(worldMapCSS,/\.world-map:has\(\.world-ship\.is-sailing\)\s*\{\s*scroll-snap-type:none/);
 });
 
-test('mode and difficulty changes keep the chosen saga instead of restoring the last completed island',()=>{
+test('mode, difficulty and viewport survive a return to the menu and a JSON reload',()=>{
  const {h,node}=setup();
  const difficulties=[1,2,3].map(id=>({dataset:{diff:String(id)}}));
  h.ctx.document.querySelectorAll=selector=>selector==='.diff-dropdown-item'?difficulties:[];
@@ -72,9 +84,15 @@ test('mode and difficulty changes keep the chosen saga instead of restoring the 
  assert.equal(node('#world-jump').dataset.saga,'2');
  node('#world-to-start').onclick();
  assert.equal(node('#world-jump').dataset.saga,'0');
- h.exec('screenSagas()');
+ h.exec("screenHome=()=>{};$('#world-map').scrollTop=2468;$('#btn-back').onclick();");
+ const view=h.exec('meta.storyMapView');
+ assert.deepEqual(JSON.parse(JSON.stringify(view)),{sagaId:'eastblue',index:0,mode:'classic',diff:3,scrollTop:2468});
+ const saved=h.exec('GameSaveStorage.parse(JSON.stringify(GameSaveStorage.payload(meta,null))).meta.storyMapView');
+ assert.deepEqual(JSON.parse(JSON.stringify(saved)),JSON.parse(JSON.stringify(view)));
+ h.exec("storyMode='nuzlocke';selectedDiff=1;meta.storyMapView=GameSaveStorage.parse(JSON.stringify(GameSaveStorage.payload(meta,null))).meta.storyMapView;screenSagas()");
  assert.equal(h.exec('storyMode'),'classic');
- assert.equal(h.exec('selectedDiff'),1,'initial navigation still restores the last completed island');
+ assert.equal(h.exec('selectedDiff'),3);
+ assert.equal(node('#world-map').scrollTop,2468);
 });
 
 test('unified chart enforces saga, sequential difficulty and mode-specific island locks',()=>{

@@ -53,6 +53,11 @@ export class LocalSession {
     this.action({ type: 'select', team });
   }
   ready(value) { this.action({ type: 'ready', ready: !!value, denDen: this.denDenAvailable() }); }
+  returnToLobby() {
+    if (this.view.phase !== 'finished') return false;
+    if (this.host) { this.reset(); return true; }
+    return this.send({ type: 'return-to-lobby' }) !== false;
+  }
   ultimate(match) { this.action({ type: 'command', match, action: 'ultimate' }); }
   relay(match, index) { this.action({ type: 'command', match, action: 'relay', index }); }
   action(packet) { this.host ? this.receive('host', packet) : this.send(packet); }
@@ -91,6 +96,7 @@ export class LocalSession {
       return;
     }
     if (packet.type === 'leave') { this.disconnect(id); return; }
+    if (packet.type === 'return-to-lobby' && this.view.phase === 'finished') { this.reset(); return; }
     if (this.view.phase === 'lobby') {
       if (packet.type === 'select' && this.engine.validTeam(packet.team, this.view.size) && packet.team.every(id => player.roster.includes(id))) { player.team = [...packet.team]; player.ready = false; }
       if (packet.type === 'ready' && typeof packet.ready === 'boolean') {
