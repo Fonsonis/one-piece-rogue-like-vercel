@@ -48,6 +48,17 @@ test('manual save overwrites a single JSON and a fresh game restores all progres
   restored.run('GameSaveStorage.validate(loadedSave);validateGameSave(loadedSave);');
 });
 
+test('crew minigame rewards and records survive a fresh load',()=>{
+  const h=harness();
+  h.run("creditMinigameReward({fame:2.5,logPoses:3}); meta.minigameBests.zoro=42; saveMeta(); flushRunnerFame();");
+  const restored=harness(h.memory);
+  assert.equal(restored.run('meta.fame'),2.5);
+  assert.equal(restored.run('meta.accXp'),2.5);
+  assert.equal(restored.run('meta.logPoses'),3);
+  assert.equal(restored.run('meta.minigameBests.zoro'),42);
+  restored.run('GameSaveStorage.validate(loadedSave);');
+});
+
 test('Guardar opens the JSON location picker and writes the current game to the selected file',async()=>{
  const h=harness();let options,contents,closed=false;
  h.ctx.window.showSaveFilePicker=async opts=>{options=opts;return {createWritable:async()=>({write:async blob=>{contents=await blob.text();},close:async()=>{closed=true;}})};};

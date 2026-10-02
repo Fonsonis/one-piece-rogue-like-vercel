@@ -558,6 +558,7 @@ const META_DEFAULTS = () => ({
   challenge: null,
   soloWins: 0,
   logPoses: 0,
+  minigameBests: {},
   localYonkoReward: null,
   denDenMushis: null,
   starPity: 0,
@@ -900,6 +901,18 @@ function creditRunnerFame(amount, now = Date.now()) {
   runnerFamePending = true;
   if (now - runnerFameLastSave >= 1000) flushRunnerFame(now);
   return amount;
+}
+function creditMinigameReward(reward) {
+  const fame = Number(reward?.fame || 0);
+  const logPoses = Number(reward?.logPoses || 0);
+  if (!Number.isFinite(fame) || fame < 0 || !Number.isSafeInteger(logPoses) || logPoses < 0 || (!fame && !logPoses)) return {fame:0,logPoses:0};
+  if (fame) creditRunnerFame(fame);
+  if (logPoses) {
+    meta.logPoses += logPoses;
+    runnerFamePending = true;
+    flushRunnerFame();
+  }
+  return {fame,logPoses};
 }
 
 // ---------- Estado de la partida ----------
@@ -2620,7 +2633,7 @@ function screenHome() {
     </div>
     </section>
     <div class="home-section-heading home-section-heading-secondary"><span>02 · JUEGA A TU MANERA</span><small>Partidas rápidas y multijugador</small></div>
-    <button class="runner-menu-button" id="btn-runner" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>⚡ LUFFY RUN</strong><small>${runnerUnlocked ? '0,5 fama por metro · 25 pasos cada 1.000 m' : '🔒 Se desbloquea al nivel 1 de cuenta'}</small></span></button>
+    <button class="runner-menu-button" id="btn-minigames" ${runnerUnlocked ? '' : 'disabled'}><img src="sprites/luffy.png" alt=""><span><strong>🎮 MINIJUEGOS DE LA TRIPULACIÓN</strong><small>${runnerUnlocked ? '10 juegos · Luffy Run, fama y Log Poses' : '🔒 Se desbloquea al nivel 1 de cuenta'}</small></span></button>
     <button class="local-menu-button" id="btn-local"><span aria-hidden="true">⚔️</span><span><strong>MULTIJUGADOR</strong><small>Duelo · Torneo · Alianza contra un yonko · Sala por código</small></span></button>
     ${pendingPirateKingRewards().length ? `<div class="panel"><button class="btn gold" id="btn-king-rewards">👑 ELEGIR LEGENDARIO · ${pendingPirateKingRewards().length} recompensa(s) de Rey Pirata</button></div>` : ''}
     <div class="home-section-heading home-section-heading-secondary"><span>03 · PREPARA TU TRIPULACIÓN</span><small>Consulta, mejora y consigue recompensas</small></div>
@@ -2707,29 +2720,7 @@ function screenHome() {
   });
   if (towerUnlocked) $('#mode-tower').onclick = () => screenTowerIntro();
   if (challengeUnlocked) $('#mode-challenge').onclick = () => screenChallenges();
-  $('#btn-runner').onclick = async () => {
-    if (accountLevel() < 1) return toast('🔒 Luffy Run se desbloquea al nivel 1 de cuenta.');
-    const btn = $('#btn-runner');
-    btn.disabled = true;
-    try {
-      const { openRunner } = await import('./runner/ui.mjs');
-      playMusic('combat');
-      await openRunner({
-        best: meta.runnerBest || 0,
-        onSteps: amount => grantDailySteps(amount),
-        onFame: creditRunnerFame,
-        onCheckpoint: flushRunnerFame,
-        onScore: score => {
-          if (score > (meta.runnerBest || 0)) { meta.runnerBest = score; saveMeta(); }
-        },
-        onExit: () => { flushRunnerFame(); screenHome(); $('#btn-runner')?.focus(); },
-      });
-    } catch (e) {
-      playMusic('menu');
-      toast('No se pudo abrir el minijuego. Inténtalo de nuevo.');
-      btn.disabled = false;
-    }
-  };
+  $('#btn-minigames').onclick = screenMinigames;
   $('#btn-dex').onclick = screenDex;
   const invBtn = $('#btn-inventory');
   if (invBtn) invBtn.onclick = () => showInventoryModal();
@@ -2748,6 +2739,52 @@ function screenHome() {
       () => { e.target.value = ''; });
   };
 
+}
+
+const MINIGAMES = [
+  {id:'luffy',name:'Luffy Run',subtitle:'Salta y golpea en una carrera sin fin',reward:'⭐ Fama · 👢 pasos',portrait:'luffy'},
+  {id:'zoro',name:'Corte de Zoro',subtitle:'Desliza para cortar frutas',reward:'⭐ Fama',portrait:'zoro'},
+  {id:'nami',name:'Ruta de Nami',subtitle:'Navega entre rocas y remolinos',reward:'🧭 Log Poses',portrait:'nami'},
+  {id:'usopp',name:'Tirachinas de Usopp',subtitle:'Revienta globos desde el centro',reward:'⭐ Fama',portrait:'usopp'},
+  {id:'sanji',name:'Cocina de Sanji',subtitle:'Sirve los platos correctos a tiempo',reward:'🧭 Log Poses',portrait:'sanji'},
+  {id:'robin',name:'Memoria de Robin',subtitle:'Recuerda y repite las flores',reward:'⭐ Fama',portrait:'robin'},
+  {id:'chopper',name:'Trineo de Chopper',subtitle:'Baja la ladera y esquiva los árboles',reward:'🧭 Log Poses',portrait:'chopper'},
+  {id:'brook',name:'Piano de Brook',subtitle:'Toca las teclas al ritmo',reward:'⭐ Fama',portrait:'brook'},
+  {id:'franky',name:'Alas de Franky',subtitle:'Toma impulso entre las colinas',reward:'🧭 Log Poses',portrait:'franky'},
+  {id:'jinbe',name:'Guardia de Jinbe',subtitle:'Protege el arrecife de las amenazas',reward:'🧭 Log Poses',portrait:'jinbe'},
+];
+function screenMinigames() {
+  if (accountLevel() < 1) return toast('🔒 Los minijuegos se desbloquean al nivel 1 de cuenta.');
+  render(`${topbar(false)}<section class="minigames-hub" aria-label="Minijuegos de la tripulación">
+    <button class="btn gray small back-btn" id="btn-minigames-back">← PUERTO</button>
+    <div class="minigames-heading"><span>LA TRIPULACIÓN JUEGA</span><h1>🎮 Minijuegos</h1><p>Escoge un nakama, supera tu récord y consigue recompensas para tu cuenta.</p></div>
+    <div class="minigames-grid">${MINIGAMES.map(game => `<button type="button" class="minigame-card" data-minigame="${game.id}" aria-label="Jugar a ${game.name}"><img src="/art/portraits/${game.portrait}.png" alt="" loading="lazy"><span class="minigame-card-copy"><strong>${game.name}</strong><small>${game.subtitle}</small><span class="minigame-reward">${game.reward}</span><span class="minigame-best">Récord: ${Number(game.id === 'luffy' ? meta.runnerBest : meta.minigameBests?.[game.id]) || 0}</span></span><span class="minigame-play">JUGAR →</span></button>`).join('')}</div>
+  </section>`);
+  $('#btn-minigames-back').onclick = screenHome;
+  document.querySelectorAll('[data-minigame]').forEach(btn => btn.onclick = async () => {
+    const id = btn.dataset.minigame;
+    btn.disabled = true;
+    try {
+      playMusic('combat');
+      const onExit = () => { flushRunnerFame(); playMusic('menu'); screenMinigames(); document.querySelector(`[data-minigame="${id}"]`)?.focus(); };
+      const onScore = score => {
+        if (!Number.isFinite(score) || score < 0) return;
+        if (id === 'luffy') { if (score > (meta.runnerBest || 0)) { meta.runnerBest = score; saveMeta(); } }
+        else if (score > (meta.minigameBests?.[id] || 0)) { meta.minigameBests ||= {}; meta.minigameBests[id] = score; saveMeta(); }
+      };
+      if (id === 'luffy') {
+        const {openRunner} = await import('./runner/ui.mjs');
+        await openRunner({best:meta.runnerBest || 0,onSteps:grantDailySteps,onFame:creditRunnerFame,onCheckpoint:flushRunnerFame,onScore,onExit});
+      } else {
+        const {openMinigame} = await import('./minigames/ui.mjs');
+        await openMinigame({id,best:meta.minigameBests?.[id] || 0,onReward:creditMinigameReward,onScore,onExit});
+      }
+    } catch (e) {
+      playMusic('menu');
+      toast('No se pudo abrir el minijuego. Inténtalo de nuevo.');
+      btn.disabled = false;
+    }
+  });
 }
 
 // ============ PANTALLA: SAGAS ============
