@@ -849,7 +849,7 @@ function validateGameSave(data) {
 }
 
 // Nivel de cuenta: sube de forma exponencial con los PX de cuenta (se ganan a la par que la Fama)
-const SAGA_LEVEL_CAPS = {eastblue:7,alabasta:15,skypiea:20,water7:25,thriller:30,sabaody:30,marineford:35,gyojin:40,punkhazard:40,dressrosa:45,zou:45,wholecake:50,wano:55,egghead:100,elbaph:100};
+const SAGA_LEVEL_CAPS = {eastblue:8,alabasta:15,skypiea:20,water7:25,thriller:30,sabaody:30,marineford:35,gyojin:40,punkhazard:40,dressrosa:45,zou:45,wholecake:50,wano:55,egghead:100,elbaph:100};
 
 // Los reclutas empiezan en el nivel base máximo que el jugador puede usar.
 function recruitLevelForPlayer() {
@@ -857,7 +857,7 @@ function recruitLevelForPlayer() {
 }
 
 function getMaxAccountLevelCap() {
-  if (typeof SAGAS === 'undefined' || !SAGAS.length) return 7;
+  if (typeof SAGAS === 'undefined' || !SAGAS.length) return 8;
   let highest = 0;
   for (let i = 0; i < SAGAS.length; i++) {
     if (typeof sagaUnlocked === 'function' && sagaUnlocked(i)) {
