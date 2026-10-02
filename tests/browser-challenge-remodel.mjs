@@ -40,11 +40,14 @@ try {
  await page.setViewportSize({width:390,height:844});
  await page.screenshot({path:'outputs/challenges/remodel-menu-mobile.png'});
  await page.evaluate(()=>{meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.charUpgrades.luffy=44;showCharModal('luffy');});
+ assert.equal(await page.locator('[data-gear4-choice]').count(),0);
+ for(let i=0;i<3;i++)await page.locator('#sheet-phase-next').click();
  assert.equal(await page.locator('[data-gear4-choice]').count(),3);
  await page.locator('[data-gear4-choice="luffy4-tankman"]').click();
  assert.equal(await page.evaluate(()=>meta.formPreferences.luffyGear4),'luffy4-tankman');
- for(let i=0;i<6;i++)await page.locator('#sheet-phase-next').click();
+ for(let i=0;i<3;i++)await page.locator('#sheet-phase-next').click();
  assert.match(await page.locator('.sheet-phase-caption').innerText(),/Bloqueada.*50/);
+ assert.equal(await page.locator('[data-gear4-choice]').count(),0);
  assert.equal(await page.locator('.art-preview-button,.ultimate-preview-button,.sheet-stats,.sheet-move').count(),0);
  assert.equal(await page.locator('.char-sheet-sprite').evaluate(el=>getComputedStyle(el).filter),'brightness(0)');
  assert.equal(await page.locator('.char-sheet > h2 .dex-sprite').count(),0);

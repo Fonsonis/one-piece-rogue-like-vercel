@@ -58,6 +58,14 @@ test('sheet respects insufficient funds and stops offering upgrades at the saga 
  assert.match(ov.html,/Nivel máximo alcanzado/);
 });
 
+test('Gear 4 variants appear only on Gear 4 character sheets',()=>{
+ const {h,overlays}=modalHarness();
+ h.exec("showCharModal('luffy');showCharModal('luffy',null,'luffy4-boundman');showCharModal('luffy',null,'luffy5');");
+ assert.doesNotMatch(overlays[0].html,/data-gear4-choice/);
+ assert.equal((overlays[1].html.match(/data-gear4-choice/g)||[]).length,3);
+ assert.doesNotMatch(overlays[2].html,/data-gear4-choice/);
+});
+
 test('faction in the sheet follows the purchased crew version and matches its synergy',()=>{
  const {h,overlays}=modalHarness();
  h.exec("meta.roster=['robin'];meta.logPoses=100000;saveMeta=()=>true;var priorRobin=makeChar('robin',20);showCharModal('robin');");

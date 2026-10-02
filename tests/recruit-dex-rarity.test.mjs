@@ -22,14 +22,22 @@ function recruitmentHarness() {
   return {h, overlay, nodes};
 }
 
-test('wild encounter identifies Dex status and blocks four-star recruitment', () => {
-  const {h, overlay} = recruitmentHarness();
+test('wild encounter blocks base four-star recruitment but allows evolved four-star pirates', () => {
+  const {h, overlay, nodes} = recruitmentHarness();
   h.exec("meta.dex=[];wildEncounter(makeChar('arlong',10,true))");
   assert.match(overlay.innerHTML, /Nuevo en tu Dex/);
   assert.match(overlay.innerHTML, /PIRATA DE 4 ESTRELLAS/);
   assert.doesNotMatch(overlay.innerHTML, /id="we-pay"|id="we-chains"/);
   h.exec("meta.dex=['arlong'];wildEncounter(makeChar('arlong',10,true))");
   assert.match(overlay.innerHTML, /Ya en tu Dex/);
+
+  h.exec("wildEncounter(makeEnemy('zoro',20,true))");
+  assert.equal(h.exec("CHARS.zoro2.rareza"), 4);
+  assert.match(overlay.innerHTML, /id="we-pay"/);
+  assert.match(overlay.innerHTML, /id="we-chains"/);
+  nodes.get('#we-pay').onclick();
+  assert.equal(h.exec("run.team.some(f=>f.id==='zoro2')"), false);
+  assert.equal(h.exec("run.team.some(f=>f.id==='zoro'&&f.lvl===7)"), true);
 });
 
 test('mystery recruitment excludes four-star pirates while Crossguild keeps them', () => {
