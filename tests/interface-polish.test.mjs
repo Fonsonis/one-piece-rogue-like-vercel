@@ -2,10 +2,11 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {combatHarness} from './balance-harness.mjs';
 
-test('East Blue allows purchased starting levels up to 15',()=>{
+test('East Blue allows purchased starting levels up to 20',()=>{
   const h=combatHarness();
-  assert.equal(h.exec(`meta.sagaDiffWins={};meta.wins={};meta.nuzWins={};maxStartLvlCap()`),15);
-  assert.equal(h.exec(`meta.charUpgrades={luffy:20};startLvlOf('luffy')`),15);
+  assert.equal(h.exec(`meta.sagaDiffWins={};meta.wins={};meta.nuzWins={};maxStartLvlCap()`),20);
+  assert.equal(h.exec(`meta.charUpgrades={luffy:20};startLvlOf('luffy')`),20);
+  assert.equal(h.exec(`meta.sagaDiffWins={eastblue:{3:true}};maxStartLvlCap()`),20);
 });
 
 test('scroll cancels reordering; holding then dragging reorders; cancellation clears hold',()=>{

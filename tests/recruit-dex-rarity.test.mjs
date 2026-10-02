@@ -37,7 +37,7 @@ test('wild encounter blocks base four-star recruitment but allows evolved four-s
   assert.match(overlay.innerHTML, /id="we-chains"/);
   nodes.get('#we-pay').onclick();
   assert.equal(h.exec("run.team.some(f=>f.id==='zoro2')"), false);
-  assert.equal(h.exec("run.team.some(f=>f.id==='zoro'&&f.lvl===15)"), true);
+  assert.equal(h.exec("run.team.some(f=>f.id==='zoro'&&f.lvl===20)"), true);
 });
 
 test('mystery recruitment excludes four-star pirates while Crossguild keeps them', () => {
