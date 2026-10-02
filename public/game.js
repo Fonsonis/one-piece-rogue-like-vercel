@@ -851,9 +851,9 @@ function validateGameSave(data) {
 // Nivel de cuenta: sube de forma exponencial con los PX de cuenta (se ganan a la par que la Fama)
 const SAGA_LEVEL_CAPS = {eastblue:7,alabasta:15,skypiea:20,water7:25,thriller:30,sabaody:30,marineford:35,gyojin:40,punkhazard:40,dressrosa:45,zou:45,wholecake:50,wano:55,egghead:100,elbaph:100};
 
-// Los reclutas empiezan en el tope base de la saga que se está jugando.
-function recruitLevelForCurrentSaga() {
-  return SAGA_LEVEL_CAPS[SAGAS[run.saga].id] ?? 100;
+// Los reclutas empiezan en el nivel base máximo que el jugador puede usar.
+function recruitLevelForPlayer() {
+  return maxStartLvlCap();
 }
 
 function getMaxAccountLevelCap() {
@@ -1114,6 +1114,16 @@ function registerRecruit(id) {
   registerDex(id);
   if (!meta.recruited.includes(id)) { meta.recruited.push(id); saveMeta(); }
 }
+function grantRecruitBaseLevel(id) {
+  const base = baseFormOf(id);
+  const cap = maxStartLvlCap();
+  if (5 + (meta.charUpgrades?.[base] || 0) >= cap) return;
+  const spent = charBaseLevelSpent(base);
+  meta.charUpgrades ||= {};
+  meta.charUpgradeSpent ||= {};
+  meta.charUpgrades[base] = cap - 5;
+  meta.charUpgradeSpent[base] = spent;
+}
 // Los reclutas de la banda actual solo son permanentes al completar la isla.
 function unlockRoster(allowBosses = true) {
   const added = [];
@@ -1122,6 +1132,7 @@ function unlockRoster(allowBosses = true) {
     const b = baseFormOf(f.id);
     if (!meta.roster.includes(b)) {
       meta.roster.push(b);
+      grantRecruitBaseLevel(b);
       added.push(b);
     }
   }
@@ -2417,7 +2428,10 @@ function awardLogPosePrize(prizeId) {
   meta.logPoses = (meta.logPoses || 0) + duplicateReward;
   registerRecruit(prizeId);
   const base = baseFormOf(prizeId);
-  if (!meta.roster.includes(base)) meta.roster.push(base);
+  if (!meta.roster.includes(base)) {
+    meta.roster.push(base);
+    grantRecruitBaseLevel(base);
+  }
   return duplicateReward;
 }
 
@@ -2443,7 +2457,7 @@ function startLogPoseAutoGacha(activeSagas,count,cost) {
   ov.innerHTML = `<div class="modal logpose-auto-session" role="dialog" aria-modal="true" aria-labelledby="lp-session-title">
     <h2 id="lp-session-title">🎰 Carteles automáticos</h2>
     <p id="lp-session-progress" role="status"></p>
-    <div class="poster-row" aria-label="Carteles de la tirada">${[0,1,2,3,4].map(i=>`<div class="poster" data-p="${i}"><div class="poster-stars">${'⭐'.repeat(i+1)}</div><div class="poster-face" id="pf-${i}">📜<br><span>SE BUSCA</span></div></div>`).join('')}</div>
+    <div class="poster-row" aria-label="Carteles de la tirada">${[0,1,2,3,4].map(i=>`<div class="poster" data-p="${i}"><div class="poster-stars">${'★'.repeat(i+1)}</div><div class="poster-face" id="pf-${i}">📜<br><span>SE BUSCA</span></div></div>`).join('')}</div>
     <p id="lp-session-reward" aria-live="polite">Destapando carteles…</p>
     <div class="actions"><button class="btn blue" id="lp-skip-pull">SALTAR ESTA ANIMACIÓN</button><button class="btn gray" id="lp-stop-auto">DETENER TIRADAS</button></div>
   </div>`;
@@ -2473,7 +2487,7 @@ function startLogPoseAutoGacha(activeSagas,count,cost) {
       face.innerHTML = '🧭<br><span>+1000</span>';
       ov.querySelector('#lp-session-reward').textContent = 'Garantía completada · +1000 Log Poses';
     } else {
-      face.innerHTML = `${charIcon(current.id,28)}<br><span>${CHARS[current.id].name}</span><br>${current.wasInDex ? '📖 Ya en Dex' : '✨ Nuevo en Dex'}`;
+      face.innerHTML = `${charIcon(current.id,28)}<span class="poster-result-name">${CHARS[current.id].name}</span><span class="poster-result-status">${current.wasInDex ? '📖 Ya en Dex' : '✨ Nuevo en Dex'}</span>`;
       ov.querySelector('#lp-session-reward').textContent = `${CHARS[current.id].name} · ${current.wasInDex ? 'Ya en Dex' : 'Nuevo en Dex'}${current.duplicateReward ? ` · +${current.duplicateReward} 🧭` : ''}`;
     }
   };
@@ -5574,7 +5588,7 @@ function doMystery(island) {
           modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">Ningún pirata de esta zona puede unirse mediante el evento. Encuentras 200 Berries en su lugar.</div>`, screenMap);
           break;
         }
-        const recLvl = recruitLevelForCurrentSaga();
+        const recLvl = recruitLevelForPlayer();
         const f = applyUpgrades(makeChar(id, recLvl));
         const dexStatus = recruitDexStatusHTML(id);
         addToTeam(f, ok => {
@@ -5667,7 +5681,7 @@ function wildEncounter(wild) {
   }
   const recruit = () => {
     if (cannotRecruit) return;
-    const recLvl = recruitLevelForCurrentSaga();
+    const recLvl = recruitLevelForPlayer();
     const f = applyUpgrades(makeChar(wild.id, recLvl));
     const dexStatus = recruitDexStatusHTML(f.id);
     addToTeam(f, ok => {
@@ -6317,7 +6331,7 @@ function specialBlockedReason() {
 }
 
 function specialJoin(id, lvl, dexStatus = recruitDexStatusHTML(id)) {
-  const recLvl = recruitLevelForCurrentSaga();
+  const recLvl = recruitLevelForPlayer();
   const f = applyUpgrades(makeChar(id, recLvl));
   addToTeam(f, ok => {
     if (ok) {
@@ -6349,7 +6363,7 @@ function specialPiratePoolHTML() {
 
 function doSpecialPirate(island) {
   meta.starPity = meta.starPity || 0;
-  const lvl = recruitLevelForCurrentSaga();
+  const lvl = recruitLevelForPlayer();
   const gachaPrice = specialGachaPrice();
   const blocked = specialBlockedReason();
   const ov = document.createElement('div');
@@ -8283,8 +8297,11 @@ function pendingPirateKingRewards() {
 }
 function claimPirateKingReward(sagaId, id) {
   if (meta.pirateKingRewards?.[sagaId] !== 'pending' || !pirateKingLegendaryPool(sagaId).includes(id)) return false;
-  const before = { roster: meta.roster, recruited: meta.recruited, dex: meta.dex, pirateKingRewards: meta.pirateKingRewards };
+  const before = { roster: meta.roster, recruited: meta.recruited, dex: meta.dex, pirateKingRewards: meta.pirateKingRewards,
+    charUpgrades: {...meta.charUpgrades}, charUpgradeSpent: {...meta.charUpgradeSpent} };
+  const newRecruit = !meta.roster.includes(id);
   for (const key of ['roster','recruited','dex']) meta[key] = [...new Set([...(meta[key] || []), id])];
+  if (newRecruit) grantRecruitBaseLevel(id);
   meta.pirateKingRewards = { ...meta.pirateKingRewards, [sagaId]: id };
   if (saveMeta() === false) { Object.assign(meta, before); return false; }
   return true;
@@ -8656,7 +8673,7 @@ function nextStarterSlotItem() {
   }
   const nextN = current + 1;
   const cost = 600 * Math.pow(2, nextN - 2);
-  const lvlReq = 5 + (nextN - 2) * 3;
+  const lvlReq = nextN === 2 ? 7 : 5 + (nextN - 2) * 3;
   const names = ['', '', 'Dúo inicial (2 casillas)', 'Trío inicial (3 casillas)', 'Cuarteto inicial (4 casillas)', 'Quinteto inicial (5 casillas)', 'Sexteto inicial (6 casillas)'];
   return {
     id: `starter_slot_${nextN}`,
