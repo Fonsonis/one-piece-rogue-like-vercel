@@ -123,12 +123,17 @@ function evolutionFormAt(id, lvl, progress = meta, gear4Choice = progress.formPr
   return nextId;
 }
 // Rivals ignore permanent player upgrades, but keep combat-level and story-saga gates.
-function enemyFormAt(id, lvl, progress = meta) {
-  const available = characterForms(id).filter(phase => phase.level <= lvl && formSagaUnlocked(phase.id, progress));
+function enemyFormAt(id, lvl, progress = meta, sagaFrontier = null) {
+  const availableInSaga = phaseId => {
+    if (sagaFrontier === null) return formSagaUnlocked(phaseId, progress);
+    const unlockSaga = formUnlockSaga(phaseId);
+    return !unlockSaga || SAGAS.findIndex(saga => saga.id === unlockSaga) <= sagaFrontier;
+  };
+  const available = characterForms(id).filter(phase => phase.level <= lvl && availableInSaga(phase.id));
   let nextId = available.at(-1).id;
   if (baseFormOf(id) === 'luffy' && lvl >= EVOLUTION_LEVELS.gear4 && nextId !== 'luffy5') {
-    nextId = formSagaUnlocked('luffy4', progress) ? 'luffy4' :
-      (formSagaUnlocked('luffy4-boundman', progress) ? 'luffy4-boundman' : nextId);
+    nextId = availableInSaga('luffy4') ? 'luffy4' :
+      (availableInSaga('luffy4-boundman') ? 'luffy4-boundman' : nextId);
   }
   return nextId;
 }
@@ -1022,8 +1027,8 @@ function makeChar(id, lvl, isEnemy = false, exactForm = false) {
   };
 }
 // AI forms follow combat level; only story encounters apply difficulty scaling.
-function makeEnemy(id, lvl, scaleDifficulty = false) {
-  const enemy = makeChar(enemyFormAt(id, lvl), lvl, scaleDifficulty, true);
+function makeEnemy(id, lvl, scaleDifficulty = false, sagaFrontier = null) {
+  const enemy = makeChar(enemyFormAt(id, lvl, meta, sagaFrontier), lvl, scaleDifficulty, true);
   enemy.crewId = defaultCrew(id);
   return enemy;
 }
@@ -1451,7 +1456,7 @@ function showSettingsModal() {
       <div class="settings-body">
         <section class="settings-section" aria-labelledby="settings-display-title">
           <div class="settings-section-heading"><span aria-hidden="true">🎨</span><div><h3 id="settings-display-title">Aspecto</h3><p>Adapta la pantalla a tu forma de jugar.</p></div></div>
-          <div class="settings-control"><label for="setting-theme">Tema visual</label><select id="setting-theme"><option value="light" ${meta.settings.theme !== 'dark' ? 'selected' : ''}>Claro · Egghead</option><option value="dark" ${meta.settings.theme === 'dark' ? 'selected' : ''}>Oscuro · Egghead</option></select></div>
+          <div class="settings-control"><label for="setting-theme">Tema visual</label><select id="setting-theme"><option value="light" ${meta.settings.theme !== 'dark' ? 'selected' : ''}>Claro</option><option value="dark" ${meta.settings.theme === 'dark' ? 'selected' : ''}>Oscuro</option></select></div>
           <div class="settings-control">${mobileColumnsControl()}</div>
         </section>
         <section class="settings-section" aria-labelledby="settings-sound-title">
@@ -2611,7 +2616,7 @@ function screenHome() {
   const { totalCompleted: completedAch, totalAchievements: totalAchCount, hasUnclaimedAch } = getAchievementsInfo();
   render(`
     ${topbar(false)}
-    <div class="subtitle">AVENTURA ROGUELIKE · EGGHEAD EDITION</div>
+    <div class="subtitle">AVENTURA ROGUELIKE</div>
     <section class="home-play" aria-label="Modos de juego">
     <div class="home-section-heading"><span>01 · ELIGE TU AVENTURA</span><small>Continúa tu viaje o empieza uno nuevo</small></div>
     <div class="modes">
@@ -3590,7 +3595,7 @@ function showInventoryModal(opts = {}) {
       return `<article class="inventory-card ${currentTeam.includes(id)?'in-team':''}" data-id="${id}">
         <div class="inventory-card-top"><span>${currentTeam.includes(id)?'En tu equipo':'Reclutado'}</span><span class="inventory-card-marks"><span class="inventory-relic-mark ${ownsRelic?'owned':'locked'}" role="img" aria-label="${relicStatus}" title="${relicStatus}">${ownsRelic?'🏺':'🔒'}</span><span class="inventory-rarity" aria-label="Rareza ${c.rareza} de 5 estrellas"><span aria-hidden="true">★</span> ${c.rareza}/5</span></span></div>
         <button class="inventory-profile btn-info-inv" data-id="${id}" aria-label="Ver ficha de ${collectionText(c.name)}"><span class="inventory-portrait" aria-hidden="true">${charIcon(displayId,80)}</span><strong>${c.name}</strong><span class="inventory-profile-link">Ver ficha ↗</span></button>
-        ${characterSortStatHTML(displayId,invViewState.sort)}<div class="inventory-level"><span>Nivel base</span><span class="inventory-level-details"><span class="inventory-type-dots">${c.types.filter(t=>TYPES[t]).map(t=>`<span class="inventory-type-dot" style="background:${TYPES[t].color}" role="img" aria-label="Tipo ${collectionText(t)}" title="${collectionText(t)}"></span>`).join('')}</span><strong>${level}</strong></span></div>
+        ${characterSortStatHTML(displayId,invViewState.sort)}<div class="inventory-level"><span class="inventory-level-details"><span>N. base</span><strong>${level}</strong></span><span class="inventory-type-dots">${c.types.filter(t=>TYPES[t]).map(t=>`<span class="inventory-type-dot" style="background:${TYPES[t].color}" role="img" aria-label="Tipo ${collectionText(t)}" title="${collectionText(t)}"></span>`).join('')}</span></div>
         <div class="inventory-upgrade">${maxed?`<span class="inventory-limit">Límite de saga: Nv. ${cap}</span><button class="btn btn-upg-inv" data-id="${id}" disabled aria-label="Nivel máximo de saga alcanzado"><span class="inventory-upgrade-label">Nivel máximo</span><span class="inventory-upgrade-short" aria-hidden="true">Máx.</span></button>`:`<span class="inventory-cost" title="${number(cost)} Log Poses">Coste: <strong>${compact(cost)} 🧭</strong></span><button class="btn gold btn-upg-inv" data-id="${id}" ${canAfford?'':'disabled'} aria-label="Mejorar a ${collectionText(c.name)} al nivel base ${level+1} por ${number(cost)} Log Poses"><span class="inventory-upgrade-label">Subir a Nv. ${level+1}</span><span class="inventory-upgrade-short" aria-hidden="true">↑ Lv. ${level+1}</span></button>${canAfford?'':`<span class="inventory-shortfall">Faltan ${compact(cost-(meta.logPoses||0))} 🧭</span>`}`}${level>5?`<button class="btn gray small btn-sell-base-inv" data-id="${id}" aria-label="Vender niveles base de ${collectionText(c.name)} y recuperar ${number(Math.floor(charBaseLevelSpent(id)/2))} Log Poses">Vender niveles · +${compact(Math.floor(charBaseLevelSpent(id)/2))} 🧭</button>`:''}</div>
       </article>`;
     }).join('');
@@ -4013,11 +4018,11 @@ function screenStarter(sagaIdx, islandIdx = 0) {
       return `
               <div class="preset-slot-box" style="display:flex;align-items:center;gap:4px;background:rgba(0,0,0,0.4);padding:4px 8px;border-radius:4px;border:1px solid #555;">
                 <span style="font-size:8.5px;color:var(--gold);font-weight:bold;">P${slot}:</span>
-                <button class="btn small gray btn-load-preset" data-slot="${slot}" style="font-size:7.5px;padding:3px 6px;">
-                  📂 Cargar ${p.length ? `(${p.length})` : '(vacío)'}
+                <button class="btn small gray btn-load-preset" data-slot="${slot}" style="font-size:7.5px;padding:3px 6px;" title="Cargar equipo ${slot}${p.length ? ` (${p.length} nakamas)` : ' (vacío)'}" aria-label="Cargar equipo ${slot}${p.length ? `, ${p.length} nakamas` : ', vacío'}">
+                  📂
                 </button>
-                <button class="btn small blue btn-save-preset" data-slot="${slot}" style="font-size:7.5px;padding:3px 6px;" title="Guardar selección actual en Preset ${slot}">
-                  💾 Guardar
+                <button class="btn small blue btn-save-preset" data-slot="${slot}" style="font-size:7.5px;padding:3px 6px;" title="Guardar selección actual en equipo ${slot}" aria-label="Guardar selección actual en equipo ${slot}">
+                  💾
                 </button>
               </div>`;
     }).join('')}
@@ -4039,8 +4044,8 @@ function screenStarter(sagaIdx, islandIdx = 0) {
       <p style="font-size:8.5px;color:#555;margin-bottom:12px;">Toca para elegir · Mantén pulsado para reordenar.</p>
       
       <div id="starter-slots-container"></div>
-      <section class="team-synergy-summary" aria-label="Sinergias del equipo"><h3>Sinergias activas</h3><div id="starter-synergies" aria-live="polite"></div><button class="btn small gray" id="starter-synergy-info">Ver sinergias y tipos</button></section>
       ${renderPresetsBar()}
+      <section class="team-synergy-summary" aria-label="Sinergias del equipo"><h3>Sinergias activas</h3><div id="starter-synergies" aria-live="polite"></div><button class="btn small gray" id="starter-synergy-info">Ver sinergias y tipos</button></section>
 
       <div class="starter-launch-actions" style="text-align:center;margin-top:16px;">
         <button class="btn green" id="btn-zarpar" style="font-size:11px;padding:10px 20px;">
@@ -5460,7 +5465,7 @@ function enterNode(r, i) {
       const id = pickWildEnemy(island.pool);
       let lvl = rnd(island.lvl[0], island.lvl[1]);
       if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
-      wildEncounter(makeEnemy(id, lvl, true));
+      wildEncounter(makeEnemy(id, lvl, true, run.saga));
       break;
     }
     case 'marine': {
@@ -5619,7 +5624,7 @@ function wildTeamPreviewHTML() {
 
 function wildEncounter(wild) {
   const c = charData(wild);
-  const cannotRecruit = c.rareza >= 4;
+  const cannotRecruit = CHARS[baseFormOf(wild.id)].rareza >= 4;
   const price = wildRecruitPrice(c);
   const nuzBlock = run.mode === 'nuzlocke' && run.nuzCaught[run.islandIdx];
   const ov = document.createElement('div');
@@ -5989,7 +5994,7 @@ function showCharModal(fOrId, existingOverlay = null, selectedForm = null, navig
       return `<button type="button" class="btn small gear4-choice${previewing?' selected':''}${unlocked?'':' crew-choice-locked'}" data-crew-choice="${id}" aria-pressed="${previewing}" title="${unlocked?'Versión desbloqueada':`Versión bloqueada · ${CREW_VERSION_PRICE.toLocaleString('es')} Log Poses`}"><span>${crew.emoji} ${esc(crew.name)}</span><small>${status}</small></button>`;
     }).join('')}</div><p>Toca una versión para verla. Si está bloqueada, tócala de nuevo para confirmar su compra por 100.000 Log Poses. Las versiones compradas se pueden elegir gratis para nuevas aventuras.</p>
   </section>` : '';
-  const showGear4Choice = !isLive && baseFormOf(fOrId) === 'luffy';
+  const showGear4Choice = !isLive && LUFFY_GEAR4_FORMS.includes(previewId);
   const gear4Preference = preferredLuffyGear4(meta);
   const gear4ChoiceHTML = showGear4Choice ? `<section class="sheet-section sheet-gear4" aria-labelledby="sheet-gear4-title">
     <b id="sheet-gear4-title">☁️ Gear 4 para nuevas aventuras</b>
@@ -6893,7 +6898,7 @@ const SYNERGIES = {
   Nakama: {
     name: 'Sombrero de Paja',
     d1: '+10% al ataque, defensas y velocidad de la banda',
-    d2: 'Un aliado que caiga a 0 PS sobrevive con 1 PS una vez por viaje'
+    d2: 'Un aliado que caiga a 0 PS revive con el 50% de sus PS una vez por viaje'
   },
 };
 const synEmoji = t => t === 'Nakama' ? '🏴‍☠️' : TYPES[t].emoji;
@@ -6993,7 +6998,7 @@ function showSynergyModal(team) {
     const s = SYNERGIES[t];
     return `<div class="sheet-section synergy-guide-card ${tier ? 'is-active' : ''}">
             <b>${synEmoji(t)} ${t} — ${s.name}${team ? ` · ${synergyCount(team,t)} nakamas` : ''} ${tier ? `<span style="color:var(--accent);">— ACTIVA ${tier === 2 ? 'Ⅱ' : 'Ⅰ'}</span>` : ''}</b>
-            <p>Ⅰ: ${s.d1}<br>Ⅱ: ${s.d2}<br><b>6/6:</b> ${t === 'Nakama' ? 'Bonus de estadísticas +14 %; la protección conserva 1 PS.' : 'Bonus numéricos ×1,4; sin duplicar inmunidades ni efectos garantizados.'}${team && synergyBoost(team,t)>1 ? ' ★ ACTIVO' : ''}</p>
+            <p>Ⅰ: ${s.d1}<br>Ⅱ: ${s.d2}<br><b>6/6:</b> ${t === 'Nakama' ? 'Bonus de estadísticas +14 %; la reanimación conserva el 50 % de los PS.' : 'Bonus numéricos ×1,4; sin duplicar inmunidades ni efectos garantizados.'}${team && synergyBoost(team,t)>1 ? ' ★ ACTIVO' : ''}</p>
           </div>`;
   }).join('')}
       <h3>🏴‍☠️ Tripulaciones y facciones principales</h3>
@@ -7936,8 +7941,8 @@ function afterRound() {
         else if (b.opts?.local) b.localGuard[isPlayer ? 'p' : 'e'] = true;
         else if (isPlayer) { if (b.tower && tower) tower.nakamaGuardUsed = true; else if (run) { run.nakamaGuardUsed = true; saveRun(); } }
         else b.eGuardUsed = true;
-        f.hp = 1;
-        log(`🏴‍☠️ ¡Espíritu de Tripulación! ${charName(f)} resiste con ${f.hp} PS.`);
+        f.hp = Math.max(1, Math.floor(f.maxhp * 0.5));
+        log(`🏴‍☠️ ¡Espíritu de Tripulación! ${charName(f)} revive con ${f.hp} PS.`);
       }
     }
   };

@@ -27,7 +27,7 @@ test('all enemy identities follow combat level and unlocked sagas, never permane
  assert.equal(h.exec("makeEnemy('lucci-awakened',65).lvl"),65);
 });
 
-test('story wilds, marine groups, bosses and ambushes create evolved enemies with existing difficulty scaling',()=>{
+test('story wilds respect the current saga while other enemy groups keep existing evolution rules',()=>{
  const h=combatHarness();
  h.exec(`maxStartLvlCap=()=>100;meta.charUpgrades={};meta.sagaDiffWins={};meta.reachedSagas=SAGAS.slice(0,SAGAS.findIndex(s=>s.id==='egghead')+1).map(s=>s.id);let enemies;wildEncounter=f=>{enemies=[f];};startBattle=fs=>{enemies=fs;};
  saveRun=()=>{};resolveAutoLoot=()=>{};hasPendingLoot=()=>false;
@@ -35,10 +35,12 @@ test('story wilds, marine groups, bosses and ambushes create evolved enemies wit
  const island=SAGAS[0].islands[0];island.pool=['lucci'];island.lvl=[59,59];island.boss=['lucci'];island.bossLvl=[65];Math.random=()=>0;`);
  for(const type of ['wild','marine','boss']){
   h.exec(`run.map.rows[0][0].type='${type}';enterNode(0,0);`);
-  assert.equal(h.exec("enemies.every(e=>e.id==='lucci-awakened'&&e.lvl===65)"),true,type);
-  assert.equal(h.exec(`enemies[0].atk===makeChar('lucci-awakened',65,${type!=='boss'},true).atk`),true,type);
+  const expected=type==='wild'?'lucci':'lucci-awakened';
+  assert.equal(h.exec(`enemies.every(e=>e.id==='${expected}'&&e.lvl===65)`),true,type);
+  assert.equal(h.exec(`enemies[0].atk===makeChar('${expected}',65,${type!=='boss'},true).atk`),true,type);
   assert.equal(h.exec('enemies.length'),type==='marine'?3:1);
  }
+ assert.equal(h.exec("makeEnemy('lucci',65,true,SAGAS.findIndex(s=>s.id==='egghead')).id"),'lucci-awakened');
  h.exec(`MYSTERY_EVENTS.splice(0,MYSTERY_EVENTS.length,{kind:'battle',text:'Emboscada'});Math.random=()=>.1;modalInfo=(title,body,callback)=>callback();doMystery(island);`);
  assert.equal(h.exec('enemies[0].id'),'lucci-awakened');
  assert.equal(h.exec('enemies[0].lvl'),66);
