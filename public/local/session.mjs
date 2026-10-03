@@ -1,4 +1,4 @@
-export const RULES = 'egghead-local-4';
+export const RULES = 'egghead-local-5';
 export const DEFAULT_TEAM = ['luffy', 'zoro', 'nami', 'sanji', 'usopp', 'chopper'];
 export const BOSSES = ['kaido', 'bigmom', 'shanks', 'teach', 'newgate'];
 const cleanName = name => String(name || 'Pirata').replace(/[\x00-\x1f<>]/g, '').trim().slice(0, 24) || 'Pirata';
@@ -19,6 +19,7 @@ export class LocalSession {
     this.denDenAvailable=denDenAvailable; this.consumeDenDen=consumeDenDen;
     this.self = host ? 'host' : null; this.name = cleanName(name); this.roomId = roomId; this.visible = true; this.lastHost = now();
     this.peers = new Map(); this.arenas = new Map(); this.counter = 0; this.nextTick = 0;
+    this.spentDenDenWins = new Set();
     this.roster = engine.ownedRoster(); this.lastBroadcast = 0;
     this.view = { phase: 'lobby', mode: 'duel', size: 3, boss: 'kaido', round: 0, champion: null, paused: false,
       players: host ? [{ id: 'host', name: this.name, roster: [...this.roster], team: this.roster.slice(0, 3), ready: false, connected: true, visible: true, denDen: denDenAvailable() }] : [], matches: [] };
@@ -67,8 +68,8 @@ export class LocalSession {
       if (packet.type === 'reject') { this.onError(String(packet.message).slice(0, 200)); return; }
       if (packet.type !== 'state' || packet.rules !== RULES || !validView(packet.view, this.engine)) return;
       if (typeof packet.self !== 'string' || !packet.view.players.some(p => p.id === packet.self)) return;
-      if (this.view.phase==='lobby' && packet.view.phase==='playing' && packet.view.mode==='coop' && !this.consumeDenDen()) {
-        this.send({type:'leave'}); this.onError('No se pudo gastar un den den mushi. Revisa el guardado y vuelve a crear la sala.'); return;
+      if (!this.spendDenDenForWin(packet.view)) {
+        this.send({type:'leave'}); this.onError('No se pudo gastar el den den mushi de la victoria. Revisa el guardado y vuelve a crear la sala.'); return;
       }
       this.self = packet.self; this.view = packet.view; this.lastHost = this.now(); this.notify(); return;
     }
@@ -125,8 +126,6 @@ export class LocalSession {
     if (v.mode==='coop') {
       v.players[0].denDen=this.denDenAvailable();
       if (v.players.some(p=>p.denDen<1)) throw new Error('Cada jugador necesita un den den mushi para el desafío contra el yonkou.');
-      if (!this.consumeDenDen()) throw new Error('No se pudo gastar el den den mushi. Revisa el guardado local.');
-      v.players[0].denDen=this.denDenAvailable();
     }
     v.phase = 'playing'; v.round = 1; v.matches = []; v.champion = null; this.arenas.clear();
     if (v.mode === 'tournament') this.makeRound(bracketPairs(v.players.map(p => p.id)));
@@ -197,7 +196,12 @@ export class LocalSession {
       if (!this.view.matches.some(m => m.status === 'playing')) {
         const winners = this.view.matches.filter(m => m.round === this.view.round && m.status !== 'replay').map(m => m.winner);
         if (this.view.mode === 'tournament' && winners.length > 1) this.view.phase = 'round-end';
-        else { this.view.phase = 'finished'; this.view.champion = winners[0] || 'draw'; }
+        else {
+          const champion = winners[0] || 'draw';
+          const finished = { ...this.view, phase: 'finished', champion };
+          if (!this.spendDenDenForWin(finished)) throw new Error('No se pudo gastar el den den mushi de la victoria. Revisa el guardado local.');
+          this.view.phase = 'finished'; this.view.champion = champion;
+        }
       }
     }
     if (changed || now - this.lastBroadcast >= 1000) this.broadcast();
@@ -206,6 +210,15 @@ export class LocalSession {
     this.lastBroadcast = this.now();
     this.notify();
     for (const p of this.view.players.slice(1)) this.peers.get(p.id)?.send({ type: 'state', rules: RULES, self: p.id, view: this.view });
+  }
+  spendDenDenForWin(view) {
+    if (view.mode !== 'coop' || view.phase !== 'finished' || view.champion !== 'alliance') return true;
+    const win = view.matches[0]?.rewardId;
+    if (!win || this.spentDenDenWins.has(win)) return true;
+    if (!this.consumeDenDen()) return false;
+    this.spentDenDenWins.add(win);
+    if (this.host) this.view.players[0].denDen = this.denDenAvailable();
+    return true;
   }
   close() { if (!this.host) this.send({ type: 'leave' }); this.peers.clear(); this.arenas.clear(); }
 }

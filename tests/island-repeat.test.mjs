@@ -11,6 +11,15 @@ function setup(){
  return {h,nodes};
 }
 function advance(h){const before=h.exec('run');for(let i=0;i<20 && h.exec('run')===before;i++)if(!h.tick())break;assert.notEqual(h.exec('run'),before);}
+test('changing team after an automatic defeat cancels the series and opens the island selection',()=>{
+ const {h,nodes}=setup();
+ h.exec(`let selection;screenStarter=(s,i)=>selection=[s,i];startIslandRepeats(0,['luffy'],0,3);run.team=[];gameOver();`);
+ assert.match(h.exec('repeatHTML'),/CAMBIAR EQUIPO/);
+ nodes.get('#repeat-change-team').onclick();
+ assert.equal(h.exec('run'),null);assert.equal(h.exec('autoMode'),false);
+ assert.deepEqual(Array.from(h.exec('selection')),[0,0]);
+ while(h.tick()){}assert.equal(h.exec('run'),null);
+});
 test('ten attempts count wins and defeats, keep the exact island/team/order, then stop',()=>{
  const {h}=setup();
  h.exec(`storyMode='nuzlocke';selectedDiff=3;meta.islandProgress['eastblue:nuzlocke:3']=[0];meta.charUpgrades.luffy=3;`);
