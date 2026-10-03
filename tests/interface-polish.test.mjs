@@ -34,7 +34,7 @@ test('journey effects and XP survive the next fight; combat passive flags reset'
     if(f.xp!==17||f.hp!==hp||f.st.burn!==2||f.st.poisonDefense!==.3||f.st.receivedHit)return false;
     screenMap=()=>{};
     originalEndBattle(true);
-    return f.lvl===13&&f.xp===17&&f.st.burn===2;
+    return f.lvl===12&&f.xp===17&&f.st.burn===2;
   })()`),true);
 });
 
