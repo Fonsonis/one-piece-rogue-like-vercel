@@ -70,3 +70,26 @@ test('capacity policies normalize safely and survive save roundtrips',()=>{
  assert.equal(h.exec("normalizeAutoSettings({fullTeamAction:'invalid'}).fullTeamAction"),'keep');
  assert.equal(h.exec('normalizeAutoSettings({}).fullBagAction'),'leave');
 });
+
+test('pausing before an item or mystery preserves automatic overflow policy for that node',()=>{
+ for(const type of ['item','mystery']){
+  const h=setup();h.ctx.Math.random=()=>0.5;
+  h.exec(`modalInfo=()=>{};run.items={carne:27,cartel:27};run.bagLayout={};prepareBackpack(run);
+   run.map.rows=[[{type:'${type}',done:false}]];
+   autoSettings.pauseEvents=['${type}'];autoSettings.fullBagAction='leave';
+   MYSTERY_EVENTS.splice(0,MYSTERY_EVENTS.length,MYSTERY_EVENTS.find(e=>e.kind==='item'));
+   advanceAutoNode(0,0);`);
+  assert.equal(h.exec('autoMode'),false);assert.equal(h.exec('run.map.rows[0][0].done'),false);
+  h.exec('enterNode(0,0)');
+  assert.equal(h.exec('hasPendingLoot(run)'),false);assert.equal(h.exec('autoMode'),false);
+  assert.equal(h.exec('run.items.carne'),27);assert.equal(h.exec('run.items.cartel'),27);
+ }
+});
+
+test('explicitly stopping auto clears the paused node policy and keeps manual loot pending',()=>{
+ const h=setup();h.ctx.Math.random=()=>0.5;
+ h.exec(`modalInfo=()=>{};run.items={carne:27,cartel:27};run.bagLayout={};prepareBackpack(run);
+  run.map.rows=[[{type:'item',done:false}]];autoSettings.pauseEvents=['item'];
+  advanceAutoNode(0,0);stopAutoMode();enterNode(0,0);`);
+ assert.equal(h.exec('hasPendingLoot(run)'),true);assert.equal(h.exec('autoMode'),false);
+});

@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {denDenRemaining,denDenState,spendDenDen} from '../public/local/den-den.mjs';
 
-test('four den den mushis are available each local day and only successful starts spend them',()=>{
+test('four den den mushis are available each local day and persisted victories spend them',()=>{
   const meta={denDenMushis:null},today=new Date(2026,8,23,12),tomorrow=new Date(2026,8,24,12);
   assert.equal(denDenRemaining(meta,today),4);
   for(let n=3;n>=0;n--){assert.equal(spendDenDen(meta,()=>true,today),true);assert.equal(denDenRemaining(meta,today),n);}

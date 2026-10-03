@@ -530,7 +530,7 @@ const CHARS = {
     desc: 'Emperatriz golosa que roba almas y años de vida.',
   },
   shanks: {
-    name: 'Shanks', emoji: '🍷', types: ['Haki'],
+    name: 'Shanks', emoji: '🍷', types: ['Haki', 'Corte'],
     base: [34, 17, 12, 14], rareza: 5, boss: true,
     learnset: [[1, 'hakiarm'], [14, 'kamusarirojo']],
     desc: 'El Pelirrojo. Un solo brazo le basta para gobernar el mar.',

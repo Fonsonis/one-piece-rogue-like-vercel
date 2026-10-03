@@ -225,6 +225,7 @@ try {
 }
 
 let autoMode = false;
+let autoPausedLootNode = null;
 let autoTimer = null;
 const PORT_SHOP_STOCK = ['carne','carnereal','bocadillo','sake','bebida_ataque','bebida_defensa','cartel','carteldorado','cartelbuster'];
 const AUTO_ROUTE_KEYS = ['random','wild','marine','item','mystery','shop','rest','special','boss','battle'];
@@ -259,6 +260,7 @@ function normalizeAutoSettings(value) {
 }
 let autoSettings = AUTO_DEFAULTS();
 function pauseAutoForChoice(message) {
+  autoPausedLootNode = null;
   autoMode=false;
   if(autoTimer) clearTimeout(autoTimer);
   autoTimer=null;
@@ -277,6 +279,7 @@ function advanceAutoNode(r,i) {
   }
   if(autoSettings.pauseEvents?.includes(run.map.rows[r][i].type)) {
     pauseAutoForChoice();screenMap();
+    autoPausedLootNode = {journey:run, row:r, index:i};
     toast(`🤖 Pausa antes de ${NODE_TYPES[run.map.rows[r][i].type].label}. Elige cuándo entrar.`);
     return;
   }
@@ -295,6 +298,7 @@ function advanceAutoNode(r,i) {
 }
 
 function stopAutoMode() {
+  autoPausedLootNode = null;
   autoMode = false;
   if (autoTimer) {
     clearTimeout(autoTimer);
@@ -1114,16 +1118,6 @@ function registerRecruit(id) {
   registerDex(id);
   if (!meta.recruited.includes(id)) { meta.recruited.push(id); saveMeta(); }
 }
-function grantRecruitBaseLevel(id) {
-  const base = baseFormOf(id);
-  const cap = maxStartLvlCap();
-  if (5 + (meta.charUpgrades?.[base] || 0) >= cap) return;
-  const spent = charBaseLevelSpent(base);
-  meta.charUpgrades ||= {};
-  meta.charUpgradeSpent ||= {};
-  meta.charUpgrades[base] = cap - 5;
-  meta.charUpgradeSpent[base] = spent;
-}
 // Los reclutas de la banda actual solo son permanentes al completar la isla.
 function unlockRoster(allowBosses = true) {
   const added = [];
@@ -1132,7 +1126,6 @@ function unlockRoster(allowBosses = true) {
     const b = baseFormOf(f.id);
     if (!meta.roster.includes(b)) {
       meta.roster.push(b);
-      grantRecruitBaseLevel(b);
       added.push(b);
     }
   }
@@ -1281,6 +1274,7 @@ function toggleMute() {
 }
 
 function cycleTopbarAuto() {
+  autoPausedLootNode = null;
   if (!autoMode) {
     autoMode = true;
     autoSettings.speed = 'x1';
@@ -2430,7 +2424,6 @@ function awardLogPosePrize(prizeId) {
   const base = baseFormOf(prizeId);
   if (!meta.roster.includes(base)) {
     meta.roster.push(base);
-    grantRecruitBaseLevel(base);
   }
   return duplicateReward;
 }
@@ -4392,6 +4385,7 @@ function showIslandRepeatCheckpoint(continueAuto = false) {
     <p>${repeat.wins} victorias · ${repeat.losses} derrotas</p><p>Último resultado: ${repeat.result==='win'?'victoria':'derrota'}. El progreso permanente se conserva.</p>
     ${journeyRewardsHTML(journey)}
     ${finished?'':`<p>${autoMode?'El siguiente intento comienza automáticamente.':'Serie pausada. Continúa cuando quieras.'}</p><button class="btn green" id="repeat-next">Continuar serie</button>`}
+    ${repeat.result==='loss'?'<button class="btn blue" id="repeat-change-team">👥 CAMBIAR EQUIPO</button>':''}
     <button class="btn gray" id="repeat-finish">${finished?'Volver a las islas':'Cancelar repeticiones'}</button></section>`);
   const next=()=>{
     if(run!==journey || !journey.islandRepeat || !$('#repeat-checkpoint') || finished)return;
@@ -4400,6 +4394,12 @@ function showIslandRepeatCheckpoint(continueAuto = false) {
     startRun(attempt.saga,attempt.starterIds,attempt.islandIdx,{...repeat,result:null});
   };
   if(!finished)$('#repeat-next').onclick=next;
+  if(repeat.result==='loss')$('#repeat-change-team').onclick=()=>{
+    if(run!==journey)return;
+    autoMode=false;clearTimeout(autoTimer);autoTimer=null;
+    storyMode=attempt.mode;selectedDiff=attempt.diff;clearRun();
+    screenStarter(attempt.saga,attempt.islandIdx);
+  };
   $('#repeat-finish').onclick=()=>{
     if(run!==journey)return;
     autoMode=false;clearTimeout(autoTimer);autoTimer=null;
@@ -4483,19 +4483,19 @@ function addBackpackItem(owner, id, count = 1) {
   owner.bagLayout = plan.layout;
   return true;
 }
-function receiveBackpackItem(owner, id, count = 1) {
+function receiveBackpackItem(owner, id, count = 1, automatic = autoMode) {
   if (!ITEMS[id] || !Number.isInteger(count) || count < 1) return false;
   const stored = addBackpackItem(owner, id, count);
   if (!stored) {
     owner.pendingLoot ||= {};
     owner.pendingLoot[id] = (owner.pendingLoot[id] || 0) + count;
-    if (autoMode) resolveAutoLoot(owner);
+    if (automatic) resolveAutoLoot(owner, automatic);
     else { clearTimeout(autoTimer); autoTimer = null; }
   }
   return stored;
 }
-function resolveAutoLoot(owner) {
-  if (!autoMode || !hasPendingLoot(owner)) return;
+function resolveAutoLoot(owner, automatic = autoMode) {
+  if (!automatic || !hasPendingLoot(owner)) return;
   if (autoSettings.fullBagAction === 'manual') {
     pauseAutoForChoice('🎒 Mochila llena: guarda o deja el objeto.');
     return;
@@ -5453,7 +5453,9 @@ function pickWildEnemy(pool) {
 
 // ============ ENTRAR EN NODO ============
 function enterNode(r, i) {
-  resolveAutoLoot(run);
+  const automaticLoot = autoMode || (autoPausedLootNode?.journey === run && autoPausedLootNode.row === r && autoPausedLootNode.index === i);
+  autoPausedLootNode = null;
+  resolveAutoLoot(run, automaticLoot);
   if (hasPendingLoot(run)) {
     if (autoMode) pauseAutoForChoice();
     toast('🎒 Guarda o deja los objetos pendientes antes de continuar.'); screenMap(2); return;
@@ -5507,13 +5509,13 @@ function enterNode(r, i) {
         const commonLoot = ['carne', 'carne', 'carnereal', 'cartel', 'cartel', 'carteldorado', 'sake', 'bocadillo'];
         id = pick(commonLoot);
       }
-      const stored = receiveBackpackItem(run,id);
+      const stored = receiveBackpackItem(run,id,1,automaticLoot);
       trackItemCollected(1);
       saveRun();
       modalInfo('🎁 ¡Objeto encontrado!', `<div class="reward-list">${ITEMS[id].emoji} <b>${ITEMS[id].name}</b><br><small>${ITEMS[id].desc}</small>${stored ? '' : hasPendingLoot(run) ? '<br>🎒 Elige dónde guardar el objeto en la mochila.' : '<br>🤖 Mochila llena: objeto dejado.'}</div>`, () => screenMap(hasPendingLoot(run) ? 2 : 0));
       break;
     }
-    case 'mystery': trackStat('mystery_visit', 1); doMystery(island); break;
+    case 'mystery': trackStat('mystery_visit', 1); doMystery(island,automaticLoot); break;
     case 'special': trackStat('special_visit', 1); doSpecialPirate(island); break;
     case 'shop': screenShop(); break;
     case 'rest': {
@@ -5526,7 +5528,7 @@ function enterNode(r, i) {
   }
 }
 
-function doMystery(island) {
+function doMystery(island, automaticLoot = autoMode) {
   let ev;
   if (Math.random() < 0.02) {
     ev = MYSTERY_EVENTS.find(e => e.kind === 'fruta') || MYSTERY_EVENTS[7];
@@ -5544,7 +5546,7 @@ function doMystery(island) {
     }
     case 'item': {
       const id = pick(['carne', 'cartel', 'carnereal', 'carteldorado']);
-      const stored = receiveBackpackItem(run,id); saveRun();
+      const stored = receiveBackpackItem(run,id,1,automaticLoot); saveRun();
       modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS[id].emoji} <b>${ITEMS[id].name}</b>${stored ? '' : hasPendingLoot(run) ? '<br>🎒 Elige dónde guardar el objeto en la mochila.' : '<br>🤖 Mochila llena: objeto dejado.'}</div>`, () => screenMap(hasPendingLoot(run) ? 2 : 0));
       break;
     }
@@ -5605,7 +5607,7 @@ function doMystery(island) {
       break;
     }
     case 'fruta': {
-      const stored = receiveBackpackItem(run,'fruta_diablo');
+      const stored = receiveBackpackItem(run,'fruta_diablo',1,automaticLoot);
       trackItemCollected(1);
       saveRun();
       modalInfo('❓ Misterio', `${eventArt}<div class="reward-list">${ev.text}<br><br>${ITEMS['fruta_diablo'].emoji} <b>${ITEMS['fruta_diablo'].name}</b>${stored ? ' añadida a tu mochila.' : hasPendingLoot(run) ? '<br>🎒 Elige dónde guardar el objeto en la mochila.' : '<br>🤖 Mochila llena: objeto dejado.'}</div>`, () => screenMap(hasPendingLoot(run) ? 2 : 0));
@@ -5654,9 +5656,10 @@ function wildEncounter(wild) {
     </div>
     ${wildTeamPreviewHTML()}
     ${cartelesBadgeHTML()}
-    ${cannotRecruit ? `<div class="special-fail special-fail-rare">${c.rareza === 5 ? '👑 PIRATA LEGENDARIO (5⭐)' : '⭐ PIRATA DE 4 ESTRELLAS'}<br>Solo puede conseguirse en Crossguild o en la tirada de carteles. ¡Aquí únicamente puedes combatirlo!</div>` : nuzBlock ? '<div class="special-fail">Regla Nuzlocke: ya reclutaste en esta isla (solo puedes combatir).</div>' : ''}
+    ${cannotRecruit ? `<div class="special-fail special-fail-rare">${c.rareza === 5 ? '👑 PIRATA LEGENDARIO (5⭐)' : '⭐ PIRATA DE 4 ESTRELLAS'}<br>Solo puede conseguirse en Crossguild o en la tirada de carteles. Aquí puedes combatirlo o intentar huir.</div>` : nuzBlock ? '<div class="special-fail">Regla Nuzlocke: ya reclutaste en esta isla. Puedes combatir o intentar huir.</div>' : ''}
     <div class="actions" style="flex-direction:column;align-items:stretch;">
       <button class="btn red" id="we-fight">⚔️ COMBATIR — gana XP para la banda</button>
+      <button class="btn gray" id="we-flee">🏃 HUIR — 70 % de éxito</button>
       ${!cannotRecruit ? `
         <button class="btn green" id="we-pay" ${nuzBlock || run.berries < price ? 'disabled' : ''}>💋 SEDUCIR — ${berriesHTML(price)}</button>
         <button class="btn gold" id="we-chains" ${nuzBlock ? 'disabled' : ''}>⛓️ TENTAR A LA SUERTE — las 3 cadenas</button>
@@ -5695,16 +5698,32 @@ function wildEncounter(wild) {
       }
     });
   };
-  ov.querySelector('#we-fight').onclick = () => { ov.remove(); startBattle([wild], { wild: true }); };
+  let resolved = false, confirmingFlee = false;
+  const finishEncounter = action => {
+    if (resolved) return;
+    resolved = true; ov.remove(); action();
+  };
+  ov.querySelector('#we-fight').onclick = () => finishEncounter(() => startBattle([wild], { wild: true }));
+  ov.querySelector('#we-flee').onclick = () => {
+    if (resolved || confirmingFlee) return;
+    if (autoMode) pauseAutoForChoice();
+    confirmingFlee = true;
+    modalConfirm('🏃 ¿Intentar huir?',
+      'La huida tiene un 70 % de probabilidad de éxito. Si escapas, continuarás sin recompensa; si falla, comenzarás el combate contra este pirata.',
+      () => finishEncounter(() => {
+        if (Math.random() < 0.7) { toast('🏃 ¡Escapas del pirata!'); screenMap(); }
+        else { toast('🏃 ¡No consigues escapar!'); startBattle([wild], { wild: true }); }
+      }), () => { confirmingFlee = false; });
+  };
   const payBtn = ov.querySelector('#we-pay');
   if (payBtn && !nuzBlock && run.berries >= price) payBtn.onclick = () => {
+    if (resolved) return;
     run.berries -= price;
     saveRun();
-    ov.remove();
-    recruit();
+    finishEncounter(recruit);
   };
   const chainsBtn = ov.querySelector('#we-chains');
-  if (chainsBtn && !nuzBlock) chainsBtn.onclick = () => { ov.remove(); renderChains(wild, recruit); };
+  if (chainsBtn && !nuzBlock) chainsBtn.onclick = () => finishEncounter(() => renderChains(wild, recruit));
 }
 
 // Las 3 cadenas: 50% de romperse cada una. Cada cadena puede romperse gastando
@@ -8299,9 +8318,7 @@ function claimPirateKingReward(sagaId, id) {
   if (meta.pirateKingRewards?.[sagaId] !== 'pending' || !pirateKingLegendaryPool(sagaId).includes(id)) return false;
   const before = { roster: meta.roster, recruited: meta.recruited, dex: meta.dex, pirateKingRewards: meta.pirateKingRewards,
     charUpgrades: {...meta.charUpgrades}, charUpgradeSpent: {...meta.charUpgradeSpent} };
-  const newRecruit = !meta.roster.includes(id);
   for (const key of ['roster','recruited','dex']) meta[key] = [...new Set([...(meta[key] || []), id])];
-  if (newRecruit) grantRecruitBaseLevel(id);
   meta.pirateKingRewards = { ...meta.pirateKingRewards, [sagaId]: id };
   if (saveMeta() === false) { Object.assign(meta, before); return false; }
   return true;
@@ -8452,6 +8469,7 @@ function gameOver() {
       ${rewardsHTML}
       <div class="actions" style="flex-wrap:wrap;justify-content:center;">
         ${retry ? '<button class="btn green" id="btn-retry-island">🔄 VOLVER A INTENTAR</button>' : ''}
+        ${retry ? '<button class="btn blue" id="btn-change-team">👥 CAMBIAR EQUIPO</button>' : ''}
         <button class="btn red" id="btn-fin">VOLVER AL PUERTO</button>
       </div>
     </div>
@@ -8460,6 +8478,11 @@ function gameOver() {
   if (retry) {
     let used = false;
     $('#btn-retry-island').onclick = () => { if (!used) { used = true; retryIsland(retry); } };
+    $('#btn-change-team').onclick = () => {
+      if (used) return;
+      used = true; storyMode = retry.mode; selectedDiff = retry.diff;
+      screenStarter(retry.saga, retry.islandIdx);
+    };
   }
 }
 

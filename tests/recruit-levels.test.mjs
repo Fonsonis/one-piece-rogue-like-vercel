@@ -46,14 +46,19 @@ test('the second and third starting nakamas unlock at account level 7', () => {
   assert.equal(h.exec('nextStarterSlotItem().lvl'), 11);
 });
 
-test('new permanent recruits receive the available base level without refundable free upgrades', () => {
+test('new permanent recruits start at level 5 and keep any purchased base levels', () => {
   const h = combatHarness();
-  h.exec("run={islandComplete:true,team:[makeChar('zoro',15)]};unlockRoster()");
-  assert.equal(h.exec("startLvlOf('zoro')"), 20);
-  assert.equal(h.exec('meta.charUpgradeSpent.zoro'), 0);
+  h.exec(`meta.charUpgrades.nami=2;meta.charUpgradeSpent.nami=123;
+    run={islandComplete:true,team:[makeChar('zoro',20),makeChar('nami',20)]};unlockRoster()`);
+  assert.equal(h.exec("startLvlOf('zoro')"), 5);
+  assert.equal(h.exec('meta.charUpgrades.zoro'), undefined);
+  assert.equal(h.exec('meta.charUpgradeSpent.zoro'), undefined);
+  assert.equal(h.exec("startLvlOf('nami')"), 7);
+  assert.equal(h.exec('meta.charUpgrades.nami'), 2);
+  assert.equal(h.exec('meta.charUpgradeSpent.nami'), 123);
 
-  h.exec("meta.sagaDiffWins={eastblue:{3:true},alabasta:{3:true}};awardLogPosePrize('nami')");
-  assert.equal(h.exec("startLvlOf('nami')"), h.exec('maxStartLvlCap()'));
-  assert.equal(h.exec('meta.charUpgradeSpent.nami'), 0);
-  assert.equal(h.exec("sellCharBaseLevels('nami')"), 0);
+  h.exec("meta.sagaDiffWins={eastblue:{3:true},alabasta:{3:true}};awardLogPosePrize('sanji')");
+  assert.equal(h.exec("startLvlOf('sanji')"), 5);
+  assert.equal(h.exec('meta.charUpgrades.sanji'), undefined);
+  assert.equal(h.exec('meta.charUpgradeSpent.sanji'), undefined);
 });

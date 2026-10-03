@@ -28,7 +28,9 @@ test('first final-island victories in Rey Pirata grant one persistent choice per
     h.exec(`const sagaId=SAGAS[${saga}].id, choice=pirateKingLegendaryPool(sagaId)[0];`);
     assert.equal(h.exec('claimPirateKingReward(sagaId,choice)'),true);
     assert.equal(h.exec('meta.roster.includes(choice)&&meta.dex.includes(choice)&&meta.recruited.includes(choice)'),true);
-    assert.equal(h.exec('startLvlOf(choice)'),h.exec('maxStartLvlCap()'));
+    assert.equal(h.exec('startLvlOf(choice)'),5);
+    assert.equal(h.exec('meta.charUpgrades[choice]'),undefined);
+    assert.equal(h.exec('meta.charUpgradeSpent[choice]'),undefined);
     assert.equal(h.exec('claimPirateKingReward(sagaId,choice)'),false);
     h.exec('preparePirateKingRewards(meta);');
     assert.equal(h.exec('meta.pirateKingRewards[sagaId]===choice'),true);

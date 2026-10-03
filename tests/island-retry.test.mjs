@@ -51,6 +51,17 @@ test('death retry survives removal of every Nuzlocke fighter and cannot be invok
  h.exec('run.berries=87');retry();assert.equal(h.exec('run.berries'),87);
 });
 
+test('changing team after defeat opens the same island selection with its mode and difficulty',()=>{
+ const {h,nodes}=setup();
+ h.exec(`storyMode='nuzlocke';selectedDiff=3;meta.islandProgress['eastblue:nuzlocke:3']=[0];
+   startRun(0,['luffy'],1);run.team=[];let selections=[];screenStarter=(s,i)=>selections.push([s,i]);gameOver();`);
+ assert.match(h.exec('html'),/CAMBIAR EQUIPO/);
+ const change=nodes.get('#btn-change-team').onclick;
+ h.exec("storyMode='classic';selectedDiff=1");change();change();
+ assert.equal(h.exec('run'),null);assert.equal(h.exec('storyMode'),'nuzlocke');assert.equal(h.exec('selectedDiff'),3);
+ assert.deepEqual(JSON.parse(h.exec('JSON.stringify(selections)')),[[0,1]]);
+});
+
 test('canceling restart preserves the attempt and auto mode; accepting starts once with auto off',()=>{
  const {h}=setup();
  h.exec("startRun(0,['luffy']);run.berries=777;autoMode=true;var before=JSON.stringify(run);confirmRestartIsland();");

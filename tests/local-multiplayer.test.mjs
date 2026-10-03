@@ -217,19 +217,54 @@ test('either yonko player can return to mode selection without closing the room'
   assert.ok(s.view.players.every(p => !p.ready));
   assert.equal(s.view.players.length, 2);
 });
-test('yonko cannot start without one den den mushi per player and spends one on a real start', () => {
-  const {s}=room(); let remaining=1, spent=0;
+test('yonko requires a den den mushi but spends it only once per victory on host and guest', () => {
+  const {s,api,heartbeat,advance}=room(); let remaining=2, spent=0;
   s.denDenAvailable=()=>remaining;
   s.consumeDenDen=()=>{if(!remaining)return false;remaining--;spent++;return true;};
   s.configure({mode:'coop'});
-  s.receive('host',{type:'ready',ready:true,denDen:1});
+  s.receive('host',{type:'ready',ready:true,denDen:2});
   s.receive(guestId(1),{type:'ready',ready:true,denDen:0});
   assert.throws(()=>s.start());
   assert.equal(spent,0);
-  s.receive(guestId(1),{type:'ready',ready:true,denDen:1});
+  s.receive(guestId(1),{type:'ready',ready:true,denDen:2});
   s.start();
+  assert.equal(spent,0);
+  let battle=s.arenas.get(s.view.matches[0].id); battle.over=true; battle.winner='e';
+  advance(); heartbeat(); s.pulse();
+  assert.equal(s.view.champion,'yonko');
+  assert.equal(spent,0);
+
+  let guestRemaining=2,guestSpent=0;
+  const guest=new LocalSession({host:false,name:'Guest',engine:api,denDenAvailable:()=>guestRemaining,consumeDenDen:()=>{guestRemaining--;guestSpent++;return true;}});
+  const guestState=()=>({type:'state',rules:RULES,self:guestId(1),view:JSON.parse(JSON.stringify(s.view))});
+  guest.receive('host',guestState());
+  guest.receive('host',guestState());
+  assert.equal(guestSpent,0);
+
+  s.reset();
+  for(const p of s.view.players)s.receive(p.id,{type:'ready',ready:true,denDen:2});
+  s.start();
+  battle=s.arenas.get(s.view.matches[0].id); battle.over=true; battle.winner='p';
+  advance(); heartbeat(); s.pulse();
+  assert.equal(s.view.champion,'alliance');
   assert.equal(spent,1);
-  assert.equal(remaining,0);
+  assert.equal(remaining,1);
+  s.pulse();
+  assert.equal(spent,1);
+
+  guest.receive('host',guestState());
+  guest.receive('host',guestState());
+  assert.equal(guestSpent,1);
+  assert.equal(guestRemaining,1);
+
+  s.reset();
+  for(const p of s.view.players)s.receive(p.id,{type:'ready',ready:true,denDen:1});
+  s.start();
+  battle=s.arenas.get(s.view.matches[0].id); battle.over=true; battle.winner='p';
+  advance(); heartbeat(); s.pulse();
+  guest.receive('host',guestState());
+  assert.equal(spent,2);
+  assert.equal(guestSpent,2);
 });
 const signal = { v: 1, type: 'offer', room: 'a'.repeat(32), link: 'b'.repeat(32), sdp: 'v=0\r\nm=application 9 UDP/DTLS/SCTP webrtc-datachannel\r\na=fingerprint:sha-256 AA:BB\r\na=ice-ufrag:test\r\na=candidate:1 1 udp 2122260223 192.168.1.10 50000 typ host\r\n' };
 test('signaling token roundtrip rejects corrupt data and nonlocal candidates', async () => {
