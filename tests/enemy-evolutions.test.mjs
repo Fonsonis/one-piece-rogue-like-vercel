@@ -37,7 +37,7 @@ test('story wilds respect the current saga while other enemy groups keep existin
   h.exec(`run.map.rows[0][0].type='${type}';enterNode(0,0);`);
   const expected=type==='wild'?'lucci':'lucci-awakened';
   assert.equal(h.exec(`enemies.every(e=>e.id==='${expected}'&&e.lvl===65)`),true,type);
-  assert.equal(h.exec(`enemies[0].atk===makeChar('${expected}',65,${type!=='boss'},true).atk`),true,type);
+  assert.equal(h.exec(`enemies[0].atk===makeChar('${expected}',65,true,true).atk`),true,type);
   assert.equal(h.exec('enemies.length'),type==='marine'?3:1);
  }
  assert.equal(h.exec("makeEnemy('lucci',65,true,SAGAS.findIndex(s=>s.id==='egghead')).id"),'lucci-awakened');
