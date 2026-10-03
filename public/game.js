@@ -3152,7 +3152,7 @@ function showSagaInfoModal(sagaIdx = 0) {
   const islandsHTML = s.islands.map((isl, idx) => {
     const bossesHTML = (isl.boss || []).map((bId, bIdx) => {
       const c = CHARS[bId];
-      const bLvl = (isl.bossLvl && isl.bossLvl[bIdx]) ? isl.bossLvl[bIdx] : '?';
+      const bLvl = (isl.bossLvl && isl.bossLvl[bIdx]) ? islandBossLevel(isl,bIdx) : '?';
       if (!c) return `<span>💀 ${bId} (Nv. ${bLvl})</span>`;
       return `<div class="saga-info-boss">
         ${charIcon(bId, 22)}
@@ -3164,7 +3164,7 @@ function showSagaInfoModal(sagaIdx = 0) {
       <div class="saga-info-island">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
           <span class="saga-info-heading">🏝️ Isla ${idx + 1}: ${isl.name}</span>
-          <span class="saga-info-level">Rango Nivel: Nv. ${isl.lvl ? isl.lvl[0] + ' - ' + isl.lvl[1] : '?'}</span>
+          <span class="saga-info-level">Rango Nivel: Nv. ${isl.lvl ? isl.lvl[0] + ' - ' + storyEncounterLevel(isl.lvl[1],islandMapCount(isl)-1) : '?'}</span>
         </div>
         <div class="saga-info-bosses">
           <b>Jefes:</b> ${bossesHTML || 'Sin jefes'}
@@ -3716,6 +3716,13 @@ let currentStarterUpdateFn = null;
 function islandMapCount(island) {
   return Math.min(5, Math.max(3, 2 + island.boss.length));
 }
+// Rivals keep pace with the party's victories across the island's maps.
+function storyEncounterLevel(baseLevel, mapIdx = run?.mapIdx || 0) {
+  return baseLevel + Math.max(0,mapIdx) * 2;
+}
+function islandBossLevel(island, index) {
+  return storyEncounterLevel(island.bossLvl[index],islandMapCount(island)-1);
+}
 function migrateLegacyIslandWins(progress) {
   progress.islandProgress ||= {};
   for (const saga of SAGAS) for (const [diff, won] of Object.entries(progress.sagaDiffWins?.[saga.id] || {})) {
@@ -3882,8 +3889,8 @@ function worldIslandPanelHTML(sagaIdx,index) {
   return `<header><div><h2>${location?.place || island.name}</h2><p>${location?.zone || saga.name} · ${location?.kind || 'Destino'}</p></div><button class="btn gray small" id="world-close" aria-label="Cerrar destino">✕</button></header>
     <div class="world-inspector-body">
     <div class="world-completions" aria-label="Dificultades completadas por modo">${progress}</div>
-    <p>${islandMapCount(island)} mapas · Enemigos Nv. ${island.lvl[0]}–${island.lvl[1]}</p>
-    <details><summary>Jefes y datos del destino</summary><p>${location?.description || ''}</p><p>${island.boss.map((id,k)=>`${CHARS[id].name} · Nv. ${island.bossLvl[k]}`).join('<br>')}</p><p>${saga.name} · ${storyMode==='classic'?'Clásico':'Nuzlocke'} · ${DIFFICULTIES.find(d=>d.id===selectedDiff)?.name}</p></details>
+    <p>${islandMapCount(island)} mapas · Enemigos comunes Nv. ${island.lvl[0]}–${storyEncounterLevel(island.lvl[1],islandMapCount(island)-1)} · +2 niveles por mapa</p>
+    <details><summary>Jefes y datos del destino</summary><p>${location?.description || ''}</p><p>${island.boss.map((id,k)=>`${CHARS[id].name} · Nv. ${islandBossLevel(island,k)}`).join('<br>')}</p><p>${saga.name} · ${storyMode==='classic'?'Clásico':'Nuzlocke'} · ${DIFFICULTIES.find(d=>d.id===selectedDiff)?.name}</p></details>
     ${state.reason?`<p class="world-lock">🔒 ${state.reason}</p>`:''}</div>
     <footer><span id="world-arrival" role="status" aria-live="polite">Destino seleccionado</span><div class="world-panel-actions"><button class="btn small gray" id="world-skip" hidden>SALTAR TRAVESÍA</button><button class="btn small gold" id="world-enter" ${state.available?'':'disabled'}>${state.active?'CONTINUAR':'ENTRAR'}</button></div></footer>`;
 }
@@ -3941,7 +3948,7 @@ function showIslandInfo(sagaIdx, index, trigger) {
   ov.innerHTML=`<div class="modal island-info" role="dialog" aria-modal="true" aria-label="Información de ${island.name}">
     <h2>${available ? 'ⓘ' : '🔒'} ${island.name}</h2>
     <p>${islandMapCount(island)} mapas · ${island.boss.length} ${island.boss.length===1 ? 'jefe' : 'jefes'} en un único combate final.</p>
-    <div class="island-bosses"><h3>Jefes y niveles</h3>${island.boss.map((id,k)=>`<div class="island-boss"><span>${CHARS[id].name}</span><strong>Nv. ${island.bossLvl[k]}</strong></div>`).join('')}</div>
+    <div class="island-bosses"><h3>Jefes y niveles</h3>${island.boss.map((id,k)=>`<div class="island-boss"><span>${CHARS[id].name}</span><strong>Nv. ${islandBossLevel(island,k)}</strong></div>`).join('')}</div>
     <p>${available ? 'Isla disponible. Selecciónala en el mapa para preparar tu banda o continuar tu viaje.' : reason}</p>
     <div class="actions"><button class="btn gray" data-close-island-info>CERRAR</button></div>
   </div>`;
@@ -5481,7 +5488,7 @@ function enterNode(r, i) {
       const id = pickWildEnemy(island.pool);
       let lvl = rnd(island.lvl[0], island.lvl[1]);
       if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
-      wildEncounter(makeEnemy(id, lvl, true, run.saga));
+      wildEncounter(makeEnemy(id, storyEncounterLevel(lvl), true, run.saga));
       break;
     }
     case 'marine': {
@@ -5491,13 +5498,13 @@ function enterNode(r, i) {
         const id = pickWildEnemy(island.pool);
         let lvl = rnd(island.lvl[0], island.lvl[1] + 1);
         if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
-        enemies.push(makeEnemy(id, lvl, true));
+        enemies.push(makeEnemy(id, storyEncounterLevel(lvl), true));
       }
       startBattle(enemies, { wild: false, marine: true });
       break;
     }
     case 'boss': {
-      const enemies = island.boss.map((id, k) => makeEnemy(id, island.bossLvl[k]));
+      const enemies = island.boss.map((id, k) => makeEnemy(id, storyEncounterLevel(island.bossLvl[k]), true));
       startBattle(enemies, { wild: false, boss: true, reward: 400 * (run.islandIdx + 1) });
       break;
     }
@@ -5555,7 +5562,7 @@ function doMystery(island, automaticLoot = autoMode) {
         const id = pickWildEnemy(island.pool);
         let lvl = rnd(island.lvl[0] + 1, island.lvl[1] + 2);
         if (CHARS[id] && CHARS[id].rareza === 5) lvl += 6;
-        startBattle([makeEnemy(id, lvl, true)], { wild: true });
+        startBattle([makeEnemy(id, storyEncounterLevel(lvl), true)], { wild: true });
       });
       break;
     }
