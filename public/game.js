@@ -1062,6 +1062,13 @@ function applyUpgrades(f) {
 const charData = f => CHARS[f.id];
 const charName = f => CHARS[f.id].name;
 
+function enemyCombatXP(defeated, fighter, opts = {}) {
+  const base = defeated.lvl * 14 * (charData(defeated).boss ? 1.6 : 1) * (opts.xpMult || 1);
+  // Recompensa completa para cada nakama, ponderada por el reto para su nivel.
+  const relativeLevel = Math.min(3, Math.max(0.25, defeated.lvl / Math.max(1, fighter.lvl)));
+  return Math.max(1, Math.floor(base * relativeLevel));
+}
+
 function gainXP(f, amount, log) {
   syncEvolution(f);
   f.xp += amount;
@@ -8028,9 +8035,12 @@ function afterRound() {
       saveMeta();
       log(`🧭 ¡Consigues ${logPosesWon} Log Pose! (Total: ${meta.logPoses})`);
     }
-    const xp = Math.floor(defeated.lvl * 14 * (charData(defeated).boss ? 1.6 : 1) * (b.opts.xpMult || 1));
-    log(`¡Toda la banda gana ${xp} EXP!`);
-    b.pTeam.forEach(f => { if (f.hp > 0) gainXP(f, xp, log); });
+    b.pTeam.forEach(f => {
+      if (f.hp <= 0) return;
+      const xp = enemyCombatXP(defeated, f, b.opts);
+      log(`¡${charName(f)} gana ${xp} EXP!`);
+      gainXP(f, xp, log);
+    });
     changed = true;
   }
   if (run && run.mode === 'nuzlocke' && !b.tower) {
@@ -8244,11 +8254,6 @@ function endBattle(victory, fled, recruited) {
     run.team = run.team.filter(f => f && f.hp > 0);
   }
   const notes = [];
-  if (victory) {
-    // cada enfrentamiento ganado sube 1 nivel completo a toda la banda viva
-    run.team.forEach(f => { if (f.hp > 0) gainXP(f, xpForLevel(f.lvl)); });
-    notes.push('⬆️ +1 nivel a la banda');
-  }
   if (victory && opts.reward) {
     run.berries += opts.reward;
     notes.push(`+${berriesHTML(opts.reward)}`);
@@ -8634,8 +8639,6 @@ function endTowerBattle(victory) {
   tower.fameWon = (tower.fameWon || 0) + towerFloorFame(tower.floor, tower.floorEnemyRarity);
   tower.team.forEach(f => {
     if (f.hp > 0) {
-      gainXP(f, xpForLevel(f.lvl)); // +1 nivel por piso conservando EXP
-      gainXP(f, 30 + tower.floor * 6);
       f.hp = Math.min(f.maxhp, f.hp + Math.floor(f.maxhp * 0.3));
     }
   });
