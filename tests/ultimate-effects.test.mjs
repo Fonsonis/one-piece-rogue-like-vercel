@@ -146,6 +146,20 @@ test('reviewed ultimates load new art while Gear 5 has a new normal attack',asyn
  await h.ready();
  assert.equal(h.images[4].url,'/art/characters/luffy5.png');
 });
+test('ultimate actors and cut-in retain the displayed crew variants',async()=>{
+ const h=lifecycle();
+ h.sprite.dataset={character:'crocodile',spriteId:'crocodile-crossguild'};
+ const defender={...h.sprite,dataset:{character:'robin',spriteId:'robin-baroque'}};
+ const portraits=[],create=h.doc.createElement;
+ h.doc.createElement=tag=>{const node=create(tag);if(tag==='img')portraits.push(node);return node;};
+ const handle=h.play({profile:{...h.profile,id:'crocodile'},source:h.source,target:{...h.target,querySelector:()=>defender}});
+ await h.ready();
+ assert.ok(h.images.some(image=>image.url==='/art/characters/ultimates/crocodile-crossguild.png'));
+ assert.ok(h.images.some(image=>image.url==='/art/characters/robin-baroque.png'));
+ assert.equal(portraits[0].src,'/art/portraits/crocodile-crossguild.png');
+ handle.cancel();assert.deepEqual(h.counts(),[0,0,0]);
+});
+
 test('reduced-motion mode is static and cleans up; interrupted screens cancel safely',async()=>{
  const h=lifecycle(true),s={profile:h.profile,source:h.source,target:h.target};
  h.play(s);await h.ready();h.step(0);h.step(700);assert.deepEqual(h.counts(),[0,0,0]);

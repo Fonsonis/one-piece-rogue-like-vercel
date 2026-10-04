@@ -16,13 +16,56 @@
     '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
   }[c]));
 
+  // Alpha-bound metrics from scripts/measure-crew-sprite-metrics.py.
+  // Crew skins retain their own geometry without changing the fighter's identity.
+  const crewSpriteMetrics = {
+    'aokiji-blackbeard': {"--atlas-scale":0.834783,"--atlas-shift":0,"--portrait-scale":0.86087,"--portrait-shift":0,"--motion-fit-x":1.203008,"--motion-fit-y":1.203008,"--motion-floor":0.050821,"--motion-center":0},
+    'robin-straw': {"--atlas-scale":0.695652,"--atlas-shift":0,"--portrait-scale":0.717391,"--portrait-shift":0,"--motion-fit-x":1.432836,"--motion-fit-y":1.432836,"--motion-floor":0.045371,"--motion-center":0},
+    'robin-baroque': {"--atlas-scale":0.695652,"--atlas-shift":0,"--portrait-scale":0.717391,"--portrait-shift":0,"--motion-fit-x":1.432836,"--motion-fit-y":1.432836,"--motion-floor":0.045371,"--motion-center":0},
+    'jinbe-sun': {"--atlas-scale":0.834783,"--atlas-shift":0,"--portrait-scale":0.86087,"--portrait-shift":0,"--motion-fit-x":1.203008,"--motion-fit-y":1.203008,"--motion-floor":0.050821,"--motion-center":0},
+    'crocodile-baroque': {"--atlas-scale":0.775758,"--atlas-shift":0,"--portrait-scale":0.8,"--portrait-shift":0,"--motion-fit-x":1.290848,"--motion-fit-y":1.432836,"--motion-floor":0.048509,"--motion-center":0},
+    'crocodile-crossguild': {"--atlas-scale":0.695652,"--atlas-shift":0,"--portrait-scale":0.717391,"--portrait-shift":0,"--motion-fit-x":1.432836,"--motion-fit-y":1.432836,"--motion-floor":0.045371,"--motion-center":0},
+    'oden-whitebeard': {"--atlas-scale":0.820513,"--atlas-shift":0,"--portrait-scale":0.846154,"--portrait-shift":0,"--motion-fit-x":1.22313,"--motion-fit-y":1.22313,"--motion-floor":0.050262,"--motion-center":0},
+    'oden-roger': {"--atlas-scale":0.914286,"--atlas-shift":0,"--portrait-scale":0.942857,"--portrait-shift":0,"--motion-fit-x":1.102001,"--motion-fit-y":1.245829,"--motion-floor":0.053935,"--motion-center":0},
+    'teach-whitebeard': {"--atlas-scale":0.695652,"--atlas-shift":0.001812,"--portrait-scale":0.717391,"--portrait-shift":0.001868,"--motion-fit-x":1.432836,"--motion-fit-y":1.432836,"--motion-floor":0.045371,"--motion-center":0.001812},
+    'law-donquixote': {"--atlas-scale":0.695652,"--atlas-shift":0.001812,"--portrait-scale":0.717391,"--portrait-shift":0.001868,"--motion-fit-x":1.432836,"--motion-fit-y":1.432836,"--motion-floor":0.045371,"--motion-center":0.001812},
+    'shanks-roger': {"--atlas-scale":0.695652,"--atlas-shift":0,"--portrait-scale":0.717391,"--portrait-shift":0,"--motion-fit-x":1.432836,"--motion-fit-y":1.432836,"--motion-floor":0.045371,"--motion-center":0},
+    'buggy-roger': {"--atlas-scale":0.695652,"--atlas-shift":0.001812,"--portrait-scale":0.717391,"--portrait-shift":0.001868,"--motion-fit-x":1.432836,"--motion-fit-y":1.432836,"--motion-floor":0.045371,"--motion-center":0.001812},
+    'buggy-crossguild': {"--atlas-scale":0.757396,"--atlas-shift":0,"--portrait-scale":0.781065,"--portrait-shift":0,"--motion-fit-x":1.32085,"--motion-fit-y":1.32085,"--motion-floor":0.04779,"--motion-center":0},
+    'hachi-sun': {"--atlas-scale":0.695652,"--atlas-shift":0.001812,"--portrait-scale":0.717391,"--portrait-shift":0.001868,"--motion-fit-x":1.432836,"--motion-fit-y":1.432836,"--motion-floor":0.045371,"--motion-center":0.001812},
+    'galdino-crossguild': {"--atlas-scale":0.775758,"--atlas-shift":0,"--portrait-scale":0.8,"--portrait-shift":0,"--motion-fit-x":1.290848,"--motion-fit-y":1.432836,"--motion-floor":0.048509,"--motion-center":0},
+    'dazbones-crossguild': {"--atlas-scale":0.695652,"--atlas-shift":0.001812,"--portrait-scale":0.717391,"--portrait-shift":0.001868,"--motion-fit-x":1.432836,"--motion-fit-y":1.432836,"--motion-floor":0.045371,"--motion-center":0.001812},
+    'izo-kozuki': {"--atlas-scale":0.723164,"--atlas-shift":0,"--portrait-scale":0.745763,"--portrait-shift":0,"--motion-fit-x":1.380678,"--motion-fit-y":1.432836,"--motion-floor":0.046449,"--motion-center":0},
+    'praline-sun': {"--atlas-scale":0.695652,"--atlas-shift":0.001812,"--portrait-scale":0.717391,"--portrait-shift":0.001868,"--motion-fit-x":1.432836,"--motion-fit-y":1.432836,"--motion-floor":0.045371,"--motion-center":0.001812},
+    'inuarashi-kozuki': {"--atlas-scale":0.723164,"--atlas-shift":0,"--portrait-scale":0.745763,"--portrait-shift":0,"--motion-fit-x":1.380678,"--motion-fit-y":1.432836,"--motion-floor":0.046449,"--motion-center":0},
+    'nekomamushi-kozuki': {"--atlas-scale":0.744186,"--atlas-shift":0,"--portrait-scale":0.767442,"--portrait-shift":0,"--motion-fit-x":1.343313,"--motion-fit-y":1.432836,"--motion-floor":0.047272,"--motion-center":0},
+    'drake-beasts': {"--atlas-scale":0.739884,"--atlas-shift":0,"--portrait-scale":0.763006,"--portrait-shift":0,"--motion-fit-x":1.350793,"--motion-fit-y":1.350793,"--motion-floor":0.047104,"--motion-center":0},
+    'newgate-young': {"--atlas-scale":1.147259,"--atlas-shift":0,"--portrait-scale":1.010886,"--portrait-shift":-0.002633,"--motion-fit-x":0.966089,"--motion-fit-y":1.192912,"--motion-floor":0.015625,"--motion-center":0},
+    'bigmom-young': {"--atlas-scale":1.114245,"--atlas-shift":-0.002902,"--portrait-scale":1.010886,"--portrait-shift":0,"--motion-fit-x":1.374282,"--motion-fit-y":1.067396,"--motion-floor":0.015625,"--motion-center":-0.002902},
+    'kaido-young': {"--atlas-scale":1.312542,"--atlas-shift":-0.003418,"--portrait-scale":1.010886,"--portrait-shift":0,"--motion-fit-x":0.847655,"--motion-fit-y":1.192324,"--motion-floor":0.015625,"--motion-center":-0.003418},
+    'shiki-young': {"--atlas-scale":1.1264,"--atlas-shift":0,"--portrait-scale":0.924841,"--portrait-shift":0,"--motion-fit-x":0.983429,"--motion-fit-y":1.240747,"--motion-floor":0.015625,"--motion-center":0},
+    'john-young': {"--atlas-scale":0.998582,"--atlas-shift":-0.0026,"--portrait-scale":0.918987,"--portrait-shift":0,"--motion-fit-x":1.144422,"--motion-fit-y":1.186806,"--motion-floor":0.015629,"--motion-center":-0.0026},
+    'sanji-raid': {"--atlas-scale":0.901408,"--atlas-shift":0,"--portrait-scale":0.835443,"--portrait-shift":-0.002176,"--motion-fit-x":1.219538,"--motion-fit-y":1.432836,"--motion-floor":0.015871,"--motion-center":0}
+  };
+
+  // Battle layout reads motion bounds on the wrapper, not its sprite child.
+  safe(() => {
+    const style = document.createElement('style');
+    style.textContent = Object.entries(crewSpriteMetrics).map(([id, metrics]) => {
+      const bounds = Object.entries(metrics).filter(([property]) => property.startsWith('--motion-'));
+      return `.fcard-sprite .sprite:has(> .dex-sprite[data-sprite-id="${id}"]){${bounds.map(([property, value]) => `${property}:${value};`).join('')}}`;
+    }).join('\n');
+    document.head.appendChild(style);
+  });
+
   charIcon = function(id, px = 26, crewId = null) {
     if (!Object.hasOwn(CHARS, id) || !/^[a-zA-Z0-9_-]+$/.test(id)) {
       return originalIcon.apply(this, arguments);
     }
     const size = Number.isFinite(Number(px)) ? Math.max(12, Math.min(256, Number(px))) : 26;
     const spriteId = crewSkinFor(id, crewId) || CHARS[id].spriteId || id;
-    return `<span class="dex-sprite" role="img" aria-label="${escape(CHARS[id].name)}" data-character="${id}" style="--sprite-size:${size}px;--sprite-atlas:url('/art/characters/${spriteId}.png');--sprite-portrait:url('/art/portraits/${spriteId}.png')"></span>`;
+    const metrics = Object.entries(crewSpriteMetrics[spriteId] || {}).map(([property, value]) => `${property}:${value};`).join('');
+    return `<span class="dex-sprite" role="img" aria-label="${escape(CHARS[id].name)}" data-character="${id}" data-sprite-id="${spriteId}" style="--sprite-size:${size}px;${metrics}--sprite-atlas:url('/art/characters/${spriteId}.png');--sprite-portrait:url('/art/portraits/${spriteId}.png')"></span>`;
   };
 
   function safe(present) {

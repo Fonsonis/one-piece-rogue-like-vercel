@@ -799,6 +799,10 @@
     active.get(owner)?.cancel();while(active.size>=2)active.values().next().value.cancel();
     const reduced=globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches||false;
     const visualProfile=basic&&profile.id==='luffy5'?{...profile,normalAttack:true}:profile;
+    const sourceSprite=source.matches?.('.dex-sprite')?source:source.querySelector?.('.dex-sprite');
+    const targetSprite=target!==source?target.querySelector?.('.dex-sprite'):null;
+    const sourceId=sourceSprite?.dataset.spriteId || profile.id;
+    const targetId=targetSprite?.dataset.spriteId || targetSprite?.dataset.character;
     const duration=reduced?650:(preview?2100:Math.max(850,1650/Math.max(1,speed)));
     const el=document.createElement('div');el.className='ultimate-scene';el.setAttribute('aria-hidden','true');
     el.dataset.character=profile.id;el.dataset.family=profile.family;el.dataset.motion=profile.motion;
@@ -806,7 +810,7 @@
     el.style.setProperty('--ultimate-color',profile.color);
     const canvas=document.createElement('canvas');el.appendChild(canvas);
     const cutin=document.createElement('div');cutin.className='ultimate-cutin';
-    const portraitId=typeof CHARS !== 'undefined' ? CHARS[profile.id]?.spriteId || profile.id : profile.id;
+    const portraitId=typeof CHARS !== 'undefined' ? CHARS[sourceId]?.spriteId || sourceId : sourceId;
     const portrait=document.createElement('img');portrait.alt='';portrait.src='/art/portraits/'+portraitId+'.png';portrait.onerror=()=>cutin.remove();
     cutin.appendChild(portrait);el.appendChild(cutin);
     const title=document.createElement('div');title.className='ultimate-technique';
@@ -814,8 +818,6 @@
     const technique=document.createElement('strong');technique.textContent=profile.technique;title.append(name,technique);el.appendChild(title);
     (source.closest('.overlay')||document.body).appendChild(el);
     let ctx;try{ctx=canvas.getContext('2d');}catch{el.remove();return null;}if(!ctx){el.remove();return null;}
-    const sourceSprite=source.matches?.('.dex-sprite')?source:source.querySelector?.('.dex-sprite');
-    const targetSprite=target!==source?target.querySelector?.('.dex-sprite'):null;
     let sprite=null,enemyImage=null,ready=false,frame=0,timer=0,start=null,last=-100,closed=false;
     let finish;
     const finished = new Promise(resolve => { finish = resolve; });
@@ -823,7 +825,7 @@
     const cancel=()=>{if(closed)return;closed=true;cancelAnimationFrame(frame);clearTimeout(timer);restore();restoreEnemy();el.remove();if(active.get(owner)===handle)active.delete(owner);finish();};
     const handle={cancel,source,basic,finished};active.set(owner,handle);
     // Hide the in-place sprite only after its replacement has loaded successfully.
-    Promise.all([loadSprite(profile.id,basic?'attack':'ultimate'),targetSprite?.dataset.character?loadSprite(targetSprite.dataset.character):null]).then(([own,enemy])=>{
+    Promise.all([loadSprite(sourceId,basic?'attack':'ultimate'),targetId?loadSprite(targetId):null]).then(([own,enemy])=>{
       if(closed)return;if(!own){cancel();return;}sprite=own;enemyImage=enemy;ready=true;
       restore=hide(sourceSprite);if(enemy)restoreEnemy=hide(targetSprite);
     }).catch(cancel);
