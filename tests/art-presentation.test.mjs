@@ -22,6 +22,7 @@ test('interface atlases and the home Cross Guild icon use compact WebP assets',(
 function harness(withArt, brokenAnimation = false) {
   let seed = 81372, randomCalls = 0, animations = 0;
   const animationFrames = [];
+  const styles = [];
   const memory = new Map(), nodes = new Map();
   function node() {
     return {
@@ -41,6 +42,7 @@ function harness(withArt, brokenAnimation = false) {
     console, Math: math,
     window: { matchMedia: () => ({ matches: false }) },
     document: {
+      head: {appendChild(style) {styles.push(style.textContent);}},
       querySelector: () => node(), addEventListener() {},
       createElement: () => node(),
       getElementById(id) { if (!nodes.has(id)) nodes.set(id, node()); return nodes.get(id); }
@@ -62,7 +64,7 @@ function harness(withArt, brokenAnimation = false) {
     scheduleRound = () => {};
   `, ctx);
   if (withArt) vm.runInContext(art, ctx);
-  return { ctx, stats: () => ({ randomCalls, animations, animationFrames }) };
+  return { ctx, styles, stats: () => ({ randomCalls, animations, animationFrames }) };
 }
 
 test('art adapter preserves every character’s attacks, ultimates, RNG and persistent state', () => {
@@ -123,6 +125,21 @@ test('Dex discovery rules are preserved and every known character resolves to it
     assert.ok(html.includes(`url('/art/portraits/${id}.png')`),id);
     assert.ok(html.includes('role="img"') && html.includes('aria-label='),id);
   }
+});
+
+test('crew variants expose their visual identity and use skin-specific geometry', () => {
+  const {ctx,styles}=harness(true);
+  const icons=vm.runInContext(`Object.entries(CREW_SKINS).flatMap(([id,crews])=>Object.entries(crews).map(([crew,skin])=>({id,skin,html:charIcon(id,64,crew)})))`,ctx);
+  for(const {id,skin,html} of icons) {
+    assert.ok(html.includes(`data-character="${id}"`),skin);
+    assert.ok(html.includes(`data-sprite-id="${skin}"`),skin);
+    assert.ok(html.includes(`url('/art/characters/${skin}.png')`),skin);
+    assert.ok(html.includes('--atlas-scale:'),skin);
+    assert.ok(html.includes('--motion-fit-y:'),skin);
+    assert.ok(styles.some(css=>css.includes(`.sprite:has(> .dex-sprite[data-sprite-id="${skin}"])`)),`Battle wrapper bounds: ${skin}`);
+  }
+  const croco=icons.find(icon=>icon.skin==='crocodile-crossguild');
+  assert.ok(Number(croco.html.match(/--atlas-scale:([\d.]+)/)[1])<0.8,'Tall CrossGuild artwork must not inherit the base scale');
 });
 
 test('complete Dex art coverage has four distinct transparent frames per character', () => {
