@@ -1320,7 +1320,7 @@ const SAGA_DEFS = [
   { id: 'marineford', name: 'MARINEFORD', img: 'Images/portada-saga-marine-fort.jpg', color: '#c45a5a', islands: [
     ['Amazon Lily', ['sadie', 'domino']], ['Impel Down Nv1-3', ['saldeath', 'minotauros', 'hannyabal']],
     ['Impel Down Nv4-6', ['magellan']], ['Bahía de Marineford', ['momonga', 'onigumo', 'johngiant']],
-    ['Plaza Ejecución', ['strawberry', 'doberman', 'sengoku']],
+    ['Plaza Ejecución', ['akainu', 'kizaru', 'aokiji', 'sengoku']],
   ]},
   { id: 'gyojin', name: 'ISLA GYOJIN', img: 'Images/portada-saga-gyogin.jpg', color: '#3fbfae', islands: [
     ['Bosque Marino', ['hammond', 'hyouzou']], ['Distrito Gyojin', ['dosun', 'zeo', 'daruma']],
@@ -1782,7 +1782,7 @@ const SAGAS = SAGA_DEFS.map((d, i) => {
   // Insertar Sabaody no eleva los niveles de las sagas que ya existían.
   const originalOrder=['eastblue','alabasta','skypiea','water7','thriller','marineford','gyojin','dressrosa','wholecake','wano','egghead','elbaph'];
   const difficultyIndex=({sabaody:4.5,punkhazard:7,zou:7.5})[d.id] ?? originalOrder.indexOf(d.id);
-  const startLvl = Math.round(8 + 7 * difficultyIndex + (difficultyIndex >= 3 ? Math.pow(difficultyIndex - 2, 2.2) * 2.2 : 0));
+  const startLvl = d.id === 'marineford' ? 100 : Math.round(8 + 7 * difficultyIndex + (difficultyIndex >= 3 ? Math.pow(difficultyIndex - 2, 2.2) * 2.2 : 0));
   const totalIslands = d.islands.length;
   const mobs = Object.keys(CHARS).filter(id =>
     CHARS[id].saga === d.id && (!CHARS[id].boss || CHARS[id].rareza === 5) && !CHARS[id].nakama && !EVOLVED_FORMS.has(id));

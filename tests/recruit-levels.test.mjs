@@ -24,13 +24,16 @@ test('recruitment uses the highest base level available to the player', () => {
   h.exec("wildEncounter(makeChar('zoro',90,true))");
   nodes.get('#we-pay').onclick();
   assert.equal(h.exec('run.team.find(f=>f.id===\'zoro\').lvl'), 20);
+  assert.equal(h.exec("meta.roster.includes('zoro')"), false, 'wild recruits remain pending');
 
   h.exec(`MYSTERY_EVENTS.splice(0,MYSTERY_EVENTS.length,MYSTERY_EVENTS.find(e=>e.kind==='recruit'));
     doMystery({lvl:[90,100],pool:['nami']});`);
   assert.equal(h.exec("run.team.find(f=>f.id==='nami').lvl"), 20);
+  assert.equal(h.exec("meta.roster.includes('nami')"), true, 'accepted mystery recruits are permanent');
 
   h.exec("specialJoin('sanji',100)");
   assert.equal(h.exec("run.team.find(f=>f.id==='sanji').lvl"), 20);
+  assert.equal(h.exec("meta.roster.includes('sanji')"), true, 'Cross Guild recruits are permanent');
 
   h.exec("meta.sagaDiffWins={eastblue:{3:true},alabasta:{3:true}};specialJoin('chopper',100)");
   assert.ok(h.exec('maxStartLvlCap()') > 15);
