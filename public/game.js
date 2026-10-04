@@ -1125,7 +1125,15 @@ function registerRecruit(id) {
   registerDex(id);
   if (!meta.recruited.includes(id)) { meta.recruited.push(id); saveMeta(); }
 }
-// Los reclutas de la banda actual solo son permanentes al completar la isla.
+function registerPermanentRecruit(id) {
+  registerRecruit(id);
+  const base = baseFormOf(id);
+  if (!meta.roster.includes(base)) {
+    meta.roster.push(base);
+    saveMeta();
+  }
+}
+// Los reclutas de pirata salvaje pendientes se hacen permanentes al completar la isla.
 function unlockRoster(allowBosses = true) {
   const added = [];
   if (!run?.islandComplete) return added;
@@ -3939,7 +3947,7 @@ function enterWorldIsland() {
   if(!state.available)return;
   if(state.active){screenMap();return;}
   const choose=()=>screenStarter(sagaIdx,index);
-  if(run)modalConfirm('🧭 ¿Preparar otra expedición?', 'Al zarpar sustituirás el viaje en curso. Los reclutas de una isla sin completar aún no son permanentes.', choose);
+  if(run)modalConfirm('🧭 ¿Preparar otra expedición?', 'Al zarpar sustituirás el viaje en curso. Los reclutas de pirata salvaje de una isla sin completar aún no son permanentes.', choose);
   else choose();
 }
 
@@ -5610,7 +5618,7 @@ function doMystery(island, automaticLoot = autoMode) {
         addToTeam(f, ok => {
           if (ok) {
             if (run.mode === 'nuzlocke') run.nuzCaught[run.islandIdx] = true;
-            registerRecruit(id); saveRun();
+            registerPermanentRecruit(id); saveRun();
             modalInfo('❓ ¡Nuevo nakama!', `${eventArt}<div class="reward-list">${ev.text}<br><br><span style="font-size:30px">${charIcon(id, 40)}</span><br><b>${CHARS[id].name}</b> Nv${f.lvl}<br>${dexStatus}</div>`, screenMap);
           } else {
             run.berries += 100; saveRun();
@@ -6366,14 +6374,14 @@ function specialBlockedReason() {
 function specialJoin(id, lvl, dexStatus = recruitDexStatusHTML(id)) {
   const recLvl = recruitLevelForPlayer();
   const f = applyUpgrades(makeChar(id, recLvl));
+  registerPermanentRecruit(id);
   addToTeam(f, ok => {
     if (ok) {
       if (run.mode === 'nuzlocke') run.nuzCaught[run.islandIdx] = true;
-      registerRecruit(id);
       saveRun();
       modalInfo('🎉 ¡Nuevo nakama!', `<div class="reward-list"><span style="font-size:34px;">${charIcon(id, 44)}</span><br><b>${CHARS[id].name}</b> Nv${recLvl} se une a tu banda.<br>${dexStatus}</div>`, screenMap);
     } else {
-      modalInfo('🌊 Trato deshecho', '<div class="reward-list">Dejas marchar al recluta. Lo pagado no se devuelve: negocios son negocios.</div>', screenMap);
+      modalInfo('📦 Nakama en el inventario', '<div class="reward-list">No añades al recluta a la banda de esta partida, pero ya lo tienes en tu inventario permanente.</div>', screenMap);
     }
   });
 }
