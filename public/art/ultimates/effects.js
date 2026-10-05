@@ -623,7 +623,6 @@
   });
 
   function loadSprite(id, presentation='base') {
-    id = typeof CHARS !== 'undefined' ? CHARS[id]?.spriteId || id : id;
     if(!/^[a-zA-Z0-9_-]+$/.test(id))return Promise.resolve(null);
     const path=presentation==='attack'&&id==='luffy5'
       ? '/art/characters/attacks/luffy5.png'
@@ -650,6 +649,16 @@
     const envelope=Math.sin(Math.PI*attack), reach=ease(attack/.38)*returnHome;
     const m={pose:t<.08||t>.94?0:t<.27||t>.76?1:2,travel:0,lift:0,angle:0,stretch:0,scale:1,echoes:0,alpha:1};
     if(reduced){m.pose=2;return m;}
+    if(p.id==='teach-yonko'){
+      // Pull the rival into darkness, then unleash two earthquake impacts.
+      const charge=between(t,.08,.28), strike=between(t,.30,.75);
+      const wave=Math.sin(Math.PI*strike*2);
+      m.pose=t<.08||t>.94?0:t<.30?1:2;
+      m.travel=.22*reach;m.scale=1+.18*envelope;
+      m.angle=strike>0&&strike<1?wave*.12:-.06*Math.sin(Math.PI*charge);
+      m.lift=Math.abs(wave)*envelope*.06;m.echoes=strike>0&&strike<1?2:0;
+      return m;
+    }
     if(p.id==='luffy5'&&p.normalAttack){
       m.travel=.72*ease(between(t,.31,.48))*returnHome;
       m.lift=.06*envelope;m.angle=-.08*envelope;
@@ -801,8 +810,10 @@
     const visualProfile=basic&&profile.id==='luffy5'?{...profile,normalAttack:true}:profile;
     const sourceSprite=source.matches?.('.dex-sprite')?source:source.querySelector?.('.dex-sprite');
     const targetSprite=target!==source?target.querySelector?.('.dex-sprite'):null;
-    const sourceId=sourceSprite?.dataset.spriteId || profile.id;
-    const targetId=targetSprite?.dataset.spriteId || targetSprite?.dataset.character;
+    const characterSpriteId=id=>typeof CHARS !== 'undefined'?CHARS[id]?.spriteId||id:id;
+    // Dataset sprite IDs already identify an atlas; never resolve them as character IDs again.
+    const sourceId=sourceSprite?.dataset.spriteId || characterSpriteId(profile.id);
+    const targetId=targetSprite?.dataset.spriteId || characterSpriteId(targetSprite?.dataset.character);
     const duration=reduced?650:(preview?2100:Math.max(850,1650/Math.max(1,speed)));
     const el=document.createElement('div');el.className='ultimate-scene';el.setAttribute('aria-hidden','true');
     el.dataset.character=profile.id;el.dataset.family=profile.family;el.dataset.motion=profile.motion;
@@ -810,7 +821,7 @@
     el.style.setProperty('--ultimate-color',profile.color);
     const canvas=document.createElement('canvas');el.appendChild(canvas);
     const cutin=document.createElement('div');cutin.className='ultimate-cutin';
-    const portraitId=typeof CHARS !== 'undefined' ? CHARS[sourceId]?.spriteId || sourceId : sourceId;
+    const portraitId=sourceId;
     const portrait=document.createElement('img');portrait.alt='';portrait.src='/art/portraits/'+portraitId+'.png';portrait.onerror=()=>cutin.remove();
     cutin.appendChild(portrait);el.appendChild(cutin);
     const title=document.createElement('div');title.className='ultimate-technique';

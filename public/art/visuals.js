@@ -19,6 +19,8 @@
   // Alpha-bound metrics from scripts/measure-crew-sprite-metrics.py.
   // Crew skins retain their own geometry without changing the fighter's identity.
   const crewSpriteMetrics = {
+    'teach': {"--atlas-scale":0.9696969696969697,"--atlas-shift":0,"--portrait-scale":0.8354430379746836,"--portrait-shift":0,"--motion-fit-x":0.7214872797605792,"--motion-fit-y":1.0513961100069789,"--motion-floor":0.14389493034591302,"--motion-center":0},
+    'teach-jaya': {"--atlas-scale":1.258119658119658,"--atlas-shift":0,"--portrait-scale":0.960759493670886,"--portrait-shift":0,"--motion-fit-x":0.5660279127613724,"--motion-fit-y":0.8534675942130038,"--motion-floor":0.18130342244879996,"--motion-center":0},
     'aokiji-blackbeard': {"--atlas-scale":0.834783,"--atlas-shift":0,"--portrait-scale":0.86087,"--portrait-shift":0,"--motion-fit-x":1.203008,"--motion-fit-y":1.203008,"--motion-floor":0.050821,"--motion-center":0},
     'robin-straw': {"--atlas-scale":0.695652,"--atlas-shift":0,"--portrait-scale":0.717391,"--portrait-shift":0,"--motion-fit-x":1.432836,"--motion-fit-y":1.432836,"--motion-floor":0.045371,"--motion-center":0},
     'robin-baroque': {"--atlas-scale":0.695652,"--atlas-shift":0,"--portrait-scale":0.717391,"--portrait-shift":0,"--motion-fit-x":1.432836,"--motion-fit-y":1.432836,"--motion-floor":0.045371,"--motion-center":0},

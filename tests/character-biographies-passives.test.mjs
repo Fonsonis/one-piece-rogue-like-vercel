@@ -2,9 +2,9 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {combatHarness} from './balance-harness.mjs';
 
-test('only displayed four and five star forms have passive rules and effects', () => {
+test('Chopper heals in every form; other passive rules start at four stars', () => {
   const h = combatHarness();
-  assert.equal(h.exec(`Object.entries(CHARS).every(([id,c]) => c.rareza >= 4 || !passiveRule({id}).name)`), true);
+  assert.equal(h.exec(`Object.entries(CHARS).every(([id,c]) => c.rareza >= 4 || baseFormOf(id)==='chopper' || !passiveRule({id}).name)`), true);
   assert.equal(h.exec(`!!passiveRule({id:'luffy'}).name`), false);
   assert.equal(h.exec(`!!passiveRule({id:'luffy4'}).name`), true);
   assert.equal(h.exec(`!!passiveRule({id:'zoro'}).name`), false);

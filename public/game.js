@@ -6814,7 +6814,7 @@ const PASSIVES = {
   nami: { name:'Lectura Meteorológica', desc:'+10 puntos de evasión a los aliados vivos.' },
   usopp: { name:'Disparo Preparado', desc:'+30% de velocidad en la primera ronda.', openingSpeed:1.3 },
   sanji: { name:'Tenacidad del Cocinero', desc:'Reduce un 15% todo el daño de ataques recibido.' },
-  chopper: { name:'Médico de la Banda', desc:'Recupera un 3% de sus PS por ronda; el Clímax reduce la curación.', regen:.03 },
+  chopper: { name:'Médico de la Banda', desc:'Desde la reserva, cura al aliado activo un 10% del daño de sus ataques acertados. Si está activo, se cura a sí mismo. Con su reliquia cura un 50%. El Clímax reduce la curación.' },
   robin: { name:'Ojos en Todas Partes', desc:'+10 puntos de probabilidad de crítico.', critical:.10 },
   franky: { name:'Armadura Frontal', desc:'Los ataques recibidos no pueden ser críticos.' },
   brook: { name:'Segunda Vida', desc:'Revive una vez por viaje con el 20% de PS. No revive aliados en Nuzlocke.' },
@@ -6864,7 +6864,7 @@ const PASSIVES = {
   im: { name:'Sombra del Trono', desc:'+25% de daño de Oscuridad y Haki. Interpretación para el juego.', types:{Oscuridad:1.25,Haki:1.25} },
   xebec: { name:'Furia Salvaje', desc:'+25% de ataque.', attack:1.25 },
 };
-const passiveRule = f => (CHARS[f.id]?.rareza || 0) >= 4 ? PASSIVES[f.id] || PASSIVES[baseFormOf(f.id)] || {} : {};
+const passiveRule = f => (CHARS[f.id]?.rareza || 0) >= 4 || isP(f,'chopper') ? PASSIVES[f.id] || PASSIVES[baseFormOf(f.id)] || {} : {};
 const hasPassive = (f,id) => isP(f,id) && !!passiveRule(f).name;
 function passiveInfo(f) {
   const rule = passiveRule(f);
@@ -7743,6 +7743,22 @@ function popDamageCard(card, text, color) {
   setTimeout(() => { p.remove(); sprite.classList.remove('shake'); }, 800);
 }
 
+function healChopperOnHit(att, damage) {
+  if (!battle || att.hp <= 0 || !(damage > 0)) return;
+  const team = teamOf(att);
+  const medics = team.filter(f => f.hp > 0 && hasPassive(f,'chopper'));
+  if (!medics.length) return;
+  const active = battle.pTeam.includes(att) ? battle.curP : battle.curE;
+  if (!active || active.hp <= 0 || att !== active) return;
+  const opposingTeam = battle.pTeam.includes(att) ? battle.eTeam : battle.pTeam;
+  if (synergyTier(opposingTeam,'Oscuridad') === 2) return;
+  const rate = Math.max(...medics.map(f => relicRule(f).hitHeal || .10));
+  const heal = Math.min(active.maxhp - active.hp, Math.floor(damage * rate * healScaleNow()));
+  if (heal <= 0) return;
+  active.hp += heal;
+  log(`💊 Chopper cura a ${charName(active)} (+${heal} PS).`);
+}
+
 function attackWith(att, dfd, mv, targetSide) {
   if (!mv) return; // guardia: sin movimiento válido, se salta el ataque
   const attName = charName(att);
@@ -7804,7 +7820,9 @@ function attackWith(att, dfd, mv, targetSide) {
     log(`${attName} usa <b>${mv.name}</b>... ¡pero no le afecta! ✨`);
     return;
   }
+  const damageDealt = Math.min(dfd.hp, dmg);
   dfd.hp = Math.max(0, dfd.hp - dmg);
+  if (damageDealt > 0) healChopperOnHit(att, damageDealt);
   dfd.st ||= {};
   if (dmg > 0) dfd.st.receivedHit = true;
   if (passiveRule(att).slow) dfd.st.slow = 2;
@@ -9075,8 +9093,6 @@ function screenShip() {
 
     container.querySelectorAll('[data-up]').forEach(btn => {
       btn.onclick = () => {
-        if (Date.now() - shipBuyLock < 300) return;
-        shipBuyLock = Date.now();
         const id = btn.dataset.up;
         const stat = btn.dataset.stat;
         const u = meta.upgrades[id] = meta.upgrades[id] || {};
@@ -9296,7 +9312,7 @@ const SIGNATURE_RELICS = {
   nami: ['Aguja del Clima-Tact','🌩️','Pronóstico perfecto','+25% de daño de Rayo y +10 puntos de evasión.', {type:'Rayo',damage:1.25,evasion:.10}],
   usopp: ['Semilla del francotirador','🌱','Disparo preparado','+35% de daño contra rivales con todos sus PS.', {openingDamage:1.35}],
   sanji: ['Encendedor del All Blue','🔥','Pasión del cocinero','+25% de daño de Fuego; recupera 3% de PS por ronda.', {type:'Fuego',damage:1.25,regen:.03}],
-  chopper: ['Recetario de Hiriluk','💊','Medicina milagrosa','Cura 4% de los PS de cada aliado participante por ronda.', {teamRegen:.04}],
+  chopper: ['Recetario de Hiriluk','💊','Medicina milagrosa','Desde la reserva, Chopper cura al aliado activo un 50% del daño de sus ataques acertados. Si está activo, se cura a sí mismo. El Clímax reduce la curación.', {hitHeal:.50}],
   robin: ['Fragmento de Ohara','📜','Conocimiento prohibido','Los ataques especiales ignoran 25% de defensa especial.', {specialPierce:.25}],
   franky: ['Reserva de cola','🥤','Superblindaje','Recibe 20% menos daño con más del 50% de PS.', {healthyReduction:.80}],
   brook: ['Tone Dial de Laboon','🎻','Canción de regreso','Empieza cada combate con 68% de carga de Ultimate.', {charge:68}],

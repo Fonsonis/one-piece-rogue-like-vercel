@@ -10079,5 +10079,56 @@
     ],
     "atlasScale": 0.9333333333333333,
     "portraitScale": 0.8772151898734177
+  },
+  "hyogoro-muscled": {
+    "ratio": 1.25,
+    "guardBounds": [
+      33,
+      31,
+      160,
+      180
+    ],
+    "portraitBounds": [
+      29,
+      18,
+      164,
+      176
+    ],
+    "atlasScale": 1.0738255033557047,
+    "portraitScale": 1.0443037974683544
+  },
+  "teach-jaya": {
+    "ratio": 1.15,
+    "guardBounds": [
+      45,
+      63,
+      147,
+      180
+    ],
+    "portraitBounds": [
+      27,
+      18,
+      165,
+      176
+    ],
+    "atlasScale": 1.258119658119658,
+    "portraitScale": 0.960759493670886
+  },
+  "franky-newworld": {
+    "ratio": 1.15,
+    "guardBounds": [
+      51,
+      80,
+      142,
+      180
+    ],
+    "portraitBounds": [
+      24,
+      18,
+      168,
+      176
+    ],
+    "atlasScale": 1.472,
+    "portraitScale": 0.960759493670886
   }
 }

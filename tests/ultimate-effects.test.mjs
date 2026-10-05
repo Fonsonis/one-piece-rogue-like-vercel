@@ -99,7 +99,7 @@ function lifecycle(reduced=false,brokenCanvas=false) {
  const values=new Map();const sprite={dataset:{character:'zoro'},style:{setProperty(k,v){values.set(k,v);},getPropertyValue(k){return values.get(k)||'';},getPropertyPriority(){return '';},removeProperty(k){values.delete(k);}},getBoundingClientRect(){return {left:5,top:100,right:185,bottom:280,width:180,height:180};}};
  const source={querySelector(){return sprite;},isConnected:true,closest(){return null;},getBoundingClientRect(){return {left:0,top:100,right:190,bottom:300,width:190,height:200};}};
  const target={...source,getBoundingClientRect(){return {left:200,top:100,right:390,bottom:300,width:190,height:200};}};
- return {sprite,images,recording,ready:async()=>{for(let i=0;i<5;i++)await Promise.resolve();},play:vm.runInContext('UltimateFX.play',c),profile:vm.runInContext("UltimateArtProfiles.resolve('zoro',{name:'Zoro'},{name:'Ashura'})",c),source,target,doc,
+ return {sprite,images,recording,exec:s=>vm.runInContext(s,c),ready:async()=>{for(let i=0;i<5;i++)await Promise.resolve();},play:vm.runInContext('UltimateFX.play',c),profile:vm.runInContext("UltimateArtProfiles.resolve('zoro',{name:'Zoro'},{name:'Ashura'})",c),source,target,doc,
  step(t){const q=[...rafs.values()];rafs.clear();q.forEach(fn=>fn(t));},nodes:()=>nodes,counts:()=>[nodes.length,rafs.size,timeouts.size]};
 }
 test('effects respect viewport bounds, cap concurrency and release timers and canvases',async()=>{
@@ -158,6 +158,20 @@ test('ultimate actors and cut-in retain the displayed crew variants',async()=>{
  assert.ok(h.images.some(image=>image.url==='/art/characters/robin-baroque.png'));
  assert.equal(portraits[0].src,'/art/portraits/crocodile-crossguild.png');
  handle.cancel();assert.deepEqual(h.counts(),[0,0,0]);
+});
+
+test('Emperor Kurohige keeps his atlas when its sprite ID is also the Jaya character ID',async()=>{
+ const h=lifecycle();
+ h.exec(`globalThis.CHARS={teach:{spriteId:'teach-jaya'},'teach-yonko':{spriteId:'teach'}};`);
+ h.sprite.dataset={character:'teach-yonko',spriteId:'teach'};
+ const portraits=[],create=h.doc.createElement;
+ h.doc.createElement=tag=>{const node=create(tag);if(tag==='img')portraits.push(node);return node;};
+ const handle=h.play({profile:{...h.profile,id:'teach-yonko'},source:h.source,target:h.target});
+ await h.ready();
+ assert.ok(h.images.some(image=>image.url==='/art/characters/ultimates/teach.png'));
+ assert.ok(!h.images.some(image=>image.url.includes('teach-jaya')));
+ assert.equal(portraits[0].src,'/art/portraits/teach.png');
+ handle.cancel();
 });
 
 test('reduced-motion mode is static and cleans up; interrupted screens cancel safely',async()=>{

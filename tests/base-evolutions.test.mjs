@@ -6,7 +6,7 @@ test('every evolution requires permanent level, journey level and its saga at th
  const h=combatHarness();
  h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));');
  const chains=JSON.parse(h.exec('JSON.stringify(Object.entries(CHARS).filter(([,c])=>c.evo).map(([id,c])=>[id,baseFormOf(id),c.evo.lvl,c.evo.to]))'));
- assert.equal(chains.length,126);
+ assert.equal(chains.length,129);
  for(const [id,base,level,to] of chains){
   if(to==='luffy4-boundman')h.exec("meta.formPreferences={luffyGear4:'luffy4-boundman'};");
   h.exec(`meta.charUpgrades={${base}:${level-6}};`);
@@ -29,8 +29,8 @@ test('the canonical saga catalog covers every evolution exactly once',()=>{
    taggedBases:Object.keys(CHARS).filter(id=>!BASE_OF[id]&&CHARS[id].unlockSaga),
   };
  })()`);
- assert.equal(audit.count,126);
- assert.equal(audit.unique,126);
+ assert.equal(audit.count,129);
+ assert.equal(audit.unique,129);
  assert.deepEqual(Array.from(audit.missing),[]);
  assert.deepEqual(Array.from(audit.invalid),[]);
  assert.deepEqual(Array.from(audit.taggedBases),[]);
@@ -71,13 +71,17 @@ test('player forms need saga, permanent level and journey level independently',(
  assert.equal(h.exec("makeChar('sanji',100).id"),'sanji-raid','permanent threshold remains intact');
 });
 
-test('Robin and Franky unlock their faithful level 40 combat forms and reserved techniques',()=>{
+test('Robin and Franky unlock their faithful combat forms and reserved techniques',()=>{
  const h=combatHarness();h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));meta.charUpgrades={robin:35,franky:35};');
  assert.equal(h.exec("makeChar('robin',39).id"),'robin');
  assert.equal(h.exec("makeChar('robin',39).moves.includes('demoniofleur')"),false);
  assert.equal(h.exec("makeChar('robin',40).id"),'robin-demoniofleur');
  assert.equal(h.exec("makeChar('robin',40).moves.includes('demoniofleur')"),true);
- assert.equal(h.exec("makeChar('franky',39).id"),'franky');
+ assert.equal(h.exec("makeChar('franky',29).id"),'franky');
+ assert.equal(h.exec("makeChar('franky',29).moves.includes('radicalbeam')"),false);
+ assert.equal(h.exec("makeChar('franky',30).id"),'franky-newworld');
+ assert.equal(h.exec("makeChar('franky',30).moves.includes('radicalbeam')"),true);
+ assert.equal(h.exec("makeChar('franky',39).id"),'franky-newworld');
  assert.equal(h.exec("makeChar('franky',40).id"),'franky-shogun');
  assert.equal(h.exec("makeChar('franky',40).moves.includes('generalcannon')"),true);
 });
