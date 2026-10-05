@@ -10130,5 +10130,56 @@
     ],
     "atlasScale": 1.472,
     "portraitScale": 0.960759493670886
+  },
+  "law-wano": {
+    "ratio": 1.05,
+    "guardBounds": [
+      59,
+      92,
+      134,
+      180
+    ],
+    "portraitBounds": [
+      29,
+      18,
+      164,
+      176
+    ],
+    "atlasScale": 1.5272727272727273,
+    "portraitScale": 0.8772151898734177
+  },
+  "kid-wano": {
+    "ratio": 1.15,
+    "guardBounds": [
+      60,
+      109,
+      133,
+      180
+    ],
+    "portraitBounds": [
+      15,
+      18,
+      177,
+      176
+    ],
+    "atlasScale": 2.073239436619718,
+    "portraitScale": 0.960759493670886
+  },
+  "coby-hachinosu": {
+    "ratio": 1.05,
+    "guardBounds": [
+      53,
+      68,
+      140,
+      180
+    ],
+    "portraitBounds": [
+      35,
+      18,
+      158,
+      176
+    ],
+    "atlasScale": 1.2,
+    "portraitScale": 0.8772151898734177
   }
 }

@@ -1643,6 +1643,20 @@ CHARS['ivankov-female']={...CHARS.ivankov,name:'Emporio Ivankov · Forma femenin
   desc:'Transformación hormonal mediante la Horu Horu no Mi. Requiere nivel base y en partida 30, además de alcanzar su saga de debut.'};
 CHARS.ivankov.evo={lvl:30,to:'ivankov-female'};
 
+// Despertares de Wano y el siguiente paso de Koby tras su entrenamiento con Garp.
+MOVES.puncturewille={name:'Puncture Wille',type:'Fruta',power:140,acc:.9};
+MOVES.damnedpunk={name:'Damned Punk',type:'Rayo',power:140,acc:.9};
+for(const [start,id,name,types,base,move,desc] of [
+  ['law','law-wano','Trafalgar Law · Wano',['Fruta','Corte'],[32,16,12,16],'puncturewille','El despertar de la Ope Ope extiende K-ROOM por Kikoku para liberar una onda de choque interna.'],
+  ['kid','kid-wano','Eustass Kid · Wano',['Fruta','Rayo'],[34,18,14,12],'damnedpunk','El despertar magnético reúne metal en un cañón electromagnético y desata Damned Punk.'],
+  ['coby2','coby-hachinosu','Koby · Hachinosu',['Golpe','Haki'],[32,20,15,19,14,18],'galaxyimpact','Koby lleva el entrenamiento de Garp a Hachinosu y desata Galaxy Impact. Adaptación de la técnica para el juego.'],
+]){
+  CHARS[id]={...CHARS[start],name,types,base,rareza:4,learnset:[[40,move]],ultimate:move,
+    evo:undefined,generated:false,formLevel:40,
+    desc:`${desc} Requiere nivel base y nivel en partida 40, además de alcanzar su saga de debut.`};
+  CHARS[start].evo={lvl:40,to:id};
+}
+
 // Recompensas de colección de las nuevas sagas, sin recalcular atributos existentes.
 CHARS.caesar.rareza=5;CHARS.caesar.bossLevelRarity=3;
 CHARS.zunesha.rareza=5;
@@ -1728,11 +1742,11 @@ const FORM_UNLOCK_SAGAS = Object.freeze({
     'luffy5','kaido-animal','kaido-hybrid','yamato-animal','yamato-hybrid','king-animal','king-hybrid','queen-animal','queen-hybrid',
     'drake-hybrid','orochi-animal','orochi-hybrid','jack-hybrid','ulti-animal','ulti-hybrid','pageone-animal','pageone-hybrid',
     'whoswho-animal','whoswho-hybrid','sasaki-animal','sasaki-hybrid','blackmaria-animal','blackmaria-hybrid','devon-animal','devon-hybrid',
-    'zoro-enma','zoro-kingofhell','nami-zeus','sanji-raid','sanji-ifrit','robin-demoniofleur','hyogoro-muscled',
+    'zoro-enma','zoro-kingofhell','nami-zeus','sanji-raid','sanji-ifrit','robin-demoniofleur','hyogoro-muscled','law-wano','kid-wano',
     'wanda-sulong','inuarashi-sulong','nekomamushi-sulong','shishilian-sulong','giovanni-sulong','concelot-sulong','roddy-sulong','blackback-sulong',
     'momonosuke-adult','momonosuke-dragon',
   ],
-  egghead: ['stronger-animal','lucci-awakened','kaku-awakened','bonney-nika','bepo-sulong','saturn-hybrid','saturn-beast','mars-beast','warcury-beast','nusjuro-hybrid','nusjuro-beast','jupeter-beast'],
+  egghead: ['coby-hachinosu','stronger-animal','lucci-awakened','kaku-awakened','bonney-nika','bepo-sulong','saturn-hybrid','saturn-beast','mars-beast','warcury-beast','nusjuro-hybrid','nusjuro-beast','jupeter-beast'],
   elbaph: [
     'loki-animal','killingham-animal','killingham-hybrid',
     'garp-young','roger-young','rayleigh-young','gaban-young','newgate-young','bigmom-young','kaido-young','shiki-young','xebec-young','garling-young',

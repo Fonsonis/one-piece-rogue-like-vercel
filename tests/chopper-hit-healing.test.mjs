@@ -57,7 +57,7 @@ test('ultimate hits heal once and round end does not grant the old Chopper regen
 });
 
 test('Chopper respects climax and darkness healing suppression and never revives the active',()=>{
-  for(const condition of ['battle.round=15','fighter.hp=0',`battle.eTeam.push(...['teach','moria','bigmom'].map(id=>makeChar(id,40,false,true)))`]) {
+  for(const condition of ['battle.combatProgress.stallRounds=14','fighter.hp=0',`battle.eTeam.push(...['teach','moria','bigmom'].map(id=>makeChar(id,40,false,true)))`]) {
     const h=setup({relic:true});
     h.exec(`${condition};healChopperOnHit(fighter,100)`);
     assert.equal(h.exec('fighter.hp'),condition==='fighter.hp=0'?0:100,condition);

@@ -15,7 +15,7 @@ function encounter(opts={boss:true}) {
   return h;
 }
 
-test('each successive enemy resets damage, healing and fatigue without resetting event turns',()=>{
+test('each successive enemy resets stagnation without resetting event turns',()=>{
   for(const opts of [{boss:true},{wild:true},{tower:true}]) {
     const h=opts.tower?combatHarness():encounter(opts);
     if(opts.tower)h.exec(`
@@ -23,26 +23,28 @@ test('each successive enemy resets damage, healing and fatigue without resetting
       tower={team:[player],items:{}};run={mode:'classic',saga:0,team:[player],items:{}};
       startBattle(foes,{tower:true});clearTimeout(battle.timer);player.maxhp=player.hp=10000;
     `);
-    h.exec('battle.round=40;foes[0].hp=0;afterRound()');
+    h.exec('battle.round=40;battle.combatProgress.stallRounds=30;foes[0].hp=0;afterRound()');
     assert.equal(h.exec('battle.round'),41);
     assert.equal(h.exec('battle.curE===foes[1]'),true);
     assert.equal(h.exec('combatRoundNow()'),1);
+    assert.equal(h.exec('combatStallRounds()'),0);
     assert.equal(h.exec('climaxDmgMult()'),1);
     assert.equal(h.exec('healScaleNow()'),1);
     const hp=h.exec('player.hp');
     h.exec('afterRound()');
     assert.equal(h.exec('player.hp'),hp,'new fight does not inherit previous fatigue');
     assert.equal(h.exec('combatRoundNow()'),2);
+    assert.equal(h.exec('combatStallRounds()'),1);
   }
 });
 
-test('boss damage growth is linear within a duel and never compounds into base stats',()=>{
+test('boss damage growth follows consecutive stagnation and never compounds into base stats',()=>{
   const h=encounter();
   h.exec('const before=JSON.stringify(foes[0]);');
   const baseline=h.exec('calcDamage(foes[0],player,MOVES.punetazo,false,1).dmg');
-  for(const round of [1,10,11,15,20,30]) {
-    h.exec(`battle.round=${round}`);
-    const expected=1+.1*Math.max(0,round-10);
+  for(const stalled of [0,9,10,14,19,29]) {
+    h.exec(`battle.combatProgress.stallRounds=${stalled}`);
+    const expected=1+.1*Math.max(0,stalled-9);
     assert.equal(h.exec('climaxDmgMult()'),expected);
     const damage=h.exec('calcDamage(foes[0],player,MOVES.punetazo,false,1).dmg');
     assert.ok(Math.abs(damage-baseline*expected)<=expected+1);
@@ -52,22 +54,52 @@ test('boss damage growth is linear within a duel and never compounds into base s
   const unscaled=h.exec(`(()=>{const round=battle.round;battle.round=1;
     const dmg=calcDamage(foes[1],player,MOVES.punetazo,false,1).dmg;battle.round=round;return dmg;})()`);
   assert.equal(h.exec('fresh'),unscaled,'next boss starts at its own unscaled damage');
-  h.exec('battle.round=battle.combatStartRound+19');
+  h.exec('battle.combatProgress.stallRounds=19');
   assert.equal(h.exec('climaxDmgMult()'),2);
   h.exec('foes[1].hp=0;afterRound()');
   assert.equal(h.exec('combatRoundNow()'),1);
+  assert.equal(h.exec('combatStallRounds()'),0);
   assert.equal(h.exec('climaxDmgMult()'),1);
 });
 
-test('remaining on the same enemy or manually relaying does not restart the duel',()=>{
+test('slow net progress keeps climax inactive for arbitrarily long fights',()=>{
   const h=encounter();
-  h.exec('battle.round=15;afterRound()');
-  assert.equal(h.exec('combatRoundNow()'),16);
-  h.exec('const reserve=makeChar("bandido",100);battle.pTeam.push(reserve);battle.curP=reserve;afterRound()');
-  assert.equal(h.exec('combatRoundNow()'),17);
+  for(let round=0;round<50;round++) {
+    h.exec('foes[0].hp-=1;afterRound()');
+    assert.equal(h.exec('combatStallRounds()'),0);
+    assert.equal(h.exec('climaxDmgMult()'),1);
+    assert.equal(h.exec('healScaleNow()'),1);
+  }
+  assert.equal(h.exec('combatRoundNow()'),51);
+});
+
+test('healing oscillations do not masquerade as progress and fatigue cannot reset itself',()=>{
+  const h=encounter();
+  h.exec('const full=foes[0].hp;foes[0].hp=full-10;afterRound()');
+  assert.equal(h.exec('combatStallRounds()'),0);
+  for(let round=0;round<10;round++) {
+    h.exec(`foes[0].hp=full-${round%2?5:0};afterRound()`);
+  }
+  assert.equal(h.exec('combatStallRounds()'),10);
+  assert.equal(h.exec('climaxDmgMult()'),1.1);
+  assert.equal(h.exec('healScaleNow()'),.8);
+  h.exec('battle.combatProgress.stallRounds=29;afterRound()');
+  assert.equal(h.exec('combatStallRounds()'),30);
+  const hp=h.exec('player.hp');
+  h.exec('afterRound()');
+  assert.equal(h.exec('combatStallRounds()'),31,'fatigue damage is absorbed into the floor without progress');
+  assert.ok(h.exec('player.hp')<hp);
+});
+
+test('remaining on the same enemy or manually relaying preserves stagnation',()=>{
+  const h=encounter();
+  h.exec('const reserve=makeChar("bandido",100);battle.pTeam.push(reserve);resetCombatProgress(battle);battle.combatProgress.stallRounds=12;afterRound()');
+  assert.equal(h.exec('combatStallRounds()'),13);
+  h.exec('battle.curP=reserve;afterRound()');
+  assert.equal(h.exec('combatStallRounds()'),14);
   h.exec('reserve.hp=0;afterRound()');
   assert.equal(h.exec('battle.curP===player'),true);
-  assert.equal(h.exec('combatRoundNow()'),18,'replacing a fallen ally keeps the same enemy duel');
+  assert.equal(h.exec('combatStallRounds()'),0,'a real new team HP minimum is progress, not a scope reset');
 });
 
 test('challenge and local sequential enemy replacements also restart climax',()=>{
@@ -78,10 +110,11 @@ test('challenge and local sequential enemy replacements also restart climax',()=
       const player=makeChar('bandido',100),foes=[makeChar('bandido',100,true),makeChar('bandido',100,true)];
       run={mode:'classic',saga:0,team:[player],items:{}};
       startBattle(foes,{...options,team:[player],items:{}});clearTimeout(battle.timer);
-      battle.round=20;foes[0].hp=0;afterRound();
+      battle.round=20;battle.combatProgress.stallRounds=20;foes[0].hp=0;afterRound();
     `);
     assert.equal(h.exec('battle.round'),21);
     assert.equal(h.exec('combatRoundNow()'),1);
+    assert.equal(h.exec('combatStallRounds()'),0);
     assert.equal(h.exec('healScaleNow()'),1);
   }
 });

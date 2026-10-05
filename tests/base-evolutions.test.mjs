@@ -6,7 +6,7 @@ test('every evolution requires permanent level, journey level and its saga at th
  const h=combatHarness();
  h.exec('maxStartLvlCap=()=>100;meta.sagaDiffWins=Object.fromEntries(SAGAS.map(s=>[s.id,{3:true}]));');
  const chains=JSON.parse(h.exec('JSON.stringify(Object.entries(CHARS).filter(([,c])=>c.evo).map(([id,c])=>[id,baseFormOf(id),c.evo.lvl,c.evo.to]))'));
- assert.equal(chains.length,129);
+ assert.equal(chains.length,132);
  for(const [id,base,level,to] of chains){
   if(to==='luffy4-boundman')h.exec("meta.formPreferences={luffyGear4:'luffy4-boundman'};");
   h.exec(`meta.charUpgrades={${base}:${level-6}};`);
@@ -29,8 +29,8 @@ test('the canonical saga catalog covers every evolution exactly once',()=>{
    taggedBases:Object.keys(CHARS).filter(id=>!BASE_OF[id]&&CHARS[id].unlockSaga),
   };
  })()`);
- assert.equal(audit.count,129);
- assert.equal(audit.unique,129);
+ assert.equal(audit.count,132);
+ assert.equal(audit.unique,132);
  assert.deepEqual(Array.from(audit.missing),[]);
  assert.deepEqual(Array.from(audit.invalid),[]);
  assert.deepEqual(Array.from(audit.taggedBases),[]);

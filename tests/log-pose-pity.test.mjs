@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {combatHarness} from './balance-harness.mjs';
 
-test('main-menu guarantee activates at 500 accumulated stars and resets after a legendary',()=>{
+test('main-menu guarantee activates at 1500 accumulated stars and resets after a legendary',()=>{
  const h=combatHarness();
  h.exec(`document.body={appendChild(){}};
  const posters=Array.from({length:5},()=>({classList:{toggle(){},add(){},remove(){}}}));
@@ -10,12 +10,24 @@ test('main-menu guarantee activates at 500 accumulated stars and resets after a 
  Math.random=()=>0;
  let awardedRarity;
  registerRecruit=id=>{awardedRarity=CHARS[id].rareza;};`);
- for(const [before,rarity,after] of [[499,1,500],[500,5,0],[750,5,0],[1000,5,0]]){
+ for(const [before,rarity,after] of [[1499,1,1500],[1500,5,0],[750,1,751],[1000,1,1001]]){
   h.exec(`meta.starPity=${before};startLogPoseGacha(SAGAS);`);
   h.exec('for(const poster of posters)poster.onclick?.();');
   assert.equal(h.exec('awardedRarity'),rarity);
   assert.equal(h.exec('meta.starPity'),after);
  }
+});
+
+test('special island posters use the shared 1500-star guarantee threshold',()=>{
+ const h=combatHarness();
+ h.exec(`const posters=Array.from({length:5},()=>({classList:{toggle(){},add(){},remove(){}},focus(){}}));
+ const host={isConnected:true,querySelectorAll:()=>posters,querySelector:()=>posters[0],className:''};
+ document.body={appendChild(){}};document.createElement=()=>host;saveMeta=()=>{};Math.random=()=>0;
+ run={saga:0,berries:0};`);
+ h.exec('meta.starPity=1499;renderSpecialGacha(20);');
+ assert.equal(h.exec('meta.starPity'),1500);
+ h.exec('meta.starPity=1500;renderSpecialGacha(20);');
+ assert.equal(h.exec('meta.starPity'),0);
 });
 
 function posterHarness() {
@@ -34,7 +46,7 @@ function posterHarness() {
 test('guaranteed legendary is the only missing one even when it has already been seen',()=>{
  const h=posterHarness();
  h.exec(`const missing=legendaryIds.at(-1);meta.roster=legendaryIds.filter(id=>id!==missing);
- meta.dex.push(missing);meta.starPity=500;startLogPoseGacha(SAGAS);
+ meta.dex.push(missing);meta.starPity=1500;startLogPoseGacha(SAGAS);
  for(const poster of posters)poster.onclick?.();`);
  assert.equal(h.exec('awardedId'),h.exec('missing'));
  assert.equal(h.exec('meta.starPity'),0);
@@ -45,7 +57,7 @@ test('completed selected sagas compensate without awarding duplicates or other s
  const h=posterHarness();
  h.exec(`const selected=SAGAS.find(s=>sagaBasePirateIds(s.id).some(id=>CHARS[id].rareza===5));
  meta.roster=sagaBasePirateIds(selected.id).filter(id=>CHARS[id].rareza===5);
- meta.logPoses=17;meta.starPity=500;startLogPoseGacha([selected]);`);
+ meta.logPoses=17;meta.starPity=1500;startLogPoseGacha([selected]);`);
  assert.equal(h.exec('awardedId'),null);
  assert.equal(h.exec('meta.logPoses'),1017);
  assert.equal(h.exec('meta.starPity'),0);

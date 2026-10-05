@@ -80,7 +80,7 @@ test('art adapter preserves every character’s attacks, ultimates, RNG and pers
         startBattle([e,e2], {wild:true});
         p.hp = Math.ceil(p.maxhp * .6);
         p.ultCharge = 100;
-        if (i % 3 === 0) battle.round = 15;
+        if (i % 3 === 0) battle.combatProgress.stallRounds = 14;
         if (moveId === 'ULTIMATE') useUltimate(p);
         else attackWith(p, e, MOVES[moveId], 'enemy');
         results.push({id,moveId,p:p.hp,e:e.hp,p2:p2.hp,e2:e2.hp,charge:p.ultCharge,

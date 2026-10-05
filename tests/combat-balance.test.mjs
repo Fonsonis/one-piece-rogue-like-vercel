@@ -60,17 +60,17 @@ test('finite opening dodges, real support buffs, healing cooldown and climax',()
   attackWith(p,e,MOVES.animo,'enemy');if(calcDamage(p,e,MOVES.punetazo,false,1).dmg!==boosted||boosted<=base)return false;
   p.hp=1;p.moves=['remedytouch'];attackWith(p,e,MOVES.remedytouch,'enemy');
   const hp=p.hp;attackWith(p,e,MOVES.remedytouch,'enemy');if(p.hp!==hp||!chooseMove(p,e).power)return false;
-  battle.round=15;p.hp=1;attackWith(p,e,MOVES.remedytouch,'enemy');return p.hp===1;
+  battle.combatProgress.stallRounds=14;p.hp=1;attackWith(p,e,MOVES.remedytouch,'enemy');return p.hp===1;
  })()`));
 });
 
 test('unlucky full teams terminate even when all attacks miss',()=>{
  const h=combatHarness();
- const team=['buggy','enel','katakuri','marco','bigmom','brook'];
+ const team=['buggy','enel','katakuri','franky','smoker','warcury'];
  const r=h.duel(team,team,50,{forceMiss:true});
  // Each successive enemy now gets its own climax/fatigue window.
  assert.ok(r.outcome); assert.ok(r.rounds<40*team.length,JSON.stringify(r));
- assert.ok(h.exec('combatRoundNow()')<40);
+ assert.ok(h.exec('combatStallRounds()')<40);
 });
 
 test('canonical signatures and learned Haki; XP and evolution keep two moves',()=>{
@@ -94,7 +94,7 @@ test('passive drains resolve KOs once and cannot heal through climax; Nuzlocke n
  assert.ok(h.exec(`(()=>{
   const p=makeChar('bigmom',20),e=makeChar('bandido',20);
   run={mode:'story',saga:0,team:[p],items:{}};startBattle([e],{wild:true});
-  battle.round=15;p.hp=20;e.hp=1;
+  battle.combatProgress.stallRounds=14;p.hp=20;e.hp=1;
   const before=meta.stats?.kills||0;afterRound();
   if(e.hp!==0||p.hp!==20||(meta.stats.kills||0)!==before+1)return false;
   afterRound();if((meta.stats.kills||0)!==before+1)return false;

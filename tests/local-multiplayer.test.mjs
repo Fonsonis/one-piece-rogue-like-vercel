@@ -47,7 +47,10 @@ test('host enforces each peer inventory and incomplete teams cannot become ready
 test('one attack per step, then residual effects, with the normal 900/1200 ms cadence', () => {
   const { api } = engine(), b = api.create([player('host'), player(guestId(1))]);
   b.pTeam[0].maxhp = b.pTeam[0].hp = b.eTeam[0].maxhp = b.eTeam[0].hp = 10000;
+  const initialEnemyHP = b.eTeam.reduce((sum, f) => sum + f.hp, 0);
+  assert.equal(b.combatProgress, undefined);
   api.tick(b);
+  assert.equal(b.combatProgress.minE, initialEnemyHP,'local combat captures its HP floor before the first hit');
   assert.equal(b.event.kind, 'attack'); assert.equal(b.event.source, 0);
   assert.equal(b.eTeam[0].ultCharge, 0); assert.equal(b.round, 1); assert.equal(b.delay, 900);
   api.tick(b);

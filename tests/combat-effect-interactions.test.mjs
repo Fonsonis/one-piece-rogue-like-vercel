@@ -66,7 +66,7 @@ test('round healing survives an enemy KO without draining the dead or the reserv
       if(kind==='teamRelic')team[1].battleRelic='relic_chopper';
       if(['relic','climax','darkness','dead'].includes(kind)){p.id='saturn';p.battleRelic='relic_saturn';}
       p.maxhp=1000;p.hp=kind==='dead'?0:100;e.hp=0;
-      if(kind==='climax')battle.round=15;
+      if(kind==='climax')battle.combatProgress.stallRounds=14;
       const reserveHP=reserve.hp;afterRound();
       return {hp:p.hp,reserveUnchanged:reserve.hp===reserveHP};
     })()`);
