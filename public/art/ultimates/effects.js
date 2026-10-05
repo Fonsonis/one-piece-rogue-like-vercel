@@ -649,6 +649,20 @@
     const envelope=Math.sin(Math.PI*attack), reach=ease(attack/.38)*returnHome;
     const m={pose:t<.08||t>.94?0:t<.27||t>.76?1:2,travel:0,lift:0,angle:0,stretch:0,scale:1,echoes:0,alpha:1};
     if(reduced){m.pose=2;return m;}
+    if(p.id==='law-wano'){
+      const plunge=between(t,.38,.66);
+      m.travel=.82*reach;m.lift=.24*Math.sin(Math.PI*plunge)*returnHome;
+      m.angle=-.16*Math.sin(Math.PI*plunge);m.echoes=plunge>0&&plunge<1?2:0;
+      return m;
+    }
+    if(p.id==='kid-wano'){
+      const fire=between(t,.32,.74);
+      m.travel=-.12*envelope;m.scale=1+.10*envelope;
+      m.angle=-.06*Math.sin(Math.PI*fire*4)*envelope;
+      m.pose=t<.08||t>.94?0:t<.32?1:2;
+      m.echoes=fire>0&&fire<1?1:0;
+      return m;
+    }
     if(p.id==='teach-yonko'){
       // Pull the rival into darkness, then unleash two earthquake impacts.
       const charge=between(t,.08,.28), strike=between(t,.30,.75);

@@ -2228,6 +2228,7 @@ function showAchievementsModal(savedScrollTop = 0, initialCategory = currentAchC
 
 
 // ============ LOG POSE GACHA CARTELES ============
+const LOG_POSE_LEGENDARY_STARS = 1500;
 let logPoseBlockedSagaIds = [];
 let logPoseAutoCount = 10;
 
@@ -2260,7 +2261,7 @@ function showLogPoseGachaModal() {
       </header>
       <div class="logpose-market-rules" aria-label="Recompensas de los carteles">
         <span><b>Duplicados</b> · 3⭐ 50 🧭 · 4⭐ 500 🧭 · 5⭐ 1000 🧭</span>
-        <small>Al llegar a 500⭐, el siguiente premio es un legendario nuevo; si ya los tienes todos, recibes 1000 🧭.</small>
+        <small>Al llegar a ${LOG_POSE_LEGENDARY_STARS}⭐, el siguiente premio es un legendario nuevo; si ya los tienes todos, recibes 1000 🧭.</small>
       </div>
       <div class="logpose-market-status">
         <div>
@@ -2268,10 +2269,10 @@ function showLogPoseGachaModal() {
           <strong>🧭 ${meta.logPoses}</strong>
           <span>Log Poses</span>
         </div>
-        <div class="${(meta.starPity || 0) >= 500 ? 'ready' : ''}">
+        <div class="${(meta.starPity || 0) >= LOG_POSE_LEGENDARY_STARS ? 'ready' : ''}">
           <small>GARANTÍA LEGENDARIA</small>
-          <strong>⭐ ${Math.min(meta.starPity || 0, 500)} / 500</strong>
-          <span>${(meta.starPity || 0) >= 500 ? '¡ASEGURADA!' : 'Estrellas acumuladas'}</span>
+          <strong>⭐ ${Math.min(meta.starPity || 0, LOG_POSE_LEGENDARY_STARS)} / ${LOG_POSE_LEGENDARY_STARS}</strong>
+          <span>${(meta.starPity || 0) >= LOG_POSE_LEGENDARY_STARS ? '¡ASEGURADA!' : 'Estrellas acumuladas'}</span>
         </div>
       </div>
       <section class="logpose-saga-picker">
@@ -2391,12 +2392,12 @@ function duplicatePosterReward(id) {
 function rollLogPosePrize(activeSagas) {
   meta.starPity = meta.starPity || 0;
   const activePirates = [...new Set(activeSagas.flatMap(s => sagaBasePirateIds(s.id)))];
-  const guaranteed = meta.starPity >= 500;
+  const guaranteed = meta.starPity >= LOG_POSE_LEGENDARY_STARS;
   const newLegendaries = activePirates.filter(id => CHARS[id].rareza === 5 && !isNakamaUnlocked(id));
   if (guaranteed && !newLegendaries.length) return null;
   const weights = [41.5, 30, 21, 7, 0.5];
   let roll = Math.random() * 100, stopIdx = 4;
-  if (meta.starPity >= 500) {
+  if (meta.starPity >= LOG_POSE_LEGENDARY_STARS) {
     stopIdx = 4; // Pity activado: legendario asegurado (5⭐)
   } else {
     for (let i = 0; i < 5; i++) {
@@ -2578,7 +2579,7 @@ function startLogPoseGacha(activeSagas) {
     <h2>🎰 Carteles de SE BUSCA (Log Pose)</h2>
     <p style="font-size:8px;text-align:center;margin-bottom:6px;">Destapa los carteles en orden. ¡En uno de ellos está tu nuevo recluta!</p>
     <div style="font-size:9px;text-align:center;margin-bottom:10px;color:#f39c12;">
-      ⭐ Estrellas acumuladas (Pity): <b>${meta.starPity} / 500</b>
+      ⭐ Estrellas acumuladas (Pity): <b>${meta.starPity} / ${LOG_POSE_LEGENDARY_STARS}</b>
     </div>
     <div class="poster-row">
       ${[0, 1, 2, 3, 4].map(i => `
@@ -6414,8 +6415,8 @@ function doSpecialPirate(island) {
     <p class="special-map-price" style="font-size:8px;text-align:center;line-height:1.8;">Mapa ${specialMapMultiplier()} · Carteles ×${specialMapMultiplier()} · 5⭐ solo en carteles</p>
     ${cartelesBadgeHTML()}
     <div style="font-size:9.5px;text-align:center;margin-top:6px;margin-bottom:6px;color:#f39c12;background:rgba(243,156,18,0.12);padding:6px 10px;border-radius:6px;border:1px solid rgba(243,156,18,0.4);display:flex;align-items:center;justify-content:center;gap:6px;">
-      <span>⭐ Estrellas acumuladas (Pity): <b>${meta.starPity || 0} / 1000</b></span>
-      ${(meta.starPity || 0) >= 1000 ? '<span style="color:#2ecc71;font-weight:bold;">¡LEGENDARIO ASEGURADO!</span>' : ''}
+      <span>⭐ Estrellas acumuladas (Pity): <b>${meta.starPity || 0} / ${LOG_POSE_LEGENDARY_STARS}</b></span>
+      ${(meta.starPity || 0) >= LOG_POSE_LEGENDARY_STARS ? '<span style="color:#2ecc71;font-weight:bold;">¡LEGENDARIO ASEGURADO!</span>' : ''}
     </div>
     ${blocked ? `<div class="special-fail">${blocked}</div>` : ''}
     <div class="actions" style="flex-direction:column;align-items:stretch;">
@@ -6520,7 +6521,7 @@ function renderSpecialGacha(lvl) {
   // pesos: 1⭐ -> 41.5%, 2⭐ -> 30%, 3⭐ -> 21%, 4⭐ -> 7%, 5⭐ (legendarios) -> 0.5%
   const weights = [41.5, 30, 21, 7, 0.5];
   let roll = Math.random() * 100, stopIdx = 4;
-  if (meta.starPity >= 1000) {
+  if (meta.starPity >= LOG_POSE_LEGENDARY_STARS) {
     stopIdx = 4; // Pity activado: legendario asegurado (5⭐)
   } else {
     for (let i = 0; i < 5; i++) { roll -= weights[i]; if (roll <= 0) { stopIdx = i; break; } }
@@ -6541,7 +6542,7 @@ function renderSpecialGacha(lvl) {
     <h2>🎰 Los 5 carteles de SE BUSCA</h2>
     <p style="font-size:8px;text-align:center;margin-bottom:6px;">Destapa los carteles en orden. ¡En uno de ellos está tu recluta! El cartel premiado también da 1 Log Pose por estrella. Si ya tienes al personaje en tu inventario, los de 3⭐ dan 50, los de 4⭐ dan 500 y los de 5⭐ dan 1000 Log Poses.</p>
     <div style="font-size:9px;text-align:center;margin-bottom:10px;color:#f39c12;">
-      ⭐ Estrellas acumuladas (Pity): <b>${meta.starPity} / 1000</b>
+      ⭐ Estrellas acumuladas (Pity): <b>${meta.starPity} / ${LOG_POSE_LEGENDARY_STARS}</b>
     </div>
     <div class="poster-row">
       ${[0, 1, 2, 3, 4].map(i => `
@@ -6786,24 +6787,55 @@ function preferredCombatSpeed() {
 }
 
 // ---------- Clímax de combate (anti combates eternos) ----------
-// A partir de la ronda CLIMAX_ROUND el daño de ambos bandos sube un 10%
-// acumulativo por ronda y toda curación pierde un 20% de eficacia por ronda
-// (hasta anularse). Garantiza que ningún combate pueda durar para siempre.
-const CLIMAX_ROUND = 10;
-// Las rondas del evento siguen contando para turnos y estados; el Clímax empieza de nuevo con cada rival.
+// Solo avanza cuando ninguno de los bandos alcanza un nuevo mínimo de PS.
+// Así un combate lento pero con progreso real no recibe una escalada artificial.
+const CLIMAX_STALL_ROUNDS = 10;
+const FATIGUE_STALL_ROUNDS = 30;
+// Las rondas del evento siguen contando para turnos y estados; el progreso empieza de nuevo con cada rival.
 function combatRoundNow() {
   return battle ? Math.max(1, (battle.round || 1) - (battle.combatStartRound || 1) + 1) : 1;
+}
+function combatHpTotals(b = battle) {
+  const sum = team => team.reduce((total, f) => total + Math.max(0, Number(f?.hp) || 0), 0);
+  return {p:sum(b?.pTeam || []),e:sum(b?.eTeam || [])};
+}
+function resetCombatProgress(b = battle) {
+  if (!b) return null;
+  const hp = combatHpTotals(b);
+  return b.combatProgress = {stallRounds:0,minP:hp.p,minE:hp.e};
+}
+function ensureCombatProgress(b = battle) {
+  return b?.combatProgress || resetCombatProgress(b);
+}
+function combatStallRounds() {
+  return ensureCombatProgress()?.stallRounds || 0;
+}
+function recordCombatProgress(b) {
+  const progress = ensureCombatProgress(b), hp = combatHpTotals(b);
+  if (!progress) return {progressed:false,stallRounds:0};
+  const progressed = hp.p < progress.minP || hp.e < progress.minE;
+  progress.minP = Math.min(progress.minP,hp.p);
+  progress.minE = Math.min(progress.minE,hp.e);
+  progress.stallRounds = progressed ? 0 : progress.stallRounds + 1;
+  return {progressed,stallRounds:progress.stallRounds};
+}
+function absorbFatigueProgress(b) {
+  const progress = ensureCombatProgress(b), hp = combatHpTotals(b);
+  if (!progress) return;
+  progress.minP = Math.min(progress.minP,hp.p);
+  progress.minE = Math.min(progress.minE,hp.e);
 }
 function resetClimaxForNextEnemy(b, nextEnemy) {
   if (!b.opts?.duos && !b.opts?.coop && b.curE?.hp <= 0 && nextEnemy && nextEnemy !== b.curE) {
     b.combatStartRound = (b.round || 1) + 1;
+    resetCombatProgress(b);
   }
 }
 function climaxDmgMult() {
-  return 1 + 0.10 * Math.max(0, combatRoundNow() - CLIMAX_ROUND);
+  return 1 + 0.10 * Math.max(0, combatStallRounds() - CLIMAX_STALL_ROUNDS + 1);
 }
 function healScaleNow() {
-  return clamp(1 - 0.20 * Math.max(0, combatRoundNow() - CLIMAX_ROUND), 0, 1);
+  return clamp(1 - 0.20 * Math.max(0, combatStallRounds() - CLIMAX_STALL_ROUNDS + 1), 0, 1);
 }
 
 const activeP = () => battle.pTeam.includes(battle.curP) && battle.curP.hp > 0
@@ -7120,9 +7152,7 @@ function showTypeChartModal(team) {
       </div>
       <div class="sheet-section">
         <b>⚔️ Clímax de combate</b>
-        <p>A partir de la ronda ${CLIMAX_ROUND} el daño de ambos bandos aumenta un <b>+10% acumulativo
-        por ronda</b> y todas las curaciones (movimientos de apoyo y pasivas) pierden un <b>20% de eficacia
-        por ronda</b> hasta anularse. El contador se reinicia al entrar el siguiente rival, aunque pertenezca al mismo evento. Desde la ronda 30 de cada combate ambos activos sufren desgaste creciente, incluso si esquivan. Si ambos bandos caen a la vez, pierdes el combate.</p>
+        <p>Solo aparece tras ${CLIMAX_STALL_ROUNDS} rondas seguidas sin que ningún bando alcance un nuevo mínimo de PS. Entonces el daño de ambos bandos aumenta un <b>+10% por ronda estancada</b> y todas las curaciones (movimientos de apoyo y pasivas) pierden un <b>20% de eficacia por ronda estancada</b> hasta anularse. Cualquier avance neto, por pequeño que sea, detiene el Clímax. El contador se reinicia al entrar el siguiente rival, aunque pertenezca al mismo evento. Tras ${FATIGUE_STALL_ROUNDS} rondas estancadas ambos activos sufren desgaste creciente, incluso si esquivan. Si ambos bandos caen a la vez, pierdes el combate.</p>
       </div>
     </div>
     <div class="actions guide-actions">
@@ -7225,6 +7255,7 @@ function startBattle(enemies, opts) {
     f.st = Object.fromEntries(['burn','burnRate','poison','poisonDefense','slow','slowRate','gust','gustBonus']
       .filter(key => previous[key] !== undefined).map(key => [key, previous[key]]));
   });
+  resetCombatProgress(battle);
   battle.firstHit = { p: true, e: true }; // para Rayo Ⅱ: primer ataque crítico garantizado
   battle.curP = activeP();
   battle.curE = activeE();
@@ -7769,6 +7800,7 @@ function healChopperOnHit(att, damage) {
 }
 
 function attackWith(att, dfd, mv, targetSide) {
+  ensureCombatProgress(); // LocalCombat también comparte este motor sin pasar por startBattle.
   if (!mv) return; // guardia: sin movimiento válido, se salta el ataque
   const attName = charName(att);
   if (mv.power === 0 && mv.effect) {
@@ -7996,14 +8028,28 @@ function afterRound() {
     if (!act || act.hp <= 0) return;
     const drained = actors.reduce((sum, other, j) => sum + (targets[j] === act ? hpDelta[j].drain || 0 : 0), 0);
     act.hp = Math.max(0, Math.min(act.maxhp, act.hp + (hpDelta[i].heal || 0)) - drained);
-    // Límite independiente de precisión, inmunidades y azar: desgaste de ambos activos.
-    const combatRound = combatRoundNow();
-    if (combatRound >= 30 && act.hp > 0) {
-      const fatigue = Math.max(1, Math.ceil(act.maxhp * Math.min(.5, .05 * (combatRound - 29))));
+  });
+  const previousStall = combatStallRounds();
+  const progress = recordCombatProgress(b);
+  if (progress.stallRounds === CLIMAX_STALL_ROUNDS) {
+    log('⚔️ <b>¡Clímax de combate!</b> No hay avance: el daño aumenta y las curaciones flaquean.');
+  } else if (progress.stallRounds > CLIMAX_STALL_ROUNDS) {
+    const pct = Math.round((climaxDmgMult() - 1) * 100);
+    const hs = Math.round(healScaleNow() * 100);
+    log(`⚔️ Clímax por estancamiento: +${pct}% de daño · curaciones al ${hs}%.`);
+  } else if (previousStall >= CLIMAX_STALL_ROUNDS && progress.progressed) {
+    log('⚔️ El combate vuelve a avanzar. El Clímax se disipa.');
+  }
+  // El desgaste termina combates realmente bloqueados, pero su propio daño no cuenta como progreso.
+  actors.forEach(act => {
+    if (progress.stallRounds >= FATIGUE_STALL_ROUNDS && act?.hp > 0) {
+      const fatigueStep = progress.stallRounds - FATIGUE_STALL_ROUNDS + 1;
+      const fatigue = Math.max(1, Math.ceil(act.maxhp * Math.min(.5, .05 * fatigueStep)));
       act.hp = Math.max(0, act.hp - fatigue);
       log(`⚔️ Desgaste: ${charName(act)} pierde ${fatigue} PS.`);
     }
   });
+  absorbFatigueProgress(b);
   const checkRevive = f => {
     if (!f || f.hp > 0) return;
     const isPlayer = b.pTeam.includes(f) || (run && run.team && run.team.includes(f));
@@ -8111,16 +8157,8 @@ function afterRound() {
   if (deadP && np !== b.curP) log(`¡Adelante, ${charName(np)}!`);
   resetClimaxForNextEnemy(b, ne);
   b.curE = ne; b.curP = np;
-  // Avance de ronda y aviso del Clímax de combate
+  // La ronda global conserva turnos, estados y cooldowns; Clímax usa solo estancamiento neto.
   b.round = (b.round || 1) + 1;
-  const combatRound = combatRoundNow();
-  if (combatRound === CLIMAX_ROUND + 1) {
-    log('⚔️ <b>¡Clímax de combate!</b> El daño aumenta cada ronda y las curaciones flaquean.');
-  } else if (combatRound > CLIMAX_ROUND + 1) {
-    const pct = Math.round((climaxDmgMult() - 1) * 100);
-    const hs = Math.round(healScaleNow() * 100);
-    log(`⚔️ Clímax: +${pct}% de daño · curaciones al ${hs}%.`);
-  }
   if (changed) renderBattlePreserveLog();
   else refreshHPCards();
   scheduleRound(changed ? 1800 : 1400);

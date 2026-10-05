@@ -72,6 +72,9 @@
   group('teach','dark','black-hole',{count:8});group('kaido','dragon','flame-dragon');
   group('bigmom','soul','homies',{count:3});group('law','room','gamma-knife');
   group('kid','metal','magnetic',{count:12});group('mihawk shawk','slash','black-blade',{count:1,color:'#95f49d'});
+  group('law-wano','room','puncture-wille',{color:'#55dcff',accent:'#e6fdff',count:8});
+  group('kid-wano','laser','damned-punk',{color:'#ff678b',accent:'#aefbff',count:8});
+  group('coby-hachinosu','impact','galaxy',{color:'#ff9ba5',accent:'#d2edff',count:8});
   group('crocodile scroc','sand','desert-spada');group('doflamingo sflamingo','string','birdcage',{count:12});
   group('kuma sbear','paw','ursus-shock');group('hancock ssnake','heart','petrify',{count:6});
   group('akainu','flame','magma',{color:'#f75e42',count:5});group('kizaru','laser','magatama',{color:'#ffdc66',count:8});
