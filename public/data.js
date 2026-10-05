@@ -152,6 +152,7 @@ const MOVES = {
   ikoku:         { name: 'Ikoku',               type: 'Oscuridad', power: 130, acc: 0.8 },
   kamusarirojo:  { name: 'Kamusari Carmesí',    type: 'Haki',    power: 135, acc: 0.8 },
   blackhole:     { name: 'Black Hole',          type: 'Oscuridad', power: 125, acc: 0.85 },
+  darkquake:     { name: 'Black Hole · Terremoto del Fin', type: 'Oscuridad', power: 150, acc: 0.8 },
   gigantpistol:  { name: 'Gigant Pistol', type: 'Golpe', power: 100, acc: 0.9 },
   elephantgun:   { name: 'Elephant Gun', type: 'Haki', power: 110, acc: 0.9 },
   elephantgatling: { name: 'Elephant Gatling', type: 'Haki', power: 125, acc: 0.85 },
@@ -536,10 +537,10 @@ const CHARS = {
     desc: 'El Pelirrojo. Un solo brazo le basta para gobernar el mar.',
   },
   teach: {
-    name: 'Barbanegra', emoji: '🌑', types: ['Oscuridad', 'Fruta'],
+    name: 'Kurohige · Jaya', emoji: '🌑', spriteId: 'teach-jaya', types: ['Oscuridad', 'Fruta'],
     base: [36, 16, 12, 9], rareza: 5, boss: true,
-    learnset: [[1, 'blackhole'], [12, 'terremoto']],
-    desc: 'Dos frutas en un solo cuerpo. La oscuridad lo traga todo. Zehahaha.',
+    learnset: [[1, 'golpebajo'], [12, 'blackhole']],
+    desc: 'Kurohige antes de dominar el poder sísmico. La Yami Yami no Mi devora cuanto encuentra. Zehahaha.',
   },
   // ===== COMPENDIO: facciones del mundo =====
   law: {
@@ -1302,7 +1303,7 @@ const SAGA_DEFS = [
     ['Alubarna', ['paula', 'dazbones', 'crocodile']],
   ]},
   { id: 'skypiea', name: 'SKYPIEA', img: 'Images/portada-saga-skypiea.jpg', color: '#9fd6e8', islands: [
-    ['Jaya', ['sarquiss', 'bellamy']], ['Playa Angel', ['satori', 'shura']],
+    ['Jaya', ['sarquiss', 'bellamy', 'teach']], ['Playa Angel', ['satori', 'shura']],
     ['Upper Yard', ['gedatsu', 'ohm', 'yama']], ['Santuario de Dios', ['enel']],
   ]},
   { id: 'water7', name: 'WATER 7', img: 'Images/portada-saga-water-seven.jpg', color: '#5aa8c4', islands: [
@@ -1553,6 +1554,7 @@ const STRAW_HAT_COMBAT_FORMS = {
     ['robin-demoniofleur', 'Robin · Demonio Fleur', 40, ['Fruta','Oscuridad'], [32,19,15,17], 'demoniofleur', 'Demonio Fleur', 'Un gigantesco doble demoníaco brota con cuernos, alas y múltiples brazos para inmovilizar al rival.'],
   ],
   franky: [
+    ['franky-newworld', 'Franky · Nuevo Mundo', 30, ['Disparo','Golpe'], [35,19,15,14], 'radicalbeam', 'Radical Beam', 'El cuerpo BF-37 incorpora la tecnología que Franky estudió durante sus dos años de entrenamiento.'],
     ['franky-shogun', 'Franky · General Franky', 40, ['Disparo','Golpe'], [39,23,18,11], 'generalcannon', 'General Cannon', 'El Battle Franky 38 concentra la potencia de sus armas en un disparo colosal.'],
   ],
 };
@@ -1575,6 +1577,23 @@ CHARS.sanji.ultimate=SIGNATURE_MOVES.sanji='mutonshoot';
 CHARS.sanji.learnset=CHARS.sanji.learnset.filter(([level])=>level<20);
 CHARS.robin.ultimate=SIGNATURE_MOVES.robin='clutch';
 CHARS.robin.learnset=CHARS.robin.learnset.filter(([,move])=>move!=='demoniofleur');
+CHARS.franky.ultimate=SIGNATURE_MOVES.franky='strongright';
+CHARS.franky.learnset=CHARS.franky.learnset.filter(([,move])=>move!=='radicalbeam');
+
+// Hyogoro recupera su fuerza en Wano; Kurohige incorpora el poder sísmico tras Jaya.
+MOVES.hyogorogoken={name:'Goken de la Flor',type:'Haki',power:120,acc:.9};
+CHARS['hyogoro-muscled']={...CHARS.hyogoro,name:'Hyogoro · Forma musculosa',spriteId:'hyogoro-muscled',
+  types:['Golpe','Haki'],base:[36,20,16,14],rareza:4,learnset:[[40,'hyogorogoken']],
+  ultimate:'hyogorogoken',evo:undefined,generated:false,formLevel:40,
+  desc:'Hyogoro recupera la fuerza de sus años como gran jefe y reviste sus golpes con Ryuo. Requiere nivel base y nivel en partida 40, además de alcanzar Wano.'};
+CHARS.hyogoro.evo={lvl:40,to:'hyogoro-muscled'};
+
+CHARS['teach-yonko']={...CHARS.teach,name:'Kurohige · Emperador',spriteId:'teach',
+  types:['Oscuridad','Fruta','Tierra'],base:[42,21,16,11],rareza:5,
+  learnset:[[40,'terremoto'],[40,'darkquake']],ultimate:'darkquake',evo:undefined,
+  generated:false,formLevel:40,
+  desc:'Emperador que combina la oscuridad de la Yami Yami con los terremotos de la Gura Gura. Requiere nivel base y nivel en partida 40, además de alcanzar Marineford.'};
+CHARS.teach.evo={lvl:40,to:'teach-yonko'};
 
 // Sulong mostrado en el manga. El umbral sustituye a la luna como adaptación jugable.
 const SULONG_FORMS=['carrot','wanda','inuarashi','nekomamushi','shishilian','giovanni','concelot','roddy','blackback','pekoms','bepo'];
@@ -1655,12 +1674,12 @@ const SAGA_FIXES = {
   // Alabasta — Marina
   tashigi: 'alabasta', smoker: 'alabasta', fullbody: 'alabasta', jango: 'alabasta',
   // Skypiea — Piratas de Barbanegra en Jaya
-  docq: 'skypiea', stronger: 'skypiea', lafitte: 'skypiea', burgess: 'skypiea', vanaugur: 'skypiea',
+  teach: 'skypiea', docq: 'skypiea', stronger: 'skypiea', lafitte: 'skypiea', burgess: 'skypiea', vanaugur: 'skypiea',
   // Sabaody — Supernovas, aliados locales y asalto de la Marina
   kid: 'sabaody', killer: 'sabaody', drake: 'sabaody', hawkins: 'sabaody', apoo: 'sabaody', law:'sabaody',
   bonney: 'sabaody', rayleigh: 'sabaody', camie: 'sabaody', pappag: 'sabaody', kuma:'sabaody',
   // Marineford — Barbablanca, Barbanegra y Marina
-  newgate: 'marineford', marco: 'marineford', ace: 'marineford', teach: 'marineford',
+  newgate: 'marineford', marco: 'marineford', ace: 'marineford',
   akainu: 'marineford', kizaru: 'sabaody', aokiji: 'marineford', garp: 'marineford',
   bogard: 'marineford', brandnew: 'marineford', coby: 'marineford', coby2: 'marineford', helmeppo: 'marineford',
   rosward: 'sabaody', charlos: 'sabaody', shalria: 'sabaody', sabo: 'marineford',
@@ -1699,8 +1718,8 @@ const FORM_UNLOCK_SAGAS = Object.freeze({
   skypiea: ['pierre-animal','pierre-hybrid'],
   water7: ['luffy2','luffy3','coby2','usopp2','chopper-monster','lucci-animal','lucci-hybrid','kaku-animal','kaku-hybrid','jabra-animal','jabra-hybrid','sanji-diable'],
   sabaody: ['drake-animal'],
-  marineford: ['marco-animal','marco-hybrid','sandersonia-animal','sandersonia-hybrid','marigold-animal','marigold-hybrid','sengoku-animal','onigumo-hybrid','ivankov-female'],
-  gyojin: ['nami-sorcery','franky-shogun','pekoms-animal','pekoms-hybrid'],
+  marineford: ['teach-yonko','marco-animal','marco-hybrid','sandersonia-animal','sandersonia-hybrid','marigold-animal','marigold-hybrid','sengoku-animal','onigumo-hybrid','ivankov-female'],
+  gyojin: ['nami-sorcery','franky-newworld','franky-shogun','pekoms-animal','pekoms-hybrid'],
   punkhazard: ['momonosuke-animal'],
   zou: ['jack-animal'],
   dressrosa: ['luffy4-boundman'],
@@ -1709,7 +1728,7 @@ const FORM_UNLOCK_SAGAS = Object.freeze({
     'luffy5','kaido-animal','kaido-hybrid','yamato-animal','yamato-hybrid','king-animal','king-hybrid','queen-animal','queen-hybrid',
     'drake-hybrid','orochi-animal','orochi-hybrid','jack-hybrid','ulti-animal','ulti-hybrid','pageone-animal','pageone-hybrid',
     'whoswho-animal','whoswho-hybrid','sasaki-animal','sasaki-hybrid','blackmaria-animal','blackmaria-hybrid','devon-animal','devon-hybrid',
-    'zoro-enma','zoro-kingofhell','nami-zeus','sanji-raid','sanji-ifrit','robin-demoniofleur',
+    'zoro-enma','zoro-kingofhell','nami-zeus','sanji-raid','sanji-ifrit','robin-demoniofleur','hyogoro-muscled',
     'wanda-sulong','inuarashi-sulong','nekomamushi-sulong','shishilian-sulong','giovanni-sulong','concelot-sulong','roddy-sulong','blackback-sulong',
     'momonosuke-adult','momonosuke-dragon',
   ],

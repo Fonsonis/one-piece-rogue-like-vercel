@@ -35,6 +35,9 @@
   group('nami-sorcery nami-zeus','lightning','storm',{count:6});
   group('sanji-diable sanji-raid','flame','kick');
   group('sanji-ifrit','flame','kick',{color:'#61cfff',accent:'#e7fcff'});
+  group('hyogoro-muscled','impact','ryuo',{color:'#63bfff',accent:'#ffe49a',count:6});
+  group('franky-newworld','laser','radical',{count:5});
+  group('teach-yonko','quake','darkquake',{color:'#9960da',accent:'#d8faff',count:8});
   group('loki','lightning','hammer',{count:6});
   group('loki-animal','dragon','lightning',{color:'#b69cf0',count:7});
   group('shamrock','slash','cerberus',{count:3});
