@@ -1077,10 +1077,9 @@ function gainXP(f, amount, log) {
     f.xp -= xpForLevel(f.lvl);
     f.lvl++;
     const c = CHARS[f.id];
-    const oldMax = f.maxhp;
     f.maxhp = hpAt(c.base[0], f.lvl) + (f.hpBonus || 0);
     if (f.hp > 0) {
-      f.hp = Math.min(f.maxhp, f.hp + (f.maxhp - oldMax));
+      f.hp = f.maxhp;
     }
     f.atk = statAt(c.base[1], f.lvl) + f.atkBonus;
     f.def = statAt(c.base[2], f.lvl) + f.defBonus;
@@ -6791,11 +6790,20 @@ function preferredCombatSpeed() {
 // acumulativo por ronda y toda curación pierde un 20% de eficacia por ronda
 // (hasta anularse). Garantiza que ningún combate pueda durar para siempre.
 const CLIMAX_ROUND = 10;
+// Las rondas del evento siguen contando para turnos y estados; el Clímax empieza de nuevo con cada rival.
+function combatRoundNow() {
+  return battle ? Math.max(1, (battle.round || 1) - (battle.combatStartRound || 1) + 1) : 1;
+}
+function resetClimaxForNextEnemy(b, nextEnemy) {
+  if (!b.opts?.duos && !b.opts?.coop && b.curE?.hp <= 0 && nextEnemy && nextEnemy !== b.curE) {
+    b.combatStartRound = (b.round || 1) + 1;
+  }
+}
 function climaxDmgMult() {
-  return battle ? 1 + 0.10 * Math.max(0, (battle.round || 1) - CLIMAX_ROUND) : 1;
+  return 1 + 0.10 * Math.max(0, combatRoundNow() - CLIMAX_ROUND);
 }
 function healScaleNow() {
-  return battle ? clamp(1 - 0.20 * Math.max(0, (battle.round || 1) - CLIMAX_ROUND), 0, 1) : 1;
+  return clamp(1 - 0.20 * Math.max(0, combatRoundNow() - CLIMAX_ROUND), 0, 1);
 }
 
 const activeP = () => battle.pTeam.includes(battle.curP) && battle.curP.hp > 0
@@ -7114,7 +7122,7 @@ function showTypeChartModal(team) {
         <b>⚔️ Clímax de combate</b>
         <p>A partir de la ronda ${CLIMAX_ROUND} el daño de ambos bandos aumenta un <b>+10% acumulativo
         por ronda</b> y todas las curaciones (movimientos de apoyo y pasivas) pierden un <b>20% de eficacia
-        por ronda</b> hasta anularse. Desde la ronda 30 ambos activos sufren desgaste creciente, incluso si esquivan. Si ambos bandos caen a la vez, pierdes el combate.</p>
+        por ronda</b> hasta anularse. El contador se reinicia al entrar el siguiente rival, aunque pertenezca al mismo evento. Desde la ronda 30 de cada combate ambos activos sufren desgaste creciente, incluso si esquivan. Si ambos bandos caen a la vez, pierdes el combate.</p>
       </div>
     </div>
     <div class="actions guide-actions">
@@ -7198,6 +7206,7 @@ function startBattle(enemies, opts) {
     tower: !!opts.tower,
     timer: null,
     round: 1,
+    combatStartRound: 1,
     switchUsed: false,
     itemBuffs: new Map(),
     teamTotals: {p: team.length, e: enemies.length},
@@ -7988,8 +7997,9 @@ function afterRound() {
     const drained = actors.reduce((sum, other, j) => sum + (targets[j] === act ? hpDelta[j].drain || 0 : 0), 0);
     act.hp = Math.max(0, Math.min(act.maxhp, act.hp + (hpDelta[i].heal || 0)) - drained);
     // Límite independiente de precisión, inmunidades y azar: desgaste de ambos activos.
-    if (b.round >= 30 && act.hp > 0) {
-      const fatigue = Math.max(1, Math.ceil(act.maxhp * Math.min(.5, .05 * (b.round - 29))));
+    const combatRound = combatRoundNow();
+    if (combatRound >= 30 && act.hp > 0) {
+      const fatigue = Math.max(1, Math.ceil(act.maxhp * Math.min(.5, .05 * (combatRound - 29))));
       act.hp = Math.max(0, act.hp - fatigue);
       log(`⚔️ Desgaste: ${charName(act)} pierde ${fatigue} PS.`);
     }
@@ -8024,7 +8034,9 @@ function afterRound() {
   const deadE = b.curE.hp <= 0, deadP = b.curP.hp <= 0;
   // Las partidas locales nunca conceden EXP, modifican el viaje ni escriben el guardado.
   if (b.opts?.local) {
-    b.curP = activeP(); b.curE = activeE();
+    const nextEnemy = activeE();
+    resetClimaxForNextEnemy(b, nextEnemy);
+    b.curP = activeP(); b.curE = nextEnemy;
     if (!b.curP || !b.curE) {
       b.over = true;
       b.winner = b.curP ? 'p' : b.curE ? 'e' : 'draw';
@@ -8097,12 +8109,14 @@ function afterRound() {
   }
   if (deadE && ne !== b.curE) { registerDex(ne.id); log(`¡${charName(ne)} entra en combate!`); }
   if (deadP && np !== b.curP) log(`¡Adelante, ${charName(np)}!`);
+  resetClimaxForNextEnemy(b, ne);
   b.curE = ne; b.curP = np;
   // Avance de ronda y aviso del Clímax de combate
   b.round = (b.round || 1) + 1;
-  if (b.round === CLIMAX_ROUND + 1) {
+  const combatRound = combatRoundNow();
+  if (combatRound === CLIMAX_ROUND + 1) {
     log('⚔️ <b>¡Clímax de combate!</b> El daño aumenta cada ronda y las curaciones flaquean.');
-  } else if (b.round > CLIMAX_ROUND + 1) {
+  } else if (combatRound > CLIMAX_ROUND + 1) {
     const pct = Math.round((climaxDmgMult() - 1) * 100);
     const hs = Math.round(healScaleNow() * 100);
     log(`⚔️ Clímax: +${pct}% de daño · curaciones al ${hs}%.`);
@@ -9299,6 +9313,7 @@ function afterChallengeRound(b) {
     b.timer=setTimeout(()=>{if(battle===b)endBattle(!!p&&!e);},1300/b.speed);
     return;
   }
+  resetClimaxForNextEnemy(b,e);
   b.curP=p;b.curE=e;b.round++;
   refreshHPCards();scheduleRound(1400);
 }

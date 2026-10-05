@@ -68,7 +68,9 @@ test('unlucky full teams terminate even when all attacks miss',()=>{
  const h=combatHarness();
  const team=['buggy','enel','katakuri','marco','bigmom','brook'];
  const r=h.duel(team,team,50,{forceMiss:true});
- assert.ok(r.outcome); assert.ok(r.rounds<70,JSON.stringify(r));
+ // Each successive enemy now gets its own climax/fatigue window.
+ assert.ok(r.outcome); assert.ok(r.rounds<40*team.length,JSON.stringify(r));
+ assert.ok(h.exec('combatRoundNow()')<40);
 });
 
 test('canonical signatures and learned Haki; XP and evolution keep two moves',()=>{
