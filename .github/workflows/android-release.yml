@@ -55,10 +55,8 @@ jobs:
       - run: sdkmanager 'platforms;android-35' 'build-tools;35.0.0'
       - run: npm ci
       - run: node scripts/verify-android-version.mjs
-      - name: Preparar manifiesto Android
-        shell: bash
-        run: |
-          node -e "const fs=require('fs');const p='public/android-version.json';const x=JSON.parse(fs.readFileSync(p));x.version=process.env.APP_VERSION_NAME;x.versionCode=Number(process.env.APP_VERSION_CODE);x.downloadUrl='https://github.com/Fonsonis/mareas-del-umbral/releases/download/android-'+process.env.APP_VERSION_CODE+'/mareas-del-umbral.apk';fs.writeFileSync(p,JSON.stringify(x,null,2)+'\n')"
+      - name: Preparar configuración de release
+        run: node scripts/prepare-platform-release.mjs
       - run: npm run android:sync
       - name: Verificar puente de actualización Android
         working-directory: android
@@ -132,10 +130,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Preparar manifiesto Windows
-        shell: pwsh
-        run: |
-          node -e "const fs=require('fs');const p='public/windows-version.json';const x=JSON.parse(fs.readFileSync(p));x.version=process.env.APP_VERSION_NAME;x.build=Number(process.env.APP_VERSION_CODE);x.downloadUrl='https://github.com/Fonsonis/mareas-del-umbral/releases/download/android-'+process.env.APP_VERSION_CODE+'/mareas-del-umbral-setup.exe';fs.writeFileSync(p,JSON.stringify(x,null,2)+'\n')"
+      - name: Preparar configuración de release
+        run: node scripts/prepare-platform-release.mjs
       - run: npm run desktop:exe
       - name: Preparar artefactos Windows
         if: github.event_name != 'pull_request'

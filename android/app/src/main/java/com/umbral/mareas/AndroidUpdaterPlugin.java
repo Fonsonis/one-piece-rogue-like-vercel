@@ -16,6 +16,8 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 import java.io.File;
+import java.net.URI;
+import java.net.URISyntaxException;
 
 @CapacitorPlugin(name = "AndroidUpdater")
 public class AndroidUpdaterPlugin extends Plugin {
@@ -37,8 +39,13 @@ public class AndroidUpdaterPlugin extends Plugin {
 
     static boolean validReleaseUrl(String value, int versionCode) {
         if (value == null) return false;
-        Uri uri = Uri.parse(value);
-        String path = uri.getPath();
+        URI uri;
+        try {
+            uri = new URI(value);
+        } catch (URISyntaxException invalid) {
+            return false;
+        }
+        String path = uri.getRawPath();
         String artifactPath = "/mareas-del-umbral.apk";
         String versionRelease = "/releases/download/android-" + versionCode + artifactPath;
         String latestRelease = "/releases/latest/download" + artifactPath;

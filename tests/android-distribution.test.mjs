@@ -49,7 +49,7 @@ test('la APK empaqueta la build estática completa y consulta actualizaciones fi
   assert.match(workflow, /branches:\s*\n\s*- main/);
   assert.match(workflow, /pull_request:/);
   assert.match(workflow, /app_version_code=\$\(date \+%s\)/);
-  assert.match(workflow, /releases\/download\/android-'\+process\.env\.APP_VERSION_CODE/);
+  assert.match(workflow, /node scripts\/prepare-platform-release\.mjs/);
   assert.match(workflow, /mareas-del-umbral\.apk/);
   assert.match(workflow, /-PappVersionCode="\$APP_VERSION_CODE"/);
   assert.match(workflow, /assembleDebug/);

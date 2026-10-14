@@ -48,7 +48,12 @@ public class AndroidUpdaterPluginTest {
                 "https://github.com/example/game/releases/download/android-10200/mareas-del-umbral.apk",
                 "https://github.com/example/game/releases/download/android-10201/other.apk",
                 "https://github.com/example/game/releases/download/android-10201/mareas-del-umbral.apk?token=1",
-                "https://user@github.com/example/game/releases/download/android-10201/mareas-del-umbral.apk"
+                "https://user@github.com/example/game/releases/download/android-10201/mareas-del-umbral.apk",
+                "https://github.com:443/example/game/releases/download/android-10201/mareas-del-umbral.apk",
+                "https://github.com/example/game/releases/download/android-10201/mareas-del-umbral.apk#fragment",
+                "https://github.com/example/game/releases/download/android-10201/%6dareas-del-umbral.apk",
+                "https://github.com/example/game/releases/download/android-10201/mareas del umbral.apk",
+                "https://[invalid"
         }) assertFalse(url, AndroidUpdaterPlugin.validReleaseUrl(url, 10201));
     }
 }
