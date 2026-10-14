@@ -42,9 +42,9 @@ test('la APK empaqueta la build estática completa y consulta actualizaciones fi
   assert.match(nativeFiles, /nativePlugin\('Share'\)/);
   assert.match(game, /exportAndroidJson\(json\)/);
   assert.equal(release.downloadUrl, '');
-  assert.equal(distribution.androidUrl, null);
-  assert.equal(distribution.androidVersionUrl, null);
-  assert.equal(distribution.androidReleasesApiUrl, null);
+  assert.match(distribution.androidUrl, /^https:\/\/github\.com\/.+\/releases\/latest\/download\/mareas-del-umbral\.apk$/);
+  assert.match(distribution.androidVersionUrl, /\/releases\/latest\/download\/android-version\.json$/);
+  assert.match(distribution.androidReleasesApiUrl, /^https:\/\/api\.github\.com\/repos\/.+\/releases\/latest$/);
   assert.match(manifest, /android\.permission\.CAMERA/);
   assert.match(workflow, /branches:\s*\n\s*- main/);
   assert.match(workflow, /pull_request:/);

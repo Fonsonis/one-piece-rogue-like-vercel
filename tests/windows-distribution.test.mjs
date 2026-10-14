@@ -46,8 +46,8 @@ test('el botón web abre un selector Android o Windows y Electron no lo muestra'
   assert.match(downloads, /GameDistribution\?\.androidUrl/);
   assert.match(downloads, /GameDistribution\?\.windowsUrl/);
   assert.equal(manifest.downloadUrl, '');
-  assert.equal(distribution.androidUrl, null);
-  assert.equal(distribution.windowsUrl, null);
+  assert.match(distribution.androidUrl, /\/releases\/latest\/download\/mareas-del-umbral\.apk$/);
+  assert.match(distribution.windowsUrl, /\/releases\/latest\/download\/mareas-del-umbral-setup\.exe$/);
 });
 
 test('Android y Windows se publican juntos para compartir la release latest', () => {

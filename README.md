@@ -68,7 +68,7 @@ Desregistrar el service worker o borrar los datos del sitio elimina las cachés 
 
 La build normal incluye solo el juego base y su registro. Los mods instalados se guardan localmente mediante Service Worker y Cache Storage. La descarga para uso sin conexión incorpora el contenido base; cada mod debe instalarse desde su propio archivo.
 
-Los instaladores APK y EXE todavía no están publicados desde esta configuración. `public/distribution.json` contiene URLs vacías; configúralas al publicar artefactos reales.
+Los enlaces de APK y EXE en `public/distribution.json` apuntan a los instaladores publicados en GitHub Releases. GitHub Actions genera la configuración de cada build a partir de `GITHUB_REPOSITORY`, la versión y el código de compilación.
 
 Estructura principal:
 

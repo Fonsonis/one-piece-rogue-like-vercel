@@ -132,6 +132,6 @@ El mod de One Piece incluye migración para guardados web antiguos `oplike_*` y 
 
 ## Publicación
 
-La build predeterminada publica únicamente Mareas del Umbral. Distribuye un mod como archivo `.umbralmod` independiente. `public/distribution.json` no contiene todavía enlaces para APK o EXE; quien publique instaladores debe configurar URLs reales y mantener sus versiones.
+La build predeterminada publica únicamente Mareas del Umbral. Distribuye un mod como archivo `.umbralmod` independiente. `public/distribution.json` contiene los enlaces a los instaladores publicados. Si usas otro repositorio, actualiza esos enlaces para la web; GitHub Actions prepara automáticamente los enlaces de las builds nativas desde `GITHUB_REPOSITORY`.
 
 Revisa por tu cuenta los derechos de los textos, imágenes, audio y marcas que incluyas. El soporte técnico del formato no constituye una autorización para distribuir contenido de terceros.

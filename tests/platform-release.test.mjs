@@ -41,8 +41,8 @@ test('the release workflow prepares runtime distribution before both platform bu
   assert.ok(workflow.lastIndexOf('node scripts/prepare-platform-release.mjs') < workflow.indexOf('npm run desktop:exe'));
 });
 
-test('checked-in distribution stays unpublished until CI prepares a release build', () => {
-  assert.deepEqual(JSON.parse(readFileSync('public/distribution.json', 'utf8')), {
-    androidUrl: null, windowsUrl: null, androidVersionUrl: null, androidReleasesApiUrl: null,
-  });
+test('web and local builds point to the published installers and update manifest', () => {
+  const distribution = JSON.parse(readFileSync('public/distribution.json', 'utf8'));
+  const latest = buildPlatformReleaseConfig({ repository: 'Fonsonis/one-piece-rogue-like-vercel', version: '1.2.0', versionCode: 10200 });
+  assert.deepEqual(distribution, latest.distribution);
 });

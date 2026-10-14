@@ -1,1 +1,6 @@
-{"androidUrl":null,"windowsUrl":null,"androidVersionUrl":null,"androidReleasesApiUrl":null}
+{
+  "androidUrl": "https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/latest/download/mareas-del-umbral.apk",
+  "windowsUrl": "https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/latest/download/mareas-del-umbral-setup.exe",
+  "androidVersionUrl": "https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/latest/download/android-version.json",
+  "androidReleasesApiUrl": "https://api.github.com/repos/Fonsonis/one-piece-rogue-like-vercel/releases/latest"
+}
