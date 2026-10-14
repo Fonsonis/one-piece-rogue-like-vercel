@@ -2,6 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {combatHarness} from './balance-harness.mjs';
+const pack=JSON.parse(fs.readFileSync('mods/one-piece/pack.json','utf8'));
+const canonicalId=id=>pack.legacy.keys[id] || id;
 
 test('Elbaph appends eight playable stages and unlocks from Egghead after Sabaody insertion',()=>{
  const h=combatHarness();
@@ -60,16 +62,24 @@ test('Im phases are separate from Gunko and old fighters retain bonuses, XP and 
 
 test('every new phase has its own four-frame atlas, portrait and catalog destination art',()=>{
  const spec=JSON.parse(fs.readFileSync('docs/elbaph-art-prompts.json'));
- const manifest=JSON.parse(fs.readFileSync('public/art/manifest.json'));
  const h=combatHarness();
  for(const id of Object.keys(spec.assets)){
   h.ctx.assetId=id;assert.equal(h.exec('!!CHARS[assetId]'),true,id);
-  assert.equal(manifest.characters[id]?.frames,4,id);
-  for(const type of ['characters','portraits'])assert.ok(fs.statSync(`public/art/${type}/${id}.png`).size>1000,id);
+  const canonical=canonicalId(id);
+  for(const type of ['characters','portraits']){
+   const asset=`art/${type}/${canonical}.png`;
+   assert.ok(pack.assets.includes(asset),asset);
+   const png=fs.readFileSync(`mods/one-piece/assets/${asset}`);
+   assert.ok(png.length>1000,id);
+   assert.equal(png.readUInt32BE(16),type==='characters'?768:192,id);
+   assert.equal(png.readUInt32BE(20),192,id);
+  }
  }
  h.exec(fs.readFileSync('public/art/world-locations.js','utf8'));
  assert.equal(h.exec('SAGAS[14].islands.every(i=>i.location.place)'),true);
- assert.ok(fs.statSync('public/art/scenes/elbaph.webp').size>1000);
+ const scene=pack.data.SAGAS.find(s=>s.id===canonicalId('elbaph')).img.slice(1);
+ assert.ok(pack.assets.includes(scene),scene);
+ assert.ok(fs.statSync(`mods/one-piece/assets/${scene}`).size>1000);
 });
 
 test('all five Gorosei have playable transformations gated by saga and both levels, with matching base identities',()=>{

@@ -1,16 +1,14 @@
 const CURRENT_VERSION = '1.2.0';
 const CURRENT_VERSION_CODE = 10200;
-const RELEASE_URL = 'https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/latest/download/one-piece-rogue-like.apk';
-const RELEASE_VERSION_URL = 'https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/latest/download/android-version.json';
-const RELEASE_API_URL = 'https://api.github.com/repos/Fonsonis/one-piece-rogue-like-vercel/releases/latest';
+const RELEASE_URL = globalThis.GameDistribution?.androidUrl || '';
+const RELEASE_VERSION_URL = globalThis.GameDistribution?.androidVersionUrl || '';
+const RELEASE_API_URL = globalThis.GameDistribution?.androidReleasesApiUrl || '';
 
 export function isAndroidApp() {
   return globalThis.Capacitor?.isNativePlatform?.() === true && globalThis.Capacitor?.getPlatform?.() === 'android';
 }
 
 async function nativeGet(url) {
-  // GitHub release redirects do not expose CORS headers. Use the native HTTP
-  // bridge only for this small manifest; the APK stays in DownloadManager.
   const http = globalThis.Capacitor?.registerPlugin?.('CapacitorHttp') || globalThis.Capacitor?.Plugins?.CapacitorHttp;
   if (!http?.get) throw new Error('El módulo de conexión nativa no está disponible.');
   const response = await http.get({
@@ -26,7 +24,6 @@ async function nativeGet(url) {
   }
   let data;
   try {
-    // Release assets can arrive as application/octet-stream rather than JSON.
     data = typeof response.data === 'string' ? JSON.parse(response.data) : response.data;
   } catch {
     throw new Error('El archivo de versión publicado no contiene JSON válido.');
@@ -36,10 +33,28 @@ async function nativeGet(url) {
 
 function validateRelease(release) {
   const versionCode = Number(release?.versionCode);
+  let downloadUrl;
+  let configuredUrl;
+  try {
+    downloadUrl = new URL(release?.downloadUrl);
+    configuredUrl = new URL(RELEASE_URL);
+  } catch {
+    throw new Error('El archivo de versión publicado está incompleto o no es válido.');
+  }
+  const configuredArtifact = '/releases/latest/download/mareas-del-umbral.apk';
+  const releaseRoot = configuredUrl.pathname.endsWith(configuredArtifact)
+    ? configuredUrl.pathname.slice(0, -configuredArtifact.length)
+    : null;
+  const validPath = releaseRoot && (
+    downloadUrl.pathname === `${releaseRoot}/releases/download/android-${versionCode}/mareas-del-umbral.apk` ||
+    downloadUrl.pathname === configuredUrl.pathname
+  );
   if (!release || typeof release.version !== 'string' || !release.version.trim() ||
       !Number.isSafeInteger(versionCode) || versionCode <= 0 || versionCode > 2147483647 ||
       typeof release.downloadUrl !== 'string' ||
-      !new RegExp(`^https://github\\.com/Fonsonis/one-piece-rogue-like-vercel/releases/(?:download/android-${versionCode}|latest/download)/one-piece-rogue-like\\.apk$`).test(release.downloadUrl)) {
+      configuredUrl.protocol !== 'https:' || downloadUrl.protocol !== 'https:' ||
+      downloadUrl.origin !== configuredUrl.origin || downloadUrl.username || downloadUrl.password ||
+      downloadUrl.search || downloadUrl.hash || !validPath) {
     throw new Error('El archivo de versión publicado está incompleto o no es válido.');
   }
   return { ...release, versionCode };
@@ -49,12 +64,10 @@ async function latestAndroidRelease() {
   try {
     return validateRelease(await nativeGet(`${RELEASE_VERSION_URL}?t=${Date.now()}`));
   } catch (manifestError) {
-    // The release asset endpoint can fail while the GitHub API still exposes
-    // the published APK. Only accept an APK from the same release tag.
     try {
       const release = await nativeGet(`${RELEASE_API_URL}?t=${Date.now()}`);
       const code = Number(/^android-(\d+)$/.exec(release?.tag_name || '')?.[1]);
-      const apk = release?.assets?.find(asset => asset.name === 'one-piece-rogue-like.apk');
+      const apk = release?.assets?.find(asset => asset.name === 'mareas-del-umbral.apk');
       if (!Number.isInteger(code) || !apk || apk.state !== 'uploaded') throw new Error('La última release no incluye una APK publicada.');
       return validateRelease({ version: release.name || release.tag_name, versionCode: code, downloadUrl: apk.browser_download_url });
     } catch (apiError) {
@@ -74,7 +87,7 @@ function downloadMessage(status) {
     const percent = Math.min(100, Math.floor(downloaded * 100 / total));
     return `⬇ Descargando actualización… ${percent}% · ${(downloaded / 1048576).toFixed(1)}/${(total / 1048576).toFixed(1)} MB`;
   }
-  return status.state === 'paused' ? '⏸ Android ha pausado la descarga; se reanudará cuando sea posible.' : '⬇ Preparando descarga segura en Android…';
+  return status.state === 'paused' ? "⏸ Android ha pausado la technique_038; se reanudará cuando sea posible." : "⬇ Preparando technique_038 segura en Android…";
 }
 
 async function finishNativeDownload(updater, initialStatus, toast) {
@@ -88,7 +101,7 @@ async function finishNativeDownload(updater, initialStatus, toast) {
     if (status.state === 'paused') {
       pausedSince ||= Date.now();
       if (Date.now() - pausedSince > 15000) {
-        toast?.('⏸ La descarga sigue en pausa en Android. Puedes volver a pulsar el botón para comprobarla más tarde.');
+        toast?.("⏸ La technique_038 sigue en pausa en Android. Puedes volver a pulsar el botón para comprobarla más tarde.");
         return;
       }
     } else pausedSince = 0;
@@ -120,12 +133,13 @@ async function installedRelease() {
 }
 
 export async function pendingAndroidUpdate() {
-  if (!isAndroidApp()) return null;
+  if (!isAndroidApp() || !RELEASE_VERSION_URL) return null;
   const [installed, release] = await Promise.all([installedRelease(), latestAndroidRelease()]);
   return release.versionCode > installed.versionCode ? release : null;
 }
 
 export async function downloadAndroidApk({ toast } = {}) {
+  if(!RELEASE_URL){toast?.('Todavía no se ha publicado un instalador de esta edición.');return;}
   if (!isAndroidApp()) {
     globalThis.location.assign(RELEASE_URL);
     return;

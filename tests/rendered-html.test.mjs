@@ -21,11 +21,14 @@ test('static deployment contains the exact game and every asset, with both entry
   for(const [,url] of html.matchAll(/(?:src|href)="([^"#]+)"/g)) {
     if (!url.startsWith('https:')) assert.ok(existsSync(join('dist',url)),url);
   }
-  assert.ok(html.indexOf('save-storage.js') < html.indexOf('game.js'));
+  const boot=readFileSync('dist/content/boot.mjs','utf8');
+  assert.ok(boot.indexOf("'save-storage.js'") < boot.indexOf("'game.js'"));
+  assert.match(html,/content\/boot\.mjs/);
   const config = JSON.parse(readFileSync('vercel.json','utf8'));
   assert.equal(config.framework,null);
   assert.equal(config.outputDirectory,'dist');
   assert.equal(existsSync('dist/server'),false);
   assert.equal(existsSync('dist/api'),false);
+  assert.equal(existsSync('dist/mods'),false,'installable mods must remain outside the default build');
   assert.doesNotMatch(readFileSync('dist/game.js','utf8'), /\/api\/|sendBeacon|cloudReady|btn-login|btn-register/);
 });

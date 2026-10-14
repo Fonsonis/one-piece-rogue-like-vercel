@@ -13,30 +13,22 @@ function trimBounds(image) {
   for(let y=0;y<c.height;y++)for(let x=0;x<c.width;x++)if(a[(y*c.width+x)*4+3]>25){l=Math.min(l,x);r=Math.max(r,x);t=Math.min(t,y);b=Math.max(b,y);}
   return {image,x:l,y:t,w:r-l+1,h:b-t+1};
 }
-const spriteNames=['bandido','marineraso','arlong','buggy','wapol'];
+const spriteNames=["unit_021","unit_020","unit_043","unit_034","unit_117"];
 let assetsPromise;
 async function assets() {
   if(!assetsPromise)assetsPromise=Promise.all([
-    imageAsset('/Images/fondo-game.jpg'),
+    imageAsset('/Images/asset_1958.jpg'),
     ...spriteNames.map(n=>imageAsset('/sprites/'+n+'.png').then(trimBounds)),
-    ...Array.from({length:8},(_,i)=>imageAsset('/runner/luffy-'+i+'.png')),
-    fetch('/runner/luffy.json').then(r=>{if(!r.ok)throw Error('No se pudo cargar la animación');return r.json();})
+    ...Array.from({length:8},(_,i)=>imageAsset("/runner/unit_001-"+i+'.png')),
+    fetch("/runner/unit_001.json").then(r=>{if(!r.ok)throw Error('No se pudo cargar la animación');return r.json();})
   ]).catch(e=>{assetsPromise=null;throw e;});
   return assetsPromise;
 }
 
 export async function openRunner({onExit,onScore,onSteps,onFame,onCheckpoint,best=0}={}) {
   if(document.querySelector('.runner-root'))return;
-  const root=document.createElement('section');root.className='runner-root';root.setAttribute('aria-label','Minijuego Luffy Run');
-  root.innerHTML=`
-    <header class="runner-header"><div><h1>LUFFY RUN</h1><p>¡Corre, salta y abre camino!</p></div><div class="runner-header-actions"><button class="runner-small" data-pause disabled aria-label="Pausar partida">Ⅱ Pausa</button><button class="runner-small" data-exit>✕ Menú</button></div></header>
-    <div class="runner-hud"><div class="runner-stat"><span>PUNTOS</span><strong data-score>0</strong></div><div class="runner-stat"><span>RÉCORD</span><strong data-best>${Number(best)||0}</strong></div><div class="runner-stat"><span>METROS</span><strong data-meters>0</strong></div><div class="runner-stat speed"><span>VELOCIDAD</span><strong data-speed>×1.0</strong></div></div>
-    <div class="runner-stage"><canvas aria-label="Zona de juego. Toca para saltar. Máximo dos saltos antes de tocar el suelo." tabindex="0"></canvas><div class="runner-status" data-callout></div>
-      <div class="runner-dialog"><div class="runner-dialog-card"><h2 data-title>Luffy Run</h2><p data-description>Preparando las animaciones…</p><button data-primary disabled>Cargando…</button></div></div>
-    </div>
-    <div class="runner-controls"><button class="runner-action jump" data-jump>↑ SALTAR<small data-jumps>Doble salto · 2 disponibles</small></button><button class="runner-action punch" data-punch aria-disabled="true">👊 <span data-punch-label>PUÑETAZO</span><small data-cooldown>Gomu Gomu no Pistol</small><span class="cooldown-fill"></span></button></div>
-    <p class="runner-reward" data-reward>⭐ 0 fama · +0,5 por metro · 25 pasos cada 1.000 m</p>
-    <p class="runner-keytip">Toca la pantalla para saltar · Teclado: espacio / ↑ salto · X golpe · P pausa</p>`;
+  const root=document.createElement('section');root.className='runner-root';root.setAttribute('aria-label',GameContent.text("text_0161"));
+  root.innerHTML=`${GameContent.text("text_0162")}${Number(best)||0}${GameContent.text("text_0163")}`;
   document.body.appendChild(root);
   const oldOverflow=document.body.style.overflow;document.body.style.overflow='hidden';
   const $=s=>root.querySelector(s),canvas=$('canvas'),ctx=canvas.getContext('2d');
@@ -46,9 +38,9 @@ export async function openRunner({onExit,onScore,onSteps,onFame,onCheckpoint,bes
   const reducedMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
   let audio;
   function sound(type) {
-    // Follow the music mute setting already used by the main game.
+
     try {
-      if(localStorage.getItem('oplike_muted')==='true')return;
+      if(GameContent.storage.getItem("umbral_muted")==='true')return;
       audio ||= new (window.AudioContext||window.webkitAudioContext)();
       if(audio.state==='suspended')audio.resume().catch(()=>{});
       const osc=audio.createOscillator(),gain=audio.createGain();osc.connect(gain);gain.connect(audio.destination);
@@ -79,14 +71,14 @@ export async function openRunner({onExit,onScore,onSteps,onFame,onCheckpoint,bes
   }});
   function showDialog(title,description,label,action) {
     $('[data-title]').textContent=title;$('[data-description]').textContent=description;primary.textContent=label;primary.disabled=false;primary.onclick=action;dialog.hidden=false;
-    // Only move focus for keyboard players; touch remains on the playfield.
+
     if(document.activeElement===canvas)primary.focus({preventScroll:true});
   }
   function start(){if(!loaded)return;dialog.hidden=true;earnedSteps=0;earnedFame=0;engine.start();last=performance.now();accumulator=0;pause.disabled=false;pause.textContent='Ⅱ Pausa';pause.setAttribute('aria-label','Pausar partida');$('[data-callout]').textContent='';canvas.focus({preventScroll:true});}
   function togglePause(){
     if(engine.status==='running'){
       engine.pause();pause.textContent='▶ Seguir';pause.setAttribute('aria-label','Continuar partida');
-      showDialog('Pausa','Tómate un respiro. Luffy te espera.','SEGUIR CORRIENDO',togglePause);
+      showDialog('Pausa',GameContent.text("text_0164"),'SEGUIR CORRIENDO',togglePause);
     }else if(engine.status==='paused'){
       engine.resume();dialog.hidden=true;pause.textContent='Ⅱ Pausa';pause.setAttribute('aria-label','Pausar partida');last=performance.now();accumulator=0;canvas.focus({preventScroll:true});
     }
@@ -130,7 +122,7 @@ export async function openRunner({onExit,onScore,onSteps,onFame,onCheckpoint,bes
     for(let x=offset;x<W;x+=bgW)ctx.drawImage(background,x,0,bgW+1,bgH);
     ctx.fillStyle='#447e32';ctx.fillRect(0,G,W,H-G);
     ctx.fillStyle='#c7b276';ctx.fillRect(0,G+7,W,16);ctx.fillStyle='#254b2a';ctx.fillRect(0,G+23,W,5);
-    // Moving ground marks communicate speed without moving the player's camera anchor.
+
     ctx.fillStyle='#88a551';for(let x=-(engine.scroll%65);x<W;x+=65)ctx.fillRect(x,G+40,26,4);
     ctx.save();
     if(engine.shake&&!reducedMotion)ctx.translate(Math.sin(engine.time*173)*engine.shake,Math.cos(engine.time*139)*engine.shake*.5);
@@ -171,11 +163,11 @@ export async function openRunner({onExit,onScore,onSteps,onFame,onCheckpoint,bes
       lastHud=now;$('[data-score]').textContent=engine.score;$('[data-best]').textContent=Math.max(best,engine.score);$('[data-meters]').textContent=engine.meters;
       $('[data-jumps]').textContent=`Doble salto · ${RULES.maxJumps-engine.jumpsUsed} disponibles`;
       $('[data-jump]').setAttribute('aria-disabled',String(engine.status!=='running'||engine.jumpsUsed>=RULES.maxJumps));
-      $('[data-reward]').textContent=`⭐ ${formatFame(earnedFame)} fama (+0,5/m) · ${engine.meters % RULES.metersPerReward}/1.000 m para ${RULES.stepsPerReward} pasos · Pasos ganados: ${earnedSteps}`;$('[data-speed]').textContent='×'+(engine.speed/RULES.startSpeed).toFixed(1);
+      $('[data-reward]').textContent=`⭐ ${formatFame(earnedFame)} fama (+0,5/m) · ${engine.meters % RULES.metersPerReward}/1.000 m para ${RULES.stepsPerReward} pasos · Pasos ganados: ${earnedSteps}`;$("[data-speed]").textContent='×'+(engine.speed/RULES.startSpeed).toFixed(1);
       const waiting=engine.cooldown>0;
       $('[data-punch]').setAttribute('aria-disabled',String(waiting||engine.status!=='running'));
       $('[data-punch-label]').textContent=waiting?'RECARGANDO':'PUÑETAZO';
-      $('[data-cooldown]').textContent=waiting?engine.cooldown.toFixed(1)+' s':'Gomu Gomu no Pistol';
+      $('[data-cooldown]').textContent=waiting?engine.cooldown.toFixed(1)+' s':GameContent.text("text_0165");
       $('.cooldown-fill').style.transform=`scaleX(${1-engine.cooldown/RULES.punchCooldown})`;
     }
     raf=requestAnimationFrame(loop);

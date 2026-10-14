@@ -1,7 +1,14 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {existsSync} from 'node:fs';
+import {existsSync,readFileSync} from 'node:fs';
 import {combatHarness} from './balance-harness.mjs';
+const pack=JSON.parse(readFileSync('mods/one-piece/pack.json','utf8'));
+const legacyIds=Object.entries(pack.legacy.keys).sort((a,b)=>b[0].length-a[0].length);
+const canonicalId=value=>{
+  if(pack.legacy.keys[value])return pack.legacy.keys[value];
+  const generated=legacyIds.find(([legacy])=>value.startsWith(legacy+'-'));
+  return generated?generated[1]+value.slice(generated[0].length):value;
+};
 
 test('only established groups are available; each fighter counts for one chosen group', () => {
   const h=combatHarness();
@@ -50,8 +57,12 @@ test('custom artwork is packaged as four-pose atlases and portraits', () => {
   for(const [id,skins] of variants) {
     assert.equal(new Set(skins).size,skins.length,`${id} must look different for each affiliation`);
     for(const name of skins) {
-      assert.ok(existsSync(`public/art/characters/${name}.png`),name);
-      assert.ok(existsSync(`public/art/portraits/${name}.png`),name);
+      const canonical=canonicalId(name);
+      for(const folder of ['characters','portraits']){
+        const asset=`art/${folder}/${canonical}.png`;
+        assert.ok(pack.assets.includes(asset),asset);
+        assert.ok(existsSync(`mods/one-piece/assets/${asset}`),asset);
+      }
     }
   }
 });

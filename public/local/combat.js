@@ -1,11 +1,11 @@
-// Adaptador síncrono: reutiliza las reglas del juego sin tocar su viaje ni su guardado.
+
 'use strict';
 globalThis.LocalCombat = (() => {
   const roster = Object.entries(CHARS).map(([id, c]) => ({ id, name: c.name, types: c.types }));
   const allowed = new Set(roster.map(c => c.id));
   function ownedRoster() {
-    const bases = [...new Set(['luffy', ...(meta.roster || [])].filter(id => allowed.has(id)).map(baseFormOf))];
-    return bases.filter(isNakamaUnlocked).map(id => evolutionFormAt(id, startLvlOf(id)));
+    const bases = [...new Set(["unit_001", ...(meta.roster || [])].filter(id => allowed.has(id)).map(baseFormOf))];
+    return bases.filter(isAllyUnlocked).map(id => evolutionFormAt(id, startLvlOf(id)));
   }
   const withBattle = (sessionBattle, fn) => {
     const previous = battle;
@@ -27,7 +27,7 @@ globalThis.LocalCombat = (() => {
     if (players.length < 2 || players.length > 8) throw new Error('Se necesitan entre 2 y 8 jugadores.');
     const coop = options.mode === 'coop';
     const pTeam = coop ? players.flatMap(crew) : crew(players[0]);
-    const eTeam = coop ? [{ ...makeEnemy(options.boss || 'kaido', 30), owner: 'yonko' }] : crew(players[1]);
+    const eTeam = coop ? [{ ...makeEnemy(options.boss || "unit_053", 30), owner: "Regent" }] : crew(players[1]);
     if (coop) {
       const strength = players.length * players[0].team.length;
       const boss = eTeam[0];
@@ -44,7 +44,7 @@ globalThis.LocalCombat = (() => {
       activeByOwner: {}, relays: {}, turns: [], event: null, delay: 900 };
     for (const f of [...pTeam, ...eTeam]) b.activeByOwner[f.owner] ??= f;
     [...pTeam, ...eTeam].forEach(f => { f.st = {}; f.dodgeLeft = passiveRule(f).dodge || 0; });
-    b.lines.push(coop ? '¡Toda la alianza contra el yonko!' : '¡Comienza el duelo amistoso!');
+    b.lines.push(coop ? GameContent.text("extra_062") : '¡Comienza el duelo amistoso!');
     return b;
   }
   function activeFor(b, owner) {
@@ -77,12 +77,12 @@ globalThis.LocalCombat = (() => {
     withBattle(b, () => {
       b.event = null;
       const allies = () => (b.opts.coop ? b.participants : [b.participants[0]]).map(id => activeFor(b, id)).filter(Boolean);
-      const enemy = () => activeFor(b, b.opts.coop ? 'yonko' : b.participants[1]);
+      const enemy = () => activeFor(b, b.opts.coop ? "Regent" : b.participants[1]);
       if (!b.turns.length && !b.endRound) {
         const active = allies(); b.roundOwners = active.map(f => f.owner);
         if (b.opts.coop) {
-          // Una acción conjunta de los jugadores y una sola respuesta del yonkou.
-          b.turns.push(['alliance', 'yonko'], ['yonko', 'alliance']);
+
+          b.turns.push(['alliance', "Regent"], ["Regent", 'alliance']);
         } else for (const p of active) {
           const e = enemy(); b.curP = p; b.curE = e;
           if (!e) break;
@@ -124,7 +124,7 @@ globalThis.LocalCombat = (() => {
         }
         b.delay = 900;
       } else {
-        b.localActors = [...b.roundOwners.map(id => b.activeByOwner[id]), b.activeByOwner[b.opts.coop ? 'yonko' : b.participants[1]]].filter(Boolean);
+        b.localActors = [...b.roundOwners.map(id => b.activeByOwner[id]), b.activeByOwner[b.opts.coop ? "Regent" : b.participants[1]]].filter(Boolean);
         b.curP = b.localActors.find(f => b.pTeam.includes(f)) || b.curP;
         b.curE = b.localActors.find(f => b.eTeam.includes(f)) || b.curE;
         afterRound();
@@ -144,7 +144,7 @@ globalThis.LocalCombat = (() => {
   }
   return Object.freeze({ roster, ownedRoster, validSelection, validTeam, create, command, tick, snapshot, withBattle,
     icon: (id, size = 36) => allowed.has(id) ? charIcon(id, size) : '',
-    name: id => allowed.has(id) ? CHARS[id].name : 'Nakama',
+    name: id => allowed.has(id) ? CHARS[id].name : "Aliado",
     home: () => screenHome(),
   });
 })();

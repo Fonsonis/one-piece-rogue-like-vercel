@@ -10,7 +10,7 @@ const portArg = args.indexOf('--port');
 const hostArg = args.indexOf('--host');
 const port = Number(portArg < 0 ? process.env.PORT || 4173 : args[portArg + 1]);
 const host = hostArg < 0 ? '127.0.0.1' : args[hostArg + 1];
-const mime = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.json':'application/json', '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.svg':'image/svg+xml', '.mp3':'audio/mpeg', '.woff2':'font/woff2' };
+const mime = { '.html':'text/html; charset=utf-8', '.js':'text/javascript; charset=utf-8', '.mjs':'text/javascript; charset=utf-8', '.css':'text/css; charset=utf-8', '.json':'application/json', '.png':'image/png', '.webp':'image/webp', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.svg':'image/svg+xml', '.mp3':'audio/mpeg', '.ttf':'font/ttf', '.woff2':'font/woff2' };
 const server = createServer(async (req, res) => {
   if (!['GET','HEAD'].includes(req.method)) { res.writeHead(405, {Allow:'GET, HEAD'}).end(); return; }
   try {

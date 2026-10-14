@@ -2,6 +2,8 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {combatHarness} from './balance-harness.mjs';
+const contentPack=JSON.parse(fs.readFileSync('mods/one-piece/pack.json','utf8'));
+const canonicalId=id=>contentPack.legacy.keys[id] || id;
 
 test('Sabaody connects Thriller Bark to Marineford and contains the Supernovas and two stages',()=>{
  const h=combatHarness();
@@ -31,10 +33,16 @@ test('God Valley children are independent collectible recruits with separate pro
 });
 
 test('new Sabaody and Straw Hat forms all have packaged sprites and portraits',()=>{
- const manifest=JSON.parse(fs.readFileSync('public/art/manifest.json'));
- for(const pack of ['sabaody','strawhat','zou'])for(const id of Object.keys(JSON.parse(fs.readFileSync(`docs/${pack}-art-prompts.json`)).assets)){
-  assert.equal(manifest.characters[id]?.frames,4,id);
-  for(const folder of ['characters','portraits'])assert.ok(fs.statSync(`public/art/${folder}/${id}.png`).size>1000,id);
+ for(const group of ['sabaody','strawhat','zou'])for(const id of Object.keys(JSON.parse(fs.readFileSync(`docs/${group}-art-prompts.json`)).assets)){
+  const canonical=canonicalId(id);
+  for(const folder of ['characters','portraits']){
+   const asset=`art/${folder}/${canonical}.png`;
+   assert.ok(contentPack.assets.includes(asset),asset);
+   const png=fs.readFileSync(`mods/one-piece/assets/${asset}`);
+   assert.ok(png.length>1000,id);
+   assert.equal(png.readUInt32BE(16),folder==='characters'?768:192,id);
+   assert.equal(png.readUInt32BE(20),192,id);
+  }
  }
 });
 

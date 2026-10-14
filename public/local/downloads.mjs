@@ -1,5 +1,5 @@
-const ANDROID_URL = 'https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/latest/download/one-piece-rogue-like.apk';
-const WINDOWS_URL = 'https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/latest/download/one-piece-rogue-like-setup.exe';
+const ANDROID_URL = globalThis.GameDistribution?.androidUrl || '';
+const WINDOWS_URL = globalThis.GameDistribution?.windowsUrl || '';
 
 export function openDownloadChooser(opener) {
   if (document.getElementById('download-chooser')) return;
@@ -14,8 +14,8 @@ export function openDownloadChooser(opener) {
       <h2 id="download-chooser-title">Descargar el juego</h2>
       <p>Elige la versión adecuada para tu dispositivo. Ambas incluyen el juego completo y funcionan sin conexión.</p>
       <div class="actions">
-        <a class="btn green" href="${ANDROID_URL}" target="_blank" rel="noopener noreferrer">🤖 APK para Android</a>
-        <a class="btn blue" href="${WINDOWS_URL}" target="_blank" rel="noopener noreferrer">🖥️ EXE para Windows</a>
+        ${ANDROID_URL?`<a class="btn green" href="${ANDROID_URL}" target="_blank" rel="noopener noreferrer">🤖 APK para Android</a>`:'<span>APK aún no publicado</span>'}
+        ${WINDOWS_URL?`<a class="btn blue" href="${WINDOWS_URL}" target="_blank" rel="noopener noreferrer">🖥️ EXE para Windows</a>`:'<span>Instalador de Windows aún no publicado</span>'}
         <button class="btn gray" type="button" id="download-chooser-close">Cerrar</button>
       </div>
       <small>Windows puede mostrar un aviso de SmartScreen mientras el instalador no tenga firma digital.</small>
@@ -35,7 +35,7 @@ export function openDownloadChooser(opener) {
   overlay.querySelector('#download-chooser-close').addEventListener('click', close);
   document.addEventListener('keydown', onKeydown);
   document.body.append(overlay);
-  overlay.querySelector('a').focus();
+  (overlay.querySelector('a')||overlay.querySelector('#download-chooser-close')).focus();
 }
 
 export const downloadUrls = Object.freeze({ android: ANDROID_URL, windows: WINDOWS_URL });

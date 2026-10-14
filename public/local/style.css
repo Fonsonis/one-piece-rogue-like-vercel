@@ -16,7 +16,7 @@ body:has(#local-arena)>.dmg-pop{z-index:2200}
 body:has(#local-arena)>.ultimate-scene{z-index:2201}
 @media(max-width:600px){#local-arena{height:calc(100dvh - 160px);min-height:570px}.local-game:has(#local-arena) .local-header{padding-bottom:6px}.local-game:has(#local-arena) .local-eyebrow{display:none}.local-game:has(#local-arena) .local-header h1{font-size:20px}}
 
-.local-den-den{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:44px;padding:8px 12px;border:1px solid #62a0a1;border-radius:9px;background:#e5f5f0;color:#194d53;font:700 14px/1.4 system-ui,sans-serif}.local-den-den>span{font-size:22px}.local-den-den strong{white-space:nowrap}.local-den-den small{flex-basis:100%;font:600 11px/1.4 system-ui,sans-serif}
+.local-unit_249-unit_249{display:flex;align-items:center;gap:8px;flex-wrap:wrap;min-height:44px;padding:8px 12px;border:1px solid #62a0a1;border-radius:9px;background:#e5f5f0;color:#194d53;font:700 14px/1.4 system-ui,sans-serif}.local-unit_249-unit_249>span{font-size:22px}.local-unit_249-unit_249 strong{white-space:nowrap}.local-unit_249-unit_249 small{flex-basis:100%;font:600 11px/1.4 system-ui,sans-serif}
 
 /* A readable path from connection, through team setup, to starting a match. */
 .local-game{background:linear-gradient(145deg,#edf5ee,#f4efe2 48%,#f2eee4);}
@@ -40,10 +40,10 @@ body:has(#local-arena)>.ultimate-scene{z-index:2201}
 .local-room-heading h2{margin:14px 0 4px;}
 .local-badge{font-size:12px;line-height:1.5;}
 .local-config{align-items:start;}
-.local-config .local-field,.local-config .local-den-den{height:100%;}
-.local-config .local-den-den{align-content:center;border-width:2px;}
-.local-config .local-den-den strong{font-size:17px;}
-.local-config .local-den-den small{font-size:12px;}
+.local-config .local-field,.local-config .local-unit_249-unit_249{height:100%;}
+.local-config .local-unit_249-unit_249{align-content:center;border-width:2px;}
+.local-config .local-unit_249-unit_249 strong{font-size:17px;}
+.local-config .local-unit_249-unit_249 small{font-size:12px;}
 .local-player{background:#f5faf6;}
 .local-player>span:nth-child(2){font-weight:750;}
 .local-team-picker{margin-top:18px;}
@@ -66,7 +66,7 @@ body:has(#local-arena)>.ultimate-scene{z-index:2201}
  .local-game .local-actions>.btn{min-width:0;}
  .local-config{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;}
  .local-config .local-field{font-size:12px;}
- .local-config .local-den-den{padding:8px;}
+ .local-config .local-unit_249-unit_249{padding:8px;}
 }
 @media(max-width:360px){.local-config{grid-template-columns:1fr;}}
 
@@ -120,7 +120,7 @@ body:has(#local-arena)>.ultimate-scene{z-index:2201}
     left:50%; bottom:calc(8px - var(--sprite-size) * .0625);
     margin-left:calc(var(--sprite-size) * -.5);
   }
-  /* theme.css fija 140px!important en el atlas interior: heredar el tamaño
+  /* theme.css fija 140px!important en el unit_393 interior: heredar el tamaño
      del slot evita que vuelva a salirse de la carta cooperativa. */
   #local-arena .local-coop #side-p .fcard.active .fcard-sprite .sprite > .dex-sprite {
     --sprite-size:inherit!important;

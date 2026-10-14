@@ -1,0 +1,6 @@
+.content-mods-button{position:fixed;left:12px;bottom:max(12px,env(safe-area-inset-bottom));z-index:1500;border:2px solid #ddb96b;background:#102b44;color:#fff4d3;border-radius:10px;padding:10px 16px;font-weight:800;cursor:pointer;box-shadow:0 3px 8px #0006}
+[data-content="umbral"] .dex-sprite,[data-content="umbral"] .fcard-sprite .sprite{--portrait-scale:1!important;--portrait-shift:0!important;--motion-fit-x:1!important;--motion-fit-y:1!important;--motion-floor:0!important;--motion-center:0!important}
+[data-content="umbral"] .dex-sprite{--unit_393-scale:1!important;--unit_393-shift:0!important}
+[data-content="umbral"] .world-sea{background:radial-gradient(ellipse at 35% 10%,#66b8bb66,transparent 50%),repeating-linear-gradient(172deg,#155567 0px,#176071 22px,#246d7b 24px,#155567 28px);}
+[data-content="umbral"] .world-sea:after{background:repeating-linear-gradient(9deg,transparent 0px,transparent 55px,#a2dbcf12 57px,transparent 60px);opacity:.6;mix-blend-mode:screen;}
+#content-mods{z-index:2000}#content-mods .modal{max-height:85vh;overflow:auto}#content-mods [data-status]{overflow-wrap:anywhere}

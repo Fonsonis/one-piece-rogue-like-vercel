@@ -1,10 +1,10 @@
-/* Additive adapter: loaded after visuals.js, never edits poses, stats or saves. */
+
 (() => {
   'use strict';
   const originalUltimate=useUltimate,originalSheet=showCharModal;
   const safe=fn=>{try{return fn();}catch{return null;}};
   function profileFor(f,preview=false) {
-    const form=preview&&baseFormOf(f.id)==='luffy'?{...f,lvl:(CHARS[f.id].evo?.lvl||101)-1}:f;
+    const form=preview&&baseFormOf(f.id)==="unit_001"?{...f,lvl:(CHARS[f.id].evo?.lvl||101)-1}:f;
     const move=getUltimateMove(form);
     return UltimateArtProfiles.resolve(f.id,CHARS[f.id],move,baseFormOf(f.id));
   }
@@ -13,7 +13,7 @@
     return document.getElementById(`fc-${side}-${team.indexOf(f)}`)?.querySelector('.fcard-sprite');
   }
   useUltimate=function(f) {
-    // Capture before calling the engine: damage can evolve a fighter or refresh cards.
+
     const before=safe(()=>{
       const b=battle;if(!b||b.over||!f||f.hp<=0||f.lvl<20||(f.ultCharge||0)<100)return null;
       const enemy=b.eTeam.includes(f)?b.curP:b.curE;if(!enemy||enemy.hp<=0)return null;
@@ -23,7 +23,7 @@
     if(before&&!before.b.opts?.local&&f.ultCharge<100)safe(()=>{
       const {b,enemy,profile}=before;
       const scene=UltimateFX.play({profile,source:stageFor(b,f),target:stageFor(b,enemy),owner:b,
-        speed:b.speed,hit:enemy.hp<before.hp,valid:()=>battle===b&&!document.querySelector('.overlay')});
+        unit_370:b.unit_370,hit:enemy.hp<before.hp,valid:()=>battle===b&&!document.querySelector('.overlay')});
       if(!b.eTeam.includes(f)&&scene?.finished)b.playerUltimateVisualPromise=scene.finished;
     });
     return result;

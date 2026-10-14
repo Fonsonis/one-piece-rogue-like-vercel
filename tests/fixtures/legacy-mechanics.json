@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "level": 37,
+  "variance": 0.91,
+  "seed": 305419896,
+  "fighters": [
+    {"id":"unit_001","lvl":37,"hp":156,"maxhp":156,"atk":48,"def":32,"spatk":40,"spdef":28,"spd":40,"moves":["technique_004","technique_005"],"damage":{"dmg":35,"eff":1.25,"guard":false}},
+    {"id":"unit_008","lvl":37,"hp":151,"maxhp":151,"atk":52,"def":36,"spatk":44,"spdef":32,"spd":36,"moves":["technique_018","technique_019"],"damage":{"dmg":20,"eff":0.75,"guard":false}},
+    {"id":"unit_010","lvl":37,"hp":136,"maxhp":136,"atk":40,"def":28,"spatk":48,"spdef":32,"spd":48,"moves":["technique_041","technique_039"],"damage":{"dmg":32,"eff":1,"guard":false}},
+    {"id":"unit_016","lvl":37,"hp":146,"maxhp":146,"atk":48,"def":32,"spatk":40,"spdef":28,"spd":48,"moves":["technique_012","technique_013"],"damage":{"dmg":31,"eff":1.25,"guard":false}},
+    {"id":"unit_046","lvl":37,"hp":161,"maxhp":161,"atk":28,"def":36,"spatk":36,"spdef":40,"spd":36,"moves":["technique_001","technique_014"],"damage":{"dmg":17,"eff":1.25,"guard":false}},
+    {"id":"unit_047","lvl":37,"hp":141,"maxhp":141,"atk":36,"def":32,"spatk":44,"spdef":36,"spd":40,"moves":["technique_055","technique_047"],"damage":{"dmg":41,"eff":1,"guard":false}},
+    {"id":"unit_152","lvl":37,"hp":205,"maxhp":205,"atk":60,"def":52,"spatk":69,"spdef":56,"spd":52,"moves":["technique_139","technique_119"],"damage":{"dmg":43,"eff":0.75,"guard":false}},
+    {"id":"unit_057","lvl":37,"hp":156,"maxhp":156,"atk":44,"def":36,"spatk":52,"spdef":40,"spd":48,"moves":["technique_017","technique_080"],"damage":{"dmg":66,"eff":1,"guard":false}},
+    {"id":"unit_064","lvl":37,"hp":185,"maxhp":185,"atk":60,"def":52,"spatk":69,"spdef":56,"spd":32,"moves":["technique_033","technique_087"],"damage":{"dmg":81,"eff":1,"guard":false}},
+    {"id":"unit_056","lvl":37,"hp":215,"maxhp":215,"atk":60,"def":48,"spatk":69,"spdef":52,"spd":36,"moves":["technique_047","technique_069"],"damage":{"dmg":54,"eff":1,"guard":false}},
+    {"id":"unit_053","lvl":37,"hp":235,"maxhp":235,"atk":64,"def":60,"spatk":73,"spdef":64,"spd":36,"moves":["technique_064","technique_065"],"damage":{"dmg":113,"eff":1,"guard":false}},
+    {"id":"unit_051","lvl":37,"hp":205,"maxhp":205,"atk":64,"def":52,"spatk":73,"spdef":56,"spd":52,"moves":["technique_062","technique_049"],"damage":{"dmg":147,"eff":1,"guard":false}},
+    {"id":"unit_021","lvl":37,"hp":126,"maxhp":126,"atk":36,"def":28,"spatk":28,"spdef":24,"spd":24,"moves":["technique_045","technique_046"],"damage":{"dmg":21,"eff":1.25,"guard":false}}
+  ],
+  "mapCount": 70,
+  "mapsSha256": "9c0114fef1bb1380c0453b4e2e0a430a5ab065700ca09b2ca3ceac0e6fcdd132"
+}

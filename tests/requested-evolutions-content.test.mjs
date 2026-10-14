@@ -4,7 +4,7 @@ import {combatHarness} from './balance-harness.mjs';
 
 test('Jaya recruits five-star Kurohige before his current Emperor evolution',()=>{
  const h=combatHarness();
- const jaya=h.exec("SAGAS.find(s=>s.id==='skypiea').islands.find(i=>i.name==='Jaya')");
+ const jaya=h.exec("SAGAS.find(s=>s.id==='skypiea').islands.find(i=>i.name.startsWith('Jaya'))");
  assert.deepEqual(Array.from(jaya.boss),['sarquiss','bellamy','teach']);
  assert.ok(Array.from(jaya.pool).includes('teach'));
  assert.equal(h.exec("CHARS.teach.name"),'Kurohige · Jaya');

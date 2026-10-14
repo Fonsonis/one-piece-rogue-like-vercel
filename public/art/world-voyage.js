@@ -1,4 +1,4 @@
-/* Presentation-only travel on the same curve drawn on the chart. No game RNG or saves. */
+
 (() => {
   'use strict';
   const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));

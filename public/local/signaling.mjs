@@ -1,4 +1,4 @@
-const OFFICIAL_ORIGIN = 'https://one-piece-rogue-like-vercel.vercel.app';
+const OFFICIAL_ORIGIN = GameContent.text("extra_067");
 const REQUEST_TIMEOUT = 10000;
 
 export function normalizeRoomCode(value) {

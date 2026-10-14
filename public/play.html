@@ -8,12 +8,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="One Piece Rogue Like">
-  <link rel="icon" type="image/png" href="Images/Logo.png">
-  <link rel="apple-touch-icon" href="Images/Logo.png">
+  <meta name="apple-mobile-web-app-title" content="Mareas del Umbral">
+  <link rel="icon" type="image/png" href="content/art/icon.png">
+  <link rel="apple-touch-icon" href="content/art/icon.png">
   <link rel="manifest" href="manifest.json">
-  <link rel="preload" href="fonts/press-start-2p.ttf" as="font" type="font/ttf" crossorigin>
-  <title>One Piece Rogue Like</title>
+  <title>Mareas del Umbral</title>
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="runner/runner.css">
   <link rel="stylesheet" href="minigames/menu.css">
@@ -32,7 +31,7 @@
   <link rel="stylesheet" href="art/interface-polish.css">
   <link rel="stylesheet" href="art/backpack.css">
   <link rel="stylesheet" href="art/training-shop.css">
-  <link rel="stylesheet" href="art/nakama-picker.css">
+  <link rel="stylesheet" href="art/ally-picker.css">
   <link rel="stylesheet" href="art/challenges.css">
   <link rel="stylesheet" href="art/auto-config.css">
   <link rel="stylesheet" href="art/character-sheet.css">
@@ -42,24 +41,10 @@
   <link rel="stylesheet" href="onboarding.css">
   <link rel="stylesheet" href="art/ux-system.css">
   <link rel="stylesheet" href="art/settings-ux.css">
+  <link rel="stylesheet" href="content/style.css">
 </head>
 <body>
   <div id="app"></div>
-  <script src="data.js"></script>
-  <script src="art/world-locations.js"></script>
-  <script src="save-storage.js"></script>
-  <script src="art/world-voyage.js"></script>
-  <script src="game.js"></script>
-  <script src="local/combat.js"></script>
-  <script src="local/battle.js"></script>
-  <script src="art/visuals.js"></script>
-  <script src="art/market-reveal.js"></script>
-  <script src="art/ultimates/profiles.js"></script>
-  <script src="art/ultimates/effects.js"></script>
-  <script src="art/ultimates/integration.js"></script>
-  <script src="art/event-sprites.js"></script>
-  <script src="art/character-sheet.js"></script>
-  <script type="module" src="onboarding.mjs"></script>
-  <script type="module" src="local/update-notice.mjs"></script>
+  <script type="module" src="content/boot.mjs"></script>
 </body>
 </html>

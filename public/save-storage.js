@@ -1,14 +1,14 @@
-/* A single, device-local JSON save. No network, cookies, account or database. */
+
 (function (root) {
   'use strict';
-  const KEY = 'oplike_save';
+  const KEY = "umbral_save";
   const MAX_BYTES = 5 * 1024 * 1024;
   const record = value => value !== null && typeof value === 'object' && !Array.isArray(value);
-  const SAGA_ORDER = ['eastblue','alabasta','skypiea','water7','thriller','sabaody','marineford','gyojin','punkhazard','dressrosa','zou','wholecake','wano','egghead','elbaph'];
-  const LEGACY_SAGA_ORDER = SAGA_ORDER.filter(id=>id!=='sabaody'&&id!=='zou'&&id!=='punkhazard');
+  const SAGA_ORDER = GameContent.data.SAGAS.map(saga=>saga.id);
+  const LEGACY_SAGA_ORDER = SAGA_ORDER.filter(id=>id!=="region_06"&&id!=="region_11"&&id!=="region_09");
   function validate(data) {
-    if (!record(data) || data.game !== 'grandlinelike' || data.version !== 1 || !record(data.meta)) {
-      throw new Error('Ese archivo no es un guardado compatible de GrandLineLike.');
+    if (!record(data) || data.game !== "umbral" || data.contentId !== GameContent.id || data.version !== 1 || !record(data.meta)) {
+      throw new Error(GameContent.text("text_0166"));
     }
     for (const key of ['dex', 'recruited', 'roster', 'defeated', 'relics', 'reachedSagas']) {
       if (data.meta[key] !== undefined && (!Array.isArray(data.meta[key]) || data.meta[key].some(id => typeof id !== 'string'))) throw new Error('Progreso inválido.');
@@ -23,9 +23,9 @@
     const storyView=data.meta.storyMapView;
     if(storyView!==undefined&&storyView!==null&&(!record(storyView)||
       !SAGA_ORDER.includes(storyView.sagaId)||!Number.isInteger(storyView.index)||storyView.index<0||storyView.index>20||
-      !['classic','nuzlocke'].includes(storyView.mode)||![1,2,3,4,5].includes(storyView.diff)||
+      !['classic',"permadeath"].includes(storyView.mode)||![1,2,3,4,5].includes(storyView.diff)||
       !Number.isFinite(storyView.scrollTop)||storyView.scrollTop<0||storyView.scrollTop>1000000)) {
-      throw new Error('Vista de Historia inválida.');
+      throw new Error(GameContent.text("text_0167"));
     }
     if (Object.values(data.meta.characterUsage || {}).some(n => !Number.isSafeInteger(n) || n < 0)) throw new Error('Contadores de uso inválidos.');
     for (const islands of Object.values(data.meta.islandProgress || {})) {
@@ -39,9 +39,9 @@
     const dailySteps=data.meta.dailySteps;
     if(dailySteps!==undefined&&(!record(dailySteps)||!/^\d{4}-\d{2}-\d{2}$/.test(dailySteps.date)||
         !Number.isSafeInteger(dailySteps.remaining)||dailySteps.remaining<0||dailySteps.remaining>1000)) throw new Error('Pasos diarios inválidos.');
-    const denDen=data.meta.denDenMushis;
-    if (denDen!==undefined && denDen!==null && (!record(denDen) || !/^\d{4}-\d{2}-\d{2}$/.test(denDen.date) ||
-        !Number.isSafeInteger(denDen.remaining) || denDen.remaining<0 || denDen.remaining>4)) throw new Error('Den den mushis inválidos.');
+    const Radio=data.meta.RadioMushis;
+    if (Radio!==undefined && Radio!==null && (!record(Radio) || !/^\d{4}-\d{2}-\d{2}$/.test(Radio.date) ||
+        !Number.isSafeInteger(Radio.remaining) || Radio.remaining<0 || Radio.remaining>4)) throw new Error(GameContent.text("text_0168"));
     const t=data.meta.challenge;
     if(t!==undefined&&t!==null){
       const teamSize=t.kind==='legends'&&!t.legendCharacter?2:1;
@@ -65,11 +65,11 @@
     }
     const bagTier = data.meta.global?.backpackTier;
     if (bagTier !== undefined && (!Number.isInteger(bagTier) || bagTier < 0 || bagTier > 17)) throw new Error('Ampliación de mochila inválida.');
-    for (const key of ['fame', 'accXp', 'towerRecord', 'runnerBest', 'logPoses', 'starPity', 'soloWins', 'totalIslands']) {
+    for (const key of ['fame', 'accXp', 'towerRecord', 'runnerBest', "Compasss", 'starPity', 'soloWins', 'totalIslands']) {
       if (data.meta[key] !== undefined && (!Number.isFinite(data.meta[key]) || data.meta[key] < 0)) throw new Error('Progreso inválido.');
     }
     if (data.meta.minigameBests !== undefined && (!record(data.meta.minigameBests) ||
-      Object.entries(data.meta.minigameBests).some(([id, score]) => !['zoro','nami','usopp','sanji','robin','chopper','brook','franky','jinbe'].includes(id) || !Number.isSafeInteger(score) || score < 0))) {
+      Object.entries(data.meta.minigameBests).some(([id, score]) => !["unit_008","unit_010","unit_014","unit_016","unit_047","unit_046","unit_049","unit_048","unit_050"].includes(id) || !Number.isSafeInteger(score) || score < 0))) {
       throw new Error('Récords de minijuegos inválidos.');
     }
     if (data.run !== null && data.run !== undefined) {
@@ -93,8 +93,8 @@
       if (r?.autoPaidMapIdx !== undefined && (!Number.isInteger(r.autoPaidMapIdx) || r.autoPaidMapIdx<0 || r.autoPaidMapIdx>4 || r.autoPaidMapIdx>(r.mapIdx||0))) throw new Error('Consumo automático inválido.');
       if (r?.campaignVersion !== undefined && r.campaignVersion !== 1) throw new Error('Campaña incompatible.');
       if (!record(r) || !Number.isInteger(r.saga) || !Number.isInteger(r.islandIdx) ||
-          !['classic', 'nuzlocke'].includes(r.mode) || !Array.isArray(r.team) || !record(r.items) ||
-          !Array.isArray(r.badges) || !Number.isFinite(r.berries) || !record(r.map) ||
+          !['classic', "permadeath"].includes(r.mode) || !Array.isArray(r.team) || !record(r.items) ||
+          !Array.isArray(r.badges) || !Number.isFinite(r.coins) || !record(r.map) ||
           !Array.isArray(r.map.rows) || !r.map.rows.length || !Array.isArray(r.map.edges)) throw new Error('Viaje inválido.');
       for (const f of r.team) {
         if (!record(f) || typeof f.id !== 'string' || !Number.isFinite(f.hp) || !Number.isFinite(f.maxhp) ||
@@ -107,7 +107,7 @@
       if (r.pos !== null && !position(r.pos)) throw new Error('Posición inválida.');
       if (r.map.edges.some(e => !Array.isArray(e) || e.length !== 4 || !position(e.slice(0, 2)) || !position(e.slice(2)))) throw new Error('Rutas inválidas.');
     }
-    // Reject prototype keys, even in nested imported structures.
+
     function inspect(value) {
       if (!value || typeof value !== 'object') return;
       for (const key of Object.keys(value)) {
@@ -131,12 +131,12 @@
     if(data.run)data.run.saga=remap(data.run.saga);
     const recent=data.meta.lastCompletedIsland;
     if(recent&&Number.isInteger(recent.saga))recent.saga=remap(recent.saga);
-    if(!previous.includes('punkhazard')){
-      const m=data.meta, dress=SAGA_ORDER.indexOf('dressrosa'), punk=SAGA_ORDER.indexOf('punkhazard');
+    if(!previous.includes("region_09")){
+      const m=data.meta, dress=SAGA_ORDER.indexOf("region_10"), punk=SAGA_ORDER.indexOf("region_09");
       const wins=m.sagaDiffWins || {};
-      if(Object.entries(wins.gyojin || {}).some(([diff,won])=>won&&Number(diff)>=3)||
+      if(Object.entries(wins.region_08 || {}).some(([diff,won])=>won&&Number(diff)>=3)||
           Object.keys(wins).some(id=>SAGA_ORDER.indexOf(id)>=dress&&Object.values(wins[id]||{}).some(Boolean))||
-          (data.run&&data.run.saga>=dress))m.legacyDressrosaAccess=true;
+          (data.run&&data.run.saga>=dress))m.legacyClockGardenAccess=true;
       if(data.run?.saga===dress){
         const r=data.run;
         if(r.islandIdx===0){r.saga=punk;r.badges=[];}
@@ -144,34 +144,34 @@
       }
       if(recent?.saga===dress&&Number.isInteger(recent.index)){if(recent.index===0)recent.saga=punk;else recent.index--;}
       for(const [key,indices] of Object.entries(m.islandProgress || {})){
-        if(!key.startsWith('dressrosa:'))continue;
-        if(indices.includes(0))m.islandProgress[key.replace('dressrosa:','punkhazard:')]=[0];
+        if(!key.startsWith("region_10:"))continue;
+        if(indices.includes(0))m.islandProgress[key.replace("region_10:","region_09:")]=[0];
         m.islandProgress[key]=indices.filter(i=>i>0).map(i=>i-1);
       }
-      const claims=Object.entries(m.claimedAch || {}).filter(([key])=>/^island_diff_dressrosa_\d+_[1-5]$/.test(key));
+      const claims=Object.entries(m.claimedAch || {}).filter(([key])=>/^island_diff_region_10_\d+_[1-5]$/.test(key));
       for(const [key] of claims)delete m.claimedAch[key];
       for(const [key,value] of claims){
-        const [,index,diff]=key.match(/^island_diff_dressrosa_(\d+)_([1-5])$/);
-        m.claimedAch[Number(index)===0?`island_diff_punkhazard_0_${diff}`:`island_diff_dressrosa_${Number(index)-1}_${diff}`]=value;
+        const [,index,diff]=key.match(/^island_diff_region_10_(\d+)_([1-5])$/);
+        m.claimedAch[Number(index)===0?`island_diff_region_09_0_${diff}`:`island_diff_region_10_${Number(index)-1}_${diff}`]=value;
       }
     }
-    if(!previous.includes('sabaody')) {
-      // Preserve already-earned Marineford access without inventing Sabaody wins.
+    if(!previous.includes("region_06")) {
+
       const wins=data.meta.sagaDiffWins || {};
-      if(Object.entries(wins.thriller || {}).some(([diff,won])=>won&&Number(diff)>=3)||
+      if(Object.entries(wins.region_05 || {}).some(([diff,won])=>won&&Number(diff)>=3)||
           Object.keys(wins).some(id=>SAGA_ORDER.indexOf(id)>=6&&Object.values(wins[id]||{}).some(Boolean))||
-          (data.run&&data.run.saga>=6))data.meta.legacyMarinefordAccess=true;
+          (data.run&&data.run.saga>=6))data.meta.legacySkyBastionAccess=true;
     }
-    if(!previous.includes('zou')){
+    if(!previous.includes("region_11")){
       const wins=data.meta.sagaDiffWins || {};
-      if(Object.entries(wins.dressrosa || {}).some(([diff,won])=>won&&Number(diff)>=3)||
-          Object.keys(wins).some(id=>SAGA_ORDER.indexOf(id)>=SAGA_ORDER.indexOf('wholecake')&&Object.values(wins[id]||{}).some(Boolean))||
-          (data.run&&data.run.saga>=SAGA_ORDER.indexOf('wholecake')))data.meta.legacyWholeCakeAccess=true;
+      if(Object.entries(wins.region_10 || {}).some(([diff,won])=>won&&Number(diff)>=3)||
+          Object.keys(wins).some(id=>SAGA_ORDER.indexOf(id)>=SAGA_ORDER.indexOf("region_12")&&Object.values(wins[id]||{}).some(Boolean))||
+          (data.run&&data.run.saga>=SAGA_ORDER.indexOf("region_12")))data.meta.legacyAmberRealmAccess=true;
     }
     data.sagaOrder=[...SAGA_ORDER];
   }
-  // IDs conservados solo para importar guardados anteriores a la retirada de estos personajes.
-  const retired = new Set(['naruto','narutokurama','sasuke','kakashi','madara','orochimaru','itadori','yuta','gojo','sukuna','tanjiro','zenitsu','inosuke','nezuko','kibutsuji','goku','vegeta','gohan','gokuui','jiren','cell','frieza','zenosama','saitama','genos','garou','tatsumaki']);
+
+  const retired = new Set(GameContent.data.RETIRED_IDS || []);
   function migrateRetiredContent(data) {
     const m = data.meta;
     for (const key of ['dex','recruited','roster','defeated']) if (m[key]) m[key] = m[key].filter(id => !retired.has(id));
@@ -179,7 +179,7 @@
     if (record(m.teamPresets)) for (const key of Object.keys(m.teamPresets)) {
       if (Array.isArray(m.teamPresets[key])) m.teamPresets[key] = m.teamPresets[key].filter(id => !retired.has(id));
     }
-    for (const id of ['tri_naruto','tri_jjk','tri_kimetsu','tri_db','tri_opm']) if (m.claimedAch) delete m.claimedAch[id];
+    for (const id of GameContent.data.RETIRED_ACHIEVEMENTS || []) if (m.claimedAch) delete m.claimedAch[id];
     const auto = m.settings?.autoConfig;
     if (record(auto)) {
       delete auto.crossoverAction;
@@ -195,7 +195,7 @@
       r.startingTeam = r.startingTeam.filter(id => !retired.has(id));
       if (!r.startingTeam.length) { delete r.startingTeam; delete r.islandRepeat; }
     }
-    // El antiguo portal solo se añadía después del jefe, en la última fila.
+
     let removedPortal = false;
     while (r.map.rows.at(-1)?.every(n => n.type === 'crossover')) { r.map.rows.pop(); removedPortal = true; }
     if (!r.map.rows.length) { data.run = null; return data; }
@@ -206,10 +206,10 @@
   }
   function parse(text) {
     if (typeof text !== 'string' || text.length > MAX_BYTES) throw new Error('El archivo de guardado es demasiado grande.');
-    return validate(JSON.parse(text));
+    return validate(GameContent.migrateSave(JSON.parse(text)));
   }
   function payload(meta, run) {
-    return { game: 'grandlinelike', version: 1, sagaOrder:[...SAGA_ORDER], date: new Date().toISOString(), user: 'local', meta, run: run || null };
+    return { game: "umbral", contentId: GameContent.id, version: 1, sagaOrder:[...SAGA_ORDER], date: new Date().toISOString(), user: 'local', meta, run: run || null };
   }
   function create(getStorage) {
     return {
@@ -217,15 +217,15 @@
         const storage = getStorage();
         const current = storage.getItem(KEY);
         if (current !== null) return parse(current);
-        const oldMeta = storage.getItem('oplike_meta');
-        const oldRun = storage.getItem('oplike_run');
+        const oldMeta = storage.getItem("umbral_meta");
+        const oldRun = storage.getItem("umbral_run");
         if(!oldMeta)return null;
         const legacy=payload(JSON.parse(oldMeta),oldRun?JSON.parse(oldRun):null);
         delete legacy.sagaOrder;
         return validate(legacy);
       },
       write(data) {
-        // setItem replaces the entire JSON atomically; failed writes retain the previous save.
+
         const json = JSON.stringify(data);
         if (json.length > MAX_BYTES) throw new Error('La partida supera el tamaño máximo de guardado.');
         getStorage().setItem(KEY, json);

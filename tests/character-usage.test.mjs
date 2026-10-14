@@ -9,7 +9,7 @@ test('usage counts actual starts, groups forms, composes with filters and surviv
   assert.equal(h.exec(`characterUsageCount('zoro')`),1);
   assert.equal(h.exec(`characterUsageCount('shanks')`),0);
   assert.deepEqual(Array.from(h.exec(`filterSortChars(['zoro','shanks','luffy'],{sort:'usageDesc'})`)),['luffy','zoro','shanks']);
-  assert.deepEqual(Array.from(h.exec(`filterSortChars(['zoro','shanks','luffy'],{sort:'usageDesc',q:'zoro'})`)),['zoro']);
+  assert.deepEqual(Array.from(h.exec(`filterSortChars(['zoro','shanks','luffy'],{sort:'usageDesc',q:CHARS.zoro.name})`)),['zoro']);
   h.exec(`const saved=JSON.parse(JSON.stringify(GameSaveStorage.payload(meta,null)));GameSaveStorage.validate(saved);meta=saved.meta;`);
   assert.equal(h.exec(`characterUsageCount('luffy')`),2);
   for(const value of ['[]','{"luffy":-1}','{"luffy":1.5}','{"luffy":"2"}']) {

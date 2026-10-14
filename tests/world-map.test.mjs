@@ -36,7 +36,7 @@ test('choosing a saga sends the ship to its first island',()=>{
  h.ctx.document.querySelectorAll=selector=>selector==='[data-jump-saga]'?buttons:[];
  h.exec("screenSagas();let sailedTo='';worldNavigator={travelTo:id=>(sailedTo=id,true)};");
  buttons[0].onclick();
- assert.equal(h.exec('sailedTo'),'skypiea-0');
+ assert.equal(h.exec('sailedTo'),'region_03-0');
  assert.equal(node('#world-jump').dataset.saga,'2');
  assert.equal(h.exec('meta.storyMapView.sagaId'),'skypiea');
  assert.equal(h.exec('meta.storyMapView.index'),0);

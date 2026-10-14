@@ -8,7 +8,7 @@ const root = fileURLToPath(new URL('..', import.meta.url));
 const tools = join(root, '.tools');
 const signingDirectory = join(root, '.android-signing');
 const propertiesPath = join(signingDirectory, 'signing.properties');
-const keystorePath = join(signingDirectory, 'one-piece-rogue-like.jks');
+const keystorePath = join(signingDirectory, 'mareas-del-umbral.jks');
 const outputDirectory = join(root, 'outputs');
 
 function firstDirectory(directory) {
@@ -27,16 +27,16 @@ mkdirSync(signingDirectory, { recursive: true });
 if (!existsSync(propertiesPath) || !existsSync(keystorePath)) {
   const password = randomBytes(24).toString('base64url');
   const generated = spawnSync(keytool, [
-    '-genkeypair', '-v', '-keystore', keystorePath, '-alias', 'one-piece-rogue-like',
+    '-genkeypair', '-v', '-keystore', keystorePath, '-alias', 'mareas-del-umbral',
     '-keyalg', 'RSA', '-keysize', '4096', '-validity', '10000',
     '-storepass', password, '-keypass', password,
-    '-dname', 'CN=One Piece Rogue Like, OU=Fan Game, O=Fonsonis, L=Madrid, C=ES',
+    '-dname', 'CN=Mareas del Umbral, OU=Fan Game, O=Fonsonis, L=Madrid, C=ES',
   ], { cwd: root, stdio: 'inherit' });
   if (generated.status !== 0) throw new Error('No se pudo crear la clave de firma Android.');
   writeFileSync(propertiesPath, [
-    'storeFile=.android-signing/one-piece-rogue-like.jks',
+    'storeFile=.android-signing/mareas-del-umbral.jks',
     `storePassword=${password}`,
-    'keyAlias=one-piece-rogue-like',
+    'keyAlias=mareas-del-umbral',
     `keyPassword=${password}`,
     '',
   ].join('\n'));
@@ -55,9 +55,9 @@ if (build.status !== 0) throw new Error(`La compilación Android no terminó cor
 const source = join(root, 'android', 'app', 'build', 'outputs', 'apk', 'release', 'app-release.apk');
 if (!existsSync(source)) throw new Error('Gradle terminó sin generar app-release.apk.');
 mkdirSync(outputDirectory, { recursive: true });
-const destination = join(outputDirectory, 'one-piece-rogue-like.apk');
+const destination = join(outputDirectory, 'mareas-del-umbral.apk');
 copyFileSync(source, destination);
 const digest = createHash('sha256').update(readFileSync(destination)).digest('hex');
-writeFileSync(`${destination}.sha256`, `${digest}  one-piece-rogue-like.apk\n`);
+writeFileSync(`${destination}.sha256`, `${digest}  mareas-del-umbral.apk\n`);
 console.log(`APK firmada: ${resolve(destination)}`);
 console.log(`SHA-256: ${digest}`);

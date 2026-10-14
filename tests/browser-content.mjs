@@ -1,0 +1,75 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';import {createRequire} from 'node:module';
+import {spawn} from 'node:child_process';
+let server;
+if(process.env.LOCAL_START_SERVER==='1'){
+ server=spawn(process.execPath,['scripts/serve-static.mjs','--port','4174'],{stdio:['ignore','pipe','inherit']});
+ await new Promise((resolve,reject)=>{server.stdout.once('data',resolve);server.once('error',reject);});
+ process.env.LOCAL_TEST_URL='http://127.0.0.1:4174';
+}
+const require=createRequire(import.meta.url);
+const {chromium}=require(process.env.LOCAL_PLAYWRIGHT_PATH||'playwright');
+const browser=await chromium.launch({headless:true,executablePath:process.env.LOCAL_CHROME_PATH||undefined});
+const report={errors:[],failures:[],checks:[]};
+async function adventure(page,label){
+ await page.locator('[data-world-island="0"][data-world-saga="0"]').click();
+ if(await page.locator('#world-skip').isVisible())await page.locator('#world-skip').click();
+ await page.locator('#world-enter').click();
+ await page.locator('.starter-slot-card.empty-slot').first().click();
+ await page.locator('#inventory-modal-overlay [data-id="unit_001"]').click();
+ await page.locator('#btn-zarpar').click();
+ await page.locator('.map-node.reachable').first().waitFor();
+ assert.equal(await page.evaluate(()=>run.team[0].id),'unit_001');
+ await page.screenshot({path:`outputs/content-${label}-party.png`,fullPage:true});
+ await page.evaluate(()=>startBattle([makeChar('unit_021',5,true)],{wild:true}));
+ await page.locator('.fcard').first().waitFor();
+ await page.evaluate(()=>attackWith(battle.pTeam[0],battle.pTeam[0].moves[0]));
+ await page.screenshot({path:`outputs/content-${label}-battle.png`,fullPage:true});
+ report.checks.push(`${label} party, map and combat`);
+}
+try{
+ const context=await browser.newContext(),page=await context.newPage();
+ page.on('pageerror',e=>report.errors.push(e.message));
+ page.on('response',r=>{if(r.status()>=400)report.failures.push(r.url());});
+ await page.goto(process.env.LOCAL_TEST_URL||'http://127.0.0.1:4173');
+ await page.locator('#mode-story').waitFor({timeout:30000});
+ assert.equal(await page.evaluate(()=>GameContent.id),'umbral');
+ assert.ok(!(await page.locator('body').innerText()).includes('One Piece'));report.checks.push('original home');
+ await page.locator('#mode-story').click();
+ await page.screenshot({path:'outputs/content-original.png',fullPage:true});
+ report.checks.push('original campaign');
+ await adventure(page,'original');
+ await page.locator('.content-mods-button').click();
+ await page.locator('[data-import]').setInputFiles('outputs/mods/one-piece.umbralmod');
+ await page.locator('[data-status]').filter({hasText:'instalado. Pulsa Jugar'}).waitFor({timeout:180000});
+ await page.locator('[data-packs] p').filter({hasText:'One Piece'}).getByRole('button',{name:'Jugar',exact:true}).click();
+ await page.waitForFunction(()=>globalThis.GameContent?.id==='one-piece');
+ await page.locator('#mode-story').waitFor({timeout:30000});
+ assert.equal(await page.evaluate(()=>GameContent.id),'one-piece');
+ assert.equal(await page.evaluate(()=>CHARS.unit_001.name),'Luffy');
+ await page.locator('#mode-story').click();
+ await page.screenshot({path:'outputs/content-mod.png',fullPage:true});report.checks.push('One Piece installation and campaign');
+ await adventure(page,'mod');
+ const modAssets=await page.evaluate(async()=>{
+  const {activeRecord}=await import('/content/runtime.mjs');const p=await activeRecord();return(await(await caches.open(p.cache)).keys()).length;
+ });assert.ok(modAssets>1900);
+ await page.locator('.content-mods-button').click();
+ await page.locator('[data-packs] p').filter({hasText:'Mareas del Umbral'}).getByRole('button',{name:'Jugar',exact:true}).click();
+ await page.waitForFunction(()=>globalThis.GameContent?.id==='umbral');
+ await page.locator('#mode-story').waitFor({timeout:30000});assert.equal(await page.evaluate(()=>GameContent.id),'umbral');report.checks.push('switch back');
+ await page.evaluate(async()=>{await(await import('/local/offline.mjs')).prepareOffline();});
+ await page.locator('#offline-start').click();
+ await page.locator('#offline-status').filter({hasText:'Copia lista'}).waitFor({timeout:90000});
+ await context.setOffline(true);
+ await page.reload();
+ await page.locator('#mode-story').waitFor({timeout:30000});
+ assert.equal(await page.evaluate(()=>GameContent.id),'umbral');report.checks.push('original offline reload');
+ await page.locator('.content-mods-button').click();
+ await page.locator('[data-packs] p').filter({hasText:'One Piece'}).getByRole('button',{name:'Jugar',exact:true}).click();
+ await page.waitForFunction(()=>globalThis.GameContent?.id==='one-piece');
+ await page.locator('#mode-story').waitFor({timeout:30000});
+ assert.equal(await page.evaluate(()=>CHARS.unit_001.name),'Luffy');report.checks.push('mod offline reload');
+ assert.deepEqual(report.failures,[]);
+ assert.deepEqual(report.errors,[]);
+ fs.writeFileSync('outputs/browser-content-report.json',JSON.stringify(report,null,2));console.log(JSON.stringify(report));
+}finally{await browser.close();server?.kill();}

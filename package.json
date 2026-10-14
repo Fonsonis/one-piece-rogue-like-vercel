@@ -1,5 +1,5 @@
 {
-  "name": "one-piece-rogue-like-vercel",
+  "name": "mareas-del-umbral",
   "version": "1.2.0",
   "private": true,
   "type": "module",
@@ -8,7 +8,7 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "node scripts/update-ultimate-manifest.mjs && node scripts/prepare-offline.mjs && node scripts/serve-static.mjs",
+    "dev": "node scripts/prepare-offline.mjs && node scripts/serve-static.mjs",
     "build": "node scripts/build-static.mjs",
     "android:sync": "npm run build && node --require ./scripts/node-user-info-shim.cjs ./node_modules/@capacitor/cli/bin/capacitor sync android",
     "android:apk": "npm run android:sync && node scripts/build-android-apk.mjs",
@@ -16,8 +16,11 @@
     "desktop:dir": "npm run build && electron-builder --dir --win --x64 --publish never",
     "desktop:exe": "npm run build && electron-builder --win nsis --x64 --publish never",
     "start": "node scripts/serve-static.mjs --production",
-    "test": "npm run build && node --test tests/*.test.mjs",
-    "lint": "node --check public/game.js && node --check public/data.js && node --check public/save-storage.js && node --check public/art/visuals.js && node --check public/runner/ui.mjs && node --check public/runner/engine.mjs && node --check public/local/combat.js && node --check public/local/battle.js && node --check public/local/connection.mjs && node --check public/local/session.mjs && node --check public/local/signaling.mjs && node --check public/local/ui.mjs && node --check public/local/offline.mjs && node --check public/local/downloads.mjs && node --check public/local/android-files.mjs && node --check public/local/android-update.mjs && node --check public/service-worker.js && node --check api/multiplayer.mjs && node --check server/multiplayer-service.mjs && node --check desktop/main.mjs && node --check desktop/preload.cjs && node --check scripts/build-android-apk.mjs && node scripts/verify-android-version.mjs"
+    "test": "npm run build && node --import ./tests/content-test-compat.mjs --test tests/*.test.mjs",
+    "lint": "node --check public/game.js && node --check public/data.js && node --check public/save-storage.js && node --check public/art/visuals.js && node --check public/runner/ui.mjs && node --check public/runner/engine.mjs && node --check public/local/combat.js && node --check public/local/battle.js && node --check public/local/connection.mjs && node --check public/local/session.mjs && node --check public/local/signaling.mjs && node --check public/local/ui.mjs && node --check public/local/offline.mjs && node --check public/local/downloads.mjs && node --check public/local/android-files.mjs && node --check public/local/android-update.mjs && node --check public/service-worker.js && node --check api/multiplayer.mjs && node --check server/multiplayer-service.mjs && node --check desktop/main.mjs && node --check desktop/preload.cjs && node --check scripts/build-android-apk.mjs && node scripts/verify-android-version.mjs",
+    "mod:pack": "node scripts/package-mod.mjs",
+    "test:content": "node --test tests/content-validation.test.mjs tests/mod-archive.test.mjs tests/content-engine.test.mjs tests/content-install.test.mjs tests/content-migration.test.mjs",
+    "audit:content": "node scripts/audit-base-content.mjs"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
@@ -34,8 +37,8 @@
     "@capacitor/share": "^7.0.4"
   },
   "build": {
-    "appId": "com.fonsonis.onepieceroguelike.desktop",
-    "productName": "One Piece Rogue Like",
+    "appId": "com.umbral.mareas.desktop",
+    "productName": "Mareas del Umbral",
     "asar": true,
     "directories": {
       "output": "outputs/windows",
@@ -57,14 +60,14 @@
         }
       ],
       "icon": "assets/icon.png",
-      "artifactName": "one-piece-rogue-like-setup.${ext}"
+      "artifactName": "mareas-del-umbral-setup.${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "One Piece Rogue Like",
+      "shortcutName": "Mareas del Umbral",
       "deleteAppDataOnUninstall": false
     }
   }

@@ -1,4 +1,4 @@
-// Signaling only exchanges these tokens; gameplay stays on the direct WebRTC data channel.
+
 export const MAX_TOKEN = 24000;
 const encoder = new TextEncoder(), decoder = new TextDecoder();
 const id = () => crypto.randomUUID().replaceAll('-', '');
@@ -39,7 +39,7 @@ export async function decodeSignal(token) {
         !/^[a-f0-9]{32}$/.test(value.link) || typeof value.sdp !== 'string' || value.sdp.length > 18000 ||
         !value.sdp.startsWith('v=0') || !value.sdp.includes('m=application ') ||
         !value.sdp.includes('a=fingerprint:sha-256 ') || !value.sdp.includes('a=ice-ufrag:')) throw Error();
-    // Accept host candidates only: never silently fall back to internet relays.
+
     const candidates = value.sdp.split(/\r?\n/).filter(line => line.startsWith('a=candidate:'));
     if (!candidates.length || candidates.some(line => !/ typ host(?: |$)/.test(line))) throw Error();
     return value;
@@ -55,7 +55,7 @@ export class LocalLink {
       if (!this.closed) this.onState(this.pc.connectionState);
     };
     this.pc.ondatachannel = event => {
-      if (this.channel || event.channel.label !== 'one-piece-local-v1') return event.channel.close();
+      if (this.channel || event.channel.label !== 'umbral-local-v1') return event.channel.close();
       this.bind(event.channel);
     };
   }
@@ -85,7 +85,7 @@ export class LocalLink {
     return encodeSignal({ v: 1, room: this.room, link: this.id, type, sdp });
   }
   async offer() {
-    this.bind(this.pc.createDataChannel('one-piece-local-v1', { ordered: true }));
+    this.bind(this.pc.createDataChannel('umbral-local-v1', { ordered: true }));
     await this.pc.setLocalDescription(await this.pc.createOffer());
     return this.gather();
   }

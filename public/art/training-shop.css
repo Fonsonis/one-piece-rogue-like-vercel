@@ -39,7 +39,7 @@
 .training-detail .ship-card-header > .emoji { flex:0 0 56px; }
 .training-detail .ship-card-header .dex-sprite { --sprite-size:56px!important; }
 
-/* Training is a two step task: find a nakama, then choose a visible upgrade. */
+/* Training is a two step task: find a ally, then choose a visible upgrade. */
 #app .ship-training {
   padding:clamp(14px,2.5vw,24px);
   border:2px solid #87aaa5;

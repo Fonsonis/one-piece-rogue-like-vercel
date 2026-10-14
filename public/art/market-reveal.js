@@ -1,10 +1,10 @@
-/* Cosmetic market reveal. Never rolls RNG, charges currency or grants recruits. */
+
 const MarketReveal = (() => {
   'use strict';
   const tiers = [
     {title:'UN NUEVO RUMBO',hint:'Un nombre comienza a sonar en el puerto.',color:'#9cd6ce',delay:180,duration:1200,particles:6},
     {title:'PIRATA PROMETEDOR',hint:'Este cartel ya despierta algunas miradas.',color:'#99c5ef',delay:330,duration:1350,particles:10},
-    {title:'UN NOMBRE TEMIDO',hint:'Los rumores cruzan la Grand Line.',color:'#b7a4f1',delay:550,duration:1850,particles:16},
+    {title:'UN NOMBRE TEMIDO',hint:GameContent.text("text_0008"),color:'#b7a4f1',delay:550,duration:1850,particles:16},
     {title:'EL MAR SE ESTREMECE',hint:'Una presencia que impone respeto.',color:'#f0c472',delay:850,duration:2450,particles:22},
     {title:'NACE UNA LEYENDA',hint:'El mundo recordará este nombre.',color:'#ffcf76',delay:1200,duration:3250,particles:28},
   ].map(Object.freeze);
@@ -14,12 +14,7 @@ const MarketReveal = (() => {
     const stars=rarityOf(rarity), tier=tiers[stars-1];
     const media=window.matchMedia('(prefers-reduced-motion: reduce)');
     host.classList.add('market-reveal-host');
-    host.innerHTML=`<section class="modal market-reveal" data-rarity="${stars}" role="dialog" aria-modal="true" aria-label="Recluta de ${stars} estrellas" style="--reveal-color:${tier.color};--reveal-delay:${tier.delay}ms;--reveal-duration:${tier.duration}ms">
-      <header class="mr-heading"><span>CROSSGUILD</span><p>${tier.hint}</p></header>
-      <div class="mr-scene">
-        <div class="mr-effects" aria-hidden="true"><div class="mr-rays"></div><div class="mr-ring"></div><div class="mr-ring mr-ring-two"></div>
-          <svg class="mr-haki" viewBox="0 0 500 380" preserveAspectRatio="none"><path d="M0 65 108 112 68 130 184 167 121 182 230 205M500 20 375 97 418 111 297 173 357 180 269 212M20 380 135 288 91 270 218 214M487 359 401 301 437 282 292 217"/></svg>
-          ${Array.from({length:tier.particles},(_,i)=>{const angle=i*2.399963,radius=100+(i%5)*24;return `<i class="mr-spark" style="--x:${Math.round(Math.cos(angle)*radius)}px;--y:${Math.round(Math.sin(angle)*radius)}px;--spark-delay:${tier.delay+(i%6)*55}ms;--turn:${i*47}deg"></i>`;}).join('')}
+    host.innerHTML=`<section class="modal market-reveal" data-rarity="${stars}" role="dialog" aria-modal="true" aria-label="Recluta de ${stars} estrellas" style="--reveal-color:${tier.color};--reveal-delay:${tier.delay}ms;--reveal-duration:${tier.duration}${GameContent.text("extra_001")}${tier.hint}${GameContent.text("extra_002")}${Array.from({length:tier.particles},(_,i)=>{const angle=i*2.399963,radius=100+(i%5)*24;return `<i class="mr-spark" style="--x:${Math.round(Math.cos(angle)*radius)}px;--y:${Math.round(Math.sin(angle)*radius)}px;--spark-delay:${tier.delay+(i%6)*55}ms;--turn:${i*47}deg"></i>`;}).join('')}
         </div>
         <div class="mr-poster"><div class="mr-poster-top">WANTED</div><div class="mr-rule"></div>
           <div class="mr-portrait" aria-hidden="true">${portraitHTML}</div>

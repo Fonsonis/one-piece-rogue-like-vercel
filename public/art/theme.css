@@ -1,4 +1,4 @@
-/* Luffy Run art direction. Layout hooks, controls and game rules are preserved. */
+/* Carrera del Umbral art direction. Layout hooks, controls and game rules are preserved. */
 :root {
   --ink:#102b44; --paper:#f0f7fb; --paper-dark:#d9e9f3;
   --sea:#216ba0; --accent:#ab5c1c; --gold:#ffda69;
@@ -8,7 +8,7 @@
 body {
   font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   font-size:14px; line-height:1.5; color:var(--ink);
-  background:linear-gradient(180deg,#071c31db,#0d3458b8 55%,#081c31ed),url('../Images/fondo-menu.jpg') center/cover fixed;
+  background:linear-gradient(180deg,#071c31db,#0d3458b8 55%,#081c31ed),url('../Images/asset_1960.jpg') center/cover fixed;
   background-color:#081c31;
 }
 #app { max-width:1100px; padding:max(24px,env(safe-area-inset-top)) max(20px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(20px,env(safe-area-inset-left)); }
@@ -27,7 +27,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-v
 .floating-controls .btn { min-height:34px; font-size:11px; padding:6px 10px; }
 .daily-steps { display:flex; align-items:center; gap:5px; width:max-content; padding:6px 10px; border:1px solid #8cafbc; border-radius:8px; background:#0b2845; color:#fff4d3; font-size:12px; line-height:1; }
 .daily-steps strong { color:var(--gold); font-size:14px; }
-.floating-berries .berries { background:#0b2845; border:1px solid #8cafbc; border-radius:8px; color:#ffda69; font-size:13px; }
+.floating-coins .coins { background:#0b2845; border:1px solid #8cafbc; border-radius:8px; color:#ffda69; font-size:13px; }
 .panel,.modal { border:2px solid #82a9c0; border-radius:14px; padding:20px; box-shadow:var(--shadow); }
 .panel h2,.modal h2 { color:#174366; font-size:13px; line-height:1.8; }
 .panel h2 { padding-bottom:12px; border-bottom:1px solid #b9d1e0; margin-bottom:16px; }
@@ -129,7 +129,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-v
 .achieve-bar { border-radius:5px; overflow:hidden; }
 .overlay { background:#031426bd; backdrop-filter:blur(5px); padding:18px; }
 .modal { max-width:570px; max-height:88dvh; }
-.char-sheet-hero { background:linear-gradient(#123f6266,#081c3144),url('../Images/fondo-game.jpg') center 65%/cover!important; overflow:hidden; }
+.char-sheet-hero { background:linear-gradient(#123f6266,#081c3144),url('../Images/asset_1958.jpg') center 65%/cover!important; overflow:hidden; }
 .char-sheet-sprite { position:relative; line-height:0; width:256px; height:195px; }
 .char-sheet h2 small { font-size:12px; }
 .sheet-line,.sheet-section p,.sheet-move,.sheet-desc { font-size:12px; line-height:1.6; }
@@ -147,7 +147,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-v
 .chart-table tr:nth-child(even) td { background:#e5f0f7; }
 .toast { background:#0b2845; border:2px solid #83b6d1; border-radius:10px; color:#f5fbff; font-size:14px; box-shadow:0 8px 26px #04142777; max-width:calc(100vw - 32px); }
 
-/* Atlas geometry is identical across all 457 characters: four 192px cells. */
+/* Mira Velacobre 2 geometry is identical across all 457 characters: four 192px cells. */
 .dex-sprite {
   display:inline-block; width:var(--sprite-size); height:var(--sprite-size);
   flex-shrink:0; vertical-align:middle; background-repeat:no-repeat;
@@ -162,7 +162,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-v
 .poster-face .dex-sprite { display:inline-block; margin:0; }
 .order-strip .dex-sprite { opacity:inherit; }
 .fcard .dex-sprite { --sprite-size:192px!important; }
-.fcard .dex-sprite,.char-sheet-sprite .dex-sprite { background-image:var(--sprite-atlas); background-size:400% 100%; }
+.fcard .dex-sprite,.char-sheet-sprite .dex-sprite { background-image:var(--sprite-unit_393); background-size:400% 100%; }
 .fcard.active .dex-sprite:not([data-motion]),.char-sheet-sprite .dex-sprite:not([data-motion]) { animation:art-guard 1.3s ease-in-out infinite; }
 .fcard.ko .dex-sprite { animation:none!important; background-position:100% 0; transform:rotate(-13deg) translateY(5px); }
 .dex-card.seen:hover .dex-sprite,.sel-card:hover .dex-sprite { animation:art-guard .9s ease-in-out infinite; }
@@ -235,13 +235,13 @@ button:focus-visible,input:focus-visible,select:focus-visible,[tabindex]:focus-v
   .btn,.tab,.mode-card,.hp-bar i { transition:none; }
   .fcard-passive.on,.poster.next,.shake { animation:none; }
 }
-/* Egghead: ceramic shells, coral controls and marine blue. */
+/* Observatorio de Nácar: ceramic shells, coral controls and guild_04 blue. */
 :root {
   --ink:#243c4b; --paper:#fffcf3; --paper-dark:#e9eee8;
   --sea:#37738c; --accent:#c05443; --gold:#bc7730; --red:#b74439; --green:#347960;
   --shadow:0 5px 0 #284b5520,0 12px 28px #284b5514;
 }
-body { background:linear-gradient(#f5f4eaa6,#edf2eece),url('scenes/egghead-hub.webp') center/cover fixed; background-color:#eef0e7; color:var(--ink); }
+body { background:linear-gradient(#f5f4eaa6,#edf2eece),url('scenes/asset_1862.webp') center/cover fixed; background-color:#eef0e7; color:var(--ink); }
 .logo,.mode-title,.panel h2,.modal h2,.tower-hud,.runner-menu-button strong {
   font-family:ui-rounded,'Avenir Next',system-ui,sans-serif; font-weight:900; letter-spacing:.045em;
 }
@@ -256,11 +256,11 @@ body { background:linear-gradient(#f5f4eaa6,#edf2eece),url('scenes/egghead-hub.w
 .btn.gray { background:#e6eeea; color:#395661; border-color:#94acae; }.btn.purple { background:#817795; border-color:#645975; }
 .btn:disabled { background:#d6ddd8; color:#6c7c7d; border-color:#acbab4; }
 .floating-controls .btn { background:#fffcf3f5; color:#395661; border-color:#9db3b3; }
-.floating-berries .berries { background:#fffcf3; color:#906127; border-color:#b6c3b9; border-radius:20px; }
+.floating-coins .coins { background:#fffcf3; color:#906127; border-color:#b6c3b9; border-radius:20px; }
 .mode-card { border:1px solid #92acad; border-radius:26px; background:#fffcf3; box-shadow:var(--shadow); overflow:hidden; }
 .mode-card:hover { border-color:#c67661; box-shadow:0 6px 0 #cc8e6c30; transform:translateY(-3px); }
 .mode-art { height:185px; }.mode-art::before { background:linear-gradient(transparent 70%,#234e5522); }
-.mode-art.story { background-image:url('scenes/eastblue.webp'); }.mode-art.tower { background-image:url('scenes/marineford.webp'); }.mode-art.challenge { background-image:url('scenes/wano.webp'); }
+.mode-art.story { background-image:url('scenes/asset_1861.webp'); }.mode-art.tower { background-image:url('scenes/asset_1866.webp'); }.mode-art.challenge { background-image:url('scenes/asset_1871.webp'); }
 .mode-title { background:#fffcf3; color:#345765; font-size:16px; padding:16px 8px 9px; }.mode-btn { background:#edf0e5; color:#5b6659; border-color:#d9dfce; }
 .home-main-buttons { gap:12px; }.home-main-buttons .btn { min-height:56px; }
 .footer-note { color:#52717a; }
@@ -280,14 +280,14 @@ body { background:linear-gradient(#f5f4eaa6,#edf2eece),url('scenes/egghead-hub.w
 .char-controls input,.char-controls select { background:#fffef8; color:#334f5c; border-color:#a6bfbc; border-radius:18px; }
 .team-slot,.pick-row,.shop-item,.ship-row,.achieve-row,.global-upg-row { background:#fffdf6; border-color:#c2d1c9; border-radius:14px; }
 .team-slot .info { min-width:0; flex:1; }.team-slot .emoji { overflow:visible; }.side-panel h3 { color:#456c73; }
-.syn-none { color:#627f7f; }.map-board { border:1px solid #7d9ea3; border-radius:24px; background-image:linear-gradient(#dbeade44,#123b4855),url('scenes/eastblue.webp'); }
+.syn-none { color:#627f7f; }.map-board { border:1px solid #7d9ea3; border-radius:24px; background-image:linear-gradient(#dbeade44,#123b4855),url('scenes/asset_1861.webp'); }
 .map-node { box-shadow:0 3px 0 #25434f30; border-radius:16px; border-color:#7d9ca0; }.map-node.reachable { border-color:#b57652; background:#fcf3cf; }
 .ship-card-acc { border-radius:18px; }.ship-card-header { background:#e9eee3; color:#42626a; }.ship-card-header:hover { background:#dde8dc; }
-.overlay { background:#25465386; backdrop-filter:blur(5px); }.char-sheet-hero { background:linear-gradient(#f5f3e36b,#e0eee474),url('scenes/egghead-hub.webp') center/cover!important; border-color:#b7bba0!important; border-radius:20px!important; }
+.overlay { background:#25465386; backdrop-filter:blur(5px); }.char-sheet-hero { background:linear-gradient(#f5f3e36b,#e0eee474),url('scenes/asset_1862.webp') center/cover!important; border-color:#b7bba0!important; border-radius:20px!important; }
 .char-sheet-hero > div:last-of-type { text-shadow:none; color:#805d30!important; }.char-sheet-sprite { filter:none!important; }
 .sheet-section { border-color:#c7d6cb; }.sheet-move small { color:#5c776e; }.art-preview-button { background:#668c91; }
 .chart-table tr:nth-child(even) td { background:#edf1e5; }.toast { background:#fffcf3; color:#2b525b; border:1px solid #85a7a2; border-radius:20px; }
-.battle-cols { border:1px solid #87a5a6; border-radius:26px; background-image:linear-gradient(#e6eeeaaa,#e7eaddaa),url('scenes/eastblue.webp'); box-shadow:var(--shadow); }
+.battle-cols { border:1px solid #87a5a6; border-radius:26px; background-image:linear-gradient(#e6eeeaaa,#e7eaddaa),url('scenes/asset_1861.webp'); box-shadow:var(--shadow); }
 .battle-side { background:#f9fbefba; border:1px solid #9cb8ae; border-radius:20px; scrollbar-color:#91aba5 #edf2e9; }
 .side-head { color:#446b70; }.fcard { background:#f9fcf2eb; border:1px solid #9ebbb5; border-radius:18px; opacity:.9; }
 .fcard.active { background:#fffcf4; border:2px solid #4b8a87; box-shadow:0 4px 0 #467b7130; }
@@ -304,7 +304,7 @@ body { background:linear-gradient(#f5f4eaa6,#edf2eece),url('scenes/egghead-hub.w
 .fcard > .xp-progress { margin:4px 10px 6px; }.fcard .xp-caption { font-size:9px; }.team-slot .xp-progress { margin-top:5px; }
 /* Independent CSS scale preserves all authored pose animations. Feet share one baseline. */
 .dex-sprite { scale:var(--portrait-scale,1); translate:calc(var(--sprite-size) * var(--portrait-shift,0)) 0; transform-origin:50% 93.75%; }
-.fcard .dex-sprite,.char-sheet-sprite .dex-sprite { scale:var(--atlas-scale,1); translate:calc(var(--sprite-size) * var(--atlas-shift,0)) 0; }
+.fcard .dex-sprite,.char-sheet-sprite .dex-sprite { scale:var(--unit_393-scale,1); translate:calc(var(--sprite-size) * var(--unit_393-shift,0)) 0; }
 .char-sheet-sprite { height:245px; }
 @media(max-width:700px) {
   .panel,.modal { border-radius:20px; }.panel h2,.modal h2 { font-size:15px; }
@@ -317,17 +317,17 @@ body { background:linear-gradient(#f5f4eaa6,#edf2eece),url('scenes/egghead-hub.w
 
 .subtitle,.tower-hud { text-shadow:none; color:#466371; }
 .mode-card.locked .mode-btn { background:#e2e6dc; color:#687775; }
-.battle-cols { background-image:linear-gradient(#e6eeeaaa,#e7eaddaa),var(--scene,url('scenes/eastblue.webp')); }
-.map-board { background-image:linear-gradient(#dbeade44,#123b4855),var(--scene,url('scenes/eastblue.webp')); }
+.battle-cols { background-image:linear-gradient(#e6eeeaaa,#e7eaddaa),var(--scene,url('scenes/asset_1861.webp')); }
+.map-board { background-image:linear-gradient(#dbeade44,#123b4855),var(--scene,url('scenes/asset_1861.webp')); }
 @media(max-width:700px) { .mode-card { max-width:none; } }
 
 .home-account-status,.home-save-status { color:#42606b; font-size:12px; text-shadow:none; }
-.floating-berries { position:static; margin:0 0 10px; width:max-content; }
+.floating-coins { position:static; margin:0 0 10px; width:max-content; }
 
 .topbar { flex-wrap:wrap; }
 .topbar .logo { flex:1 1 65%; }
 .floating-controls { position:static; flex-direction:row; flex-wrap:wrap; align-items:center; margin-left:auto; }
-.floating-berries { margin-bottom:0; }
+.floating-coins { margin-bottom:0; }
 .saga-art-overlay { justify-content:flex-end; padding:12px; text-align:left; background:linear-gradient(transparent 30%,#183c4ee6); }
 .saga-art-title,.saga-art-sub { text-shadow:none; }
 .saga-row.locked { filter:none; opacity:.82; }

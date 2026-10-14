@@ -12,10 +12,10 @@ def appVersionCode = providers.gradleProperty('appVersionCode').map { it.toInteg
 def appVersionName = providers.gradleProperty('appVersionName').orElse(defaultVersionName).get()
 
 android {
-    namespace "com.fonsonis.onepieceroguelike"
+    namespace "com.umbral.mareas"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.fonsonis.onepieceroguelike"
+        applicationId "com.umbral.mareas"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode appVersionCode

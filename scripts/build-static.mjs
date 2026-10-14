@@ -2,7 +2,6 @@ import { cpSync, copyFileSync, existsSync, readdirSync, readFileSync, writeFileS
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { spawnSync } from 'node:child_process';
-import './update-ultimate-manifest.mjs';
 import './prepare-offline.mjs';
 
 const root = fileURLToPath(new URL('..', import.meta.url));

@@ -48,5 +48,5 @@ test('mystery recruitment excludes four-star pirates while Crossguild keeps them
   assert.equal(h.exec("run.team.some(f=>f.id==='zoro')"), true);
   assert.equal(h.exec("poolByRareza(4).includes('arlong')"), true);
   h.exec("meta.defeated=['arlong'];renderSpecialCatalog(10)");
-  assert.match(overlay.innerHTML, /data-hire="arlong"/);
+  assert.match(overlay.innerHTML, /data-hire="unit_043"/);
 });

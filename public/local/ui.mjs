@@ -1,12 +1,16 @@
 import { LocalLink, decodeSignal } from './connection.mjs';
 import { LocalSession, BOSSES, RULES } from './session.mjs';
 import { formatRoomCode, normalizeRoomCode, roomSignal } from './signaling.mjs';
-import { yonkoRewardForSize } from './rewards.mjs';
+import { RegentRewardForSize } from './rewards.mjs';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const MODE = { duel: 'Duelo PvP', tournament: 'Torneo', coop: 'Alianza contra un yonko' };
+const MODE = { duel: 'Duelo PvP', tournament: 'Torneo', coop: GameContent.text("extra_068") };
 const searchKey = value => String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
-export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' }), denDenAvailable = () => 4, consumeDenDen = () => true, refreshHome = () => {} } = {}) {
+export async function openLocal(options = {}) {
+  const awardRegentWin=options.awardRegentWin||(() => ({kind:'not-earned'}));
+  const RadioAvailable=options.RadioAvailable||(() => 4);
+  const consumeRadio=options.consumeRadio||(() => true);
+  const refreshHome=options.refreshHome||(()=>{});
   if (document.getElementById('local-multiplayer')) return;
   const engine = globalThis.LocalCombat;
   const root = document.createElement('div');
@@ -40,7 +44,7 @@ export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' })
     original.inert = false; document.body.style.overflow = previousOverflow; root.remove(); refreshHome(); document.getElementById('btn-local')?.focus();
   };
   function startScreen() {
-    main.innerHTML = `<section class="local-intro"><div class="local-emblem" aria-hidden="true">🏴‍☠️ ⚔️ 🏴‍☠️</div><h2>Reúne a tu tripulación</h2><p>Duelo de 1, 3 o 6 nakamas, torneo de 3 a 8 jugadores o alianza de 2 a 8 contra un yonko.</p><div class="local-steps"><p><b>1.</b> Ambos dispositivos necesitan conexión: Wi-Fi, cable o un punto de acceso con datos.</p><p><b>2.</b> Un jugador crea la sala y comparte su código de 8 caracteres.</p><p><b>3.</b> Los demás introducen el código, eligen equipo y se marcan como listos.</p></div><label class="local-field">Tu nombre<input id="local-name" maxlength="24" autocomplete="nickname" value="${esc(displayName)}"></label><div class="local-actions"><button class="btn green" id="local-create">Crear sala</button></div><div class="local-join-box"><label class="local-field">Código de sala<input id="local-code" maxlength="9" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH"></label><button class="btn blue" id="local-join">Unirse a la sala</button></div><p class="local-fine">Sin cuentas. El servicio solo intercambia los datos necesarios para conectar los dispositivos; la partida viaja directamente entre ellos. El anfitrión debe mantener el juego abierto.</p><details><summary>Si no conecta</summary><p>Comprueba que ambos dispositivos tienen Internet y pueden comunicarse por la misma Wi-Fi o punto de acceso. Evita redes de invitados, aislamiento de dispositivos y VPN.</p><p>El multijugador requiere conexión aunque hayas preparado una copia del juego para usarla sin Internet.</p></details></section>`;
+    main.innerHTML = `${GameContent.text("extra_069")}${esc(displayName)}"></label><div class="local-actions"><button class="btn green" id="local-create">Crear sala</button></div><div class="local-join-box"><label class="local-field">Código de sala<input id="local-code" maxlength="9" autocomplete="one-time-code" autocapitalize="characters" spellcheck="false" placeholder="ABCD-EFGH"></label><button class="btn blue" id="local-join">Unirse a la sala</button></div><p class="local-fine">Sin cuentas. El servicio solo intercambia los datos necesarios para conectar los dispositivos; la partida viaja directamente entre ellos. El anfitrión debe mantener el juego abierto.</p><details><summary>Si no conecta</summary><p>Comprueba que ambos dispositivos tienen Internet y pueden comunicarse por la misma Wi-Fi o punto de acceso. Evita redes de invitados, aislamiento de dispositivos y VPN.</p><p>El multijugador requiere conexión aunque hayas preparado una copia del juego para usarla sin Internet.</p></details></section>`;
     const supported = !!globalThis.RTCPeerConnection && !!globalThis.crypto?.subtle && isSecureContext;
     if (!supported) {
       say('Abre el juego mediante HTTPS o la aplicación instalada y utiliza un dispositivo compatible con WebRTC.');
@@ -63,7 +67,7 @@ export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' })
   }
   function createSession(host) {
     say('');
-    session = new LocalSession({ host, name: displayName, engine, roomId: room, denDenAvailable, consumeDenDen, send: packet => guestLink?.send(packet), onChange: renderSession, onError: message => {
+    session = new LocalSession({ host, name: displayName, engine, roomId: room, RadioAvailable, consumeRadio, send: packet => guestLink?.send(packet), onChange: renderSession, onError: message => {
       say(message); leave(); startScreen();
     } });
     session.visible = !document.hidden;
@@ -74,11 +78,11 @@ export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' })
     if (!session || closed) return;
     const v = session.view;
     if (v.mode === 'coop' && v.phase === 'finished' && v.champion === 'alliance' && (rewardStatus?.match !== v.matches[0]?.rewardId || rewardStatus?.kind === 'save-failed')) {
-      rewardStatus = { ...awardYonkoWin(v), match: v.matches[0]?.rewardId };
+      rewardStatus = { ...awardRegentWin(v), match: v.matches[0]?.rewardId };
       if (rewardStatus.kind === 'granted') refreshHome();
       if (rewardStatus.kind === 'save-failed') say('No se pudo guardar la recompensa. Revisa el almacenamiento del dispositivo antes de salir.');
     }
-    const key = JSON.stringify(v) + session.self + rewardStatus?.kind + roomCode + (v.phase==='lobby'?denDenAvailable():'');
+    const key = JSON.stringify(v) + session.self + rewardStatus?.kind + roomCode + (v.phase==='lobby'?RadioAvailable():'');
     if (key === viewKey) return; viewKey = key;
     if (v.phase !== 'lobby' && picker) { picker.remove(); picker = null; }
     const me = v.players.find(p => p.id === session.self);
@@ -101,15 +105,15 @@ export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' })
       });
     }
   }
-  const playerName = id => id === 'alliance' ? 'La alianza' : id === 'yonko' ? 'El yonko' : id === 'draw' ? 'Empate' : session.view.players.find(p => p.id === id)?.name || 'Pirata';
+  const playerName = id => id === 'alliance' ? 'La alianza' : id === "Regent" ? GameContent.text("extra_070") : id === 'draw' ? 'Empate' : session.view.players.find(p => p.id === id)?.name || 'Pirata';
   function lobbyHTML(v, me) {
-    const reward = yonkoRewardForSize(v.size);
-    const rewardText = v.mode === 'coop' ? `<p class="local-reward-preview">Victoria por jugador con ${v.size} nakama${v.size === 1 ? '' : 's'}: <strong>🧭 ${reward.logPoses.toLocaleString('es')} Log Poses · ⭐ ${reward.fame.toLocaleString('es')} Fama</strong></p>` : '';
-    return `<section class="local-panel"><div class="local-config"><label class="local-field">Modo<select id="local-mode" ${session.host ? '' : 'disabled'}>${Object.entries(MODE).map(([id, name]) => `<option value="${id}" ${id === v.mode ? 'selected' : ''}>${name}</option>`).join('')}</select></label><div class="local-den-den" role="status" aria-label="Den den mushis disponibles"><span aria-hidden="true">🐌</span><strong>${denDenAvailable()} / 4</strong><small>Necesitas uno para desafiar al yonkou · solo se gasta al ganar · se renuevan cada día</small></div><label class="local-field">Nakamas por jugador<select id="local-size" ${session.host ? '' : 'disabled'}>${[1, 3, 6].map(n => `<option ${n === v.size ? 'selected' : ''}>${n}</option>`).join('')}</select></label>${v.mode === 'coop' ? `<label class="local-field">Yonko<select id="local-boss" ${session.host ? '' : 'disabled'}>${BOSSES.map(id => `<option value="${id}" ${id === v.boss ? 'selected' : ''}>${esc(engine.name(id))}</option>`).join('')}</select></label>` : ''}</div>
-      <p class="local-fine">${v.mode === 'tournament' ? 'Eliminación directa · sorteo de cruces · pases de ronda para completar el cuadro · los empates se repiten.' : v.mode === 'coop' ? 'Los nakamas activos de la alianza atacan juntos. El yonkou responde una vez por turno; sus PS escalan con jugadores y tamaño de equipos.' : 'Los ataques son automáticos. Tú decides cuándo lanzar la definitiva del nakama activo.'}</p>${rewardText}
-      <div class="local-player-list">${v.players.map(p => `<div class="local-player"><span>${p.id === 'host' ? '👑' : '🏴‍☠️'} <b>${esc(p.name)}</b>${p.id === me.id ? ' (tú)' : ''}</span><span>${!p.connected ? 'Desconectado' : !p.visible ? 'En segundo plano' : v.mode==='coop' && p.denDen<1 ? 'Sin den den mushis' : p.ready ? '✓ Listo' : 'Eligiendo equipo'}</span>${session.host && p.id !== 'host' ? `<button class="btn gray small" data-remove="${p.id}" aria-label="Retirar a ${esc(p.name)}">Retirar</button>` : ''}</div>`).join('')}</div>
+    const reward = RegentRewardForSize(v.size);
+    const rewardText = v.mode === 'coop' ? `<p class="local-reward-preview">Victoria por jugador con ${v.size} ally${v.size === 1 ? '' : 's'}: <strong>🧭 ${reward.Compasss.toLocaleString('es')}${GameContent.text("text_0142")}${reward.fame.toLocaleString('es')} Fama</strong></p>` : '';
+    return `<section class="local-panel"><div class="local-config"><label class="local-field">Modo<select id="local-mode" ${session.host ? '' : 'disabled'}>${Object.entries(MODE).map(([id, name]) => `<option value="${id}" ${id === v.mode ? 'selected' : ''}>${name}</option>`).join('')}${GameContent.text("text_0144")}${RadioAvailable()}${GameContent.text("extra_072")}${session.host ? '' : 'disabled'}>${[1, 3, 6].map(n => `<option ${n === v.size ? 'selected' : ''}>${n}</option>`).join('')}</select></label>${v.mode === 'coop' ? `${GameContent.text("text_0143")}${session.host ? '' : 'disabled'}>${BOSSES.map(id => `<option value="${id}" ${id === v.boss ? 'selected' : ''}>${esc(engine.name(id))}</option>`).join('')}</select></label>` : ''}</div>
+      <p class="local-fine">${v.mode === 'tournament' ? 'Eliminación directa · sorteo de cruces · pases de ronda para completar el cuadro · los empates se repiten.' : v.mode === 'coop' ? GameContent.text("extra_071") : "Los ataques son automáticos. Tú decides cuándo lanzar la definitiva del ally activo."}</p>${rewardText}
+      <div class="local-player-list">${v.players.map(p => `<div class="local-player"><span>${p.id === 'host' ? '👑' : '🏴‍☠️'} <b>${esc(p.name)}</b>${p.id === me.id ? ' (tú)' : ''}</span><span>${!p.connected ? 'Desconectado' : !p.visible ? 'En segundo plano' : v.mode==='coop' && p.Radio<1 ? "Sin radio tokens" : p.ready ? '✓ Listo' : 'Eligiendo equipo'}</span>${session.host && p.id !== 'host' ? `<button class="btn gray small" data-remove="${p.id}" aria-label="Retirar a ${esc(p.name)}">Retirar</button>` : ''}</div>`).join('')}</div>
       ${session.host ? `<div class="local-room-code"><span>Código de sala</span><strong>${esc(formatRoomCode(roomCode))}</strong><button class="btn blue small" id="local-copy-code">Copiar código</button><small>Los invitados pueden entrar mientras permanezcas en esta sala.</small></div>` : `<p class="local-fine">Sala ${esc(formatRoomCode(roomCode))} · El anfitrión elige el modo y el tamaño de las tripulaciones.</p>`}</section>
-      <section class="local-panel"><h3>Tu equipo · nivel 30</h3><p class="local-fine">Elige entre los personajes de tu cuenta y sus evoluciones desbloqueadas. El orden determina quién entra en combate.</p>${me.team.length < v.size ? `<p class="local-warning">Tienes ${session.roster.length} personajes disponibles. Necesitas ${v.size} para este equipo; el anfitrión puede reducir el tamaño.</p>` : ''}<div class="local-team-picker">${me.team.map((id, i) => `<button type="button" class="local-pick" data-pick="${i}" aria-label="Cambiar nakama ${i + 1}: ${esc(engine.name(id))}"><span>${engine.icon(id, 46)}</span><span><small>Nakama ${i + 1}</small><strong>${esc(engine.name(id))}</strong></span><span aria-hidden="true">Cambiar ↗</span></button>`).join('')}</div><div class="local-actions"><button class="btn ${me.ready ? 'gray' : 'green'}" id="local-ready" ${me.team.length !== v.size || (v.mode==='coop' && denDenAvailable()<1) ? 'disabled' : ''}>${me.ready ? 'Dejar de estar listo' : 'Estoy listo'}</button>${session.host ? `<button class="btn gold" id="local-start" ${v.players.length < (v.mode === 'tournament' ? 3 : 2) || v.players.some(p => !p.ready || !p.connected || !p.visible || (v.mode==='coop' && p.denDen<1)) ? 'disabled' : ''}>Comenzar ${v.mode === 'tournament' ? 'torneo' : 'partida'}</button>` : ''}</div></section>`;
+      <section class="local-panel"><h3>Tu equipo · nivel 30</h3><p class="local-fine">Elige entre los personajes de tu cuenta y sus evoluciones desbloqueadas. El orden determina quién entra en combate.</p>${me.team.length < v.size ? `<p class="local-warning">Tienes ${session.roster.length} personajes disponibles. Necesitas ${v.size} para este equipo; el anfitrión puede reducir el tamaño.</p>` : ''}<div class="local-team-picker">${me.team.map((id, i) => `<button type="button" class="local-pick" data-pick="${i}" aria-label="Cambiar ally ${i + 1}: ${esc(engine.name(id))}"><span>${engine.icon(id, 46)}</span><span><small>Aliado ${i + 1}</small><strong>${esc(engine.name(id))}</strong></span><span aria-hidden="true">Cambiar ↗</span></button>`).join('')}</div><div class="local-actions"><button class="btn ${me.ready ? 'gray' : 'green'}" id="local-ready" ${me.team.length !== v.size || (v.mode==='coop' && RadioAvailable()<1) ? 'disabled' : ''}>${me.ready ? 'Dejar de estar listo' : 'Estoy listo'}</button>${session.host ? `<button class="btn gold" id="local-start" ${v.players.length < (v.mode === 'tournament' ? 3 : 2) || v.players.some(p => !p.ready || !p.connected || !p.visible || (v.mode==='coop' && p.Radio<1)) ? 'disabled' : ''}>Comenzar ${v.mode === 'tournament' ? 'torneo' : 'partida'}</button>` : ''}</div></section>`;
   }
   function bindLobby(v, me) {
     main.querySelectorAll('[data-pick]').forEach(button => { button.onclick = () => openPicker(Number(button.dataset.pick)); });
@@ -156,9 +160,9 @@ export async function openLocal({ awardYonkoWin = () => ({ kind: 'not-earned' })
     const relevant = v.matches.filter(m => m.round === v.round && m.status !== 'replay');
     const own = relevant.find(m => m.players.includes(me.id) && m.battle);
     const focus = own || relevant.find(m => m.battle);
-    const rewardAmount = yonkoRewardForSize(v.size);
-    const balance = rewardStatus?.balance ? `<p>Saldo actual: 🧭 ${Number(rewardStatus.balance.logPoses).toLocaleString('es')} Log Poses · ⭐ ${Number(rewardStatus.balance.fame).toLocaleString('es')} Fama</p>` : '';
-    const reward = v.mode === 'coop' && v.champion === 'alliance' ? rewardStatus?.kind === 'granted' || rewardStatus?.kind === 'already' ? `<p>🧭 +${rewardAmount.logPoses.toLocaleString('es')} Log Poses · ⭐ +${rewardAmount.fame.toLocaleString('es')} Fama para tu cuenta.</p>${balance}` : rewardStatus?.kind === 'limit' ? '<p>Límite diario alcanzado: 4 victorias recompensadas.</p>' : rewardStatus?.kind === 'save-failed' ? '<p>No se pudo guardar la recompensa.</p>' : '' : '';
+    const rewardAmount = RegentRewardForSize(v.size);
+    const balance = rewardStatus?.balance ? `<p>Saldo actual: 🧭 ${Number(rewardStatus.balance.Compasss).toLocaleString('es')}${GameContent.text("text_0145")}${Number(rewardStatus.balance.fame).toLocaleString('es')} Fama</p>` : '';
+    const reward = v.mode === 'coop' && v.champion === 'alliance' ? rewardStatus?.kind === 'granted' || rewardStatus?.kind === 'already' ? `<p>🧭 +${rewardAmount.Compasss.toLocaleString('es')}${GameContent.text("text_0146")}${rewardAmount.fame.toLocaleString('es')} Fama para tu cuenta.</p>${balance}` : rewardStatus?.kind === 'limit' ? '<p>Límite diario alcanzado: 4 victorias recompensadas.</p>' : rewardStatus?.kind === 'save-failed' ? '<p>No se pudo guardar la recompensa.</p>' : '' : '';
     const result = v.phase === 'finished' ? `<div class="local-result" role="status"><span>🏆</span><h2>${v.champion === 'draw' ? '¡Empate!' : `¡${esc(playerName(v.champion))} gana!`}</h2><p>Partida amistosa completada.</p>${reward}<button class="btn green" id="local-return-lobby">Volver a elegir modo</button></div>` : '';
     const bracket = v.mode === 'tournament' ? `<section class="local-panel"><h3>Cuadro del torneo · ronda ${v.round}</h3><div class="local-bracket">${v.matches.map(m => `<div class="local-match ${m.status === 'playing' ? 'is-playing' : ''}"><small>Ronda ${m.round}${m.attempt > 1 ? ` · Repetición ${m.attempt}` : ''}</small><b>${m.players.map(id => esc(playerName(id))).join(' vs ')}</b><span>${m.status === 'bye' ? 'Pasa de ronda' : m.status === 'replay' ? 'Empate · se repite' : m.status === 'playing' ? 'En combate' : `Gana ${esc(playerName(m.winner))}`}</span></div>`).join('')}</div></section>` : '';
     const battleHTML = focus ? '<div id="local-arena"></div>' : '<section class="local-panel"><p>Has pasado de ronda. Espera a que terminen los otros combates.</p></section>';

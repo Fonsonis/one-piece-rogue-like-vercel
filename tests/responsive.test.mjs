@@ -4,12 +4,19 @@ import fs from 'node:fs';
 const metrics=JSON.parse(fs.readFileSync('docs/motion-bounds.json','utf8'));
 const sizing=JSON.parse(fs.readFileSync('docs/sprite-sizing.json','utf8'));
 const css=fs.readFileSync('public/art/motion-bounds.css','utf8');
+const pack=JSON.parse(fs.readFileSync('mods/one-piece/pack.json','utf8'));
+const legacyIds=Object.entries(pack.legacy.keys).sort((a,b)=>b[0].length-a[0].length);
+const canonicalId=value=>{
+ if(pack.legacy.keys[value])return pack.legacy.keys[value];
+ const generated=legacyIds.find(([legacy])=>value.startsWith(legacy+'-'));
+ return generated?generated[1]+value.slice(generated[0].length):value;
+};
 
 test('all catalog sprites fit the stage throughout attack, recoil and KO, including mirrored enemies',()=>{
  assert.equal(Object.keys(metrics).length,599);
  let checked=0;
  for(const [id,m] of Object.entries(metrics)){
-   assert.ok(css.includes(`[data-character="${id}"]`));
+   assert.ok(css.includes(`[data-character="${canonicalId(id)}"]`),id);
    const s=sizing[id].atlasScale,center=(sizing[id].guardBounds[0]+sizing[id].guardBounds[2])/2;
    for(const [width,height] of [[100,60],[134,180],[169,430],[280,150],[320,245]]){
      const p=Math.min(192,(width-16)*192/(2*m.halfWidth),(height-16)*192/(m.top+m.bottom));

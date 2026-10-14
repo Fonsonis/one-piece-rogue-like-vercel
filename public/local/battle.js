@@ -1,4 +1,4 @@
-// Vista del combate local: las cartas y animaciones son las mismas que en historia.
+
 'use strict';
 globalThis.LocalBattleView = (() => {
   const esc = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -43,13 +43,13 @@ globalThis.LocalBattleView = (() => {
           const next = template.content.firstElementChild;
           card.className = next.className;
           if (coop && side === 'p') {
-            // Cada jugador conserva su propia carta y su propio escenario durante
-            // la acción conjunta; curP solo representa al primer atacante.
+
+
             card.classList.toggle('active', f.active && f.hp > 0);
             card.dataset.player = playerName(f.owner);
             card.setAttribute('aria-label', `${playerName(f.owner)}: ${next.getAttribute('aria-label')}`);
           }
-          // Conserva el nodo del sprite para que una actualización no corte sus animaciones.
+
           for (const selector of ['.fcard-title','.fcard-hp','.fcard-meters','.fcard-stats-mini']) {
             const current = card.querySelector(selector), replacement = next.querySelector(selector);
             if (current && replacement) current.innerHTML = replacement.innerHTML;

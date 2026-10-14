@@ -21,7 +21,7 @@ select,input { color:var(--ink); background:var(--paper); border:1px solid #95ae
 .runner-reward { margin:5px auto; text-align:center; color:#d7e9f4; font:12px/1.4 system-ui,sans-serif; }
 .runner-action[aria-disabled="true"] { opacity:.55; }
 html[data-theme="dark"] { color-scheme:dark; --ink:#e3ecee; --paper:#1c303c; --paper-dark:#253e49; --sea:#93c4d2; --gold:#e3bd74; --accent:#e0927b; --red:#ed9b89; --green:#87c6a8; --shadow:0 4px 0 #07111855,0 12px 25px #07111833; }
-html[data-theme="dark"] body { background:linear-gradient(#102632df,#0c1d2ae8),url('scenes/egghead-hub.webp') center/cover fixed; background-color:#102330; color:var(--ink); }
+html[data-theme="dark"] body { background:linear-gradient(#102632df,#0c1d2ae8),url('scenes/asset_1862.webp') center/cover fixed; background-color:#102330; color:var(--ink); }
 html[data-theme="dark"] :is(.panel,.modal,.mode-card,.mode-title,.starter-card,.sel-card,.dex-card,.starter-slot-card,.special-card,.saga-row,.team-slot,.pick-row,.shop-item,.ship-row,.achieve-row,.global-upg-row,.toast,.ship-card-body) { background:#1c303c; color:var(--ink); border-color:#54717b; }
 html[data-theme="dark"] :is(.logo,.logo span,.subtitle,.panel h2,.modal h2,.footer-note,.home-account-status,.home-save-status,.char-name,.char-lvl,.side-panel h3,.stat-rows label,.sheet-move small,.side-head,.saga-stat-line) { color:#d7e7e8; text-shadow:none; }
 html[data-theme="dark"] .logo span { color:#eba48b; }
@@ -39,14 +39,14 @@ html[data-theme="dark"] .dex-card.unknown { background:#243842; }
 html[data-theme="dark"] :is(.stat-bar,.hp-mini,.hp-bar,.xp-bar) { background:#324d58; }
 html[data-theme="dark"] :is(.stat-bar i,.xp-bar i) { background:#7eaebd; }
 html[data-theme="dark"] :is(.xp-caption,.syn-none,.sheet-stat label) { color:#bdd3d7; }
-html[data-theme="dark"] .floating-berries .berries { background:#253d49; color:#e6c58b; border-color:#68858b; }
+html[data-theme="dark"] .floating-coins .coins { background:#253d49; color:#e6c58b; border-color:#68858b; }
 html[data-theme="dark"] :is(#inv-logpose-info,#starter-logpose-info) { background:#132c39!important; color:#efd098!important; border-color:#b39159!important; }
 html[data-theme="dark"] .overlay { background:#07121ccc; }
 html[data-theme="dark"] .sheet-section { border-color:#526e77; }
-html[data-theme="dark"] .char-sheet-hero { background:linear-gradient(#142e45a8,#102330b8),url('scenes/egghead-hub.webp') center/cover!important; }
+html[data-theme="dark"] .char-sheet-hero { background:linear-gradient(#142e45a8,#102330b8),url('scenes/asset_1862.webp') center/cover!important; }
 html[data-theme="dark"] .char-sheet-hero > div:last-of-type { color:#e3bd74!important; }
-html[data-theme="dark"] .map-board { background-image:linear-gradient(#0d263288,#102d3588),var(--scene,url('scenes/eastblue.webp')); }
-html[data-theme="dark"] .battle-cols { background-image:linear-gradient(#102632bd,#102632bd),var(--scene,url('scenes/eastblue.webp')); border-color:#5b7c88; }
+html[data-theme="dark"] .map-board { background-image:linear-gradient(#0d263288,#102d3588),var(--scene,url('scenes/asset_1861.webp')); }
+html[data-theme="dark"] .battle-cols { background-image:linear-gradient(#102632bd,#102632bd),var(--scene,url('scenes/asset_1861.webp')); border-color:#5b7c88; }
 html[data-theme="dark"] .battle-side { background:#172d38de; border-color:#496e78; }
 html[data-theme="dark"] .fcard { background:#203c48; border-color:#59818b; }
 html[data-theme="dark"] .fcard.active { background:#284b55; border-color:#92c8b8; }

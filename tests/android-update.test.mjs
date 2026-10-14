@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { downloadAndroidApk } from '../public/local/android-update.mjs';
+
+const ANDROID_URL = 'https://github.com/Fonsonis/mareas-del-umbral/releases/latest/download/mareas-del-umbral.apk';
+const VERSION_URL = 'https://github.com/Fonsonis/mareas-del-umbral/releases/latest/download/android-version.json';
+const API_URL = 'https://api.github.com/repos/Fonsonis/mareas-del-umbral/releases/latest';
+globalThis.GameDistribution = {
+  androidUrl: ANDROID_URL,
+  androidVersionUrl: VERSION_URL,
+  androidReleasesApiUrl: API_URL,
+};
+const { downloadAndroidApk } = await import('../public/local/android-update.mjs');
 
 async function withAndroid({ installedCode, releaseCode, accepted = false, downloadStates = [{ state: 'successful', bytesDownloaded: 10, totalBytes: 10 }], installState = 'installing', httpStatus = 200, rawManifest, apiManifest, httpError, installError, nativeHttp = true, appInfo }, run) {
   const previous = {
@@ -19,7 +28,7 @@ async function withAndroid({ installedCode, releaseCode, accepted = false, downl
         if (httpError) throw httpError;
         return { status: httpStatus, data: options.url.includes('api.github.com')
           ? (apiManifest ?? rawManifest)
-          : (rawManifest === undefined ? { version: '1.2.0', versionCode: releaseCode, downloadUrl: `https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/download/android-${releaseCode}/one-piece-rogue-like.apk` } : rawManifest) };
+          : (rawManifest === undefined ? { version: '1.2.0', versionCode: releaseCode, downloadUrl: `https://github.com/Fonsonis/mareas-del-umbral/releases/download/android-${releaseCode}/mareas-del-umbral.apk` } : rawManifest) };
       } } : null;
       if (name === 'App') return { getInfo: async () => appInfo ?? ({ version: '1.2.0', build: String(installedCode) }) };
       if (name === 'AndroidUpdater') return {
@@ -49,7 +58,7 @@ async function withAndroid({ installedCode, releaseCode, accepted = false, downl
 test('the APK detects a newer build even when the semantic version is unchanged', async () => {
   await withAndroid({ installedCode: 102000001, releaseCode: 102000002, accepted: true }, async state => {
     await downloadAndroidApk({ toast: state.toast });
-    assert.deepEqual(state.downloads, [{ url: 'https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/download/android-102000002/one-piece-rogue-like.apk', versionCode: 102000002 }]);
+    assert.deepEqual(state.downloads, [{ url: 'https://github.com/Fonsonis/mareas-del-umbral/releases/download/android-102000002/mareas-del-umbral.apk', versionCode: 102000002 }]);
     assert.equal(state.installs.length, 1);
     assert.match(state.messages.at(-1), /Abriendo el instalador/);
   });
@@ -92,7 +101,7 @@ test('version lookup uses native HTTP with redirects and bounded timeouts, even 
     await downloadAndroidApk({ toast: state.toast });
     assert.equal(state.requests.length, 1);
     const request = state.requests[0];
-    assert.match(request.url, /^https:\/\/github\.com\/Fonsonis\/one-piece-rogue-like-vercel\/releases\/latest\/download\/android-version\.json\?t=\d+$/);
+    assert.match(request.url, /^https:\/\/github\.com\/Fonsonis\/mareas-del-umbral\/releases\/latest\/download\/android-version\.json\?t=\d+$/);
     assert.equal(request.responseType, 'json');
     assert.equal(request.disableRedirects, false);
     assert.equal(request.connectTimeout, 15000);
@@ -102,16 +111,16 @@ test('version lookup uses native HTTP with redirects and bounded timeouts, even 
 });
 
 test('release manifests delivered as text still update', async () => {
-  await withAndroid({ installedCode: 1, accepted: true, rawManifest: JSON.stringify({ version: '1.2.0', versionCode: 2, downloadUrl: 'https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/download/android-2/one-piece-rogue-like.apk' }) }, async state => {
+  await withAndroid({ installedCode: 1, accepted: true, rawManifest: JSON.stringify({ version: '1.2.0', versionCode: 2, downloadUrl: 'https://github.com/Fonsonis/mareas-del-umbral/releases/download/android-2/mareas-del-umbral.apk' }) }, async state => {
     await downloadAndroidApk({ toast: state.toast });
-    assert.match(state.downloads[0].url, /github\.com\/Fonsonis\/one-piece-rogue-like-vercel\/releases\/download\/android-2\/one-piece-rogue-like\.apk$/);
+    assert.match(state.downloads[0].url, /github\.com\/Fonsonis\/mareas-del-umbral\/releases\/download\/android-2\/mareas-del-umbral\.apk$/);
     assert.equal(state.installs.length, 1);
   });
 });
 
 test('GitHub API recovers the exact published release when the manifest is unavailable', async () => {
   await withAndroid({ installedCode: 1, accepted: true, rawManifest: '<html>error</html>', apiManifest: {
-    tag_name: 'android-3', name: 'Android 1.2.0', assets: [{ name: 'one-piece-rogue-like.apk', state: 'uploaded', browser_download_url: 'https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/download/android-3/one-piece-rogue-like.apk' }],
+    tag_name: 'android-3', name: 'Android 1.2.0', assets: [{ name: 'mareas-del-umbral.apk', state: 'uploaded', browser_download_url: 'https://github.com/Fonsonis/mareas-del-umbral/releases/download/android-3/mareas-del-umbral.apk' }],
   } }, async state => {
     await downloadAndroidApk({ toast: state.toast });
     assert.equal(state.requests.length, 2);
@@ -122,13 +131,28 @@ test('GitHub API recovers the exact published release when the manifest is unava
 test('a manifest pointing to another build is never downloaded', async () => {
   await withAndroid({ installedCode: 1, accepted: true, rawManifest: {
     version: '1.2.0', versionCode: 3,
-    downloadUrl: 'https://github.com/Fonsonis/one-piece-rogue-like-vercel/releases/download/android-2/one-piece-rogue-like.apk',
+    downloadUrl: 'https://github.com/Fonsonis/mareas-del-umbral/releases/download/android-2/mareas-del-umbral.apk',
   } }, async state => {
     await downloadAndroidApk({ toast: state.toast });
     assert.deepEqual(state.downloads, []);
     assert.match(state.messages.at(-1), /incompleto o no es válido/);
   });
 });
+
+for (const [label, downloadUrl] of [
+  ['another origin', 'https://example.com/Fonsonis/mareas-del-umbral/releases/download/android-3/mareas-del-umbral.apk'],
+  ['another repository', 'https://github.com/attacker/mareas-del-umbral/releases/download/android-3/mareas-del-umbral.apk'],
+]) {
+  test(`a manifest pointing to ${label} is rejected`, async () => {
+    await withAndroid({ installedCode: 1, accepted: true, rawManifest: {
+      version: '1.2.0', versionCode: 3, downloadUrl,
+    } }, async state => {
+      await downloadAndroidApk({ toast: state.toast });
+      assert.deepEqual(state.downloads, []);
+      assert.match(state.messages.at(-1), /incompleto o no es válido/);
+    });
+  });
+}
 
 test('an unreadable installed build cannot be mistaken for an up-to-date APK', async () => {
   await withAndroid({ installedCode: 1, releaseCode: 2, appInfo: { version: '1.2.0', build: '' } }, async state => {

@@ -1,4 +1,4 @@
-/* Presentation only: retain the original nodes, values and event handlers. */
+
 (() => {
   'use strict';
   function arrange(sheet) {
@@ -28,7 +28,7 @@
     statsTitle.className = 'sheet-stats-title';
     statsTitle.textContent = 'Características';
     stats.before(statsTitle);
-    // Keep the existing EVA/CRIT explanation with the statistics.
+
     const note = children[end + 1];
     if (note?.classList.contains('sheet-line')) {
       note.classList.add('sheet-stats-note');

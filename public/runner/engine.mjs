@@ -36,7 +36,7 @@ export class RunnerEngine {
     if(this.punchLeft<=0)return null;
     const phase=1-this.punchLeft/RULES.punchDuration;
     if(phase<.18||phase>.8)return null;
-    // Matches the fist in frame 6: (489 - 128) * 90 / 332 + torso anchor.
+
     return {x:this.player.x+24,y:this.player.y+27,w:100,h:37};
   }
   spawn() {
@@ -60,7 +60,7 @@ export class RunnerEngine {
   }
   update(dt) {
     if(this.status!=='running')return;
-    // Called at a fixed 120 Hz; the guard also prevents accidental giant catch-up steps.
+
     dt=Math.min(dt,1/30);
     if(this.hitStop>0){this.hitStop-=dt;return;}
     this.time+=dt;this.speed=RULES.startSpeed+this.time*RULES.speedGainPerSecond;

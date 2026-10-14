@@ -78,8 +78,8 @@ body:has(#island-carousel) .toast { max-width:calc(var(--game-view-width,100vw) 
   #app:has(:is(.map-wrap,.battle-layout)) > .topbar .daily-steps span:last-child { display:none; }
   #app:has(:is(.map-wrap,.battle-layout)) .floating-controls { gap:4px; flex-wrap:nowrap; min-width:0; }
   #app:has(:is(.map-wrap,.battle-layout)) .floating-controls .btn { min-height:40px; padding:6px; font-size:clamp(6px,1.8vw,9px); }
-  #app:has(:is(.map-wrap,.battle-layout)) .floating-berries { flex:none; }
-  #app:has(:is(.map-wrap,.battle-layout)) .floating-berries .berries { padding:4px; font-size:9px; border-radius:4px; }
+  #app:has(:is(.map-wrap,.battle-layout)) .floating-coins { flex:none; }
+  #app:has(:is(.map-wrap,.battle-layout)) .floating-coins .coins { padding:4px; font-size:9px; border-radius:4px; }
   .map-wrap { flex:1; height:0; min-height:0; margin:0; gap:4px; }
   .map-carousel { flex:1; height:0; min-height:0; align-items:stretch; }
   .carousel-page { height:100%; min-height:0; padding:0; overflow-y:auto; overscroll-behavior-y:contain; }

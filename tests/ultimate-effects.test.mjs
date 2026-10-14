@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import {combatHarness} from './balance-harness.mjs';
 const read=f=>fs.readFileSync('public/art/ultimates/'+f,'utf8');
+const pack=JSON.parse(fs.readFileSync('mods/one-piece/pack.json','utf8'));
+const id=legacy=>pack.legacy.keys[legacy] || legacy;
 function artHarness() {
  const h=combatHarness();h.exec(read('profiles.js'));
  h.exec(`globalThis.addEventListener=()=>{};`);
@@ -35,7 +37,7 @@ test('every character gets deterministic, drawable ultimate art in both directio
   draw(recording.ctx,p,.58,{reduced:true,hit:false,sprite});recording.drain();
  }
  assert.equal(h.randomCalls(),randomBefore,'No gameplay RNG for visuals');
- for(const id of ['luffy','luffy2','luffy3','luffy4-boundman','luffy4','luffy4-tankman','luffy5','zoro','law','kuma','teach','marco','aokiji'])assert.ok(profiles.find(p=>p.id===id)?.authored,id);
+ for(const legacy of ['luffy','luffy2','luffy3','luffy4-boundman','luffy4','luffy4-tankman','luffy5','zoro','law','kuma','teach','marco','aokiji'])assert.ok(profiles.find(p=>p.id===legacy)?.authored,legacy);
  console.log(`Ultimate art: ${profiles.length} characters, ${families.length} visual families, ${profiles.filter(p=>p.authored).length} character-specific directions.`);
 });
 function integrationHarness(withArt,broken=false) {
@@ -126,51 +128,58 @@ test('attack and ultimate scenes for one fighter never overlap',async()=>{
 });
 test('reviewed ultimates load new art while Gear 5 has a new normal attack',async()=>{
  const h=lifecycle();
- h.play({profile:h.profile,source:h.source,target:h.target,basic:true});
+ const zoro=id('zoro'),gear5=id('luffy5');
+ const zoroProfile={...h.profile,id:zoro};
+ h.sprite.dataset={character:zoro};
+ h.play({profile:zoroProfile,source:h.source,target:h.target,basic:true});
  await h.ready();
- assert.equal(h.images[0].url,'/art/characters/zoro.png');
- const zoroUltimate=h.play({profile:h.profile,source:h.source,target:h.target});
+ assert.equal(h.images[0].url,`/art/characters/${zoro}.png`);
+ const zoroUltimate=h.play({profile:zoroProfile,source:h.source,target:h.target});
  await h.ready();
- assert.equal(h.images[1].url,'/art/characters/ultimates/zoro.png');
+ assert.equal(h.images[1].url,`/art/characters/ultimates/${zoro}.png`);
  zoroUltimate.cancel();
  const unlisted={...h.profile,id:'unlisted-test'};
  const unlistedUltimate=h.play({profile:unlisted,source:h.source,target:h.target});
  await h.ready();
  assert.equal(h.images[2].url,'/art/characters/unlisted-test.png');
  unlistedUltimate.cancel();
- const gear={...h.profile,id:'luffy5'};
+ const gear={...h.profile,id:gear5};
+ h.sprite.dataset={character:gear5};
  h.play({profile:gear,source:h.source,target:h.target,basic:true});
  await h.ready();
- assert.equal(h.images[3].url,'/art/characters/attacks/luffy5.png');
+ assert.equal(h.images[3].url,`/art/characters/attacks/${gear5}.png`);
  h.play({profile:gear,source:h.source,target:h.target});
  await h.ready();
- assert.equal(h.images[4].url,'/art/characters/luffy5.png');
+ assert.equal(h.images[4].url,`/art/characters/${gear5}.png`);
 });
 test('ultimate actors and cut-in retain the displayed crew variants',async()=>{
  const h=lifecycle();
- h.sprite.dataset={character:'crocodile',spriteId:'crocodile-crossguild'};
- const defender={...h.sprite,dataset:{character:'robin',spriteId:'robin-baroque'}};
+ const crocodile=id('crocodile'),robin=id('robin');
+ const crocodileVariant=`${crocodile}-guild_07`,robinVariant=`${robin}-guild_06`;
+ h.sprite.dataset={character:crocodile,spriteId:crocodileVariant};
+ const defender={...h.sprite,dataset:{character:robin,spriteId:robinVariant}};
  const portraits=[],create=h.doc.createElement;
  h.doc.createElement=tag=>{const node=create(tag);if(tag==='img')portraits.push(node);return node;};
- const handle=h.play({profile:{...h.profile,id:'crocodile'},source:h.source,target:{...h.target,querySelector:()=>defender}});
+ const handle=h.play({profile:{...h.profile,id:crocodile},source:h.source,target:{...h.target,querySelector:()=>defender}});
  await h.ready();
- assert.ok(h.images.some(image=>image.url==='/art/characters/ultimates/crocodile-crossguild.png'));
- assert.ok(h.images.some(image=>image.url==='/art/characters/robin-baroque.png'));
- assert.equal(portraits[0].src,'/art/portraits/crocodile-crossguild.png');
+ assert.ok(h.images.some(image=>image.url===`/art/characters/ultimates/${crocodileVariant}.png`));
+ assert.ok(h.images.some(image=>image.url===`/art/characters/${robinVariant}.png`));
+ assert.equal(portraits[0].src,`/art/portraits/${crocodileVariant}.png`);
  handle.cancel();assert.deepEqual(h.counts(),[0,0,0]);
 });
 
 test('Emperor Kurohige keeps his atlas when its sprite ID is also the Jaya character ID',async()=>{
  const h=lifecycle();
+ const teach=id('teach'),emperor=id('teach-yonko');
  h.exec(`globalThis.CHARS={teach:{spriteId:'teach-jaya'},'teach-yonko':{spriteId:'teach'}};`);
- h.sprite.dataset={character:'teach-yonko',spriteId:'teach'};
+ h.sprite.dataset={character:emperor,spriteId:teach};
  const portraits=[],create=h.doc.createElement;
  h.doc.createElement=tag=>{const node=create(tag);if(tag==='img')portraits.push(node);return node;};
- const handle=h.play({profile:{...h.profile,id:'teach-yonko'},source:h.source,target:h.target});
+ const handle=h.play({profile:{...h.profile,id:emperor},source:h.source,target:h.target});
  await h.ready();
- assert.ok(h.images.some(image=>image.url==='/art/characters/ultimates/teach.png'));
- assert.ok(!h.images.some(image=>image.url.includes('teach-jaya')));
- assert.equal(portraits[0].src,'/art/portraits/teach.png');
+ assert.ok(h.images.some(image=>image.url===`/art/characters/ultimates/${teach}.png`));
+ assert.ok(!h.images.some(image=>image.url.includes(`${teach}-jaya`)));
+ assert.equal(portraits[0].src,`/art/portraits/${teach}.png`);
  handle.cancel();
 });
 

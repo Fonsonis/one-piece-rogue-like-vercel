@@ -1,190 +1,81 @@
-# One Piece Rogue Like — edición estática para Vercel
+# Mareas del Umbral
 
-Juego fan de One Piece, sin ánimo de lucro. La edición actual reúne música, sprites, 589 personajes y formas de One Piece, 15 sagas, 70 islas, logros y el minijuego Luffy Run.
+Roguelike de combates automáticos que se ejecuta en el navegador. La instalación base contiene el universo original **Mareas del Umbral**; el contenido fan de One Piece se conserva aparte como un mod instalable y no forma parte de la compilación predeterminada.
 
-El juego y los guardados se ejecutan en el dispositivo, sin cuentas ni cookies de sesión. Node.js prepara los archivos y las pruebas. El único servicio remoto del juego es la señalización efímera del multijugador mediante una Vercel Function y Upstash Redis; no recibe guardados ni tráfico de combate.
+El motor, las reglas de combate y la interfaz viven en `public/`. El contenido original se declara en `public/content/base.json`. El mod incluido para desarrollo está en `mods/one-piece/`, con su `pack.json` y sus recursos propios.
 
-## Recompensa de Rey Pirata
+> El formato de mod permite separar contenido y mecánicas. No constituye una autorización para distribuir contenido de terceros.
 
-Al superar la última isla de una saga en dificultad **Rey Pirata**, su primera victoria concede la elección de un **legendario de cinco estrellas de esa misma saga**, que queda desbloqueado en el inventario permanente. Es una recompensa por saga y cuenta, compartida entre Clásico y Nuzlocke. No se repite al volver a completarla ni al cambiar de modo.
+## Ejecutar en local
 
-La elección se guarda como pendiente hasta reclamarla. Puede posponerse y recuperarse desde **Elegir legendario** en el puerto, incluso tras recargar o importar el JSON. Las victorias antiguas en Rey Pirata también conceden una elección pendiente si aún no se ha reclamado. Elegir un personaje que ya está en la cuenta no genera otra copia. Lucci y Jinbe pasan a cinco estrellas para cubrir Water 7 y Gyojin, sin cambiar sus atributos ni técnicas.
-
-Se han retirado los 27 personajes crossover, sus eventos, filtros, logros y recursos individuales. Los guardados antiguos eliminan esas referencias, conservando monedas y progreso de One Piece. Si una banda solo contenía personajes retirados, se cierra ese viaje y se conserva la cuenta; los viajes con nakamas de One Piece continúan. El antiguo portal final desaparece y una victoria pendiente de cerrar completa la saga sin exigir aquel combate adicional.
-
-## Multijugador por código de sala
-
-Desde el menú principal, **Multijugador** permite jugar con dispositivos conectados mediante la misma Wi-Fi, red cableada o punto de acceso compartido. Ambos necesitan Internet para crear o encontrar la sala por código. La Vercel Function y Redis solo conservan durante unos minutos la oferta y respuesta de conexión; después WebRTC usa exclusivamente candidatos directos, sin STUN ni TURN. El dispositivo del anfitrión coordina la sesión y resuelve el combate.
-
-- **Duelo PvP:** dos jugadores, con equipos de 1, 3 o 6 nakamas.
-- **Torneo:** 3–8 jugadores, equipos de 1, 3 o 6, eliminación directa y sorteo inicial. Se asignan pases para completar el cuadro y los empates se repiten. Los cruces de una ronda se ejecutan en paralelo en el anfitrión; cada jugador ve su combate y los demás pueden observar. El anfitrión inicia cada ronda.
-- **Alianza contra un yonko:** 2–8 jugadores, equipos de 1, 3 o 6. Kaido, Big Mom, Shanks, Teach o Newgate. Cada jugador vivo actúa con su nakama activo y recibe una respuesta del jefe. PS del jefe = PS base a nivel 30 × jugadores × tamaño de equipo × 2,5; ATQ/ESP_ATQ = base × (1,25 + 0,12 × jugadores); defensas × 1,15. Es un balance inicial, sujeto a ajuste con partidas reales.
-
-Cada jugador elige únicamente entre los personajes de su inventario permanente y sus evoluciones desbloqueadas, como en el selector de historia. Ver un personaje en la Dex o reclutarlo temporalmente no basta. Los equipos mantienen el nivel 30 común, sin mejoras permanentes. Si faltan personajes para el tamaño elegido, no se puede marcar listo; el anfitrión puede elegir equipos más pequeños.
-
-Los combates comparten escenario, cartas, reservas, sinergias y efectos de ataques y definitivas con el resto del juego. El anfitrión transmite cada ataque por separado: 900 ms entre acciones y 1.200 ms tras resolver la ronda, como el combate normal a velocidad ×1. Cada participante ve su banda a la izquierda, puede ordenar la definitiva de su activo para su próximo ataque y dispone de un relevo por combate. En cooperativo, el escenario muestra por turno al aliado que está luchando y al yonko; cada jugador mantiene sus propias reservas. Los invitados reproducen los resultados y animaciones sin volver a simular el daño.
-
-La partida no concede EXP, fama ni desbloqueos, y no modifica el viaje de historia ni su JSON. El anfitrión valida las selecciones contra el inventario que comunica cada dispositivo al entrar. Los guardados continúan siendo locales: son partidas amistosas, sin verificación central del inventario ni clasificación certificada.
-
-### Crear o unirse a una sala
-
-1. Todos abren el juego con conexión a Internet y conectados a la misma Wi-Fi, red local o punto de acceso.
-2. El anfitrión pulsa **Crear sala** y comparte el código corto que aparece, por ejemplo `ABCD-EFGH`.
-3. Cada invitado escribe su nombre y ese código, y pulsa **Unirse a la sala**. El anfitrión prepara la conexión automáticamente.
-4. Todos eligen equipo y pulsan **Estoy listo**; el anfitrión comienza. Al empezar se elimina la información temporal de la sala.
-
-Mantened las pantallas encendidas y el juego visible. La partida se pausa cuando falta un participante activo o el anfitrión está en segundo plano. Una interrupción breve se recupera si WebRTC mantiene el canal; cerrar, recargar o perder definitivamente el canal requiere crear otra sala. No hay migración de anfitrión ni recuperación de estas sesiones desde disco. En la sala se puede retirar a un invitado desconectado e invitarlo de nuevo.
-
-Las redes de invitados con aislamiento, VPN, restricciones de red local y ciertos puntos de acceso pueden impedir la conexión directa aunque el código de sala funcione. No se usa ningún servidor de retransmisión como alternativa. Los datos temporales de señalización pueden contener direcciones locales o nombres mDNS y la huella WebRTC; caducan automáticamente y no incluyen guardados, equipos ni acciones de combate.
-
-### Descargas Android/Windows y juego sin internet
-
-El botón **Descargar juego** abre un único selector con **APK para Android** y **EXE para Windows**. Los dos instaladores se publican juntos en la última release de GitHub e incluyen la build completa (unos 123 MB de recursos), con sprites, mapas, música y tipografía. Después de instalar, el juego arranca sin conexión y conserva el progreso en el almacenamiento local de la aplicación.
-
-Dentro de la APK, ese mismo acceso cambia a **Buscar actualización Android**. Con conexión consulta el `android-version.json` de la última release; si falla, consulta la API de GitHub para localizar la APK publicada. Compara el código de compilación instalado con el publicado, muestra el progreso y comprueba que la descarga sea una APK de esta aplicación y de la compilación esperada antes de abrir el instalador. La búsqueda y los errores quedan visibles bajo el botón. El workflow asigna un nuevo `versionCode` a cada release y verifica que coincida con la APK; las compilaciones locales usan el código de `android/app/build.gradle`. Para publicar una actualización se debe firmar con la misma clave.
-
-La versión de Windows usa Electron con aislamiento de contexto y sin acceso de Node desde el juego. Sirve únicamente los recursos empaquetados mediante el protocolo local `oprl://`, por lo que las rutas absolutas, los módulos y el guardado mantienen un origen estable. El instalador todavía no tiene firma digital y Windows SmartScreen puede mostrar una advertencia al abrirlo.
-
-La opción secundaria **Preparar navegador sin internet → Descargar / actualizar** almacena los recursos (~121 MB) en el navegador web. Espera la confirmación de descarga completa. Después abre **la misma dirección**. La aventura individual puede funcionar desde caché; el multijugador siempre necesita Internet para crear o encontrar una sala. Las actualizaciones se descargan con el mismo botón y una descarga fallida conserva la copia anterior.
-
-El navegador puede desalojar los recursos por falta de espacio. Conserva una exportación JSON independiente del progreso. Esta función registra un service worker únicamente al solicitar la descarga; no precarga archivos ni sustituye el guardado sin pulsar el botón.
-
-Detalles y pruebas: `public/local/`, `tests/local-multiplayer.test.mjs` y la prueba opcional de navegadores `tests/browser-local.mjs` (requiere Playwright y Chrome; rutas configurables con `LOCAL_PLAYWRIGHT_PATH`, `LOCAL_CHROME_PATH`, `LOCAL_TEST_URL`).
-
-## Edición Egghead
-
-Buggy contra Buggy ya no bloquea la partida. Se revisan pasivas y técnicas, se añade EXP visible, se ajustan las escalas de los 589 sprites y se incorporan escenarios ilustrados. Se conservan estadísticas base, niveles de enemigos y curvas de progresión. Consulta [la revisión de balance](docs/combat-balance.md), [las fichas](docs/character-balance.csv) y [la dirección visual](docs/art-direction.md).
-
-## Selección de equipos y desafíos
-
-Desafíos muestra Torneo y Batalla de Leyendas en dos tarjetas horizontales, también en móvil. Ambos usan el selector de retratos de historia. Los tres equipos guardados se comparten entre historia, Torre Marine y desafíos: al cargar se conserva el orden, se omiten personajes incompatibles y se usan los huecos disponibles (1 en torneo, 2 de rareza 5★ en Leyendas y 3 en Torre). Guardar en un hueco sustituye ese equipo compartido.
-
-El piloto automático usa **Pasos 👢**: cada día se recargan 1.000. En Historia se consume 1 al comenzar a recorrer automáticamente cada mapa de una isla, nunca por cada nodo; en Desafíos, el botón **AUTO** permite elegir entre 1 y 1.000 torneos consecutivos y consume 1 por combate. Los mapas y combates iniciados manualmente no gastan pasos. La serie y el saldo se conservan en el guardado local y en las copias JSON; salir, recargar o agotar los pasos pausa la serie para reanudarla después.
-
-**Más usados** ordena los personajes por partidas iniciadas en historia, Torre Marine y desafíos. Las evoluciones comparten contador; elegir, guardar un equipo o reanudar un torneo no suma usos. Una nueva isla o un reintento sí suma uno. El contador comienza con esta actualización y se conserva en el guardado y las copias JSON; los guardados anteriores siguen siendo compatibles.
-
-Torneo y Leyendas abren en **Próximo combate**, con los equipos enfrentados, sus niveles, la ronda y un botón principal para luchar. **Cuadro completo** muestra todas las rondas y el tercer puesto, ajustados al ancho y alto de la pantalla; **Ampliar** permite leer y recorrer los cruces. Las reliquias rivales quedan dentro de un desplegable. La tarjeta de cada modo permite continuar una partida o recuperar un premio pendiente, sin botones adicionales de resultado ni colección de reliquias en el menú. Las reliquias se siguen equipando desde las fichas de los personajes.
-
-Los nuevos sorteos solo incluyen rivales de la saga más avanzada desbloqueada o de las anteriores, aunque la cuenta tenga personajes de sagas posteriores. Si no hay suficientes legendarios distintos para 16 personajes, Leyendas usa 8 personajes (4 parejas). Los cuadros ya guardados conservan sus participantes, resultados y premios.
-
-Todos los enemigos usan la evolución que corresponde a su nivel de combate, independientemente de los niveles base de la cuenta: encuentros, marines, jefes y emboscadas de historia, Torre Marine, Torneo, Leyendas y jefes cooperativos. Por ejemplo, Lucci de nivel 65 aparece despertado, con sus estadísticas, movimientos y retrato correspondientes. El cuadro y la previa de desafíos muestran la forma de cada ronda, también al continuar un torneo guardado. La saga limita qué personajes entran en el sorteo; su nivel determina la fase. Los nakamas del jugador conservan sus requisitos de desbloqueo.
-
-Las fichas muestran las fases cuyo nivel base todavía no se ha alcanzado como siluetas oscuras, con candado y el requisito de nivel. Sus estadísticas, movimientos y botones de probar ataque o definitiva permanecen ocultos hasta desbloquearlas. Las flechas permiten volver a las fases disponibles; las fichas de luchadores presentes en combate conservan su información real.
-
-## Jugar en local
-
-Con Node.js 22 o superior:
+Requiere Node.js 22 o posterior.
 
 ```sh
 npm ci
 npm run dev
 ```
 
-Abre http://127.0.0.1:4173. Para probar la compilación final:
+Abre `http://127.0.0.1:4173`. Es necesario usar HTTP; abrir los archivos mediante `file://` no permite cargar todos los módulos y recursos.
+
+Comandos habituales:
 
 ```sh
-npm run build
-npm start
+npm run build          # genera la web estática en dist/
+npm run lint           # comprueba la sintaxis del código
+npm run test:content   # valida packs, instalación y empaquetado
+npm run audit:content  # busca referencias del mod en el contenido base
 ```
 
-No abras el HTML con `file://`: Luffy Run carga módulos y recursos mediante HTTP.
+La suite histórica completa se ejecuta con `npm test`; usa un adaptador de compatibilidad para comprobar las mecánicas anteriores sobre los identificadores canónicos actuales.
 
-### Construir la APK Android
+## Instalar el mod incluido
 
-La plataforma nativa está en `android/` y Capacitor copia `dist/` dentro del instalador. Con JDK 21 y Android SDK 35 disponibles mediante `JAVA_HOME` y `ANDROID_HOME`:
+Empaquétalo desde la raíz del repositorio:
 
 ```sh
-npm ci
-npm run android:apk
+npm run mod:pack
 ```
 
-El resultado firmado se crea en `outputs/one-piece-rogue-like.apk`. En el primer build local, el script genera `.android-signing/one-piece-rogue-like.jks` y sus credenciales; ambos están ignorados por Git. Haz una copia privada de esa carpeta: perder la clave impide que Android acepte futuras versiones como actualización de la app instalada.
-
-### Construir el EXE de Windows
-
-En Windows, Electron reutiliza la misma carpeta `dist/` y genera un instalador NSIS de 64 bits:
+El comando usa `one-piece` de forma predeterminada y crea `outputs/mods/one-piece.umbralmod`. Para otro mod:
 
 ```sh
-npm ci
-npm run desktop:exe
+npm run mod:pack -- mi-mod
 ```
 
-El resultado se crea en `outputs/windows/one-piece-rogue-like-setup.exe`. Para abrir la aplicación sin crear el instalador usa `npm run desktop:start`; para generar únicamente la carpeta empaquetada usa `npm run desktop:dir`.
+Sirve el juego por HTTPS o desde `localhost`. En el menú abre **MODS**, elige el archivo `.umbralmod`, actívalo y pulsa **Jugar**. El navegador conserva el mod en su almacenamiento local; `mods/one-piece/` queda fuera de la build estática.
 
-El workflow `android-release.yml` compila Android y Windows en trabajos separados y solo publica cuando ambos terminan correctamente. La APK, el EXE, sus SHA-256 y ambos manifiestos comparten una release `android-<versionCode>`, de modo que los enlaces `releases/latest` de las dos plataformas siempre apuntan al mismo conjunto. Android requiere los secretos `ANDROID_KEYSTORE_BASE64`, `ANDROID_STORE_PASSWORD`, `ANDROID_KEY_ALIAS` y `ANDROID_KEY_PASSWORD`, obtenidos de la misma clave local.
+Consulta [Crear y distribuir mods](docs/modding.md) para el formato, los límites y el flujo de trabajo completo.
 
-## Tripulación y relevo
-
-El combate mantiene un activo por bando y muestra la tripulación sobre los controles. Toca una reserva viva para hacer **un relevo manual por combate**, también en Torre Marine. El relevo es inmediato, conserva PS, estados y carga de Ultimate, y no añade ataques: el siguiente golpe pendiente usa al nuevo activo. Las sustituciones automáticas por derrota no gastan este relevo. Cada encuentro recupera su uso; el orden del equipo para el siguiente combate se conserva.
-
-Las fichas de combate y del equipo dan más espacio a los sprites. Los activos aparecen enfrentados, uno al lado del otro también en móvil, con vida, Ultimate y EXP encima y estadísticas debajo. Los logros se filtran mediante un desplegable y muestran la recompensa debajo del texto; el control de música también queda debajo de su descripción.
-
-Cada bando indica los personajes en pie sobre el total inicial del encuentro (por ejemplo, `3/4 en pie`). El denominador se conserva también cuando Nuzlocke elimina a un aliado. Bajo las fichas compactas aparecen la tripulación, los mensajes y tres filas de controles: objetos; bandas, velocidad y sinergias; huir o rendirse cuando esté disponible. Sin objetos se muestra un aviso en su fila. Las animaciones conservan las cuatro poses, con límites ajustados al atlas y sin desplazamientos ni giros adicionales para dar más tamaño al sprite. Si se actualizan los atlas, regenera primero los límites de movimiento y después ejecuta `node scripts/compact-sprite-bounds.mjs`.
-
-## Islas y expediciones
-
-Al elegir saga aparece su mapa de islas antes de preparar el equipo. Cada isla tiene entre 3 y 5 mapas de nodos (`min(5, max(3, 2 + número de jefes definidos))`), con combates y eventos. Los mapas intermedios terminan en una salida; solo el último contiene el encuentro de jefe. Los niveles, estadísticas y curvas de enemigos existentes se conservan.
-
-La banda mantiene PS, objetos y progreso entre mapas. **Los reclutas de la expedición solo se desbloquean permanentemente al completar la isla**, si siguen en la banda. Una derrota o un abandono previo no los añade a la plantilla. Los carteles comprados en el puerto con Log Poses conservan su desbloqueo directo.
-
-Vencer al jefe desbloquea la siguiente isla y permite preparar otro equipo. El progreso de islas se guarda por saga, modo y dificultad; las sagas ya conquistadas conservan sus islas disponibles. Un viaje antiguo continúa en su mapa guardado, tratado como último mapa de la isla, sin regenerarlo.
-
-Las sinergias se activan con 2 miembros vivos del mismo tag (nivel I) y 3 o más (nivel II). Con 6/6, sus bonus numéricos se multiplican por 1,4: un 25 % pasa al 35 %. Las inmunidades y protecciones garantizadas no se duplican.
-
-Huir requiere confirmación y pausa el combate mientras se decide. Los sprites de combate se centran sobre la sombra y pueden sobresalir de sus fichas; las notificaciones aparecen en horizontal arriba. Los carteles del evento especial usan papel envejecido y estrellas doradas.
-
-## Guardado en el dispositivo
-
-- **💾**: sobrescribe un único documento JSON en el almacenamiento local del navegador, bajo la clave `oplike_save`. No descarga archivos ni envía datos a un servidor.
-- Se mantienen los puntos de guardado automáticos del juego para progresión, ajustes y final de encuentros. El botón manual durante un combate pide terminarlo; no se guarda un combate a mitad de turno.
-- **Exportar JSON**: descarga `grandlinelike.json`, una copia portátil con el progreso permanente y el viaje. El navegador controla las descargas: puede añadir un sufijo si ya existe ese archivo, en vez de sobrescribirlo.
-- **Importar JSON**: tras confirmar, valida el archivo y sustituye el progreso del dispositivo. Un archivo inválido o un fallo de escritura conserva la partida anterior.
-- Se recuperan las antiguas claves locales `oplike_meta` y `oplike_run` si todavía no existe el nuevo guardado. Las copias JSON con `game: "grandlinelike"` y `version: 1` siguen siendo compatibles. No hay inicio de sesión ni recuperación desde servidores antiguos.
-- En Ajustes puedes elegir aspecto claro/oscuro y 2 o 3 columnas de nakamas en móvil. Estas preferencias viajan en el mismo JSON local.
-- Luffy Run está disponible desde el nivel 1 de cuenta: máximo dos saltos antes de aterrizar y hasta 25 pasos recuperados por cada 1.000 metros completos de una carrera, sin superar el máximo diario de 1.000. Los golpes suman puntos, pero no metros ni pasos adicionales. La recompensa se guarda al alcanzar el tramo; empezar otra carrera reinicia la distancia.
-- La tienda agrupa las mejoras de veteranos en listas desplegables por saga, con búsqueda por nombre.
-- Los récords y recompensas de Torre Marine, Desafíos y Luffy Run se conservan en el progreso permanente. Sus sesiones en curso siguen siendo temporales, como en el motor original.
-
-El guardado pertenece al **navegador y al dominio** donde juegas. Para llevarlo a otro móvil, navegador, dominio o URL de preview, exporta e importa el JSON. Borrar los datos del sitio o cerrar una sesión privada puede eliminar la copia local. Conserva un JSON si necesitas una copia independiente del navegador.
-
-## Subir al proyecto de Vercel existente
-
-Destino original: `Fonsonis/one-piece-rogue-like-vercel` en GitHub y `one-piece-rogue-like-vercel` en Vercel.
-
-1. Coloca el contenido de esta edición en la raíz del repositorio. Conserva la carpeta `public/` completa, incluidos `art/`, `runner/`, `Images/`, `sprites/` y `soundtracks/`, junto con `scripts/`, `package.json`, `package-lock.json` y `vercel.json`. No subas `node_modules/`, `dist/` ni `outputs/`.
-2. En Vercel, abre el proyecto existente y comprueba que está conectado a ese repositorio y su rama `main`. Utiliza la raíz del repositorio como **Root Directory**.
-3. La configuración incluida en `vercel.json` fija **Framework Preset: Other**, **Install Command: npm ci**, **Build Command: npm run build** y **Output Directory: dist**. Elimina cualquier ajuste antiguo que apunte a una subcarpeta o a Cloudflare. Usa Node.js 22 o 24 en Vercel.
-4. En **Storage**, conecta una base Upstash Redis al proyecto. La integración debe inyectar `KV_REST_API_URL` y `KV_REST_API_TOKEN` (o sus equivalentes `UPSTASH_REDIS_REST_URL` y `UPSTASH_REDIS_REST_TOKEN`) en producción y previews.
-5. Haz commit y push. La integración Git de Vercel generará el despliegue. Si esa integración está desactivada, despliega desde el panel después de subir los cambios.
-6. Abre `/`, pulsa 💾, recarga y comprueba el mensaje de guardado. Crea también una sala para verificar la función y Redis. `/play.html` e `/index.html` están incluidos en la salida.
-
-El build copia `public/` a `dist/` y crea `index.html` a partir de `play.html`. Vercel publica además `api/multiplayer.mjs` como Function. Redis es obligatorio para el multijugador; el resto del juego y sus guardados no dependen de esa base.
-
-Alternativa desde la terminal, con Vercel CLI y tu sesión iniciada: ejecuta `vercel link`, selecciona **el proyecto existente**, y después `vercel --prod`. El comando publica la versión; no lo uses hasta haber seleccionado el destino correcto.
-
-Vercel Hobby es gratuito para uso personal no comercial, sujeto a sus límites de tráfico y recursos. Servir archivos estáticos también consume transferencia. Referencias: [precios de Vercel](https://vercel.com/pricing) y [límites](https://vercel.com/docs/limits).
-
-## Verificación
+## Crear un mod
 
 ```sh
-npm test
-npm run lint
+node scripts/create-mod.mjs mi-mod "Mi aventura"
 ```
 
-Las pruebas verifican contenido del juego, los 589 atlas y retratos, escenarios con/sin efectos visuales, Nuzlocke, Luffy Run, JSON local, recuperación, importaciones inválidas, almacenamiento bloqueado, el protocolo de salas con un Redis simulado y la copia exacta de todos los recursos. La suite automatizada no requiere red. Para reproducir la comparación histórica: `node scripts/audit-balance.mjs 607b860`.
+Esto crea `mods/mi-mod/pack.json` con una copia completa de los datos y textos originales y un directorio `assets/` vacío. Edita el JSON y añade únicamente los recursos que quieras sustituir: si una ruta no está incluida en el mod, se usan los gráficos originales.
 
-## Estructura
+Los packs son datos JSON. Pueden cambiar personajes, movimientos, sagas, grupos, objetos, textos y recursos, pero actualmente no pueden ejecutar JavaScript ni añadir efectos de combate nuevos. Los identificadores mecánicos reservados deben mantenerse estables.
 
-- `public/`: juego completo y recursos que se sirven al navegador.
-- `scripts/build-static.mjs`: prepara `dist/` y comprueba la sintaxis JavaScript.
-- `scripts/build-android-apk.mjs`: genera una APK release firmada y su SHA-256.
-- `android/`: contenedor nativo de Capacitor; sus assets web se actualizan con `npm run android:sync`.
-- `desktop/`: contenedor aislado de Electron para el instalador de Windows.
-- `api/` y `server/`: función de señalización y estado efímero de las salas; no transportan la partida.
-- `scripts/serve-static.mjs`: servidor de desarrollo local; no se despliega como función.
-- `tests/`: pruebas del motor, arte, guardado y salida estática.
-- `docs/`: documentación y procedencia del arte.
+## Guardados y cambio desde versiones anteriores
 
-## Créditos
+Cada pack guarda su progreso por separado bajo `umbral:<id-del-pack>:umbral_save`. Activar un mod no sobrescribe la partida de `Mareas del Umbral`.
 
-GrandLineLike es un proyecto fan sin ánimo de lucro. One Piece y sus personajes pertenecen a sus respectivos titulares. Proyecto no afiliado con Eiichiro Oda, Shueisha ni Toei Animation.
+Al activar el mod de One Piece, el navegador puede importar las antiguas claves `oplike_*` y el discriminador del JSON histórico sin borrar esas claves. Las aplicaciones Android y Windows nuevas tienen otra identidad y no pueden leer el almacenamiento nativo de la aplicación anterior. Antes de sustituirla, exporta el guardado JSON; después instala la nueva aplicación, activa el mod e importa ese archivo.
+
+Desregistrar el service worker o borrar los datos del sitio elimina las cachés y los mods instalados. Conserva tanto los archivos `.umbralmod` como exportaciones recientes de los guardados.
+
+## Compilación y distribución
+
+La build normal incluye solo el juego base y su registro. Los mods instalados se guardan localmente mediante Service Worker y Cache Storage. La descarga para uso sin conexión incorpora el contenido base; cada mod debe instalarse desde su propio archivo.
+
+Los instaladores APK y EXE todavía no están publicados desde esta configuración. `public/distribution.json` contiene URLs vacías; configúralas al publicar artefactos reales.
+
+Estructura principal:
+
+- `public/content/base.json`: pack original integrado.
+- `public/content/`: carga, validación e instalación de packs.
+- `mods/one-piece/`: mod fan separado, excluido de la build.
+- `scripts/create-mod.mjs`: crea una plantilla completa.
+- `scripts/package-mod.mjs`: produce archivos `.umbralmod`.
+- `tests/`: pruebas del contenido, motor y aplicación.
+- `api/` y `server/`: señalización efímera del multijugador.

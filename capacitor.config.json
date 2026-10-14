@@ -1,6 +1,6 @@
 {
-  "appId": "com.fonsonis.onepieceroguelike",
-  "appName": "One Piece Rogue Like",
+  "appId": "com.umbral.mareas",
+  "appName": "Mareas del Umbral",
   "webDir": "dist",
   "android": {
     "backgroundColor": "#2f7fc4",

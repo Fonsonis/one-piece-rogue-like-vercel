@@ -1,5 +1,6 @@
-/* Presentation only: keep emoji/data strings intact for saves and native controls. */
+
 (() => {
+  if(GameContent.id==='umbral')return;
   const groups = [
     ['🍖'],['🍗'],['🍱','🍽️','🥪'],['🍶'],['📜','📃'],['🏅'],
     ['📯'],['🥤'],['🛡️','🛡'],['🍈','🍇'],['🎁','🧰'],['⛺','🏕️'],
@@ -8,10 +9,10 @@
     ['🔥'],['❄️','🧊'],['☣️','🧪','🐍'],['💨','🌪️','🐌'],['🌊','💧','♨️'],['⚡'],
     ['🌑','🌌'],['👊','💪','🥊'],['🔫','💥'],['🗡️'],['❤️','💚','💖','💕','💗','♥️','💊'],['🌀','🌈']
   ];
-  const labels = ['Carne','Carne real','Comida','Sake','Cartel','Cartel dorado','Buster Call','Proteína','Defensa','Fruta del Diablo','Tesoro','Campamento','Combate','Pirata','Jefe','Tienda','Misterio','Crossguild','Log Pose','Viaje','Mochila','Berries','Estrella','Bloqueado','Fuego','Hielo','Veneno','Viento','Agua','Rayo','Oscuridad','Golpe','Disparo','Corte','Curación','Portal'];
+  const labels = [GameContent.text("text_0001"),GameContent.text("text_0002"),'Comida','Sake','Cartel','Cartel dorado',GameContent.text("text_0003"),'Proteína','Defensa',GameContent.text("text_0004"),'Tesoro','Campamento','Combate','Pirata','Jefe','Tienda','Misterio',GameContent.text("text_0005"),GameContent.text("text_0006"),'Viaje','Mochila',GameContent.text("text_0007"),'Estrella','Bloqueado','Fuego','Hielo','Veneno','Viento','Agua','Rayo','Oscuridad','Golpe','Disparo','Corte','Curación','Portal'];
   const uiGroups = [['💾'],['⚙️','⚙'],['ℹ️','ⓘ'],['🔎','🔍'],['📂','📁'],['🗑️'],['👥','👤','🤝'],['🌍','🌎','🌏','🌐'],['🧢'],['🗼','🏰'],['📋','📖','📚'],['📊','📈'],['⛓️','🔗'],['⛓️‍💥'],['🕸️'],['🥋','👴'],['🧑‍🌾'],['🏝️','🏝','🏖️'],[],['➕'],['✅','✔️'],['❌','🚫','⛔'],['🔄','🔁'],['⬆️','🔼'],['🎲'],['⚠️','🚨','❗'],['⏳','⏱️','⏰'],['💔'],['🩹','🏥'],['👑'],['🎵','🎶'],['🔊','🔉'],['🔇'],['🏃','🏃‍♂️','👟'],['🎮','🕹️'],['🦴']];
   labels.push('Guardar','Ajustes','Información','Buscar','Equipo guardado','Eliminar','Tripulación','Mundo','Marine','Torre','Registro','Estadísticas','Cadena','Cadena rota','Trampa','Entrenamiento','Aldeano','Isla','Estrella','Añadir','Confirmado','Cancelar','Cambiar','Mejorar','Azar','Aviso','Tiempo','Derrota','Curar','Corona','Música','Sonido','Silencio','Correr','Juego','Huesos');
-  // Keep the original star glyphs for character rarity, fusion and their labels.
+
   const icons = new Map([...groups,...uiGroups].flatMap((list,index) => list.map(symbol => [symbol,index])));
   const difficultyIcons = new Set(DIFFICULTIES.map(d => d.emoji));
   const difficultyContext = '.diff-dropdown-trigger,.diff-dropdown-item,.world-difficulties,.world-mode-progress,.native-difficulty';
@@ -31,7 +32,7 @@
       for(const match of matches){
         fragment.append(value.slice(offset,match.index));
         const index=icons.get(match[0]), icon=document.createElement('span');
-        icon.className='event-sprite'+(index===17?' crossguild-sprite':index>=36?' ui-sprite':'');icon.setAttribute('role','img');icon.setAttribute('aria-label',labels[index]);
+        icon.className='event-sprite'+(index===17?" guild_07-sprite":index>=36?' ui-sprite':'');icon.setAttribute('role','img');icon.setAttribute('aria-label',labels[index]);
         if(index!==17)icon.style.backgroundPosition=`${index%6*20}% ${Math.floor(index%36/6)*20}%`;
         fragment.append(icon);offset=match.index+match[0].length;
       }

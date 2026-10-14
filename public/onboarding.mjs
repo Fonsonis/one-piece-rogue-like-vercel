@@ -1,5 +1,5 @@
-// Optional, device-local help. It never writes to a game save or changes a journey.
-export const GUIDE_KEY = 'oplike_learning_v1';
+
+export const GUIDE_KEY = "umbral_learning_v1";
 export function readGuide(storage, hasSave) {
   try {
     const value = JSON.parse(storage.getItem(GUIDE_KEY));
@@ -7,25 +7,25 @@ export function readGuide(storage, hasSave) {
       return {version:1,status:value.status,combatSeen:value.combatSeen === true,
         dismissed:Array.isArray(value.dismissed) ? value.dismissed.filter(id=>['home','world','crew','route','growth'].includes(id)) : []};
     }
-  } catch { /* Help remains usable when storage is unavailable. */ }
+  } catch {  }
   return {version:1,status:hasSave ? 'available' : 'welcome',combatSeen:false,dismissed:[]};
 }
 
 export const LESSONS = {
   home:{number:1,title:'Tu primera travesía',text:'Empieza por Historia. Elige una isla, reúne tu banda y avanza hasta derrotar a sus jefes. Los demás modos pueden esperar.',task:'Pulsa Historia para elegir tu primer destino.',target:'#mode-story'},
-  world:{number:2,title:'Elige tu primera isla',text:'Para aprender, empieza en East Blue, con Clásico y dificultad Grumete. Toca una isla y abre su destino para preparar la banda. Las siguientes islas se abren al avanzar.',task:'Selecciona la primera isla de East Blue y entra en ella.',target:'[data-world-saga="0"][data-world-island="0"]'},
-  crew:{number:3,title:'Prepara tu banda',text:'Toca un hueco para elegir un nakama. Empiezas con un hueco; podrás ampliar la banda en la Tienda del inicio. Cuando tengas más miembros, combina tipos y sinergias. Las mejoras con Log Poses suben su nivel inicial de forma permanente.',task:'Elige tu banda y pulsa Zarpar. Prueba primero el viaje manual.',target:'#starter-slots-container'},
-  route:{number:4,title:'Cada parada es una decisión',text:'Avanza por los nodos iluminados: hay combates, objetos, descanso y tiendas. Revisa los PS de tu banda; en Equipo ves tus nakamas y en Mochila puedes usar lo que encuentres.',task:'Pulsa un nodo disponible para avanzar. Cada avance consume pasos diarios.',target:'.map-node.reachable'},
+  world:{number:2,title:'Elige tu primera isla',text:GameContent.text("text_0156"),task:GameContent.text("text_0157"),target:'[data-world-saga="0"][data-world-island="0"]'},
+  crew:{number:3,title:'Prepara tu banda',text:GameContent.text("text_0158"),task:'Elige tu banda y pulsa Zarpar. Prueba primero el viaje manual.',target:'#starter-slots-container'},
+  route:{number:4,title:'Cada parada es una decisión',text:GameContent.text("extra_073"),task:'Pulsa un nodo disponible para avanzar. Cada avance consume pasos diarios.',target:'.map-node.reachable'},
   growth:{number:6,title:'Ya conoces lo esencial',text:'Sigue la ruta hasta los jefes. El nivel que ganas durante el viaje es temporal; tu colección y las mejoras permanentes te ayudan en la próxima aventura. Si pierdes, puedes preparar otra banda y volver a intentarlo.',task:'Al volver al inicio, revisa Inventario, Tienda y Logros. «Cómo jugar» seguirá disponible.',target:'#tab-page-team'},
 };
 
 export const HANDBOOK = [
-  {title:'Una aventura, paso a paso',text:'Historia es el punto de partida: elige una isla, prepara la banda y recorre sus rutas hasta los jefes. Empieza en Clásico y Grumete para aprender. Nuzlocke añade reglas más exigentes.',tip:'Las dificultades se desbloquean en orden. Para abrir la siguiente saga, supera la anterior en Capitán o superior.'},
-  {title:'Tu banda y sus tipos',text:'Los tipos influyen en los enfrentamientos y en las sinergias de tu equipo. Toca un personaje para consultar sus detalles. Durante el viaje puedes reclutar nuevos nakamas; si la banda está llena, eliges a quién sustituir.',tip:'Dex es tu enciclopedia. Inventario es tu colección de personajes disponibles para preparar equipos.'},
+  {title:'Una aventura, paso a paso',text:GameContent.text("final_mode_15"),tip:'Las dificultades se desbloquean en orden. Para abrir la siguiente saga, supera la anterior en Capitán o superior.'},
+  {title:'Tu banda y sus tipos',text:GameContent.text("extra_074"),tip:'Dex es tu enciclopedia. Inventario es tu colección de personajes disponibles para preparar equipos.'},
   {title:'El mapa y la mochila',text:'Los nodos iluminados son las rutas que puedes tomar. Alterna combates con descanso, objetos y tiendas según el estado de tu banda. Cambia entre Mapa, Equipo y Mochila con las pestañas.',tip:'Los pasos limitan los avances diarios. Las bayas sirven para comprar durante el viaje; no son la moneda de las mejoras permanentes.'},
-  {title:'El combate continúa solo',text:'Los nakamas atacan automáticamente. Vigila sus PS, los tipos y la carga de la técnica definitiva. Puedes consultar las bandas, usar objetos disponibles y hacer un relevo por combate cuando esté permitido.',tip:'El control de huida permite escapar de encuentros salvajes. El intento puede fallar y no está disponible en todos los combates.'},
-  {title:'Lo que conservas al volver',text:'El nivel del viaje es temporal. Los Log Poses permiten mejorar permanentemente el nivel inicial de tus personajes y también se usan en Carteles. Para evolucionar, necesitas alcanzar el nivel requerido tanto de forma permanente como durante el viaje.',tip:'La fama se usa en la Tienda del inicio. Revisa Logros para reclamar premios. Exporta tu partida para guardar una copia fuera de este navegador.'},
-  {title:'Descubre el resto a tu ritmo',text:'Torre Marine se desbloquea al nivel de cuenta 20 y Desafíos al 35. Luffy Run y el multijugador local ofrecen otras formas de jugar. No necesitas aprenderlo todo para empezar una aventura.',tip:'Cuando ya conozcas la ruta, puedes explorar el modo automático desde Ajustes. Siempre puedes repetir esta guía.'},
+  {title:'El combate continúa solo',text:GameContent.text("extra_075"),tip:'El control de huida permite escapar de encuentros salvajes. El intento puede fallar y no está disponible en todos los combates.'},
+  {title:'Lo que conservas al volver',text:GameContent.text("text_0159"),tip:'La fama se usa en la Tienda del inicio. Revisa Logros para reclamar premios. Exporta tu partida para guardar una copia fuera de este navegador.'},
+  {title:'Descubre el resto a tu ritmo',text:GameContent.text("text_0160"),tip:'Cuando ya conozcas la ruta, puedes explorar el modo automático desde Ajustes. Siempre puedes repetir esta guía.'},
 ];
 
 export function guideContext(root) {
@@ -41,10 +41,10 @@ function boot() {
   const app = document.getElementById('app');
   if (!app) return;
   let storage;
-  try { storage = localStorage; } catch { storage = null; }
+  try { storage = GameContent.storage; } catch { storage = null; }
   let state = readGuide(storage, typeof loadedSave !== 'undefined' && !!loadedSave);
   let panel = null, dialog = null, frame = null;
-  const persist = () => { try { storage?.setItem(GUIDE_KEY,JSON.stringify(state)); } catch { /* Session-only fallback. */ } };
+  const persist = () => { try { storage?.setItem(GUIDE_KEY,JSON.stringify(state)); } catch {  } };
   persist();
   const clear = () => {
     panel?.remove(); panel = null;
@@ -132,7 +132,7 @@ function boot() {
     panel.querySelector('[data-learn-skip]').onclick=stop;
   }
   const schedule=()=>{if(frame===null)frame=requestAnimationFrame(()=>{frame=null;update();});};
-  // Root replacements are the game's screen transitions; no hooks into gameplay.
+
   new MutationObserver(schedule).observe(app,{childList:true});
   new MutationObserver(schedule).observe(document.body,{childList:true});
   update();

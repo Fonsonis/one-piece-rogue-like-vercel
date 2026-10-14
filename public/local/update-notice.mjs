@@ -1,7 +1,8 @@
 import { isAndroidApp, pendingAndroidUpdate, downloadAndroidApk } from './android-update.mjs';
+import {matchCached} from '../content/cache.mjs';
 
 const loadedVersion = document.querySelector('meta[name="game-build"]')?.content;
-const nativeDesktop = globalThis.OnePieceDesktop?.isDesktop === true;
+const nativeDesktop = globalThis.UmbralDesktop?.isDesktop === true;
 let pending = null;
 let busy = false;
 
@@ -30,8 +31,8 @@ function show(message, action = 'Actualizar') {
 
 async function offlineCopyActive() {
   if (!('caches' in window)) return false;
-  const cache = await caches.open('oplike-offline-meta');
-  return !!(await cache.match('/__oplike_offline_active__'));
+  const cache = await caches.open("umbral-offline-meta");
+  return !!(await matchCached(cache,"/__umbral_offline_active__"));
 }
 
 async function checkUpdate() {
@@ -48,7 +49,7 @@ async function checkUpdate() {
     if (nativeDesktop || !loadedVersion || loadedVersion === 'development') return;
     if ('serviceWorker' in navigator) {
       const registration = await navigator.serviceWorker.getRegistration();
-      try { await registration?.update(); } catch { /* El manifiesto aún puede estar disponible. */ }
+      try { await registration?.update(); } catch {  }
     }
     const response = await fetch(`/offline-manifest.json?update=${Date.now()}`, { cache: 'no-store' });
     if (!response.ok) return;
@@ -57,7 +58,7 @@ async function checkUpdate() {
       pending = await offlineCopyActive() ? 'offline' : 'web';
       show('Hay una nueva versión del juego disponible.');
     }
-  } catch { /* No mostramos avisos si estamos sin conexión o falla la búsqueda. */ }
+  } catch {  }
 }
 
 async function applyUpdate() {

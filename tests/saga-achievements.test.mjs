@@ -29,7 +29,7 @@ test('claim all collects every reached tier and static reward once, with rollbac
  const h=combatHarness();
  h.exec("meta.stats.kills=50;meta.sagaDiffWins.eastblue={1:true};const pending=claimableAchievementRewards();const expected={count:pending.length,total:pending.reduce((sum,reward)=>sum+reward.fame,0)};let saves=0;const result=claimAllAchievements(()=>{saves++;return true;});");
  assert.equal(h.exec("pending.filter(reward=>reward.id==='kills').length"),3);
- assert.equal(h.exec("pending.some(reward=>reward.id==='saga_diff_eastblue_1')"),true);
+ assert.equal(h.exec("pending.some(reward=>reward.id===`saga_diff_${SAGAS[0].id}_1`)"),true);
  assert.deepEqual(JSON.parse(h.exec('JSON.stringify(result)')),JSON.parse(h.exec('JSON.stringify(expected)')));
  assert.equal(h.exec('meta.fame'),h.exec('expected.total'));assert.equal(h.exec('meta.accXp'),h.exec('expected.total'));assert.equal(h.exec('saves'),1);
  assert.deepEqual(JSON.parse(h.exec('JSON.stringify(claimAllAchievements(()=>{saves++;return true;}))')),{count:0,total:0});

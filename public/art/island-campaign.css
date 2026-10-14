@@ -15,12 +15,12 @@
 @media(max-width:700px) {
   .toast { padding:10px 14px; font-size:12px; }
 }
-.island-atlas { margin:14px 0; overflow:hidden; border:1px solid #a7b9b7; border-top:5px solid #e59178; border-radius:8px; color:var(--ink); background:var(--paper); box-shadow:var(--shadow); }
-.island-atlas header { padding:16px 12px 12px; text-align:center; background:var(--paper); border-bottom:2px solid #95aeae; }
-.island-atlas h2 { font:700 clamp(13px,2.3vw,19px)/1.7 'Press Start 2P',monospace; margin:5px 0; }
-.atlas-eyebrow { font:700 8px/1.7 'Press Start 2P',monospace; letter-spacing:0; color:var(--sea); }
-.island-atlas header p { font:12px/1.5 system-ui,sans-serif; margin:5px 0 0; }
-.island-route { position:relative; height:480px; isolation:isolate; background:linear-gradient(#edf4ef30,#37738c14),url('grand-line-chart.svg') center/cover; }
+.island-unit_393 { margin:14px 0; overflow:hidden; border:1px solid #a7b9b7; border-top:5px solid #e59178; border-radius:8px; color:var(--ink); background:var(--paper); box-shadow:var(--shadow); }
+.island-unit_393 header { padding:16px 12px 12px; text-align:center; background:var(--paper); border-bottom:2px solid #95aeae; }
+.island-unit_393 h2 { font:700 clamp(13px,2.3vw,19px)/1.7 'Press Start 2P',monospace; margin:5px 0; }
+.unit_393-eyebrow { font:700 8px/1.7 'Press Start 2P',monospace; letter-spacing:0; color:var(--sea); }
+.island-unit_393 header p { font:12px/1.5 system-ui,sans-serif; margin:5px 0 0; }
+.island-route { position:relative; height:480px; isolation:isolate; background:linear-gradient(#edf4ef30,#37738c14),url('asset_1238.svg') center/cover; }
 .island-trail { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible; }
 .island-trail path { fill:none; stroke:#476f78; stroke-width:2; stroke-dasharray:5 7; vector-effect:non-scaling-stroke; }
 .island-trail path.sailed { stroke:#437e68; stroke-width:3; stroke-dasharray:none; }
@@ -46,7 +46,7 @@
 .island-stop.is-current .island-label { border:2px solid #c67661; border-top:4px solid #e59178; background:var(--paper); }
 .island-select:not(:disabled):hover .island-land { filter:drop-shadow(0 0 8px #fff3c4); }
 .island-select:focus-visible { outline:3px solid #9c641f; outline-offset:5px; border-radius:8px; }
-.atlas-note { margin:0; padding:12px; border-top:2px solid #95aeae; background:var(--paper-dark); text-align:center; font:12px/1.6 system-ui,sans-serif; }
+.unit_393-note { margin:0; padding:12px; border-top:2px solid #95aeae; background:var(--paper-dark); text-align:center; font:12px/1.6 system-ui,sans-serif; }
 @media(max-width:900px) {
   .island-route { height:max(550px,calc(var(--island-count) * 95px)); background-size:auto 100%; }
   .island-stop { top:var(--my); left:var(--mx); width:136px; }
@@ -55,10 +55,10 @@
   .sea-belt { left:5%; bottom:45%; writing-mode:vertical-rl; }
 }
 @media(max-width:700px) {
-  #app:has(.island-atlas) > .topbar .logo { display:none; }
-  .island-atlas header { padding:10px 8px; }
-  .atlas-eyebrow { font-size:7px; letter-spacing:0; }
-  .atlas-note { font-size:11px; padding:8px; }
+  #app:has(.island-unit_393) > .topbar .logo { display:none; }
+  .island-unit_393 header { padding:10px 8px; }
+  .unit_393-eyebrow { font-size:7px; letter-spacing:0; }
+  .unit_393-note { font-size:11px; padding:8px; }
 }
 @media(max-width:360px) {
   .island-route { height:max(550px,calc(var(--island-count) * 95px)); }
@@ -70,8 +70,8 @@
 .island-boss { display:flex; align-items:baseline; justify-content:space-between; gap:4px; text-align:left; font:11px/1.5 system-ui,sans-serif; }
 .island-boss > span { min-width:0; overflow-wrap:anywhere; }
 .island-boss strong { flex-shrink:0; font:700 10px/1.5 system-ui,sans-serif; color:var(--accent); }
-html[data-theme="dark"] .island-atlas { border-color:#54717b; border-top-color:#c58270; }
-html[data-theme="dark"] .island-route { background:linear-gradient(#10263299,#102632aa),url('grand-line-chart.svg') center/cover; }
+html[data-theme="dark"] .island-unit_393 { border-color:#54717b; border-top-color:#c58270; }
+html[data-theme="dark"] .island-route { background:linear-gradient(#10263299,#102632aa),url('asset_1238.svg') center/cover; }
 html[data-theme="dark"] .island-trail path { stroke:#8db6c0; }
 html[data-theme="dark"] .island-trail path.sailed { stroke:#87c6a8; }
 html[data-theme="dark"] :is(.sea-caption,.sea-belt) { color:#93c4d266; }
@@ -87,8 +87,8 @@ html[data-theme="dark"] :is(.sea-caption,.sea-belt) { color:#93c4d266; }
 #islands-back { position:sticky; top:max(8px,env(safe-area-inset-top)); z-index:100; min-height:44px; box-shadow:0 3px 8px #0004; }
 
 /* The active stop should lead the eye through a dense sea chart. */
-.island-atlas header { padding-block:20px; }
-.island-atlas header p { font-size:14px; }
+.island-unit_393 header { padding-block:20px; }
+.island-unit_393 header p { font-size:14px; }
 .island-label { transition:border-color .15s,box-shadow .15s,transform .15s; }
 .island-select:not(:disabled) { min-height:44px; }
 .island-select:not(:disabled):hover .island-label,
@@ -100,11 +100,11 @@ html[data-theme="dark"] :is(.sea-caption,.sea-belt) { color:#93c4d266; }
 .island-info { padding:4px; }
 .island-info h3 { font:800 17px/1.4 system-ui,sans-serif; }
 .island-info .island-boss-heading { font-size:12px; font-weight:800; }
-.atlas-note { font-size:13px; }
+.unit_393-note { font-size:13px; }
 html[data-theme="dark"] .island-stop.is-current .island-label { color:#fff5df; background:#483827; border-color:#e8a861; }
 @media(max-width:700px) {
- .island-atlas header { padding:14px 10px; }
- .island-atlas header p { font-size:13px; }
- .atlas-note { font-size:12px; }
+ .island-unit_393 header { padding:14px 10px; }
+ .island-unit_393 header p { font-size:13px; }
+ .unit_393-note { font-size:12px; }
 }
 @media(prefers-reduced-motion:reduce) { .island-label { transition:none; } }

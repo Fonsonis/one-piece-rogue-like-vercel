@@ -7,7 +7,7 @@
 .runner-root button{font-family:inherit;touch-action:manipulation;user-select:none;-webkit-user-select:none}
 .runner-small{background:#17364e;border:1px solid #41657c;border-radius:9px;color:#e3f3ff;padding:9px 12px;font-size:14px;min-height:42px}
 .runner-header-actions{display:flex;gap:7px}.runner-hud{width:100%;max-width:1300px;margin:7px auto 11px;display:flex;align-items:center;justify-content:space-between;gap:10px}
-.runner-stat{display:flex;gap:7px;align-items:baseline}.runner-stat span{font-size:12px;color:#a2c8dd}.runner-stat strong{font-size:22px;font-variant-numeric:tabular-nums;font-weight:850}.runner-stat.speed strong{font-size:15px;color:#ffdc77}
+.runner-stat{display:flex;gap:7px;align-items:baseline}.runner-stat span{font-size:12px;color:#a2c8dd}.runner-stat strong{font-size:22px;font-variant-numeric:tabular-nums;font-weight:850}.runner-stat.unit_370 strong{font-size:15px;color:#ffdc77}
 .runner-stage{position:relative;flex:1;min-height:0;max-width:1300px;width:100%;margin:auto;border:2px solid #456984;border-radius:14px;overflow:hidden;background:#439bc8;box-shadow:0 8px 30px #0005;touch-action:none;isolation:isolate}
 .runner-stage canvas{display:block;width:100%;height:100%;touch-action:none;image-rendering:pixelated;outline-offset:-4px}
 .runner-dialog{position:absolute;inset:0;display:grid;place-items:center;background:#041c3d69;padding:18px;pointer-events:none}

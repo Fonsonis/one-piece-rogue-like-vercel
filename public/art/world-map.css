@@ -27,7 +27,7 @@ body:has(.world-map) { width:100%; max-width:none; height:100dvh; min-height:0; 
 .world-saga-heading:before { content:''; display:block; width:54px; height:4px; background:var(--saga-color); border:1px solid #476c7155; margin:0 auto 12px; }
 .world-saga-heading h2 { font-size:clamp(12px,2vw,18px); margin:10px 0; line-height:1.8; color:inherit; }
 .world-saga-heading p { font:12px/1.6 system-ui,sans-serif; margin:6px 0; }
-.world-saga-heading .atlas-eyebrow { font-size:7px; line-height:1.8; }
+.world-saga-heading .unit_393-eyebrow { font-size:7px; line-height:1.8; }
 .world-saga-heading .world-lock { color:#744b34; }
 .world-saga-details { border:1px solid #567f7c66; border-radius:3px; background:#faf5e3de; margin-top:12px; font:12px/1.6 system-ui,sans-serif; color:#183e52; }
 .world-saga-details summary { padding:12px 8px; min-height:44px; cursor:pointer; }
@@ -49,7 +49,7 @@ body:has(.world-map) { width:100%; max-width:none; height:100dvh; min-height:0; 
 .world-stop.is-complete .island-label { border-color:#43846c; }
 /* Illustrated continent; the boat follows the central sea passage. */
 .world-redline { position:relative; isolation:isolate; display:flex; flex-direction:column; align-items:center; justify-content:space-between; gap:18px; height:clamp(190px,35vw,300px); margin-block:20px; padding:12px; text-align:center; color:#fff6df; }
-.world-redline:before { content:''; position:absolute; inset:0; z-index:-1; background:url('world/redline.webp') center/cover no-repeat; mask-image:linear-gradient(transparent,#000 12% 88%,transparent); }
+.world-redline:before { content:''; position:absolute; inset:0; z-index:-1; background:url('world/asset_1918.webp') center/cover no-repeat; mask-image:linear-gradient(transparent,#000 12% 88%,transparent); }
 .world-redline strong,.world-redline span { background:#713f30ed; border:1px solid #ffce97; padding:8px 10px; border-radius:3px; max-width:95%; }
 .world-redline strong { font-size:9px; line-height:1.8; }
 .world-redline span { font:12px/1.5 system-ui,sans-serif; }
@@ -87,8 +87,8 @@ html[data-theme="dark"] .world-saga-details,html[data-theme="dark"] .world-islan
 
 /* A fixed ocean texture keeps map scrolling smooth on mobile. */
 .world-ocean-frame { position:relative; flex:1; min-height:0; overflow:hidden; isolation:isolate; border:2px solid #284858; border-radius:3px; background:#168ac8; }
-.world-sea { position:absolute; z-index:-1; inset:0; pointer-events:none; background:#168ac8 url('world/ocean.webp') center/480px 480px repeat; }
-.world-sea:after { content:''; position:absolute; inset:0; background:url('world/ocean.webp') 150px 80px/660px 660px repeat; opacity:.22; mix-blend-mode:screen; }
+.world-sea { position:absolute; z-index:-1; inset:0; pointer-events:none; background:#168ac8 url('world/asset_1915.webp') center/480px 480px repeat; }
+.world-sea:after { content:''; position:absolute; inset:0; background:url('world/asset_1915.webp') 150px 80px/660px 660px repeat; opacity:.22; mix-blend-mode:screen; }
 .world-island-card .island-land img { display:block; width:100%; height:100%; object-fit:contain; filter:drop-shadow(0 4px 1px #074c6933); }
 .world-stop.is-selected .island-label { border-color:#9b501d; outline:3px solid #ffe59c; }
 .world-island-card .island-zone { font-weight:700; }

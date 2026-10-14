@@ -7,15 +7,19 @@ import { createHash } from 'node:crypto';
 const data = fs.readFileSync('public/data.js', 'utf8');
 const game = fs.readFileSync('public/game.js', 'utf8').split('// ============ INICIO ============')[0];
 const art = fs.readFileSync('public/art/visuals.js', 'utf8');
+const pack = JSON.parse(fs.readFileSync('mods/one-piece/pack.json', 'utf8'));
+const modAsset = path => `mods/one-piece/assets/${path}`;
 
-test('interface atlases and the home Cross Guild icon use compact WebP assets',()=>{
+test('the One Piece interface art is isolated in the mod and keeps its compact menu asset',()=>{
  const polish=fs.readFileSync('public/art/interface-polish.css','utf8');
- const fullMap=fs.statSync('public/art/cross-guild-map.png').size;
- const menuIcon=fs.statSync('public/art/cross-guild-menu.webp').size;
- assert.match(polish,/event-atlas\.webp/);
- assert.match(polish,/ui-atlas\.webp/);
- assert.doesNotMatch(polish,/(?:event|ui)-atlas\.png/);
- assert.match(game,/\/art\/cross-guild-menu\.webp/);
+ const fullMap=fs.statSync(modAsset('art/asset_1235.png')).size;
+ const menuIcon=fs.statSync(modAsset('art/asset_1236.webp')).size;
+ assert.match(polish,/asset_1237\.webp/);
+ assert.match(polish,/asset_1875\.webp/);
+ assert.doesNotMatch(polish,/(?:event|ui)-atlas\.(?:png|webp)/);
+ assert.match(game,/\/art\/asset_1236\.webp/);
+ assert.ok(pack.assets.includes('art/asset_1235.png'));
+ assert.ok(pack.assets.includes('art/asset_1236.webp'));
  assert.ok(menuIcon<fullMap/20,`Menu icon should be much smaller: ${menuIcon} vs ${fullMap}`);
 });
 
@@ -134,28 +138,31 @@ test('crew variants expose their visual identity and use skin-specific geometry'
     assert.ok(html.includes(`data-character="${id}"`),skin);
     assert.ok(html.includes(`data-sprite-id="${skin}"`),skin);
     assert.ok(html.includes(`url('/art/characters/${skin}.png')`),skin);
-    assert.ok(html.includes('--atlas-scale:'),skin);
+    assert.ok(html.includes('--unit_393-scale:'),skin);
     assert.ok(html.includes('--motion-fit-y:'),skin);
-    assert.ok(styles.some(css=>css.includes(`.sprite:has(> .dex-sprite[data-sprite-id="${skin}"])`)),`Battle wrapper bounds: ${skin}`);
+    const canonicalSkin=Object.entries(pack.legacy.keys)
+      .sort((a,b)=>b[0].length-a[0].length)
+      .reduce((value,[legacy,canonical])=>value===legacy?canonical:value.startsWith(`${legacy}-`)?canonical+value.slice(legacy.length):value,skin);
+    assert.ok(styles.some(css=>css.includes(`.sprite:has(> .dex-sprite[data-sprite-id="${canonicalSkin}"])`)),`Battle wrapper bounds: ${skin}`);
   }
-  const croco=icons.find(icon=>icon.skin==='crocodile-crossguild');
-  assert.ok(Number(croco.html.match(/--atlas-scale:([\d.]+)/)[1])<0.8,'Tall CrossGuild artwork must not inherit the base scale');
+  const croco=icons.find(icon=>icon.skin==='crocodile-guild_07');
+  assert.ok(Number(croco.html.match(/--unit_393-scale:([\d.]+)/)[1])<0.8,'Tall CrossGuild artwork must not inherit the base scale');
 });
 
-test('complete Dex art coverage has four distinct transparent frames per character', () => {
-  const manifest = JSON.parse(fs.readFileSync('public/art/manifest.json','utf8'));
-  const ctx=vm.createContext({}); vm.runInContext(data,ctx);
-  const ids=[...new Set(vm.runInContext('Object.entries(CHARS).map(([id,c])=>c.spriteId || id)',ctx))].sort();
-  assert.deepEqual(Object.keys(manifest.characters).sort(),ids);
+test('the installable mod contains complete, distinct four-frame Dex art', () => {
+  const ids=[...new Set(Object.entries(pack.data.CHARS).map(([id,c])=>c.spriteId || id))].sort();
+  assert.ok(ids.length > 500);
   const hashes = new Set();
   for(const id of ids) {
-    const entry=manifest.characters[id];
-    assert.equal(entry.frames,4,id);
-    const png=fs.readFileSync(`public/art/characters/${id}.png`);
+    const atlasPath=`art/characters/${id}.png`;
+    const portraitPath=`art/portraits/${id}.png`;
+    assert.ok(pack.assets.includes(atlasPath),atlasPath);
+    assert.ok(pack.assets.includes(portraitPath),portraitPath);
+    const png=fs.readFileSync(modAsset(atlasPath));
     assert.equal(png.readUInt32BE(16),768,id);
     assert.equal(png.readUInt32BE(20),192,id);
     assert.equal(png[25],6,'RGBA PNG required: '+id);
-    const portrait=fs.readFileSync(`public/art/portraits/${id}.png`);
+    const portrait=fs.readFileSync(modAsset(portraitPath));
     assert.equal(portrait.readUInt32BE(16),192,'Dex portrait: '+id);
     assert.equal(portrait.readUInt32BE(20),192,'Dex portrait: '+id);
     const hash=createHash('sha256').update(png).digest('hex');

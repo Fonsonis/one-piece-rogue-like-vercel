@@ -6,7 +6,7 @@ function nativePlugin(name) {
   return globalThis.Capacitor?.registerPlugin?.(name) || globalThis.Capacitor?.Plugins?.[name];
 }
 
-export async function exportAndroidJson(contents, filename = 'grandlinelike.json') {
+export async function exportAndroidJson(contents, filename = `umbral-${globalThis.GameContent?.id || 'umbral'}.json`) {
   if (!isAndroidApp()) throw new Error('La exportación nativa solo está disponible en Android.');
   const filesystem = nativePlugin('Filesystem');
   const share = nativePlugin('Share');
@@ -21,7 +21,7 @@ export async function exportAndroidJson(contents, filename = 'grandlinelike.json
   });
   if (!file?.uri) throw new Error('Android no devolvió la ubicación del JSON.');
   await share.share({
-    title: 'Copia de GrandLineLike',
+    title: GameContent.text("text_0141"),
     url: file.uri,
     dialogTitle: 'Guardar o compartir partida',
   });

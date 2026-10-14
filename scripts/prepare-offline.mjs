@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { readdirSync, readFileSync, writeFileSync, renameSync, existsSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
@@ -14,5 +14,11 @@ function walk(dir = '') {
   }
 }
 walk();
-writeFileSync(join(root, 'offline-manifest.json'), JSON.stringify({ version: digest.digest('hex').slice(0, 20), bytes, files: ['/', ...files] }));
+const manifestPath=join(root,'offline-manifest.json');
+const json=JSON.stringify({ version: digest.digest('hex').slice(0, 20), bytes, files: ['/', ...files] });
+if(!existsSync(manifestPath)||readFileSync(manifestPath,'utf8')!==json){
+  const temporary=join(root,`.offline-manifest-${process.pid}.tmp`);
+  try{writeFileSync(temporary,json);renameSync(temporary,manifestPath);}
+  finally{if(existsSync(temporary))rmSync(temporary);}
+}
 console.log(`Copia sin conexión: ${files.length} archivos, ${Math.ceil(bytes / 1000000)} MB.`);

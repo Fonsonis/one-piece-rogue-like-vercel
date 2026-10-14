@@ -5,13 +5,15 @@ import { exportAndroidJson, isAndroidApp } from '../public/local/android-files.m
 test('Android exports the save through a native temporary file and the system share sheet', async () => {
   const calls = [];
   const previous = globalThis.Capacitor;
+  const previousContent = globalThis.GameContent;
+  globalThis.GameContent = { id: 'one-piece', text: () => 'Exportar partida' };
   globalThis.Capacitor = {
     isNativePlatform: () => true,
     getPlatform: () => 'android',
     registerPlugin(name) {
       if (name === 'Filesystem') return { writeFile: async options => {
         calls.push(['write', options]);
-        return { uri: 'file:///cache/grandlinelike.json' };
+        return { uri: 'file:///cache/umbral-one-piece.json' };
       }};
       if (name === 'Share') return { share: async options => calls.push(['share', options]) };
       return null;
@@ -19,14 +21,16 @@ test('Android exports the save through a native temporary file and the system sh
   };
   try {
     assert.equal(isAndroidApp(), true);
-    assert.equal(await exportAndroidJson('{"game":"grandlinelike"}'), 'file:///cache/grandlinelike.json');
+    const json='{"game":"umbral","contentId":"one-piece"}';
+    assert.equal(await exportAndroidJson(json), 'file:///cache/umbral-one-piece.json');
     assert.deepEqual(calls[0], ['write', {
-      path: 'grandlinelike.json', data: '{"game":"grandlinelike"}', directory: 'CACHE', encoding: 'utf8', recursive: true,
+      path: 'umbral-one-piece.json', data: json, directory: 'CACHE', encoding: 'utf8', recursive: true,
     }]);
     assert.equal(calls[1][0], 'share');
-    assert.equal(calls[1][1].url, 'file:///cache/grandlinelike.json');
+    assert.equal(calls[1][1].url, 'file:///cache/umbral-one-piece.json');
   } finally {
     globalThis.Capacitor = previous;
+    globalThis.GameContent = previousContent;
   }
 });
 

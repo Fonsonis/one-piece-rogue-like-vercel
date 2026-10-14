@@ -1,11 +1,5 @@
-/* ============ GRAND LINE LIKE — Estilos ============ */
-@font-face {
-  font-family: 'Press Start 2P';
-  font-style: normal;
-  font-weight: 400;
-  font-display: block;
-  src: url('fonts/press-start-2p.ttf') format('truetype');
-}
+/* ============ MAR DEL UMBRAL LIKE — Estilos ============ */
+
 
 * { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -30,7 +24,7 @@ body {
   font-family: 'Press Start 2P', 'Courier New', monospace;
   font-size: 11px;
   color: var(--ink);
-  background: url('Images/fondo-menu.jpg') center center / cover no-repeat fixed, linear-gradient(to bottom, var(--sky1) 0%, var(--sky2) 55%, var(--sea) 55.2%, var(--sea) 70%, #4aa557 70.2%, #3f9e4d 100%);
+  background: url('Images/asset_1960.jpg') center center / cover no-repeat fixed, linear-gradient(to bottom, var(--sky1) 0%, var(--sky2) 55%, var(--sea) 55.2%, var(--sea) 70%, #4aa557 70.2%, #3f9e4d 100%);
   min-height: 100vh;
   image-rendering: pixelated;
   overflow-x: hidden;
@@ -71,10 +65,10 @@ button { font-family: inherit; cursor: pointer; }
   white-space: nowrap;
 }
 
-.floating-berries {
+.floating-coins {
   position: fixed; top: 48px; left: 10px; z-index: 999;
 }
-.floating-berries .berries {
+.floating-coins .coins {
   padding: 6px 10px; font-size: 10.5px; background: var(--ink);
   color: var(--gold); border: 2px solid var(--gold);
   box-shadow: 0 3px 6px rgba(0, 0, 0, 0.4);
@@ -139,9 +133,9 @@ button { font-family: inherit; cursor: pointer; }
   background: rgba(0, 0, 0, 0.2); transition: background .2s;
 }
 .mode-card:hover .mode-art::before { background: rgba(0, 0, 0, 0.05); }
-.mode-art.story { background-image: url('Images/historia-boton.jpg'); }
-.mode-art.tower { background-image: url('Images/marine-tower.jpg'); }
-.mode-art.challenge { background-image: url('Images/desafios.jpg'); }
+.mode-art.story { background-image: url('Images/asset_1961.jpg'); }
+.mode-art.tower { background-image: url('Images/asset_1963.jpg'); }
+.mode-art.challenge { background-image: url('Images/asset_1956.jpg'); }
 .mode-title { padding: 8px; font-size: 13px; color: var(--red); background: var(--paper); }
 .mode-btn { display: block; padding: 10px; color: #fff; background: var(--green); font-size: 11px; text-transform: uppercase; }
 .mode-card.locked .mode-btn { background: #777; }
@@ -331,7 +325,7 @@ button { font-family: inherit; cursor: pointer; }
 
 .map-board {
   flex: 1; width: 100%; position: relative; border: 3px solid var(--ink); box-shadow: var(--shadow);
-  background: url('Images/fondo-mapa.jpg') center center / cover no-repeat;
+  background: url('Images/asset_1959.jpg') center center / cover no-repeat;
   min-height: calc(100vh - 170px); overflow: hidden; display: flex; flex-direction: column;
 }
 .map-title {
@@ -390,10 +384,10 @@ button { font-family: inherit; cursor: pointer; }
 .battle-actions.moves { grid-template-columns: 1fr 1fr; }
 .battle-actions.auto { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 
-/* --- Combate estilo pokelike: dos paneles con cartas de luchador --- */
+/* --- Combate estilo roguelike: dos paneles con cartas de luchador --- */
 .battle-cols {
   display: flex; gap: 14px; margin-bottom: 12px; align-items: flex-start;
-  background: url('Images/fondo-game.jpg') center center / cover no-repeat;
+  background: url('Images/asset_1958.jpg') center center / cover no-repeat;
   border: 3px solid var(--ink); box-shadow: var(--shadow); padding: 12px;
   position: relative;
 }
@@ -452,7 +446,7 @@ button { font-family: inherit; cursor: pointer; }
 @keyframes passiveGlow { from { opacity: .8; } to { opacity: 1; } }
 
 /* En PC, con bandas grandes solo se desplaza la lista de luchadores de cada
-   bando: el registro y los botones (curar, velocidad...) quedan siempre a la vista */
+   bando: el registro y los botones (curar, velocidad...) quedan siempre a la unit_200 */
 @media (min-width: 701px) {
   .battle-side {
     max-height: max(320px, calc(100vh - 300px));
@@ -858,14 +852,14 @@ button { font-family: inherit; cursor: pointer; }
   .back-btn { top:max(8px,env(safe-area-inset-top)); }
   .floating-controls { top:max(8px,env(safe-area-inset-top)); right:max(8px,env(safe-area-inset-right)); gap:4px; }
   .floating-controls .btn { padding: 4px 6px; font-size: 7.5px; }
-  .floating-berries { top: 38px; left: 8px; }
-  .floating-berries .berries { padding: 4px 8px; font-size: 9px; }
+  .floating-coins { top: 38px; left: 8px; }
+  .floating-coins .coins { padding: 4px 8px; font-size: 9px; }
   .panel { padding: 10px; }
   .modes { gap: 10px; }
   .mode-card { width: 100%; max-width: 300px; }
   .mode-art { height: 90px; font-size: 40px; }
   .starter-card { width: 100%; max-width: 300px; }
-  /* Combate a dos columnas (banda vs enemigo), estilo pokelike compacto */
+  /* Combate a dos columnas (banda vs enemigo), estilo roguelike compacto */
   .battle-side { min-height: 0; padding: 6px; min-width: 0; max-height: calc(100vh - 220px); overflow-y: auto; touch-action: pan-y; -webkit-overflow-scrolling: touch; }
   .side-head { font-size: 8px; margin-bottom: 8px; }
   .side-head .trainer { font-size: 26px; margin-bottom: 4px; }
@@ -1163,8 +1157,8 @@ button, .mode-card, .saga-row, .map-node, .team-slot, .dex-card, .poster, .item-
   margin-top: 0;
   line-height: 1.4;
 }
-.world-controls .diff-dropdown-item.pirate-king { border-color:#e8c832; background:linear-gradient(120deg,rgba(232,200,50,.2),rgba(255,255,255,.06)); }
-.world-controls .diff-dropdown-item.pirate-king .diff-item-icon { border-color:#e8c832; background:#6d5319; box-shadow:0 0 12px rgba(232,200,50,.28); }
+.world-controls .diff-dropdown-item.pirate-unit_075 { border-color:#e8c832; background:linear-gradient(120deg,rgba(232,200,50,.2),rgba(255,255,255,.06)); }
+.world-controls .diff-dropdown-item.pirate-unit_075 .diff-item-icon { border-color:#e8c832; background:#6d5319; box-shadow:0 0 12px rgba(232,200,50,.28); }
 .world-controls .diff-item-reward { grid-column:1/-1; display:block; margin-top:2px; padding:5px 7px; border:1px solid #e8c83299; border-radius:5px; background:#e8c83218; color:#ffe79a; font:700 10px/1.4 system-ui,sans-serif; }
 .diff-locked-tag {
   font-size: 7px;
@@ -1287,12 +1281,12 @@ button, .mode-card, .saga-row, .map-node, .team-slot, .dex-card, .poster, .item-
 button:focus-visible,[tabindex]:focus-visible {outline:3px solid #fff;outline-offset:3px;}
 @media(max-width:600px) { .logo { max-width: 75%; padding-right:0; font-size:14px; } }
 
-#pirate-king-reward .modal{max-height:calc(100dvh - 32px);overflow-y:auto}
-#pirate-king-reward p{font:14px/1.5 system-ui,sans-serif}
-#pirate-king-reward .pick-grid{display:grid;grid-template-columns:1fr;gap:8px}
-#pirate-king-reward .pick-row{display:flex;align-items:center;gap:14px;text-align:left;width:100%;font:13px/1.5 system-ui,sans-serif;padding:12px}
-#pirate-king-reward .pick-row .emoji{flex:none}
-#pirate-king-reward .pick-row .info{flex:1;min-width:0}
+#pirate-unit_075-reward .modal{max-height:calc(100dvh - 32px);overflow-y:auto}
+#pirate-unit_075-reward p{font:14px/1.5 system-ui,sans-serif}
+#pirate-unit_075-reward .pick-grid{display:grid;grid-template-columns:1fr;gap:8px}
+#pirate-unit_075-reward .pick-row{display:flex;align-items:center;gap:14px;text-align:left;width:100%;font:13px/1.5 system-ui,sans-serif;padding:12px}
+#pirate-unit_075-reward .pick-row .emoji{flex:none}
+#pirate-unit_075-reward .pick-row .info{flex:1;min-width:0}
 
 /* Desafíos offline: cuadro y equipo legibles también en móvil. */
 .challenge-panel { max-width: 1100px; margin: 12px auto; }

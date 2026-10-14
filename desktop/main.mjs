@@ -3,25 +3,27 @@ import { stat } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const APP_ORIGIN = 'oprl://game';
+const APP_ORIGIN = 'umbral://game';
 const desktopDirectory = dirname(fileURLToPath(import.meta.url));
 const appDirectory = resolve(desktopDirectory, '..');
 const distDirectory = join(appDirectory, 'dist');
+if(process.env.UMBRAL_TEST_HIDDEN==='1')app.setPath('userData',join(appDirectory,'outputs','desktop-test-profile'));
 
 protocol.registerSchemesAsPrivileged([{
-  scheme: 'oprl',
+  scheme: 'umbral',
   privileges: {
     standard: true,
     secure: true,
     supportFetchAPI: true,
     corsEnabled: true,
     stream: true,
+    allowServiceWorkers: true,
   },
 }]);
 
 function localFileFor(requestUrl) {
   const url = new URL(requestUrl);
-  if (url.protocol !== 'oprl:' || url.hostname !== 'game') return null;
+  if (url.protocol !== 'umbral:' || url.hostname !== 'game') return null;
   const pathname = decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname);
   if (pathname.includes('\0') || pathname.split('/').some(part => part === '..')) return null;
   const candidate = resolve(distDirectory, `.${pathname}`);
@@ -76,14 +78,14 @@ function createWindow() {
     event.preventDefault();
     openExternalUrl(url);
   });
-  window.once('ready-to-show', () => window.show());
+  window.once('ready-to-show', () => { if(process.env.UMBRAL_TEST_HIDDEN!=='1')window.show(); });
   void window.loadURL(`${APP_ORIGIN}/`);
 }
 
-app.setAppUserModelId('com.fonsonis.onepieceroguelike.desktop');
+app.setAppUserModelId('com.umbral.mareas.desktop');
 
 app.whenReady().then(async () => {
-  protocol.handle('oprl', servePackagedFile);
+  protocol.handle('umbral', servePackagedFile);
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
     const isGame = webContents.getURL().startsWith(`${APP_ORIGIN}/`);
     const wantsCamera = permission === 'media' && details.mediaTypes?.includes('video');

@@ -2,6 +2,10 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import {createContent} from '../public/content/runtime.mjs';
+
+const onePiecePack=JSON.parse(fs.readFileSync('mods/one-piece/pack.json','utf8'));
+const memory={getItem:()=>null,setItem(){},removeItem(){}};
 
 const source=fs.readFileSync('public/art/world-voyage.js','utf8');
 const ctx=vm.createContext({});vm.runInContext(source,ctx);
@@ -21,14 +25,15 @@ test('one continuous route visits every port exactly in order and works in rever
 });
 
 test('location names preserve every encounter, stable index and progression value',()=>{
- const c=vm.createContext({});vm.runInContext(fs.readFileSync('public/data.js','utf8'),c);
+ const c=vm.createContext({GameContent:createContent(onePiecePack,memory)});vm.runInContext(fs.readFileSync('public/data.js','utf8'),c);
  const before=JSON.parse(vm.runInContext('JSON.stringify(SAGAS)',c));
  vm.runInContext(fs.readFileSync('public/art/world-locations.js','utf8'),c);
  const after=JSON.parse(vm.runInContext('JSON.stringify(SAGAS)',c));
  assert.equal(after.flatMap(s=>s.islands).length,70);
  for(let s=0;s<before.length;s++)for(let i=0;i<before[s].islands.length;i++){
-   const {name,location,...rest}=after[s].islands[i],{name:oldName,...oldRest}=before[s].islands[i];
+   const {name,location,...rest}=after[s].islands[i],{name:oldName,location:oldLocation,...oldRest}=before[s].islands[i];
    assert.deepEqual(rest,oldRest);
+   assert.deepEqual(location,oldLocation);
    assert.equal(location.id,`${after[s].id}-${i}`);
    assert.match(location.source,/^https:\/\/onepiece\.fandom\.com\/wiki\//);
    assert.equal(name,`${location.place} · ${location.zone}`);
@@ -75,7 +80,6 @@ test('ocean stays fixed while the island chart scrolls',()=>{
 });
 
 test('every canonical destination and sailing direction has a bundled static image',()=>{
- const catalog=JSON.parse(fs.readFileSync('docs/world-location-catalog.json','utf8'));
- const ids=[...Object.values(catalog).flat().map(p=>p.id),'ship-north','ship-east','ship-south','ship-west','ocean','redline'];
- for(const id of ids){const bytes=fs.readFileSync(`public/art/world/${id}.webp`);assert.ok(bytes.length>1000,id);assert.equal(bytes.toString('ascii',8,12),'WEBP');}
+ const ids=[...Object.values(onePiecePack.data.WorldLocations).flat().map(p=>p.id),'ship-north','ship-east','ship-south','ship-west'];
+ for(const id of ids){const bytes=fs.readFileSync(`mods/one-piece/assets/art/world/${id}.webp`);assert.ok(bytes.length>1000,id);assert.equal(bytes.toString('ascii',8,12),'WEBP');}
 });

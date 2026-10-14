@@ -112,7 +112,7 @@ test('co-op scales the yonko with players and crew sizes, and every active playe
   assert.equal(eight.pTeam.length, 48); assert.ok(eight.eTeam[0].maxhp > two.eTeam[0].maxhp * 10);
   for (let i = 0; i < 17; i++) api.tick(eight);
   assert.equal(eight.localActors.length, 9);
-  assert.equal(new Set(eight.localActors.filter(f => f.owner !== 'yonko').map(f => f.owner)).size, 8);
+  assert.equal(new Set(eight.localActors.filter(f => f.owner !== 'Regent').map(f => f.owner)).size, 8);
   for (let i = 0; !two.over && i < 500; i++) api.tick(two);
   assert.ok(two.over);
 });
@@ -180,7 +180,7 @@ test('yonko match IDs are unique across rematches and travel in the validated ho
   const { s, api, heartbeat, advance } = room();
   s.roomId = 'f'.repeat(32);
   s.configure({ mode: 'coop' });
-  for (const p of s.view.players) s.receive(p.id, { type: 'ready', ready: true, denDen:4 });
+  for (const p of s.view.players) s.receive(p.id, { type: 'ready', ready: true, Radio:4 });
   s.start();
   const first = s.view.matches[0].rewardId;
   assert.equal(first, `${'f'.repeat(32)}:match-1`);
@@ -194,7 +194,7 @@ test('yonko match IDs are unique across rematches and travel in the validated ho
   advance(); heartbeat(); s.pulse();
   assert.equal(s.view.champion, 'alliance');
   s.reset();
-  for (const p of s.view.players) s.receive(p.id, { type: 'ready', ready: true, denDen:3 });
+  for (const p of s.view.players) s.receive(p.id, { type: 'ready', ready: true, Radio:3 });
   s.start();
   assert.notEqual(s.view.matches[0].rewardId, first);
 });
@@ -222,30 +222,30 @@ test('either yonko player can return to mode selection without closing the room'
 });
 test('yonko requires a den den mushi but spends it only once per victory on host and guest', () => {
   const {s,api,heartbeat,advance}=room(); let remaining=2, spent=0;
-  s.denDenAvailable=()=>remaining;
-  s.consumeDenDen=()=>{if(!remaining)return false;remaining--;spent++;return true;};
+  s.RadioAvailable=()=>remaining;
+  s.consumeRadio=()=>{if(!remaining)return false;remaining--;spent++;return true;};
   s.configure({mode:'coop'});
-  s.receive('host',{type:'ready',ready:true,denDen:2});
-  s.receive(guestId(1),{type:'ready',ready:true,denDen:0});
+  s.receive('host',{type:'ready',ready:true,Radio:2});
+  s.receive(guestId(1),{type:'ready',ready:true,Radio:0});
   assert.throws(()=>s.start());
   assert.equal(spent,0);
-  s.receive(guestId(1),{type:'ready',ready:true,denDen:2});
+  s.receive(guestId(1),{type:'ready',ready:true,Radio:2});
   s.start();
   assert.equal(spent,0);
   let battle=s.arenas.get(s.view.matches[0].id); battle.over=true; battle.winner='e';
   advance(); heartbeat(); s.pulse();
-  assert.equal(s.view.champion,'yonko');
+  assert.equal(s.view.champion,'Regent');
   assert.equal(spent,0);
 
   let guestRemaining=2,guestSpent=0;
-  const guest=new LocalSession({host:false,name:'Guest',engine:api,denDenAvailable:()=>guestRemaining,consumeDenDen:()=>{guestRemaining--;guestSpent++;return true;}});
+  const guest=new LocalSession({host:false,name:'Guest',engine:api,RadioAvailable:()=>guestRemaining,consumeRadio:()=>{guestRemaining--;guestSpent++;return true;}});
   const guestState=()=>({type:'state',rules:RULES,self:guestId(1),view:JSON.parse(JSON.stringify(s.view))});
   guest.receive('host',guestState());
   guest.receive('host',guestState());
   assert.equal(guestSpent,0);
 
   s.reset();
-  for(const p of s.view.players)s.receive(p.id,{type:'ready',ready:true,denDen:2});
+  for(const p of s.view.players)s.receive(p.id,{type:'ready',ready:true,Radio:2});
   s.start();
   battle=s.arenas.get(s.view.matches[0].id); battle.over=true; battle.winner='p';
   advance(); heartbeat(); s.pulse();
@@ -261,7 +261,7 @@ test('yonko requires a den den mushi but spends it only once per victory on host
   assert.equal(guestRemaining,1);
 
   s.reset();
-  for(const p of s.view.players)s.receive(p.id,{type:'ready',ready:true,denDen:1});
+  for(const p of s.view.players)s.receive(p.id,{type:'ready',ready:true,Radio:1});
   s.start();
   battle=s.arenas.get(s.view.matches[0].id); battle.over=true; battle.winner='p';
   advance(); heartbeat(); s.pulse();
