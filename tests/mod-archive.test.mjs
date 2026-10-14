@@ -185,3 +185,61 @@ test('el empaquetador exige que assets sea un directorio real', () => {
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('la validación agrupa lecturas pequeñas y comunica progreso sin usar Blob.stream', async () => {
+  const entries = [{name:'pack.json',data:'{}'}, ...Array.from({length:200},(_,i)=>({name:`assets/art/unit-${i}.png`,data:Buffer.alloc(100,i)}))];
+  const source = new Blob([zipFixture(entries)]);
+  let reads = 0;
+  const wrap = blob => ({
+    size:blob.size,
+    slice:(start,end,type)=>wrap(blob.slice(start,end,type)),
+    arrayBuffer:()=>{reads++;return blob.arrayBuffer();},
+    stream:()=>{throw Error('No se debe depender del stream del proveedor Android.');},
+  });
+  const progress = [];
+  const result = await readModArchive(wrap(source),{onProgress:event=>progress.push(event)});
+  assert.equal(result.files.length,200);
+  assert.ok(reads<10,`No agrupa las lecturas: ${reads}`);
+  assert.equal(progress[0].phase,'directory');
+  assert.ok(progress.some(p=>p.phase==='headers' && p.done>0));
+  const final = progress.at(-1);
+  assert.equal(final.phase,'checksums');
+  assert.equal(final.done,201);
+  assert.equal(final.bytesDone,final.bytesTotal);
+});
+
+test('cancelar interrumpe una lectura del proveedor que no responde', async () => {
+  const controller = new AbortController();
+  let started;
+  const reading = new Promise(resolve=>{started=resolve;});
+  const stalled = {size:100,slice:()=>({arrayBuffer:()=>{started();return new Promise(()=>{});}})};
+  const result = readModArchive(stalled,{signal:controller.signal});
+  await reading;
+  controller.abort();
+  await assert.rejects(result,{name:'AbortError'});
+});
+
+test('una lectura bloqueada termina con un error visible en lugar de esperar indefinidamente', async () => {
+  const originalTimeout = globalThis.setTimeout;
+  globalThis.setTimeout = (callback,delay,...args)=>originalTimeout(callback,delay===30000?10:delay,...args);
+  try {
+    const stalled = {size:100,slice:()=>({arrayBuffer:()=>new Promise(()=>{})})};
+    await assert.rejects(readModArchive(stalled),/lectura del archivo no responde/);
+  } finally {globalThis.setTimeout=originalTimeout;}
+});
+
+test('un SVG enorme se rechaza antes de reservar memoria para su contenido', async () => {
+  const bytes = zipFixture([{name:'pack.json',data:'{}'},{name:'assets/large.svg',data:'',declaredSize:10*1024*1024+1}]);
+  await assert.rejects(readModArchive(new Blob([bytes])), /SVG supera 10 MB/);
+});
+
+test('los recursos ofrecen lecturas cancelables y limitadas por bloques', async () => {
+  const controller = new AbortController();
+  const source = Buffer.from('sprite bytes');
+  const {files} = await readModArchive(new Blob([zipFixture([{name:'pack.json',data:'{}'},{name:'assets/a.png',data:source}])]),{signal:controller.signal});
+  assert.deepEqual(Buffer.from(await files[0].read(0,source.length)),source);
+  assert.throws(()=>files[0].read(-1,source.length), /bloques/);
+  assert.throws(()=>files[0].read(0,source.length+1), /bloques/);
+  controller.abort();
+  await assert.rejects(files[0].read(0,source.length),{name:'AbortError'});
+});

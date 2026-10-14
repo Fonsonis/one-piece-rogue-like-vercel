@@ -41,6 +41,11 @@ try{
  await adventure(page,'original');
  await page.locator('.content-mods-button').click();
  await page.locator('[data-import]').setInputFiles('outputs/mods/one-piece.umbralmod');
+ await page.locator('[data-status]').filter({hasText:/Comprobando archivos|Verificando contenido/}).waitFor();
+ assert.ok(await page.locator('[data-install-progress]').isVisible());
+ assert.ok(await page.locator('[data-cancel]').isVisible());
+ await page.screenshot({path:'outputs/mod-install-progress.png',fullPage:true});
+ report.checks.push('visible validation progress and cancellation');
  await page.locator('[data-status]').filter({hasText:'instalado. Pulsa Jugar'}).waitFor({timeout:180000});
  await page.locator('[data-packs] p').filter({hasText:'One Piece'}).getByRole('button',{name:'Jugar',exact:true}).click();
  await page.waitForFunction(()=>globalThis.GameContent?.id==='one-piece');

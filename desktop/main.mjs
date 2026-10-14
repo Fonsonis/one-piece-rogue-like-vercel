@@ -65,6 +65,7 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: true,
       webSecurity: true,
+      backgroundThrottling: process.env.UMBRAL_TEST_HIDDEN !== '1',
     },
   });
 

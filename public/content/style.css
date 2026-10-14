@@ -4,3 +4,4 @@
 [data-content="umbral"] .world-sea{background:radial-gradient(ellipse at 35% 10%,#66b8bb66,transparent 50%),repeating-linear-gradient(172deg,#155567 0px,#176071 22px,#246d7b 24px,#155567 28px);}
 [data-content="umbral"] .world-sea:after{background:repeating-linear-gradient(9deg,transparent 0px,transparent 55px,#a2dbcf12 57px,transparent 60px);opacity:.6;mix-blend-mode:screen;}
 #content-mods{z-index:2000}#content-mods .modal{max-height:85vh;overflow:auto}#content-mods [data-status]{overflow-wrap:anywhere}
+#content-mods [data-install-progress]:not([hidden]){display:block;width:100%;height:12px;margin:12px 0 8px}

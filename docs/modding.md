@@ -95,6 +95,7 @@ Límites del formato:
 
 - hasta 5000 recursos;
 - `pack.json` de hasta 10 MB;
+- cada SVG de hasta 10 MB;
 - contenido total del archivo de hasta 1 GB;
 - rutas únicas sin distinguir mayúsculas y minúsculas;
 - ZIP estándar en modo `STORE`, sin compresión.

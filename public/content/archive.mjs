@@ -5,7 +5,10 @@ const UTF8_FLAG = 0x0800;
 const MAX_ENTRIES = 5000;
 const MAX_TOTAL_BYTES = 1024 * 1024 * 1024;
 const MAX_PACK_BYTES = 10 * 1024 * 1024;
+const MAX_SVG_BYTES = 10 * 1024 * 1024;
 const MAX_CENTRAL_BYTES = 32 * 1024 * 1024;
+const READ_WINDOW_BYTES = 1024 * 1024;
+const READ_TIMEOUT_MS = 30000;
 const ALLOWED_EXTENSIONS = new Set(['png', 'webp', 'jpg', 'jpeg', 'svg', 'mp3', 'json', 'ttf', 'woff2']);
 const MIME_TYPES = Object.freeze({
   png: 'image/png', webp: 'image/webp', jpg: 'image/jpeg', jpeg: 'image/jpeg', svg: 'image/svg+xml',
@@ -46,28 +49,53 @@ function bytesEqual(left, right) {
 }
 
 function updateCrc(crc, bytes) {
-  for (const byte of bytes) crc = CRC_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8);
+  for (let i = 0; i < bytes.length; i++) crc = CRC_TABLE[(crc ^ bytes[i]) & 0xff] ^ (crc >>> 8);
   return crc >>> 0;
 }
 
-async function crc32(blob) {
+function checkAbort(signal) {
+  if (signal?.aborted) throw new DOMException('Instalación cancelada.', 'AbortError');
+}
+
+async function readBytes(blob, signal) {
+  checkAbort(signal);
+  let reader;
+  return new Promise((resolve, reject) => {
+    let finished = false;
+    const finish = (error, value) => {
+      if (finished) return;
+      finished = true;
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', abort);
+      if (error) { reader?.abort(); reject(error); }
+      else resolve(new Uint8Array(value));
+    };
+    const abort = () => finish(new DOMException('Instalación cancelada.', 'AbortError'));
+    const timer = setTimeout(() => finish(new Error('La lectura del archivo no responde. Copia el mod a Descargas del móvil y vuelve a seleccionarlo.')), READ_TIMEOUT_MS);
+    signal?.addEventListener('abort', abort, {once:true});
+    const operation = typeof blob.arrayBuffer === 'function'
+      ? () => blob.arrayBuffer()
+      : () => new Promise((done, fail) => {
+        if (typeof FileReader !== 'function') { fail(new Error('Este dispositivo no puede leer el archivo del mod.')); return; }
+        reader = new FileReader();
+        reader.onload = () => done(reader.result);
+        reader.onerror = () => fail(new Error('No se pudo leer el archivo. Copia el mod a Descargas y vuelve a seleccionarlo.'));
+        reader.onabort = () => fail(new DOMException('Instalación cancelada.', 'AbortError'));
+        reader.readAsArrayBuffer(blob);
+      });
+    Promise.resolve().then(operation).then(value => finish(null, value), error => finish(error));
+  });
+}
+
+const paint = () => new Promise(resolve => setTimeout(resolve, 0));
+
+async function crc32(size, read, onChunk, signal) {
   let crc = 0xffffffff;
-  if (typeof blob.stream === 'function') {
-    const reader = blob.stream().getReader();
-    try {
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        crc = updateCrc(crc, value);
-      }
-    } finally {
-      reader.releaseLock();
-    }
-  } else {
-    const chunkSize = 1024 * 1024;
-    for (let offset = 0; offset < blob.size; offset += chunkSize) {
-      crc = updateCrc(crc, new Uint8Array(await blob.slice(offset, offset + chunkSize).arrayBuffer()));
-    }
+  for (let offset = 0; offset < size; offset += READ_WINDOW_BYTES) {
+    checkAbort(signal);
+    const bytes = await read(offset, Math.min(size, offset + READ_WINDOW_BYTES));
+    crc = updateCrc(crc, bytes);
+    onChunk(bytes.length);
   }
   return (crc ^ 0xffffffff) >>> 0;
 }
@@ -96,11 +124,25 @@ function checkedEnd(start, length, limit, message) {
 }
 
 
-export async function readModArchive(file) {
+export async function readModArchive(file, {onProgress = () => {}, signal} = {}) {
+  checkAbort(signal);
+  onProgress({phase:'directory', done:0, total:1, bytesDone:0, bytesTotal:file?.size || 0});
+  await paint();
   if (!file || !Number.isSafeInteger(file.size) || file.size < 22 || typeof file.slice !== 'function') fail('el archivo no se puede leer.');
+  // Android document providers have substantial per-read overhead. Reuse a
+  // bounded window for nearby ZIP records instead of thousands of tiny reads.
+  let windowStart = -1, windowBytes = new Uint8Array();
+  const readRange = async (start, end, readSignal = signal) => {
+    checkAbort(readSignal);
+    if (start >= windowStart && end <= windowStart + windowBytes.length) return windowBytes.subarray(start - windowStart, end - windowStart);
+    windowStart = start;
+    windowBytes = await readBytes(file.slice(start, Math.min(file.size, start + Math.max(READ_WINDOW_BYTES, end - start))), readSignal);
+    if (windowBytes.length < end - start) fail('contenido truncado al leer el archivo.');
+    return windowBytes.subarray(0, end - start);
+  };
   const tailLength = Math.min(file.size, 22 + 0xffff);
   const tailStart = file.size - tailLength;
-  const tail = new Uint8Array(await file.slice(tailStart).arrayBuffer());
+  const tail = await readBytes(file.slice(tailStart), signal);
   const eocdOffsetInTail = findEocd(tail);
   if (eocdOffsetInTail < 0) fail('falta el directorio ZIP.');
   const eocdAbsolute = tailStart + eocdOffsetInTail;
@@ -118,7 +160,7 @@ export async function readModArchive(file) {
     fail('hay datos inesperados antes del final del ZIP.');
   }
 
-  const centralBytes = new Uint8Array(await file.slice(centralOffset, centralOffset + centralSize).arrayBuffer());
+  const centralBytes = await readBytes(file.slice(centralOffset, centralOffset + centralSize), signal);
   const central = new DataView(centralBytes.buffer, centralBytes.byteOffset, centralBytes.byteLength);
   const entries = [];
   const names = new Set();
@@ -126,6 +168,7 @@ export async function readModArchive(file) {
   let totalBytes = 0;
   let packCount = 0;
   for (let index = 0; index < entryCount; index++) {
+    checkAbort(signal);
     if (cursor + 46 > centralBytes.length || central.getUint32(cursor, true) !== CENTRAL_SIGNATURE) fail('directorio ZIP truncado.');
     const flags = central.getUint16(cursor + 8, true);
     const method = central.getUint16(cursor + 10, true);
@@ -144,6 +187,7 @@ export async function readModArchive(file) {
     const nameBytes = centralBytes.slice(cursor + 46, cursor + 46 + nameLength);
     const archivePath = decodeName(nameBytes);
     const canonical = canonicalArchivePath(archivePath);
+    if (canonical.extension === 'svg' && size > MAX_SVG_BYTES) fail('un SVG supera 10 MB.');
     const folded = archivePath.toLowerCase();
     if (names.has(folded)) fail(`ruta duplicada: ${archivePath}.`);
     names.add(folded);
@@ -160,9 +204,11 @@ export async function readModArchive(file) {
   if (packCount !== 1) fail('debe existir exactamente un pack.json.');
 
   const ranges = [];
-  for (const entry of entries) {
+  onProgress({phase:'headers',done:0,total:entries.length,bytesDone:0,bytesTotal:totalBytes});
+  for (const [index, entry] of entries.entries()) {
+    checkAbort(signal);
     const headerEnd = checkedEnd(entry.localOffset, 30, centralOffset, 'cabecera local fuera del archivo.');
-    const headerBytes = new Uint8Array(await file.slice(entry.localOffset, headerEnd).arrayBuffer());
+    const headerBytes = await readRange(entry.localOffset, headerEnd);
     if (headerBytes.length !== 30) fail('cabecera local truncada.');
     const local = new DataView(headerBytes.buffer, headerBytes.byteOffset, headerBytes.byteLength);
     if (local.getUint32(0, true) !== LOCAL_SIGNATURE) fail('cabecera local inválida.');
@@ -174,37 +220,63 @@ export async function readModArchive(file) {
     const localNameLength = local.getUint16(26, true);
     const localExtraLength = local.getUint16(28, true);
     const variableEnd = checkedEnd(headerEnd, localNameLength + localExtraLength, centralOffset, 'cabecera local truncada.');
-    const variable = new Uint8Array(await file.slice(headerEnd, variableEnd).arrayBuffer());
+    const variable = await readRange(headerEnd, variableEnd);
     const localName = variable.slice(0, localNameLength);
     if (localFlags !== entry.flags || localMethod !== entry.method || localCrc !== entry.expectedCrc ||
         localCompressed !== entry.size || localSize !== entry.size || !bytesEqual(localName, entry.nameBytes)) {
       fail(`la cabecera local no coincide para ${entry.archivePath}.`);
     }
     const dataEnd = checkedEnd(variableEnd, entry.size, centralOffset, `contenido truncado: ${entry.archivePath}.`);
-    ranges.push({ start: entry.localOffset, end: dataEnd, entry, blob: file.slice(variableEnd, dataEnd, MIME_TYPES[entry.extension] || '') });
+    ranges.push({ start: entry.localOffset, dataStart:variableEnd, end: dataEnd, entry, blob: file.slice(variableEnd, dataEnd, MIME_TYPES[entry.extension] || '') });
+    if ((index + 1) % 32 === 0 || index + 1 === entries.length) {
+      onProgress({phase:'headers',done:index+1,total:entries.length,bytesDone:0,bytesTotal:totalBytes});
+      await paint();
+    }
   }
   ranges.sort((a, b) => a.start - b.start);
   for (let i = 1; i < ranges.length; i++) if (ranges[i].start < ranges[i - 1].end) fail('las entradas ZIP se solapan.');
 
   let pack;
   const files = [];
-  for (const { entry, blob } of ranges) {
-    if (await crc32(blob) !== entry.expectedCrc) fail(`CRC32 incorrecto: ${entry.archivePath}.`);
+  let bytesDone = 0, done = 0, lastPaint = Date.now(), lastProgress = 0;
+  const report = (force = false) => {
+    const now = Date.now();
+    if (force || now - lastProgress >= 32) {
+      lastProgress = now;
+      onProgress({phase:'checksums',done,total:ranges.length,bytesDone,bytesTotal:totalBytes});
+    }
+  };
+  report(true);
+  for (const { entry, blob, dataStart, end } of ranges) {
+    checkAbort(signal);
+    const crc = await crc32(blob.size, (start, stop) => readRange(dataStart + start, dataStart + stop), n => {bytesDone += n; report();}, signal);
+    if (crc !== entry.expectedCrc) fail(`CRC32 incorrecto: ${entry.archivePath}.`);
     if (entry.archivePath === 'pack.json') {
+      const text = new TextDecoder().decode(await readRange(dataStart, end));
       try {
-        pack = JSON.parse(await blob.text());
+        pack = JSON.parse(text);
       } catch {
+        checkAbort(signal);
         fail('pack.json no contiene JSON válido.');
       }
       if (!pack || typeof pack !== 'object' || Array.isArray(pack)) fail('pack.json debe contener un objeto JSON.');
     } else {
       if(entry.extension==='svg'){
-        const source=await blob.text();
+        const source=new TextDecoder().decode(await readRange(dataStart, end));
         if(/<\s*(?:script|foreignObject|iframe|object|embed)\b|\bon\w+\s*=|(?:javascript|vbscript)\s*:|<!ENTITY|<\?xml-stylesheet/i.test(source))fail(`SVG ejecutable: ${entry.archivePath}.`);
       }
-      files.push({ path: entry.path, blob });
+      files.push({ path: entry.path, blob, read: (start, stop, readSignal = signal) => {
+        if (!Number.isSafeInteger(start) || !Number.isSafeInteger(stop) || start < 0 || stop < start || stop > entry.size || stop - start > READ_WINDOW_BYTES) {
+          throw new RangeError('La lectura de un recurso debe usar bloques de hasta 1 MB.');
+        }
+        return readRange(dataStart + start, dataStart + stop, readSignal);
+      }});
     }
+    done++;
+    report(done === ranges.length);
+    if (Date.now() - lastPaint >= 32) { await paint(); lastPaint = Date.now(); }
   }
+  checkAbort(signal);
   files.sort((a, b) => a.path.localeCompare(b.path));
   return { pack, files };
 }
